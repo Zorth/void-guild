@@ -2,28 +2,33 @@
 
 import { Authenticated, Unauthenticated } from 'convex/react'
 import { SignInButton, UserButton } from '@clerk/nextjs'
-import { useQuery } from 'convex/react'
-import { api } from '../convex/_generated/api'
+import Characters from './characters'
 
 export default function Home() {
   return (
-    <>
-    <h1>test</h1>
+    <main className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-4xl font-bold">Guild of The Void</h1>
+        <Authenticated>
+          <UserButton />
+        </Authenticated>
+        <Unauthenticated>
+          <SignInButton />
+        </Unauthenticated>
+      </div>
+
       <Authenticated>
-      <h2>Logged in</h2>
-        <UserButton />
-        <Content />
+        <Characters />
       </Authenticated>
+
       <Unauthenticated>
-          <h2>Logged out</h2>
-        <SignInButton />
+        <div className="text-center">
+          <h2 className="text-2xl font-semibold mb-4">Welcome to the Guild of the Void!</h2>
+          <p className="text-lg text-muted-foreground">
+            Please sign in to manage your characters.
+          </p>
+        </div>
       </Unauthenticated>
-    </>
+    </main>
   )
 }
-
-function Content() {
-  const messages = useQuery(api.messages.getForCurrentUser)
-  return <div>Authenticated content: {messages?.length}</div>
-}
-
