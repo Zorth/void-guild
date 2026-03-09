@@ -9,6 +9,7 @@ import SessionDialog from './session-dialog'
 import Link from 'next/link'
 import { Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import './sessions.css'
 
 export default function Sessions() {
   const [showPastSessions, setShowPastSessions] = useState(false)
@@ -45,15 +46,19 @@ export default function Sessions() {
               
               return (
                 <li key={session._id} className="border-b pb-2 last:border-0 flex justify-between items-start">
-                  <Link 
-                    href={`/sessions/${session._id}`} 
+                  <Link
+                    href={`/sessions/${session._id}`}
                     className={cn(
-                        "flex-grow p-2 rounded-md transition-colors relative border border-transparent",
-                        hasJoined ? "bg-green-100/50 hover:bg-green-100 border-green-200" : "hover:bg-muted/50"
+                        "flex-grow p-2 rounded-md transition-colors relative",
+                        session.isOwner 
+                            ? "session-owner" 
+                            : hasJoined 
+                                ? "session-joined" 
+                                : "session-default"
                     )}
                   >
                     <div className="flex items-center gap-2">
-                      <div className={cn("font-semibold", hasJoined ? "text-green-700" : "text-primary")}>
+                      <div className={cn("font-semibold", "session-world")}>
                           {session.world}
                       </div>
                       {session.locked && <Lock className="h-3 w-3 text-muted-foreground" />}
