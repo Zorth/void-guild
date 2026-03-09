@@ -1,0 +1,64 @@
+'use client'
+
+import { useMutation } from 'convex/react'
+import { api } from '../convex/_generated/api'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { FormEvent, useState } from 'react'
+
+export default function CreateCharacter() {
+  const createCharacter = useMutation(api.characters.createCharacter)
+  const [newCharacterData, setNewCharacterData] = useState({ name: '', ancestry: '', class: '' })
+  const [isOpen, setIsOpen] = useState(false)
+
+  async function handleCreateCharacter(event: FormEvent) {
+    event.preventDefault()
+    if (!newCharacterData.name) return
+    await createCharacter(newCharacterData)
+    setNewCharacterData({ name: '', ancestry: '', class: '' })
+    setIsOpen(false)
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button className="mt-4">New Character</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Create a New Character</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleCreateCharacter} className="flex flex-col gap-4">
+          <Input
+            value={newCharacterData.name}
+            onChange={(e) => setNewCharacterData({ ...newCharacterData, name: e.target.value })}
+            placeholder="Character Name"
+          />
+          <Input
+            value={newCharacterData.ancestry}
+            onChange={(e) => setNewCharacterData({ ...newCharacterData, ancestry: e.target.value })}
+            placeholder="Ancestry"
+          />
+          <Input
+            value={newCharacterData.class}
+            onChange={(e) => setNewCharacterData({ ...newCharacterData, class: e.target.value })}
+            placeholder="Class"
+          />
+          <DialogFooter>
+            <Button type="submit" disabled={!newCharacterData.name}>
+              Create Character
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}

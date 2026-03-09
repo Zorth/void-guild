@@ -8,10 +8,12 @@ export const listCharacters = query({
     if (!user) {
       throw new Error('Not authenticated')
     }
-    return await ctx.db
+    const characters = await ctx.db
       .query('characters')
       .filter((q) => q.eq(q.field('userId'), user.subject))
       .collect()
+    
+    return characters.sort((a, b) => (b.lvl * 1000 + b.xp) - (a.lvl * 1000 + a.xp))
   },
 })
 
