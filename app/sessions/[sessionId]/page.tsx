@@ -278,6 +278,16 @@ export default function SessionDetails() {
                             <div className="text-sm text-muted-foreground">
                               Lvl {char.lvl} {char.class}
                             </div>
+                            {char.websiteLink && (
+                                <a 
+                                    href={char.websiteLink} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    className="text-xs text-blue-500 hover:underline"
+                                >
+                                    {char.websiteLink}
+                                </a>
+                            )}
                           </div>
                           {canRemove && (
                             <Button 

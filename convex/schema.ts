@@ -9,6 +9,7 @@ export default defineSchema({
         xp: v.number(),
         ancestry: v.optional(v.string()),
         class: v.optional(v.string()),
+        websiteLink: v.optional(v.string()),
     }).index('by_userId', ['userId']),
     sessions: defineTable({
         date: v.number(),

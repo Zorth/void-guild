@@ -22,6 +22,7 @@ export const createCharacter = mutation({
     name: v.string(),
     ancestry: v.optional(v.string()),
     class: v.optional(v.string()),
+    websiteLink: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
@@ -32,6 +33,7 @@ export const createCharacter = mutation({
       name: args.name,
       ancestry: args.ancestry,
       class: args.class,
+      websiteLink: args.websiteLink,
       userId: user.subject,
       lvl: 1,
       xp: 0,
@@ -44,6 +46,7 @@ export const updateCharacter = mutation({
     characterId: v.id('characters'),
     ancestry: v.optional(v.string()),
     class: v.optional(v.string()),
+    websiteLink: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
@@ -57,6 +60,7 @@ export const updateCharacter = mutation({
     await ctx.db.patch(args.characterId, {
       ancestry: args.ancestry,
       class: args.class,
+      websiteLink: args.websiteLink,
     })
   },
 })

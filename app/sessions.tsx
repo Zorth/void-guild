@@ -10,10 +10,78 @@ import Link from 'next/link'
 import { Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import './sessions.css'
+import type { Doc } from '../convex/_generated/dataModel'
+
+type SessionWithDetails = Doc<'sessions'> & {
+    isOwner: boolean;
+    characterNames: string[];
+}
+
+function SevenDayOverview({ sessions, userCharacterIds }: { sessions: SessionWithDetails[], userCharacterIds: Set<string> }) {
+    const today = new Date();
+    const nextSevenDays = Array.from({ length: 7 }, (_, i) => {
+        const date = new Date(today);
+        date.setDate(today.getDate() + i);
+        date.setHours(0, 0, 0, 0); // Normalize to start of day
+        return date;
+    });
+
+    const sessionsByDay = sessions.reduce((acc, session) => {
+        const sessionDate = new Date(session.date);
+        sessionDate.setHours(0, 0, 0, 0); // Normalize to start of day
+        const dayString = sessionDate.toDateString();
+        if (!acc[dayString]) {
+            acc[dayString] = [];
+        }
+        acc[dayString].push(session);
+        return acc;
+    }, {} as Record<string, SessionWithDetails[]>);
+
+    return (
+        <div className="seven-day-overview-container">
+            <div className="seven-day-grid">
+                {nextSevenDays.map(day => {
+                    const dayString = day.toDateString();
+                    const daySessions = sessionsByDay[dayString] || [];
+                    
+                    let dayBoxClass = "";
+                    // Prioritize owner, then joined for day box styling
+                    if (daySessions.some(s => s.isOwner)) {
+                        dayBoxClass = "day-box-owner";
+                    } else if (daySessions.some(s => s.characters.some(id => userCharacterIds.has(id)))) {
+                        dayBoxClass = "day-box-joined";
+                    }
+
+                    return (
+                        <div
+                            key={dayString}
+                            className={cn(
+                                "day-box",
+                                dayBoxClass
+                            )}
+                        >
+                            <div className="day-box-header">
+                                {day.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
+                            </div>
+                            <div className="day-box-content">
+                                {daySessions.map(session => (
+                                    <Link href={`/sessions/${session._id}`} key={session._id} className="block text-sm font-medium">
+                                        {session.world}
+                                    </Link>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
 
 export default function Sessions() {
   const [showPastSessions, setShowPastSessions] = useState(false)
-  const sessions = useQuery(api.sessions.listSessions, { past: showPastSessions })
+  const sessions = useQuery(api.sessions.listSessions, { past: showPastSessions }) as SessionWithDetails[]
   const isGM = useQuery(api.sessions.isGameMasterQuery)
   const userCharacters = useQuery(api.characters.listCharacters)
 
@@ -37,47 +105,49 @@ export default function Sessions() {
       <CardContent>
         {sessions === undefined ? (
           <p>Loading sessions...</p>
-        ) : sessions.length === 0 ? (
-          <p>No {showPastSessions ? 'past' : 'upcoming'} sessions found.</p>
         ) : (
-          <ul className="space-y-4">
-            {sessions.map((session) => {
-              const hasJoined = !showPastSessions && session.characters.some(id => userCharacterIds.has(id))
-              
-              return (
-                <li key={session._id} className="border-b pb-2 last:border-0 flex justify-between items-start">
-                  <Link
-                    href={`/sessions/${session._id}`}
-                    className={cn(
-                        "flex-grow p-2 rounded-md transition-colors relative",
-                        session.isOwner 
-                            ? "session-owner" 
-                            : hasJoined 
-                                ? "session-joined" 
-                                : "session-default"
-                    )}
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className={cn("font-semibold", "session-world")}>
-                          {session.world}
+          <>
+            {sessions.length === 0 && <p>No {showPastSessions ? 'past' : 'upcoming'} sessions found.</p>}
+            {!showPastSessions && sessions.length > 0 && <SevenDayOverview sessions={sessions} userCharacterIds={userCharacterIds} />}
+            <ul className="space-y-4 mt-8">
+              {sessions.map((session) => {
+                const hasJoined = !showPastSessions && session.characters.some(id => userCharacterIds.has(id))
+                
+                return (
+                  <li key={session._id} className="border-b pb-2 last:border-0 flex justify-between items-start">
+                    <Link
+                      href={`/sessions/${session._id}`}
+                      className={cn(
+                          "flex-grow p-2 rounded-md transition-colors relative",
+                          session.isOwner 
+                              ? "session-owner" 
+                              : hasJoined 
+                                  ? "session-joined" 
+                                  : "session-default"
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className={cn("font-semibold", "session-world")}>
+                            {session.world}
+                        </div>
+                        {session.locked && <Lock className="h-3 w-3 text-muted-foreground" />}
                       </div>
-                      {session.locked && <Lock className="h-3 w-3 text-muted-foreground" />}
-                    </div>
-                    <div className="text-sm font-medium">
-                      {new Date(session.date).toLocaleDateString()} at{' '}
-                      {new Date(session.date).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {session.characters.length} / {session.maxPlayers} players
-                    </div>
-                  </Link>
-                </li>
-              )
-            })}
-          </ul>
+                      <div className="text-sm font-medium">
+                        {new Date(session.date).toLocaleDateString()} at{' '}
+                        {new Date(session.date).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {session.characters.length} / {session.maxPlayers} players
+                      </div>
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
+          </>
         )}
       </CardContent>
     </Card>

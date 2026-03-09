@@ -36,7 +36,7 @@ export default function Characters() {
 
   const [selectedCharacter, setSelectedCharacter] = useState<Doc<'characters'> | null>(null)
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false)
-  const [editedCharacterData, setEditedCharacterData] = useState({ ancestry: '', class: '' })
+  const [editedCharacterData, setEditedCharacterData] = useState({ ancestry: '', class: '', websiteLink: '' })
 
   async function handleUpdateCharacter(event: FormEvent) {
     event.preventDefault()
@@ -59,6 +59,7 @@ export default function Characters() {
     setEditedCharacterData({
       ancestry: character.ancestry ?? '',
       class: character.class ?? '',
+      websiteLink: character.websiteLink ?? '',
     })
     setIsDetailsDialogOpen(true)
   }
@@ -90,6 +91,17 @@ export default function Characters() {
                       <span className="text-[10px] text-muted-foreground">
                           {character.ancestry} {character.class}
                       </span>
+                      {character.websiteLink && (
+                        <a 
+                            href={character.websiteLink} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-[10px] text-blue-500 hover:underline"
+                            onClick={(e) => e.stopPropagation()} // Prevent dialog from opening when clicking the link
+                        >
+                            {character.websiteLink}
+                        </a>
+                      )}
                     </div>
                     <span className="text-sm font-semibold">
                       Lvl {character.lvl}
@@ -124,6 +136,11 @@ export default function Characters() {
                 value={editedCharacterData.class}
                 onChange={(e) => setEditedCharacterData({ ...editedCharacterData, class: e.target.value })}
                 placeholder="Class"
+              />
+              <Input
+                value={editedCharacterData.websiteLink}
+                onChange={(e) => setEditedCharacterData({ ...editedCharacterData, websiteLink: e.target.value })}
+                placeholder="Website Link"
               />
               <DialogFooter className="mt-4">
                 <AlertDialog>

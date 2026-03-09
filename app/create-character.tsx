@@ -16,14 +16,14 @@ import { FormEvent, useState } from 'react'
 
 export default function CreateCharacter() {
   const createCharacter = useMutation(api.characters.createCharacter)
-  const [newCharacterData, setNewCharacterData] = useState({ name: '', ancestry: '', class: '' })
+  const [newCharacterData, setNewCharacterData] = useState({ name: '', ancestry: '', class: '', websiteLink: '' })
   const [isOpen, setIsOpen] = useState(false)
 
   async function handleCreateCharacter(event: FormEvent) {
     event.preventDefault()
     if (!newCharacterData.name) return
     await createCharacter(newCharacterData)
-    setNewCharacterData({ name: '', ancestry: '', class: '' })
+    setNewCharacterData({ name: '', ancestry: '', class: '', websiteLink: '' })
     setIsOpen(false)
   }
 
@@ -51,6 +51,11 @@ export default function CreateCharacter() {
             value={newCharacterData.class}
             onChange={(e) => setNewCharacterData({ ...newCharacterData, class: e.target.value })}
             placeholder="Class"
+          />
+          <Input
+            value={newCharacterData.websiteLink}
+            onChange={(e) => setNewCharacterData({ ...newCharacterData, websiteLink: e.target.value })}
+            placeholder="Website Link (Optional)"
           />
           <DialogFooter>
             <Button type="submit" disabled={!newCharacterData.name}>
