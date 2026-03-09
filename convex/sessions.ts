@@ -1,6 +1,6 @@
 import { query, mutation, QueryCtx } from './_generated/server'
 import { v } from 'convex/values'
-import { Doc, Id } from './_generated/dataModel'
+import { Doc } from './_generated/dataModel'
 
 /**
  * Checks if the authenticated user has Game Master permissions.
@@ -21,7 +21,9 @@ async function isGameMaster(ctx: QueryCtx) {
 /**
  * Calculates XP gain based on session level and character level.
  */
-export function calculateXPGain(sessionLevel: number, characterLevel: number): number {
+export function calculateXPGain(sessionLevel: number, characterLevel: number, isGM: boolean): number {
+  if (isGM) return 250
+
   const L = sessionLevel - characterLevel
   let xpGain = 0
   if (L % 2 === 0) {
@@ -133,7 +135,7 @@ export const previewXPGains = query({
         const characters = await Promise.all(characterIds.map(id => ctx.db.get(id)))
         
         return characters.filter((c): c is Doc<'characters'> => c !== null).map(char => {
-            const xpGain = calculateXPGain(session.level, char.lvl)
+            const xpGain = calculateXPGain(session.level, char.lvl, char._id === session.gmCharacter)
             const { lvl: newLvl, xp: newXp } = calculateNewStats(char.lvl, char.xp, xpGain)
             return {
                 id: char._id,
@@ -320,7 +322,7 @@ export const lockSession = mutation({
       for (const characterId of characterIds) {
         const character = await ctx.db.get(characterId)
         if (character) {
-          const xpGain = calculateXPGain(session.level, character.lvl)
+          const xpGain = calculateXPGain(session.level, character.lvl, character._id === session.gmCharacter)
           const { lvl: newLvl, xp: newXp } = calculateNewStats(character.lvl, character.xp, xpGain)
           
           xpGains.push({
