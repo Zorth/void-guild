@@ -5,6 +5,7 @@ import { api } from '../convex/_generated/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Book } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -103,19 +104,25 @@ export default function Characters() {
                         </a>
                       )}
                     </div>
-                    <div className="flex items-center gap-2">
-                        {/* Wiki Button */}
+                    <div className="flex items-center gap-2"> {/* Changed to flex-row for icon and level/XP block */}
+                        {/* Book Icon */}
                         <a 
                             href={`https://void.tarragon.be/Player-Characters/${character.name.replace(/\s+/g, '-')}`} 
                             target="_blank" 
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()} // Prevent dialog from opening
+                            className="text-muted-foreground hover:text-blue-500" // Added styling for the icon
                         >
-                            <Button variant="outline" size="sm" className="h-6 text-xs px-2">Wiki</Button>
+                            <Book size={16} /> {/* Replaced Button with Book icon */}
                         </a>
-                        <span className="text-sm font-semibold">
-                            Lvl {character.lvl}
-                        </span>
+                        <div className="flex flex-col items-end"> {/* Vertical alignment for Level and XP */}
+                            <span className="text-sm font-semibold">
+                                Lvl {character.lvl}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                                {character.xp} XP
+                            </span>
+                        </div>
                     </div>
                   </li>
                 ))}
