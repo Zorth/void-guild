@@ -6,7 +6,7 @@ export const listCharacters = query({
   handler: async (ctx) => {
     const user = await ctx.auth.getUserIdentity()
     if (!user) {
-      throw new Error('Not authenticated')
+      return null
     }
     const characters = await ctx.db
       .query('characters')
