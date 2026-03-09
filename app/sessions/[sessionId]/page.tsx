@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { useState } from 'react'
 import { Id, Doc } from '@/convex/_generated/dataModel'
 import Link from 'next/link'
-import { ChevronLeft, Lock as LockIcon, Trash2, Pencil, Unlock, Shield, CheckCircle2, MapPin, Clock } from 'lucide-react'
+import { Book, ChevronLeft, Lock as LockIcon, Trash2, Pencil, Unlock, Shield, CheckCircle2, MapPin, Clock } from 'lucide-react'
 import SessionDialog from '@/app/session-dialog'
 import {
     AlertDialog,
@@ -220,13 +220,14 @@ export default function SessionDetails() {
                     <CardTitle className="text-3xl font-bold flex items-center gap-3">
                         {session.world}
                         {session.locked && <LockIcon className="h-5 w-5 text-amber-500" />}
-                        {/* Wiki Button */}
+                        {/* Book Icon */}
                         <a 
                             href={`https://void.tarragon.be/Session-Reports/${sessionTime.toISOString().slice(0, 10)}-${session.world.replace(/\s+/g, '-')}`} 
                             target="_blank" 
                             rel="noopener noreferrer"
+                            className="text-muted-foreground hover:text-blue-500" // Added styling for the icon
                         >
-                            <Button variant="outline" size="sm" className="h-6 text-xs px-2">Wiki</Button>
+                            <Book size={20} /> {/* Replaced Button with Book icon, slightly larger to fit title */}
                         </a>
                     </CardTitle>
                     <div className="text-lg text-muted-foreground mt-1">
