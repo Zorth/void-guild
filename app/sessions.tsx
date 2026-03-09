@@ -4,7 +4,7 @@ import { useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import SessionDialog from './session-dialog'
 import Link from 'next/link'
 import { Book, Lock } from 'lucide-react'
@@ -17,9 +17,61 @@ type SessionWithDetails = Doc<'sessions'> & {
     characterNames: string[];
 }
 
+function useWindowSize() {
+  const [windowSize, setWindowSize] = useState({
+    width: typeof window !== 'undefined' ? window.innerWidth : 0,
+    height: typeof window !== 'undefined' ? window.innerHeight : 0,
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const handleResize = () => {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []); 
+
+  return windowSize;
+}
+
 function SevenDayOverview({ sessions, userCharacterIds }: { sessions: SessionWithDetails[], userCharacterIds: Set<string> }) {
+    const { width } = useWindowSize();
+    let numberOfDaysToShow = 7;
+    let gridColsClass = "grid-cols-7";
+
+    // Adjust breakpoints based on window width and parent's md:grid-cols-2 layout
+    if (width < 768) { // Parent is grid-cols-1
+      if (width <= 480) {
+        numberOfDaysToShow = 3;
+        gridColsClass = "grid-cols-3";
+      } else { // width > 480 and < 768
+        numberOfDaysToShow = 5;
+        gridColsClass = "grid-cols-5";
+      }
+    } else { // Parent is md:grid-cols-2, so SevenDayOverview gets ~half width
+      // We're in a two-column layout, so effective width is roughly width / 2
+      if (width / 2 <= 480) { // Effective width for 3 columns
+        numberOfDaysToShow = 3;
+        gridColsClass = "grid-cols-3";
+      } else if (width / 2 <= 768) { // Effective width for 5 columns
+        numberOfDaysToShow = 5;
+        gridColsClass = "grid-cols-5";
+      } else { // Effective width for 7 columns (large desktop)
+        numberOfDaysToShow = 7;
+        gridColsClass = "grid-cols-7";
+      }
+    }
+
     const today = new Date();
-    const nextSevenDays = Array.from({ length: 7 }, (_, i) => {
+    const nextDays = Array.from({ length: numberOfDaysToShow }, (_, i) => {
         const date = new Date(today);
         date.setDate(today.getDate() + i);
         date.setHours(0, 0, 0, 0); // Normalize to start of day
@@ -39,8 +91,8 @@ function SevenDayOverview({ sessions, userCharacterIds }: { sessions: SessionWit
 
     return (
         <div className="seven-day-overview-container">
-            <div className="seven-day-grid">
-                {nextSevenDays.map(day => {
+            <div className={cn("grid gap-4", gridColsClass)}>
+                {nextDays.map(day => {
                     const dayString = day.toDateString();
                     const daySessions = sessionsByDay[dayString] || [];
                     
@@ -56,7 +108,7 @@ function SevenDayOverview({ sessions, userCharacterIds }: { sessions: SessionWit
                         <div
                             key={dayString}
                             className={cn(
-                                "day-box",
+                                "day-box border border-gray-300 overflow-hidden",
                                 dayBoxClass
                             )}
                         >
@@ -65,7 +117,7 @@ function SevenDayOverview({ sessions, userCharacterIds }: { sessions: SessionWit
                             </div>
                             <div className="day-box-content">
                                 {daySessions.map(session => (
-                                    <Link href={`/sessions/${session._id}`} key={session._id} className="block text-sm font-medium">
+                                    <Link href={`/sessions/${session._id}`} key={session._id} className="block text-sm font-medium truncate">
                                         {session.world}
                                     </Link>
                                 ))}
