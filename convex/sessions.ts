@@ -56,7 +56,7 @@ export const listSessions = query({
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
     if (!user) {
-      throw new Error('Not authenticated')
+      return null
     }
 
     const now = Date.now()
@@ -87,7 +87,7 @@ export const getSession = query({
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
     if (!user) {
-      throw new Error('Not authenticated')
+      return null
     }
 
     const session = await ctx.db.get(args.sessionId)
@@ -122,7 +122,7 @@ export const previewXPGains = query({
     args: { sessionId: v.id('sessions') },
     handler: async (ctx, args) => {
         const user = await ctx.auth.getUserIdentity()
-        if (!user) throw new Error('Not authenticated')
+        if (!user) return null
         
         const session = await ctx.db.get(args.sessionId)
         if (!session) throw new Error('Session not found')

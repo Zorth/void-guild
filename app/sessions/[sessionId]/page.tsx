@@ -220,6 +220,14 @@ export default function SessionDetails() {
                     <CardTitle className="text-3xl font-bold flex items-center gap-3">
                         {session.world}
                         {session.locked && <LockIcon className="h-5 w-5 text-amber-500" />}
+                        {/* Wiki Button */}
+                        <a 
+                            href={`https://void.tarragon.be/Session-Reports/${sessionTime.toISOString().slice(0, 10)}-${session.world.replace(/\s+/g, '-')}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                        >
+                            <Button variant="outline" size="sm" className="h-6 text-xs px-2">Wiki</Button>
+                        </a>
                     </CardTitle>
                     <div className="text-lg text-muted-foreground mt-1">
                         {sessionTime.toLocaleDateString()} at {formatTime(sessionTime)}
