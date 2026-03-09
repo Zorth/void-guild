@@ -118,7 +118,7 @@ export default function Sessions() {
                     <Link
                       href={`/sessions/${session._id}`}
                       className={cn(
-                          "flex-grow p-2 rounded-md transition-colors relative",
+                          "flex-grow p-2 rounded-md transition-colors relative flex justify-between items-start",
                           session.isOwner 
                               ? "session-owner" 
                               : hasJoined 
@@ -126,22 +126,38 @@ export default function Sessions() {
                                   : "session-default"
                       )}
                     >
-                      <div className="flex items-center gap-2">
-                        <div className={cn("font-semibold", "session-world")}>
-                            {session.world}
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2">
+                          <div className={cn("font-semibold", "session-world")}>
+                              {session.world}
+                          </div>
+                          {session.locked && <Lock className="h-3 w-3 text-muted-foreground" />}
                         </div>
-                        {session.locked && <Lock className="h-3 w-3 text-muted-foreground" />}
+                        <div className="text-sm font-medium">
+                          {new Date(session.date).toLocaleDateString()} at{' '}
+                          {new Date(session.date).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {session.characters.length} / {session.maxPlayers} players
+                        </div>
                       </div>
-                      <div className="text-sm font-medium">
-                        {new Date(session.date).toLocaleDateString()} at{' '}
-                        {new Date(session.date).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {session.characters.length} / {session.maxPlayers} players
-                      </div>
+                      {showPastSessions && (
+                          <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="h-6 text-xs px-2 mt-1"
+                              onClick={(e) => {
+                                e.stopPropagation(); // Prevent clicking the parent Link
+                                e.preventDefault(); // Prevent any default action of the button or parent that might cause navigation
+                                window.open(`https://void.tarragon.be/Session-Reports/${new Date(session.date).toISOString().slice(0, 10)}-${session.world.replace(/\s+/g, '-')}`, '_blank');
+                              }}
+                          >
+                              Wiki
+                          </Button>
+                      )}
                     </Link>
                   </li>
                 )

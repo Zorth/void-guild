@@ -103,9 +103,20 @@ export default function Characters() {
                         </a>
                       )}
                     </div>
-                    <span className="text-sm font-semibold">
-                      Lvl {character.lvl}
-                    </span>
+                    <div className="flex items-center gap-2">
+                        {/* Wiki Button */}
+                        <a 
+                            href={`https://void.tarragon.be/Player-Characters/${character.name.replace(/\s+/g, '-')}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()} // Prevent dialog from opening
+                        >
+                            <Button variant="outline" size="sm" className="h-6 text-xs px-2">Wiki</Button>
+                        </a>
+                        <span className="text-sm font-semibold">
+                            Lvl {character.lvl}
+                        </span>
+                    </div>
                   </li>
                 ))}
               </ul>
