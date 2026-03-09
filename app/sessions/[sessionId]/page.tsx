@@ -42,7 +42,7 @@ export default function SessionDetails() {
 
   const [selectedCharacterId, setSelectedCharacterId] = useState<Id<'characters'> | ''>('')
 
-  if (session === undefined || userCharacters === undefined) {
+  if (session === undefined || session === null || userCharacters === undefined || userCharacters === null) {
     return <div className="container mx-auto px-4 py-8 text-center">Loading session details...</div>
   }
 
