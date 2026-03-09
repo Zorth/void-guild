@@ -63,7 +63,7 @@ export default function SessionDialog({ session, trigger }: SessionDialogProps) 
         setTime(`${hours}:${minutes}`)
         
         setWorld(session.world)
-        setLevel(session.level.toString())
+        setLevel(session.level?.toString() || '')
         setMaxPlayers(session.maxPlayers.toString())
         setGmCharacter(session.gmCharacter || '')
         setLocation(session.location || '')
@@ -86,9 +86,12 @@ export default function SessionDialog({ session, trigger }: SessionDialogProps) 
     const sessionDateTime = new Date(`${date}T${time}`).getTime()
     if (isNaN(sessionDateTime)) return
 
-    const levelNum = parseInt(level)
+    let levelValue: number | undefined = parseInt(level)
+    if (isNaN(levelValue) || levelValue === 0) {
+      levelValue = undefined
+    }
     const maxPlayersNum = parseInt(maxPlayers)
-    if (isNaN(levelNum) || isNaN(maxPlayersNum)) return
+    if (isNaN(maxPlayersNum)) return
 
     const gmCharId = gmCharacter === '' ? undefined : gmCharacter as Id<'characters'>
     const locationVal = location === '' ? undefined : location
@@ -98,7 +101,7 @@ export default function SessionDialog({ session, trigger }: SessionDialogProps) 
         sessionId: session._id,
         date: sessionDateTime,
         world,
-        level: levelNum,
+        level: levelValue,
         maxPlayers: maxPlayersNum,
         characters: session.characters,
         gmCharacter: gmCharId,
@@ -108,7 +111,7 @@ export default function SessionDialog({ session, trigger }: SessionDialogProps) 
       await createSession({
         date: sessionDateTime,
         world,
-        level: levelNum,
+        level: levelValue,
         maxPlayers: maxPlayersNum,
         characters: [],
         gmCharacter: gmCharId,
@@ -149,11 +152,9 @@ export default function SessionDialog({ session, trigger }: SessionDialogProps) 
                 <label className="text-sm font-medium">Level</label>
                 <Input
                 type="number"
-                min="1"
                 max="20"
                 value={level}
                 onChange={(e) => setLevel(e.target.value)}
-                required
                 />
             </div>
             <div className="flex-1 flex flex-col gap-2">
@@ -219,7 +220,7 @@ export default function SessionDialog({ session, trigger }: SessionDialogProps) 
               <Button type="button" variant="ghost" onClick={() => setIsOpen(false)} className="flex-1">
                 Cancel
               </Button>
-              <Button type="submit" disabled={!date || !time || !world || !level || !maxPlayers}>
+              <Button type="submit" disabled={!date || !time || !world || !maxPlayers}>
                 {session ? 'Update' : 'Create'}
               </Button>
             </div>

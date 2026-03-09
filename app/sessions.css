@@ -23,20 +23,13 @@
   background-color: hsl(var(--muted) / 0.5);
 }
 
-.seven-day-overview-container {
-    margin-top: 2rem;
-}
 
-.seven-day-grid {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 1rem;
-}
+
+
 
 .day-box {
     border-radius: 0.5rem;
     min-height: 8rem;
-    border: 1px solid hsl(var(--border)); /* Default border */
 }
 
 .day-box.day-box-owner {
