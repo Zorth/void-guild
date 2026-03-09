@@ -126,16 +126,19 @@ export const previewXPGains = query({
         
         const session = await ctx.db.get(args.sessionId)
         if (!session) throw new Error('Session not found')
-        
-        const characterIds = [...session.characters]
-        if (session.gmCharacter && !characterIds.includes(session.gmCharacter)) {
+
+        if (session.level === undefined) {
+            return []
+        }
+
+        const characterIds = [...session.characters];        if (session.gmCharacter && !characterIds.includes(session.gmCharacter)) {
             characterIds.push(session.gmCharacter)
         }
         
         const characters = await Promise.all(characterIds.map(id => ctx.db.get(id)))
         
         return characters.filter((c): c is Doc<'characters'> => c !== null).map(char => {
-            const xpGain = calculateXPGain(session.level, char.lvl, char._id === session.gmCharacter)
+            const xpGain = calculateXPGain(session.level!, char.lvl, char._id === session.gmCharacter)
             const { lvl: newLvl, xp: newXp } = calculateNewStats(char.lvl, char.xp, xpGain)
             return {
                 id: char._id,
@@ -155,7 +158,7 @@ export const createSession = mutation({
   args: {
     date: v.number(),
     world: v.string(),
-    level: v.number(),
+    level: v.optional(v.number()),
     maxPlayers: v.number(),
     characters: v.array(v.id('characters')),
     gmCharacter: v.optional(v.id('characters')),
@@ -187,7 +190,7 @@ export const updateSession = mutation({
     sessionId: v.id('sessions'),
     date: v.number(),
     world: v.string(),
-    level: v.number(),
+    level: v.optional(v.number()),
     maxPlayers: v.number(),
     characters: v.array(v.id('characters')),
     gmCharacter: v.optional(v.id('characters')),
@@ -310,6 +313,10 @@ export const lockSession = mutation({
         throw new Error('Only the session owner can lock it.')
       }
   
+      if (session.level === undefined) {
+          throw new Error('Session cannot be locked without a level.')
+      }
+
       if (session.locked) return
   
       const characterIds = [...session.characters]

@@ -156,7 +156,7 @@ export default function SessionDetails() {
                                 <AlertDialogHeader>
                                     <AlertDialogTitle>Confirm End of Session</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                        The following characters will be awarded XP and potentially level up based on the session level ({session.level}).
+                                        The following characters will be awarded XP and potentially level up based on the session level ({session.level ?? 'Level TBD'}).
                                     </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <div className="py-4 space-y-4 max-h-[400px] overflow-auto">
@@ -190,7 +190,7 @@ export default function SessionDetails() {
                                 </div>
                                 <AlertDialogFooter>
                                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={handleLock}>Confirm & Award XP</AlertDialogAction>
+                                    <AlertDialogAction onClick={handleLock} disabled={session.level === undefined}>Confirm & Award XP</AlertDialogAction>
                                 </AlertDialogFooter>
                             </AlertDialogContent>
                         </AlertDialog>
@@ -252,7 +252,7 @@ export default function SessionDetails() {
 
                   <div className="mt-2 flex gap-2 flex-wrap">
                     <span className="text-sm font-medium px-2 py-0.5 bg-secondary rounded-md">
-                        Session Level {session.level}
+                        Session Level {session.level ?? 'TBD'}
                     </span>
                     {session.isOwner && session.gmCharacterData && (
                         <span className="text-sm font-medium px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded-md flex items-center gap-1">

@@ -14,7 +14,7 @@ export default defineSchema({
     sessions: defineTable({
         date: v.number(),
         world: v.string(),
-        level: v.number(),
+        level: v.optional(v.number()),
         maxPlayers: v.number(),
         locked: v.boolean(),
         characters: v.array(v.id("characters")),
