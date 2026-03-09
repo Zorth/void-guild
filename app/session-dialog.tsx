@@ -20,7 +20,7 @@ interface SessionDialogProps {
     _id: Id<'sessions'>
     date: number
     world: string
-    level: number
+    level?: number
     maxPlayers: number
     locked: boolean
     characters: Id<'characters'>[]

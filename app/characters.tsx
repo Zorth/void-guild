@@ -75,7 +75,7 @@ export default function Characters() {
           <CardContent>
             {characters === undefined ? (
               <p>Loading...</p>
-            ) : characters.length === 0 ? (
+            ) : !characters || characters.length === 0 ? (
               <p>You have no characters yet.</p>
             ) : (
               <ul className="space-y-2">

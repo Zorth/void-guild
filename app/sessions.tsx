@@ -180,7 +180,10 @@ export default function Sessions() {
                     >
                       <div className="flex flex-col">
                         <div className="flex items-center gap-2">
-                          <div className={cn("font-semibold", "session-world")}>
+                          <div className={cn("font-semibold", "session-world", "flex items-center")}>
+                              <span className="inline-flex align-middle justify-center w-20 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800 mr-2">
+                                  Lvl {session.level ?? 'TBD'}
+                              </span>
                               {session.world}
                           </div>
                           {session.locked && <Lock className="h-3 w-3 text-muted-foreground" />}
