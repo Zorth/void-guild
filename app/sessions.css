@@ -22,3 +22,37 @@
 .session-default:hover {
   background-color: hsl(var(--muted) / 0.5);
 }
+
+.seven-day-overview-container {
+    margin-top: 2rem;
+}
+
+.seven-day-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1rem;
+}
+
+.day-box {
+    border-radius: 0.5rem;
+    min-height: 8rem;
+    border: 1px solid hsl(var(--border)); /* Default border */
+}
+
+.day-box.day-box-owner {
+    border: 2px solid #FBBF24; /* yellow-400 */
+}
+
+.day-box.day-box-joined {
+    border: 2px solid #6EE7B7; /* border-green-200 */
+}
+
+.day-box-header {
+    padding: 0.5rem;
+    font-weight: 600;
+    border-bottom: 1px solid hsl(var(--border));
+}
+
+.day-box-content {
+    padding: 0.5rem;
+}
