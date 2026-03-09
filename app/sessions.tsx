@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useState } from 'react'
 import SessionDialog from './session-dialog'
 import Link from 'next/link'
-import { Lock } from 'lucide-react'
+import { Book, Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import './sessions.css'
 import type { Doc } from '../convex/_generated/dataModel'
@@ -155,7 +155,7 @@ export default function Sessions() {
                                 window.open(`https://void.tarragon.be/Session-Reports/${new Date(session.date).toISOString().slice(0, 10)}-${session.world.replace(/\s+/g, '-')}`, '_blank');
                               }}
                           >
-                              Wiki
+                              <Book size={32} />
                           </Button>
                       )}
                     </Link>
