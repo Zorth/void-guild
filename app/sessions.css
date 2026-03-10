@@ -53,6 +53,7 @@
     padding: 0.5rem;
     font-weight: 600;
     border-bottom: 1px solid hsl(var(--border));
+    background-color: var(--muted); /* 1 tone lighter than --muted */
 }
 
 .day-box-content {
