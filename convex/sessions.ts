@@ -102,7 +102,7 @@ export const listSessions = query({
           ...session,
           worldName: worldDoc ? (worldDoc as Doc<'worlds'>).name : 'Unknown World', // Assert type before accessing name
           characterNames: characterDocs.filter((c): c is Doc<'characters'> => c !== null).map((c) => c.name),
-          isOwner: user.subject === session.owner || isAdminUser,
+          isOwner: user.subject === session.owner,
         }
       })
     )
