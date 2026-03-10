@@ -76,7 +76,7 @@ export default function AdminCharacterList() {
         </DialogHeader>
         
         <div className="overflow-auto flex-grow py-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-4">
             {allCharacters === undefined ? (
               <p>Loading all characters...</p>
             ) : allCharacters.map((char) => (
