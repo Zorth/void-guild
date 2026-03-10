@@ -9,12 +9,31 @@ async function isGameMaster(ctx: QueryCtx) {
   const identity = await ctx.auth.getUserIdentity()
   if (!identity) return false
   
+  const isAdminUser = await isAdmin(ctx)
+  if (isAdminUser) return true
+
   // We prioritize the 'gamemaster' claim from the JWT token (configured in Clerk JWT templates).
   return (
     identity.gamemaster === true ||
     identity.gamemaster === 'true' ||
     (identity.publicMetadata as { gamemaster?: boolean | string } | undefined)?.gamemaster === true ||
     (identity.publicMetadata as { gamemaster?: boolean | string } | undefined)?.gamemaster === 'true'
+  )
+}
+
+/**
+ * Checks if the authenticated user has Admin permissions.
+ */
+async function isAdmin(ctx: QueryCtx) {
+  const identity = await ctx.auth.getUserIdentity()
+  if (!identity) return false
+  
+  // We prioritize the 'admin' claim from the JWT token (configured in Clerk JWT templates).
+  return (
+    identity.admin === true ||
+    identity.admin === 'true' ||
+    (identity.publicMetadata as { admin?: boolean | string } | undefined)?.admin === true ||
+    (identity.publicMetadata as { admin?: boolean | string } | undefined)?.admin === 'true'
   )
 }
 
@@ -51,6 +70,13 @@ export const isGameMasterQuery = query({
   },
 })
 
+export const isAdminQuery = query({
+    args: {},
+    handler: async (ctx) => {
+      return await isAdmin(ctx)
+    },
+})
+
 export const listSessions = query({
   args: { past: v.boolean() },
   handler: async (ctx, args) => {
@@ -59,6 +85,7 @@ export const listSessions = query({
       return null
     }
 
+    const isAdminUser = await isAdmin(ctx)
     const now = Date.now()
     const sessions = await ctx.db
       .query('sessions')
@@ -75,7 +102,7 @@ export const listSessions = query({
           ...session,
           worldName: worldDoc ? (worldDoc as Doc<'worlds'>).name : 'Unknown World', // Assert type before accessing name
           characterNames: characterDocs.filter((c): c is Doc<'characters'> => c !== null).map((c) => c.name),
-          isOwner: user.subject === session.owner,
+          isOwner: user.subject === session.owner || isAdminUser,
         }
       })
     )
@@ -92,6 +119,7 @@ export const getSession = query({
       return null
     }
 
+    const isAdminUser = await isAdmin(ctx)
     const session = await ctx.db.get(args.sessionId)
     if (!session) return null
 
@@ -99,7 +127,7 @@ export const getSession = query({
       session.characters.map((id) => ctx.db.get(id))
     )
 
-    const isOwner = user.subject === session.owner
+    const isOwner = user.subject === session.owner || isAdminUser
     let gmCharacterData = null
 
     if (isOwner && session.gmCharacter) {
@@ -219,9 +247,10 @@ export const updateSession = mutation({
     const user = await ctx.auth.getUserIdentity()
     if (!user) throw new Error('Not authenticated')
 
+    const isAdminUser = await isAdmin(ctx)
     const session = await ctx.db.get(args.sessionId)
-    if (!session || session.owner !== user.subject) {
-      throw new Error('Only the session owner can edit this session')
+    if (!session || (session.owner !== user.subject && !isAdminUser)) {
+      throw new Error('Only the session owner or an admin can edit this session')
     }
 
     if (session.locked) {
@@ -246,9 +275,10 @@ export const deleteSession = mutation({
     const user = await ctx.auth.getUserIdentity()
     if (!user) throw new Error('Not authenticated')
 
+    const isAdminUser = await isAdmin(ctx)
     const session = await ctx.db.get(args.sessionId)
-    if (!session || session.owner !== user.subject) {
-      throw new Error('Only the session owner can delete this session')
+    if (!session || (session.owner !== user.subject && !isAdminUser)) {
+      throw new Error('Only the session owner or an admin can delete this session')
     }
 
     await ctx.db.delete(args.sessionId)
@@ -300,6 +330,7 @@ export const leaveSession = mutation({
     const user = await ctx.auth.getUserIdentity()
     if (!user) throw new Error('Not authenticated')
 
+    const isAdminUser = await isAdmin(ctx)
     const session = await ctx.db.get(args.sessionId)
     if (!session) throw new Error('Session not found')
 
@@ -310,8 +341,8 @@ export const leaveSession = mutation({
     const character = await ctx.db.get(args.characterId)
     if (!character) throw new Error('Character not found')
 
-    // Allow the player who owns the character OR the session owner to remove it
-    if (character.userId !== user.subject && session.owner !== user.subject) {
+    // Allow the player who owns the character OR the session owner OR an admin to remove it
+    if (character.userId !== user.subject && session.owner !== user.subject && !isAdminUser) {
         throw new Error('You do not have permission to remove this character.')
     }
 
@@ -327,9 +358,10 @@ export const lockSession = mutation({
       const user = await ctx.auth.getUserIdentity()
       if (!user) throw new Error('Not authenticated')
   
+      const isAdminUser = await isAdmin(ctx)
       const session = await ctx.db.get(args.sessionId)
-      if (!session || session.owner !== user.subject) {
-        throw new Error('Only the session owner can lock it.')
+      if (!session || (session.owner !== user.subject && !isAdminUser)) {
+        throw new Error('Only the session owner or an admin can lock it.')
       }
   
       if (session.level === undefined) {
@@ -375,9 +407,10 @@ export const unlockSession = mutation({
       const user = await ctx.auth.getUserIdentity()
       if (!user) throw new Error('Not authenticated')
   
+      const isAdminUser = await isAdmin(ctx)
       const session = await ctx.db.get(args.sessionId)
-      if (!session || session.owner !== user.subject) {
-        throw new Error('Only the session owner can unlock it.')
+      if (!session || (session.owner !== user.subject && !isAdminUser)) {
+        throw new Error('Only the session owner or an admin can unlock it.')
       }
   
       if (!session.locked || !session.xpGains) return
