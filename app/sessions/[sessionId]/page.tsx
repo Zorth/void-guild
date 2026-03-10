@@ -451,6 +451,10 @@ export default function SessionDetails() {
           </Card>
         </div>
       </div>
+      <div className="text-center mt-8 text-sm text-muted-foreground">
+        Thank you for playing with us!<br/>
+        We encourage tipping your <b className="text-primary">Voidmaster</b> for their hard work.
+      </div>
     </div>
   )
 }
