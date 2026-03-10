@@ -99,6 +99,75 @@ export default function SessionDetails() {
     }
   }
 
+  const handleSendToDiscord = async () => {
+    const webhookUrl = process.env.NEXT_PUBLIC_DISCORD_WEBHOOK_URL
+    if (!webhookUrl) {
+      alert('Discord Webhook URL is not configured.')
+      return
+    }
+
+    const sessionTime = new Date(session.date)
+    const formattedDate = sessionTime.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+    const formattedTime = sessionTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+
+    const embed = {
+      title: `New Session Alert: ${session.world}`,
+      description: `A new session for "${session.world}" has been announced!`,
+      color: 5814783, // A nice purple color
+      fields: [
+        {
+          name: 'Date & Time',
+          value: `${formattedDate} at ${formattedTime}`,
+          inline: false,
+        },
+        {
+          name: 'Level',
+          value: session.level ? `Level ${session.level}` : 'TBD',
+          inline: true,
+        },
+        {
+          name: 'Players',
+          value: `${session.characters.length}/${session.maxPlayers}`,
+          inline: true,
+        },
+      ],
+      timestamp: new Date().toISOString(),
+      url: `${window.location.origin}/sessions/${session._id}`,
+    }
+
+    // Add location to embed if available
+    if (session.location) {
+        embed.fields.push({
+            name: 'Location',
+            value: `[View on Google Maps](${session.location})`,
+            inline: false,
+        })
+    }
+
+    // Add attending characters to embed if available
+    if (session.attendingCharacters && session.attendingCharacters.length > 0) {
+        embed.fields.push({
+            name: 'Attending Characters',
+            value: session.attendingCharacters.map(char => char.name).join(', '),
+            inline: false,
+        })
+    }
+
+    try {
+      await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ embeds: [embed] }),
+      })
+      alert('Session details sent to Discord!')
+    } catch (error) {
+      console.error('Failed to send to Discord:', error)
+      alert('Failed to send session details to Discord.')
+    }
+  }
+
   // Filter out characters already in the session
   const availableCharacters = userCharacters.filter(
     (char) => !session.characters.includes(char._id)
@@ -146,14 +215,18 @@ export default function SessionDetails() {
                         </AlertDialogContent>
                         </AlertDialog>
                     ) : (
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button variant="default" size="sm">
-                                    <CheckCircle2 className="mr-2 h-4 w-4" /> End Session
-                                </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent className="max-w-2xl">
-                                <AlertDialogHeader>
+                        <>
+                            <Button variant="outline" size="sm" onClick={handleSendToDiscord}>
+                                <img src="/discord-icon.svg" alt="Discord" className="mr-2 h-4 w-4" /> Announce on Discord
+                            </Button>
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="default" size="sm">
+                                        <CheckCircle2 className="mr-2 h-4 w-4" /> End Session
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent className="max-w-2xl">
+                                    <AlertDialogHeader>
                                     <AlertDialogTitle>Confirm End of Session</AlertDialogTitle>
                                     <AlertDialogDescription>
                                         The following characters will be awarded XP and potentially level up based on the session level ({session.level ?? 'Level TBD'}).
@@ -194,6 +267,7 @@ export default function SessionDetails() {
                                 </AlertDialogFooter>
                             </AlertDialogContent>
                         </AlertDialog>
+                        </>
                     )}
                     {!session.locked && (
                         <SessionDialog 
