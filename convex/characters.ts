@@ -45,6 +45,14 @@ export const listAllCharacters = query({
   },
 })
 
+export const listAllCharactersPublic = query({
+  args: {},
+  handler: async (ctx) => {
+    const characters = await ctx.db.query('characters').collect()
+    return characters
+  },
+})
+
 export const createCharacter = mutation({
   args: {
     name: v.string(),
