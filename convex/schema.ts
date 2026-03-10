@@ -13,7 +13,7 @@ export default defineSchema({
     }).index('by_userId', ['userId']),
     sessions: defineTable({
         date: v.number(),
-        world: v.string(),
+        world: v.id("worlds"),
         level: v.optional(v.number()),
         maxPlayers: v.number(),
         locked: v.boolean(),

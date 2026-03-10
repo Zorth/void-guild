@@ -15,20 +15,12 @@ import {
 import { FormEvent, useState } from 'react'
 import { Id } from '../convex/_generated/dataModel'
 
+import { Doc } from '../convex/_generated/dataModel'
+
 interface SessionDialogProps {
-  session?: {
-    _id: Id<'sessions'>
-    date: number
-    world: Id<'worlds'> // Changed to Id<'worlds'>
-    level?: number
-    maxPlayers: number
-    locked: boolean
-    characters: Id<'characters'>[]
-    gmCharacter?: Id<'characters'>
-    location?: string
-  }
+  session?: Doc<'sessions'>
   trigger?: React.ReactNode
-  hasWorld: boolean // Added hasWorld prop
+  hasWorld: boolean
 }
 
 export default function SessionDialog({ session, trigger, hasWorld }: SessionDialogProps) {
