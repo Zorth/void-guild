@@ -3,6 +3,8 @@
 import { Authenticated, Unauthenticated } from 'convex/react'
 import { SignInButton, UserButton } from '@clerk/nextjs'
 import Characters from './characters'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
 
 export default function Home() {
   return (
@@ -10,7 +12,12 @@ export default function Home() {
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-4xl font-bold">Guild of The Void</h1>
         <Authenticated>
-          <UserButton />
+          <div className="flex items-center gap-2">
+            <Link href="/stats">
+              <Button variant="ghost">Stats</Button>
+            </Link>
+            <UserButton />
+          </div>
         </Authenticated>
         <Unauthenticated>
           <SignInButton />

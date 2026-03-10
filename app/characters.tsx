@@ -168,7 +168,7 @@ export default function Characters() {
               <p>Loading...</p>
             ) : world === null ? (
               <>
-                <p>You don't have a world yet.</p>
+                <p>You don&apos;t have a world yet.</p>
                 <Button className="mt-4" onClick={() => setShowCreateWorldDialog(true)}>
                   Create World
                 </Button>
