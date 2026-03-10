@@ -19,7 +19,7 @@ interface SessionDialogProps {
   session?: {
     _id: Id<'sessions'>
     date: number
-    world: string
+    world: Id<'worlds'> // Changed to Id<'worlds'>
     level?: number
     maxPlayers: number
     locked: boolean
@@ -28,17 +28,19 @@ interface SessionDialogProps {
     location?: string
   }
   trigger?: React.ReactNode
+  hasWorld: boolean // Added hasWorld prop
 }
 
-export default function SessionDialog({ session, trigger }: SessionDialogProps) {
+export default function SessionDialog({ session, trigger, hasWorld }: SessionDialogProps) {
   const createSession = useMutation(api.sessions.createSession)
   const updateSession = useMutation(api.sessions.updateSession)
   const deleteSession = useMutation(api.sessions.deleteSession)
   const userCharacters = useQuery(api.characters.listCharacters)
+  const worldName = useQuery(api.worlds.getWorldByOwner) // Fetch the current world details to display the name
 
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
-  const [world, setWorld] = useState('')
+  // const [world, setWorld] = useState('') // Removed: world is now derived
   const [level, setLevel] = useState(session?.level?.toString() || '1')
   const [maxPlayers, setMaxPlayers] = useState(session?.maxPlayers?.toString() || '4')
   const [gmCharacter, setGmCharacter] = useState<Id<'characters'> | ''>(session?.gmCharacter || '')
@@ -62,7 +64,7 @@ export default function SessionDialog({ session, trigger }: SessionDialogProps) 
         const minutes = d.getMinutes().toString().padStart(2, '0')
         setTime(`${hours}:${minutes}`)
         
-        setWorld(session.world)
+        // setWorld(session.world) // Removed: world is now derived
         setLevel(session.level?.toString() || '')
         setMaxPlayers(session.maxPlayers.toString())
         setGmCharacter(session.gmCharacter || '')
@@ -70,7 +72,7 @@ export default function SessionDialog({ session, trigger }: SessionDialogProps) 
       } else {
         setDate('')
         setTime('')
-        setWorld('')
+        // setWorld('') // Removed: world is now derived
         setLevel('1')
         setMaxPlayers('4')
         setGmCharacter('')
@@ -81,7 +83,7 @@ export default function SessionDialog({ session, trigger }: SessionDialogProps) 
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
-    if (!date || !time || !world || !level || !maxPlayers) return
+    if (!date || !time || !level || !maxPlayers) return // Removed world validation
 
     const sessionDateTime = new Date(`${date}T${time}`).getTime()
     if (isNaN(sessionDateTime)) return
@@ -100,7 +102,7 @@ export default function SessionDialog({ session, trigger }: SessionDialogProps) 
       await updateSession({
         sessionId: session._id,
         date: sessionDateTime,
-        world,
+        world: session.world, // Use existing session world
         level: levelValue,
         maxPlayers: maxPlayersNum,
         characters: session.characters,
@@ -110,7 +112,7 @@ export default function SessionDialog({ session, trigger }: SessionDialogProps) 
     } else {
       await createSession({
         date: sessionDateTime,
-        world,
+        // world, // Removed: world is now derived
         level: levelValue,
         maxPlayers: maxPlayersNum,
         characters: [],
@@ -131,7 +133,11 @@ export default function SessionDialog({ session, trigger }: SessionDialogProps) 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        {trigger || <Button variant="outline" size="sm">{session ? 'Edit' : 'New Session'}</Button>}
+        {trigger || (
+          <Button variant="outline" size="sm" disabled={!hasWorld}>
+            {session ? 'Edit' : 'New Session'}
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
@@ -141,10 +147,8 @@ export default function SessionDialog({ session, trigger }: SessionDialogProps) 
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium">World</label>
             <Input
-              value={world}
-              onChange={(e) => setWorld(e.target.value)}
-              placeholder="e.g. Eberron, Golarion, etc."
-              required
+              value={worldName?.name || 'Loading World...'} // Display world name
+              disabled // World name is not editable here
             />
           </div>
           <div className="flex gap-4">
@@ -220,7 +224,7 @@ export default function SessionDialog({ session, trigger }: SessionDialogProps) 
               <Button type="button" variant="ghost" onClick={() => setIsOpen(false)} className="flex-1">
                 Cancel
               </Button>
-              <Button type="submit" disabled={!date || !time || !world || !maxPlayers}>
+              <Button type="submit" disabled={!date || !time || !maxPlayers}>
                 {session ? 'Update' : 'Create'}
               </Button>
             </div>

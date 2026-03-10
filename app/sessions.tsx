@@ -15,6 +15,7 @@ import type { Doc } from '../convex/_generated/dataModel'
 type SessionWithDetails = Doc<'sessions'> & {
     isOwner: boolean;
     characterNames: string[];
+    worldName: string; // Add worldName to the type
 }
 
 function useWindowSize() {
@@ -118,7 +119,7 @@ function SevenDayOverview({ sessions, userCharacterIds }: { sessions: SessionWit
                             <div className="day-box-content">
                                 {daySessions.map(session => (
                                     <Link href={`/sessions/${session._id}`} key={session._id} className="block text-sm font-medium truncate">
-                                        {session.world}
+                                        {session.worldName}
                                     </Link>
                                 ))}
                             </div>
@@ -136,6 +137,7 @@ export default function Sessions() {
   const sessions = useQuery(api.sessions.listSessions, { past: showPastSessions }) as SessionWithDetails[]
   const isGM = useQuery(api.sessions.isGameMasterQuery)
   const userCharacters = useQuery(api.characters.listCharacters)
+  const world = useQuery(api.worlds.getWorldByOwner) // Query for the user's world
 
   const userCharacterIds = new Set(userCharacters?.map(c => c._id) ?? [])
 
@@ -144,7 +146,7 @@ export default function Sessions() {
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>{showPastSessions ? 'Past Sessions' : 'Upcoming Sessions'}</CardTitle>
         <div className="flex gap-2">
-          {isGM && <SessionDialog />}
+          {isGM && <SessionDialog hasWorld={!!world} />}
           <Button
             variant="outline"
             size="sm"
@@ -184,7 +186,7 @@ export default function Sessions() {
                               <span className="inline-flex align-middle justify-center w-20 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800 mr-2">
                                   Lvl {session.level ?? 'TBD'}
                               </span>
-                              {session.world}
+                              {session.worldName}
                           </div>
                           {session.locked && <Lock className="h-3 w-3 text-muted-foreground" />}
                         </div>
@@ -207,7 +209,7 @@ export default function Sessions() {
                               onClick={(e) => {
                                 e.stopPropagation(); // Prevent clicking the parent Link
                                 e.preventDefault(); // Prevent any default action of the button or parent that might cause navigation
-                                window.open(`https://void.tarragon.be/Session-Reports/${new Date(session.date).toISOString().slice(0, 10)}-${session.world.replace(/\s+/g, '-')}`, '_blank');
+                                window.open(`https://void.tarragon.be/Session-Reports/${new Date(session.date).toISOString().slice(0, 10)}-${session.worldName.replace(/\s+/g, '-')}`, '_blank');
                               }}
                           >
                               <Book size={32} />

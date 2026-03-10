@@ -1,6 +1,6 @@
 import { query, mutation, QueryCtx } from './_generated/server'
 import { v } from 'convex/values'
-import { Doc } from './_generated/dataModel'
+import { Doc, Id } from './_generated/dataModel'
 
 /**
  * Checks if the authenticated user has Game Master permissions.
@@ -70,8 +70,10 @@ export const listSessions = query({
         const characterDocs = await Promise.all(
           session.characters.map((id) => ctx.db.get(id))
         )
+        const worldDoc = await ctx.db.get(session.world as Id<'worlds'>) // Explicitly cast to Id<'worlds'>
         return {
           ...session,
+          worldName: worldDoc ? (worldDoc as Doc<'worlds'>).name : 'Unknown World', // Assert type before accessing name
           characterNames: characterDocs.filter((c): c is Doc<'characters'> => c !== null).map((c) => c.name),
           isOwner: user.subject === session.owner,
         }
@@ -107,8 +109,11 @@ export const getSession = query({
         }
     }
 
+    const worldDoc = await ctx.db.get(session.world as Id<'worlds'>) // Explicitly cast to Id<'worlds'>
+
     return {
       ...session,
+      worldName: worldDoc ? (worldDoc as Doc<'worlds'>).name : 'Unknown World', // Assert type before accessing name
       // Hide gmCharacter ID from non-owners
       gmCharacter: isOwner ? session.gmCharacter : undefined,
       gmCharacterData: isOwner ? gmCharacterData : undefined,
@@ -157,7 +162,7 @@ export const previewXPGains = query({
 export const createSession = mutation({
   args: {
     date: v.number(),
-    world: v.string(),
+    // world: v.string(), // Removed: world is now derived from the GM's world
     level: v.optional(v.number()),
     maxPlayers: v.number(),
     characters: v.array(v.id('characters')),
@@ -171,9 +176,23 @@ export const createSession = mutation({
     }
 
     const identity = await ctx.auth.getUserIdentity()
+    if (!identity) {
+        throw new Error('Not authenticated')
+    }
+
+    // Fetch the GM's world
+    const gmWorld = await ctx.db
+      .query('worlds')
+      .filter((q) => q.eq(q.field('owner'), identity.subject))
+      .first()
+
+    if (!gmWorld) {
+        throw new Error('Game Master must have a world to create a session.')
+    }
+
     return await ctx.db.insert('sessions', {
       date: args.date,
-      world: args.world,
+      world: gmWorld._id, // Use the ID of the GM's world
       level: args.level,
       maxPlayers: args.maxPlayers,
       locked: false,
@@ -189,7 +208,7 @@ export const updateSession = mutation({
   args: {
     sessionId: v.id('sessions'),
     date: v.number(),
-    world: v.string(),
+    world: v.id('worlds'), // Changed to v.id('worlds')
     level: v.optional(v.number()),
     maxPlayers: v.number(),
     characters: v.array(v.id('characters')),

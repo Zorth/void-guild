@@ -1,11 +1,11 @@
 'use client'
 
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Id, Doc } from '@/convex/_generated/dataModel'
 import Link from 'next/link'
 import { Book, ChevronLeft, Lock as LockIcon, Trash2, Pencil, Unlock, Shield, CheckCircle2, MapPin, Clock } from 'lucide-react'
@@ -26,37 +26,41 @@ interface SessionWithGM extends Doc<'sessions'> {
     attendingCharacters: Doc<'characters'>[];
     isOwner: boolean;
     gmCharacterData?: Doc<'characters'> | null;
+    worldName: string; // Add worldName to the interface
 }
 
 export default function SessionDetails() {
   const params = useParams()
   const sessionId = params.sessionId as Id<'sessions'>
+  const router = useRouter() // Initialize useRouter
 
   const session = useQuery(api.sessions.getSession, { sessionId }) as SessionWithGM | undefined | null
-  const xpGainsPreview = useQuery(api.sessions.previewXPGains, { sessionId })
+  const xpGainsPreview = useQuery(api.sessions.previewXPGains, session?._id ? { sessionId: session._id } : undefined) // Moved and arguments fixed
   const userCharacters = useQuery(api.characters.listCharacters)
   const joinSession = useMutation(api.sessions.joinSession)
   const leaveSession = useMutation(api.sessions.leaveSession)
   const lockSession = useMutation(api.sessions.lockSession)
   const unlockSession = useMutation(api.sessions.unlockSession)
+  const deleteSession = useMutation(api.sessions.deleteSession) // Moved to top
 
   const [selectedCharacterId, setSelectedCharacterId] = useState<Id<'characters'> | ''>('')
 
-  if (session === undefined || session === null || userCharacters === undefined || userCharacters === null) {
+  // Handle redirection to home page if session is not found/deleted
+  useEffect(() => {
+    if (session === null) {
+      router.push('/')
+    }
+  }, [session, router])
+
+  if (session === undefined || userCharacters === undefined || userCharacters === null) {
     return <div className="container mx-auto px-4 py-8 text-center">Loading session details...</div>
   }
 
+  // If session is null after the initial fetch, it means it doesn't exist (e.g., deleted)
+  // The useEffect above will handle the redirection.
+  // We can return null or a minimal loading/redirecting message
   if (session === null) {
-    return (
-      <div className="container mx-auto px-4 py-8 text-center">
-        <h1 className="text-2xl font-bold">Session not found</h1>
-        <Link href="/">
-          <Button variant="link" className="pl-0 mt-4">
-            <ChevronLeft className="mr-2 h-4 w-4" /> Back to Home
-          </Button>
-        </Link>
-      </div>
-    )
+    return null; // Or a minimal loading/redirecting message
   }
 
   const handleJoin = async () => {
@@ -99,20 +103,25 @@ export default function SessionDetails() {
     }
   }
 
+  const handleDelete = async () => {
+    // This is within an AlertDialog, so the user has already confirmed deletion.
+    await deleteSession({ sessionId: session._id })
+    // The useEffect will handle the redirection after session becomes null
+  }
+
   const handleSendToDiscord = async () => {
     const webhookUrl = process.env.NEXT_PUBLIC_DISCORD_WEBHOOK_URL
     if (!webhookUrl) {
       alert('Discord Webhook URL is not configured.')
       return
     }
-
     const sessionTime = new Date(session.date)
     const formattedDate = sessionTime.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
     const formattedTime = sessionTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
 
     const embed = {
-      title: `New Session Alert: ${session.world}`,
-      description: `A new session for "${session.world}" has been announced!`,
+      title: `New Session Alert: ${session.worldName}`, // Use session.worldName here
+      description: `A new session for "${session.worldName}" has been announced!`, // Use session.worldName here
       color: 5814783, // A nice purple color
       fields: [
         {
@@ -277,6 +286,7 @@ export default function SessionDetails() {
                                     <Pencil className="mr-2 h-4 w-4" /> Edit Session
                                 </Button>
                             }
+                            hasWorld={true} // Assuming for editing, a world must exist
                         />
                     )}
                 </>
@@ -292,11 +302,11 @@ export default function SessionDetails() {
                 <div className="space-y-4">
                   <div>
                     <CardTitle className="text-3xl font-bold flex items-center gap-3">
-                        {session.world}
+                        {session.worldName}
                         {session.locked && <LockIcon className="h-5 w-5 text-amber-500" />}
                         {/* Book Icon */}
                         <a 
-                            href={`https://void.tarragon.be/Session-Reports/${sessionTime.toISOString().slice(0, 10)}-${session.world.replace(/\s+/g, '-')}`} 
+                            href={`https://void.tarragon.be/Session-Reports/${sessionTime.toISOString().slice(0, 10)}-${session.worldName.replace(/\s+/g, '-')}`} 
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="text-muted-foreground hover:text-blue-500" // Added styling for the icon
