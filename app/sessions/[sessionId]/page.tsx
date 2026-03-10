@@ -211,8 +211,9 @@ export default function SessionDetails() {
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="flex justify-between items-center mb-6">
         <Link href="/">
-          <Button variant="ghost" size="sm">
-            <ChevronLeft className="mr-2 h-4 w-4" /> Back to Home
+          <Button variant="ghost" size="sm" className="sm:px-3 sm:w-auto w-9 px-0">
+            <ChevronLeft className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Back to Home</span>
           </Button>
         </Link>
         <div className="flex gap-2">
@@ -222,8 +223,9 @@ export default function SessionDetails() {
                         <>
                             <AlertDialog>
                                 <AlertDialogTrigger asChild>
-                                    <Button variant="destructive" size="sm">
-                                        <Unlock className="mr-2 h-4 w-4" /> Unlock Session
+                                    <Button variant="destructive" size="sm" className="sm:px-3 sm:w-auto w-9 px-0">
+                                        <Unlock className="h-4 w-4 sm:mr-2" />
+                                        <span className="hidden sm:inline">Unlock Session</span>
                                     </Button>
                                 </AlertDialogTrigger>
                                 <AlertDialogContent>
@@ -234,7 +236,7 @@ export default function SessionDetails() {
                                             WARNING: This will break XP values if this isn&apos;t the latest session for these characters.
                                         </AlertDialogDescription>
                                     </AlertDialogHeader>
-                                    <AlertDialogFooter className="flex-wrap">
+                                    <AlertDialogFooter className="flex-wrap justify-end">
                                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                                         <AlertDialogAction onClick={handleUnlock} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
                                             Unlock (Revert XP)
@@ -248,13 +250,15 @@ export default function SessionDetails() {
                         </>
                     ) : (
                         <>
-                            <Button variant="outline" size="sm" onClick={handleSendToDiscord}>
-                                <img src="/discord-icon.svg" alt="Discord" className="mr-2 h-4 w-4" /> Announce on Discord
+                            <Button variant="outline" size="sm" onClick={handleSendToDiscord} className="sm:px-3 sm:w-auto w-9 px-0">
+                                <img src="/discord-icon.svg" alt="Discord" className="sm:mr-2 h-4 w-4" />
+                                <span className="hidden sm:inline">Announce on Discord</span>
                             </Button>
                             <AlertDialog>
                                 <AlertDialogTrigger asChild>
-                                    <Button variant="default" size="sm">
-                                        <CheckCircle2 className="mr-2 h-4 w-4" /> End Session
+                                    <Button variant="default" size="sm" className="sm:px-3 sm:w-auto w-9 px-0">
+                                        <CheckCircle2 className="h-4 w-4 sm:mr-2" />
+                                        <span className="hidden sm:inline">End Session</span>
                                     </Button>
                                 </AlertDialogTrigger>
                                 <AlertDialogContent className="max-w-2xl">
@@ -293,7 +297,7 @@ export default function SessionDetails() {
                                         </div>
                                     ))}
                                 </div>
-                                <AlertDialogFooter className="flex-wrap">
+                                <AlertDialogFooter className="flex-wrap justify-end">
                                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                                     <AlertDialogAction onClick={handleLock} disabled={session.level === undefined}>Confirm & Award XP</AlertDialogAction>
                                     <AlertDialogAction onClick={handleForceLock} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
@@ -308,8 +312,9 @@ export default function SessionDetails() {
                         <SessionDialog 
                             session={session} 
                             trigger={
-                                <Button variant="outline" size="sm">
-                                    <Pencil className="mr-2 h-4 w-4" /> Edit Session
+                                <Button variant="outline" size="sm" className="sm:px-3 sm:w-auto w-9 px-0">
+                                    <Pencil className="h-4 w-4 sm:mr-2" />
+                                    <span className="hidden sm:inline">Edit Session</span>
                                 </Button>
                             }
                             hasWorld={true} // Assuming for editing, a world must exist
