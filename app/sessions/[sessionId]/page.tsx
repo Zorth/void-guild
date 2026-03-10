@@ -41,6 +41,8 @@ export default function SessionDetails() {
   const leaveSession = useMutation(api.sessions.leaveSession)
   const lockSession = useMutation(api.sessions.lockSession)
   const unlockSession = useMutation(api.sessions.unlockSession)
+  const forceLockSession = useMutation(api.sessions.forceLockSession)
+  const forceUnlockSession = useMutation(api.sessions.forceUnlockSession)
   const deleteSession = useMutation(api.sessions.deleteSession) // Moved to top
 
   const [selectedCharacterId, setSelectedCharacterId] = useState<Id<'characters'> | ''>('')
@@ -100,6 +102,22 @@ export default function SessionDetails() {
         await unlockSession({ sessionId: session._id })
     } catch (e) {
         alert(e instanceof Error ? e.message : 'Failed to unlock session')
+    }
+  }
+
+  const handleForceLock = async () => {
+    try {
+        await forceLockSession({ sessionId: session._id })
+    } catch (e) {
+        alert(e instanceof Error ? e.message : 'Failed to force close session')
+    }
+  }
+
+  const handleForceUnlock = async () => {
+    try {
+        await forceUnlockSession({ sessionId: session._id })
+    } catch (e) {
+        alert(e instanceof Error ? e.message : 'Failed to force unlock session')
     }
   }
 
@@ -201,28 +219,52 @@ export default function SessionDetails() {
             {session.isOwner && (
                 <>
                     {session.locked ? (
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button variant="destructive" size="sm">
-                                    <Unlock className="mr-2 h-4 w-4" /> Unlock Session
-                                </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>Are you sure you want to unlock the session?</AlertDialogTitle>
-                                    <AlertDialogDescription className="text-destructive font-bold">
-                                        This will undo XP given to characters in this session.
-                                        WARNING: This will break XP values if this isn&apos;t the latest session for these characters.
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={handleUnlock} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
-                                        Unlock
-                                    </AlertDialogAction>
-                                </AlertDialogFooter>
-                        </AlertDialogContent>
-                        </AlertDialog>
+                        <>
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="destructive" size="sm">
+                                        Force Unlock (No Revert)
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Force Unlock Session?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            This will unlock the session WITHOUT undoing any XP gains. 
+                                            Characters will keep their current XP and levels.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction onClick={handleForceUnlock} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                                            Force Unlock
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="destructive" size="sm">
+                                        <Unlock className="mr-2 h-4 w-4" /> Unlock Session
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Are you sure you want to unlock the session?</AlertDialogTitle>
+                                        <AlertDialogDescription className="text-destructive font-bold">
+                                            This will undo XP given to characters in this session.
+                                            WARNING: This will break XP values if this isn&apos;t the latest session for these characters.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction onClick={handleUnlock} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                                            Unlock
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                            </AlertDialogContent>
+                            </AlertDialog>
+                        </>
                     ) : (
                         <>
                             <Button variant="outline" size="sm" onClick={handleSendToDiscord}>
@@ -273,6 +315,28 @@ export default function SessionDetails() {
                                 <AlertDialogFooter>
                                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                                     <AlertDialogAction onClick={handleLock} disabled={session.level === undefined}>Confirm & Award XP</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="sm">
+                                    Force Close (No XP)
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Force Close Session?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        This will lock the session WITHOUT awarding any XP. 
+                                        Characters will NOT level up or gain XP from this session.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={handleForceLock} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                                        Force Close
+                                    </AlertDialogAction>
                                 </AlertDialogFooter>
                             </AlertDialogContent>
                         </AlertDialog>

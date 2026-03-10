@@ -428,3 +428,39 @@ export const unlockSession = mutation({
       await ctx.db.patch(args.sessionId, { locked: false, xpGains: [] })
     }
 })
+
+export const forceLockSession = mutation({
+    args: { sessionId: v.id('sessions') },
+    handler: async (ctx, args) => {
+      const user = await ctx.auth.getUserIdentity()
+      if (!user) throw new Error('Not authenticated')
+  
+      const isAdminUser = await isAdmin(ctx)
+      const session = await ctx.db.get(args.sessionId)
+      if (!session || (session.owner !== user.subject && !isAdminUser)) {
+        throw new Error('Only the session owner or an admin can lock it.')
+      }
+  
+      if (session.locked) return
+  
+      await ctx.db.patch(args.sessionId, { locked: true, xpGains: [] })
+    }
+})
+
+export const forceUnlockSession = mutation({
+    args: { sessionId: v.id('sessions') },
+    handler: async (ctx, args) => {
+      const user = await ctx.auth.getUserIdentity()
+      if (!user) throw new Error('Not authenticated')
+  
+      const isAdminUser = await isAdmin(ctx)
+      const session = await ctx.db.get(args.sessionId)
+      if (!session || (session.owner !== user.subject && !isAdminUser)) {
+        throw new Error('Only the session owner or an admin can unlock it.')
+      }
+  
+      if (!session.locked) return
+  
+      await ctx.db.patch(args.sessionId, { locked: false, xpGains: [] })
+    }
+})
