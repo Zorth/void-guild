@@ -29,6 +29,7 @@ import { FormEvent, useState } from 'react'
 import { Doc } from '../convex/_generated/dataModel'
 import Sessions from './sessions'
 import CreateCharacter from './create-character'
+import AdminCharacterList from './admin-character-list'
 
 export default function Characters() {
   const characters = useQuery(api.characters.listCharacters)
@@ -93,8 +94,9 @@ export default function Characters() {
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
       <div>
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle>Your Characters</CardTitle>
+            <AdminCharacterList />
           </CardHeader>
           <CardContent>
             {characters === undefined ? (
