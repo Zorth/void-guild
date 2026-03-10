@@ -19,6 +19,15 @@
   color: #047857; /* text-green-700 */
 }
 
+.session-admin-joined {
+    background-color: rgba(16, 185, 129, 0.1); /* bg-green-100/50 */
+    border: 2px solid #6EE7B7; /* border-green-200 */
+}
+
+.session-admin-joined:hover {
+    background-color: rgba(16, 185, 129, 0.2);
+}
+
 .session-default:hover {
   background-color: hsl(var(--muted) / 0.5);
 }
