@@ -108,7 +108,7 @@ export default function SessionDetails() {
 
     const sessionTime = new Date(session.date)
     const formattedDate = sessionTime.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
-    const formattedTime = sessionTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+    const formattedTime = sessionTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
 
     const embed = {
       title: `New Session Alert: ${session.world}`,
