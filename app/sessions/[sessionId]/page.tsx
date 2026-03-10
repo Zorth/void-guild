@@ -35,7 +35,7 @@ export default function SessionDetails() {
   const router = useRouter() // Initialize useRouter
 
   const session = useQuery(api.sessions.getSession, { sessionId }) as SessionWithGM | undefined | null
-  const xpGainsPreview = useQuery(api.sessions.previewXPGains, session?._id ? { sessionId: session._id } : undefined) // Moved and arguments fixed
+  const xpGainsPreview = useQuery(api.sessions.previewXPGains, session?._id ? { sessionId: session._id } : "skip") // Moved and arguments fixed
   const userCharacters = useQuery(api.characters.listCharacters)
   const joinSession = useMutation(api.sessions.joinSession)
   const leaveSession = useMutation(api.sessions.leaveSession)
