@@ -175,9 +175,11 @@ export default function Sessions() {
                           "flex-grow p-2 rounded-md transition-colors relative flex justify-between items-start",
                           session.isOwner 
                               ? "session-owner" 
-                              : hasJoined 
-                                  ? "session-joined" 
-                                  : "session-default"
+                              : isGM && hasJoined 
+                                  ? "session-admin-joined" 
+                                  : hasJoined 
+                                      ? "session-joined" 
+                                      : "session-default"
                       )}
                     >
                       <div className="flex flex-col">
