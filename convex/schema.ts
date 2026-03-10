@@ -28,4 +28,9 @@ export default defineSchema({
         }))),
         owner: v.string(), // Clerk userId of the GM
   }),
+    worlds: defineTable({
+        name: v.string(),
+        owner: v.string(), // Clerk userId of the world owner
+        link: v.optional(v.string()),
+    }).index('by_owner', ['owner']),
 })

@@ -10,6 +10,7 @@
 
 import type * as characters from "../characters.js";
 import type * as sessions from "../sessions.js";
+import type * as worlds from "../worlds.js";
 
 import type {
   ApiFromModules,
@@ -20,6 +21,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   characters: typeof characters;
   sessions: typeof sessions;
+  worlds: typeof worlds;
 }>;
 
 /**
