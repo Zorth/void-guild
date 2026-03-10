@@ -223,28 +223,6 @@ export default function SessionDetails() {
                             <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                     <Button variant="destructive" size="sm">
-                                        Force Unlock (No Revert)
-                                    </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>Force Unlock Session?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                            This will unlock the session WITHOUT undoing any XP gains. 
-                                            Characters will keep their current XP and levels.
-                                        </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction onClick={handleForceUnlock} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
-                                            Force Unlock
-                                        </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button variant="destructive" size="sm">
                                         <Unlock className="mr-2 h-4 w-4" /> Unlock Session
                                     </Button>
                                 </AlertDialogTrigger>
@@ -256,10 +234,13 @@ export default function SessionDetails() {
                                             WARNING: This will break XP values if this isn&apos;t the latest session for these characters.
                                         </AlertDialogDescription>
                                     </AlertDialogHeader>
-                                    <AlertDialogFooter>
+                                    <AlertDialogFooter className="flex-wrap">
                                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                                         <AlertDialogAction onClick={handleUnlock} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
-                                            Unlock
+                                            Unlock (Revert XP)
+                                        </AlertDialogAction>
+                                        <AlertDialogAction onClick={handleForceUnlock} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                                            Force Unlock (Keep XP)
                                         </AlertDialogAction>
                                     </AlertDialogFooter>
                             </AlertDialogContent>
@@ -312,30 +293,11 @@ export default function SessionDetails() {
                                         </div>
                                     ))}
                                 </div>
-                                <AlertDialogFooter>
+                                <AlertDialogFooter className="flex-wrap">
                                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                                     <AlertDialogAction onClick={handleLock} disabled={session.level === undefined}>Confirm & Award XP</AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button variant="destructive" size="sm">
-                                    Force Close (No XP)
-                                </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>Force Close Session?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        This will lock the session WITHOUT awarding any XP. 
-                                        Characters will NOT level up or gain XP from this session.
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
                                     <AlertDialogAction onClick={handleForceLock} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
-                                        Force Close
+                                        Force Close (No XP)
                                     </AlertDialogAction>
                                 </AlertDialogFooter>
                             </AlertDialogContent>
