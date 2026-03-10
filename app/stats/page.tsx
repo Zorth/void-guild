@@ -4,29 +4,33 @@ import { useQuery } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Crown, Shield, Swords } from 'lucide-react'
-import { useMemo } from 'react'
+import { useMemo, useEffect, useState } from 'react'
+import { getUsernames } from './actions'
 
 export default function StatsPage() {
     const characters = useQuery(api.characters.listAllCharactersPublic);
     const gmStats = useQuery(api.sessions.getGMStats);
     const playerStats = useQuery(api.sessions.getPlayerStats);
+    const [usernames, setUsernames] = useState<Record<string, string>>({});
   
     const sortedCharacters = useMemo(() => {
       if (!characters) return [];
       return [...characters].sort((a, b) => b.lvl - a.lvl || b.xp - a.xp);
     }, [characters]);
-  
-    const userCharacterMap = useMemo(() => {
-      if (!characters) return new Map<string, string[]>();
-      const map = new Map<string, string[]>();
-      for (const char of characters) {
-        if (!map.has(char.userId)) {
-          map.set(char.userId, []);
+
+    useEffect(() => {
+        if (gmStats && playerStats) {
+            const userIds = new Set([
+                ...gmStats.map(s => s.userId),
+                ...playerStats.map(s => s.userId)
+            ]);
+            
+            if (userIds.size > 0) {
+                getUsernames(Array.from(userIds)).then(setUsernames);
+            }
         }
-        map.get(char.userId)!.push(char.name);
-      }
-      return map;
-    }, [characters]);
+    }, [gmStats, playerStats]);
+  
 
   return (
     <div className="container mx-auto py-8">
@@ -64,8 +68,7 @@ export default function StatsPage() {
              {gmStats ? (
                 <ul className="space-y-2">
                     {gmStats.map((stat, index) => {
-                        const userChars = userCharacterMap.get(stat.userId);
-                        const displayName = userChars && userChars.length > 0 ? userChars[0] : 'Unknown GM';
+                        const displayName = usernames[stat.userId] || `User ${stat.userId.slice(-4)}`;
                         return (
                             <li key={stat.userId} className="flex justify-between items-center">
                                 <span>{index + 1}. {displayName}</span>
@@ -89,8 +92,7 @@ export default function StatsPage() {
             {playerStats ? (
                 <ul className="space-y-2">
                     {playerStats.map((stat, index) => {
-                        const userChars = userCharacterMap.get(stat.userId);
-                        const displayName = userChars ? userChars.join(', ') : 'Unknown Player';
+                        const displayName = usernames[stat.userId] || `User ${stat.userId.slice(-4)}`;
                         return (
                             <li key={stat.userId} className="flex justify-between items-center">
                                 <span>{index + 1}. {displayName}</span>
