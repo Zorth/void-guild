@@ -71,7 +71,7 @@ export default function AdminCharacterList() {
         <DialogHeader>
           <DialogTitle>All Characters</DialogTitle>
           <DialogDescription>
-            Admin view: Edit any character's details, including level and XP.
+            Admin view: Edit any character&apos;s details, including level and XP.
           </DialogDescription>
         </DialogHeader>
         
