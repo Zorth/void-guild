@@ -638,7 +638,7 @@ export default function SessionDetails() {
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
                             <AlertDialogAction onClick={handleLock} disabled={session.level === undefined}>Confirm & Award XP</AlertDialogAction>
                             {isAdmin && (
-                                <AlertDialogAction onClick={handleForceLock} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                                <AlertDialogAction onClick={handleForceLock} variant="destructive">
                                     Force Close (No XP)
                                 </AlertDialogAction>
                             )}
