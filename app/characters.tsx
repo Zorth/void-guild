@@ -49,6 +49,8 @@ export default function Characters() {
   const createWorld = useMutation(api.worlds.createWorld)
   const renameWorld = useMutation(api.worlds.renameWorld)
 
+  const isGM = useQuery(api.sessions.isGameMasterQuery)
+
   async function handleCreateWorld(event: FormEvent) {
     event.preventDefault()
     await createWorld({ name: newWorldName })
@@ -159,33 +161,35 @@ export default function Characters() {
         </Card>
 
         {/* World Management */}
-        <Card className="mt-8">
-          <CardHeader>
-            <CardTitle>Your World</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {world === undefined ? (
-              <p>Loading...</p>
-            ) : world === null ? (
-              <>
-                <p>You don&apos;t have a world yet.</p>
-                <Button className="mt-4" onClick={() => setShowCreateWorldDialog(true)}>
-                  Create World
-                </Button>
-              </>
-            ) : (
-              <div className="flex items-center justify-between">
-                <p className="text-lg font-medium">{world.name}</p>
-                <Button variant="outline" onClick={() => {
-                  setRenameWorldName(world.name)
-                  setShowRenameWorldDialog(true)
-                }}>
-                  Rename
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {isGM && (
+          <Card className="mt-8">
+            <CardHeader>
+              <CardTitle>Your World</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {world === undefined ? (
+                <p>Loading...</p>
+              ) : world === null ? (
+                <>
+                  <p>You don&apos;t have a world yet.</p>
+                  <Button className="mt-4" onClick={() => setShowCreateWorldDialog(true)}>
+                    Create World
+                  </Button>
+                </>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <p className="text-lg font-medium">{world.name}</p>
+                  <Button variant="outline" onClick={() => {
+                    setRenameWorldName(world.name)
+                    setShowRenameWorldDialog(true)
+                  }}>
+                    Rename
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <Sessions />
@@ -243,46 +247,50 @@ export default function Characters() {
         </Dialog>
       )}
       {/* Create World Dialog */}
-      <Dialog open={showCreateWorldDialog} onOpenChange={setShowCreateWorldDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create New World</DialogTitle>
-            <DialogDescription>Enter a name for your new world.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleCreateWorld} className="flex flex-col gap-4">
-            <Input
-              value={newWorldName}
-              onChange={(e) => setNewWorldName(e.target.value)}
-              placeholder="World Name"
-              required
-            />
-            <DialogFooter>
-              <Button type="submit">Create</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {isGM && (
+        <Dialog open={showCreateWorldDialog} onOpenChange={setShowCreateWorldDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create New World</DialogTitle>
+              <DialogDescription>Enter a name for your new world.</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleCreateWorld} className="flex flex-col gap-4">
+              <Input
+                value={newWorldName}
+                onChange={(e) => setNewWorldName(e.target.value)}
+                placeholder="World Name"
+                required
+              />
+              <DialogFooter>
+                <Button type="submit">Create</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Rename World Dialog */}
-      <Dialog open={showRenameWorldDialog} onOpenChange={setShowRenameWorldDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Rename World</DialogTitle>
-            <DialogDescription>Enter a new name for your world.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleRenameWorld} className="flex flex-col gap-4">
-            <Input
-              value={renameWorldName}
-              onChange={(e) => setRenameWorldName(e.target.value)}
-              placeholder="New World Name"
-              required
-            />
-            <DialogFooter>
-              <Button type="submit">Rename</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {isGM && (
+        <Dialog open={showRenameWorldDialog} onOpenChange={setShowRenameWorldDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Rename World</DialogTitle>
+              <DialogDescription>Enter a new name for your world.</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleRenameWorld} className="flex flex-col gap-4">
+              <Input
+                value={renameWorldName}
+                onChange={(e) => setRenameWorldName(e.target.value)}
+                placeholder="New World Name"
+                required
+              />
+              <DialogFooter>
+                <Button type="submit">Rename</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }
