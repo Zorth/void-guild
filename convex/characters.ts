@@ -73,6 +73,7 @@ export const createCharacter = mutation({
       userId: user.subject,
       lvl: 1,
       xp: 0,
+      rank: 'none',
     })
   },
 })
@@ -110,6 +111,7 @@ export const adminUpdateCharacter = mutation({
     ancestry: v.optional(v.string()),
     class: v.optional(v.string()),
     websiteLink: v.optional(v.string()),
+    rank: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const isAdminUser = await isAdmin(ctx)
@@ -123,6 +125,7 @@ export const adminUpdateCharacter = mutation({
       ancestry: args.ancestry,
       class: args.class,
       websiteLink: args.websiteLink,
+      rank: args.rank,
     })
   },
 })

@@ -1,8 +1,25 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 
+import { Crown, Medal } from "lucide-react"
+import React from "react"
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
+}
+
+export function CharacterRankIcon({ rank, className }: { rank?: string, className?: string }) {
+  if (!rank || rank === 'none') return null;
+
+  if (rank === 'guildmaster') {
+    return <Crown className={cn("text-amber-500", className)} size={16} title="Guildmaster" />;
+  }
+
+  if (rank === 'journeyman') {
+    return <Medal className={cn("text-slate-400", className)} size={16} title="Journeyman" />;
+  }
+
+  return null;
 }
 
 export function getLevelBadgeStyle(level: number | undefined) {

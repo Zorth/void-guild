@@ -31,7 +31,7 @@ import Sessions from './sessions'
 import CreateCharacter from './create-character'
 import AdminCharacterList from './admin-character-list'
 import { Skeleton } from '@/components/ui/skeleton'
-import { getLevelBadgeStyle } from '@/lib/utils'
+import { getLevelBadgeStyle, CharacterRankIcon } from '@/lib/utils'
 
 export default function Characters() {
   const characters = useQuery(api.characters.listCharacters)
@@ -150,12 +150,15 @@ export default function Characters() {
                             <Book size={16} /> {/* Replaced Button with Book icon */}
                         </a>
                         <div className="flex flex-col items-end"> {/* Vertical alignment for Level and XP */}
-                            <span 
-                                className="inline-flex align-middle justify-center w-14 rounded-full px-2 py-0.5 text-[10px] font-bold"
-                                style={getLevelBadgeStyle(character.lvl)}
-                            >
-                                Lvl {character.lvl}
-                            </span>
+                            <div className="flex items-center gap-1">
+                                <CharacterRankIcon rank={character.rank} />
+                                <span 
+                                    className="inline-flex align-middle justify-center w-14 rounded-full px-2 py-0.5 text-[10px] font-bold"
+                                    style={getLevelBadgeStyle(character.lvl)}
+                                >
+                                    Lvl {character.lvl}
+                                </span>
+                            </div>
                             <span className="text-[10px] text-muted-foreground">
                                 {character.xp} XP
                             </span>
@@ -212,6 +215,7 @@ export default function Characters() {
             <DialogHeader>
               <DialogTitle>{selectedCharacter.name}</DialogTitle>
               <DialogDescription className="flex items-center gap-2 mt-1">
+                <CharacterRankIcon rank={selectedCharacter.rank} />
                 <span 
                   className="inline-flex align-middle justify-center w-14 rounded-full px-2 py-0.5 text-[10px] font-bold"
                   style={getLevelBadgeStyle(selectedCharacter.lvl)}

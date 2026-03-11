@@ -34,6 +34,7 @@ export default function AdminCharacterList() {
     ancestry: '',
     class: '',
     websiteLink: '',
+    rank: 'none' as 'none' | 'journeyman' | 'guildmaster',
   })
 
   // Handle loading states and non-admin access after all hooks are called
@@ -56,6 +57,7 @@ export default function AdminCharacterList() {
       ancestry: character.ancestry ?? '',
       class: character.class ?? '',
       websiteLink: character.websiteLink ?? '',
+      rank: (character.rank as any) ?? 'none',
     })
     setIsEditDialogOpen(true)
   }
@@ -98,7 +100,11 @@ export default function AdminCharacterList() {
               <Card key={char._id} className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => openEditDialog(char)}>
                 <CardContent className="p-4 flex justify-between items-center">
                   <div>
-                    <p className="font-bold">{char.name}</p>
+                    <div className="flex items-center gap-2">
+                        <p className="font-bold">{char.name}</p>
+                        {char.rank === 'guildmaster' && <span className="text-xs text-amber-500 font-bold uppercase tracking-wider">GM</span>}
+                        {char.rank === 'journeyman' && <span className="text-xs text-blue-500 font-bold uppercase tracking-wider">JRN</span>}
+                    </div>
                     <p className="text-xs text-muted-foreground">{char.ancestry} {char.class}</p>
                   </div>
                   <div className="text-right">
@@ -125,6 +131,18 @@ export default function AdminCharacterList() {
                     value={editData.name}
                     onChange={(e) => setEditData({ ...editData, name: e.target.value })}
                   />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <label className="text-right text-sm">Rank</label>
+                  <select
+                    className="col-span-3 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    value={editData.rank}
+                    onChange={(e) => setEditData({ ...editData, rank: e.target.value as any })}
+                  >
+                    <option value="none">None</option>
+                    <option value="journeyman">Journeyman</option>
+                    <option value="guildmaster">Guildmaster</option>
+                  </select>
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <label className="text-right text-sm">Level</label>

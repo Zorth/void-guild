@@ -10,6 +10,7 @@ export default defineSchema({
         ancestry: v.optional(v.string()),
         class: v.optional(v.string()),
         websiteLink: v.optional(v.string()),
+        rank: v.optional(v.string()), // none, journeyman, guildmaster
     }).index('by_userId', ['userId']),
     sessions: defineTable({
         date: v.number(),

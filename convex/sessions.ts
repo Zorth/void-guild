@@ -177,6 +177,7 @@ export const previewXPGains = query({
             return {
                 id: char._id,
                 name: char.name,
+                rank: char.rank,
                 currentLvl: char.lvl,
                 currentXp: char.xp,
                 xpGain,

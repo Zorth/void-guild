@@ -12,7 +12,7 @@ import { Book, Calendar, ChevronLeft, Lock as LockIcon, Trash2, Pencil, Unlock, 
 import SessionDialog from '@/app/session-dialog'
 import { useAuth } from '@clerk/nextjs'
 import { Skeleton } from '@/components/ui/skeleton'
-import { cn, getLevelBadgeStyle } from '@/lib/utils'
+import { cn, getLevelBadgeStyle, CharacterRankIcon } from '@/lib/utils'
 import { fireJoinParticles } from '@/lib/particles'
 import {
     AlertDialog,
@@ -523,6 +523,7 @@ export default function SessionDetails() {
                                 </a>
                             </div>
                             <div className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
+                              <CharacterRankIcon rank={char.rank} />
                               <span 
                                 className="inline-flex align-middle justify-center w-12 rounded-full px-2 py-0.5 text-[10px] font-bold"
                                 style={getLevelBadgeStyle(char.lvl)}
@@ -630,6 +631,7 @@ export default function SessionDetails() {
                                     <div className="flex flex-col">
                                         <span className="font-semibold">{p.name}</span>
                                         <div className="flex items-center gap-1 mt-0.5">
+                                            <CharacterRankIcon rank={p.rank} />
                                             <span 
                                                 className="inline-flex align-middle justify-center w-12 rounded-full px-1.5 py-0.5 text-[10px] font-bold"
                                                 style={getLevelBadgeStyle(p.currentLvl)}

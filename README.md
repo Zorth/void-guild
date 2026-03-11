@@ -7,6 +7,7 @@
 ## Key Features
 
 *   **Character Management:** Create, edit, and delete your game characters.
+*   **Character Ranks:** Admins can assign ranks (`Journeyman`, `Guildmaster`) to characters, displayed with special icons.
 *   **Session Scheduling:** Game Masters can create and manage upcoming and past sessions.
 *   **Session Participation:** Players can join and leave sessions with their characters.
 *   **XP Tracking:** Sessions award experience points to participating characters.
