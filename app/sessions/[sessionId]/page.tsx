@@ -267,110 +267,105 @@ export default function SessionDetails() {
           </Button>
         </Link>
         <div className="flex gap-2">
-            {session.isOwner && (
+            {session.isOwner && !session.locked && (
                 <>
-                    {session.locked ? (
-                        <>
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button variant="destructive" size="sm" className="sm:px-3 sm:w-auto w-9 px-0">
-                                        <Unlock className="h-4 w-4 sm:mr-2" />
-                                        <span className="hidden sm:inline">Unlock Session</span>
-                                    </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>Are you sure you want to unlock the session?</AlertDialogTitle>
-                                        <AlertDialogDescription className="text-destructive font-bold">
-                                            This will undo XP given to characters in this session.
-                                            WARNING: This will break XP values if this isn&apos;t the latest session for these characters.
-                                        </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter className="flex-wrap justify-end">
-                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction onClick={handleUnlock} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
-                                            Unlock (Revert XP)
-                                        </AlertDialogAction>
-                                        <AlertDialogAction onClick={handleForceUnlock} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
-                                            Force Unlock (Keep XP)
-                                        </AlertDialogAction>
-                                    </AlertDialogFooter>
-                            </AlertDialogContent>
-                            </AlertDialog>
-                        </>
-                    ) : (
-                        <>
-                            <Button variant="outline" size="sm" onClick={handleSendToDiscord} className="sm:px-3 sm:w-auto w-9 px-0">
-                                <img src="/discord-icon.svg" alt="Discord" className="sm:mr-2 h-4 w-4" />
-                                <span className="hidden sm:inline">Announce on Discord</span>
+                    <Button variant="outline" size="sm" onClick={handleSendToDiscord} className="sm:px-3 sm:w-auto w-9 px-0">
+                        <img src="/discord-icon.svg" alt="Discord" className="sm:mr-2 h-4 w-4" />
+                        <span className="hidden sm:inline">Announce on Discord</span>
+                    </Button>
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="default" size="sm" className="sm:px-3 sm:w-auto w-9 px-0">
+                                <CheckCircle2 className="h-4 w-4 sm:mr-2" />
+                                <span className="hidden sm:inline">End Session</span>
                             </Button>
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button variant="default" size="sm" className="sm:px-3 sm:w-auto w-9 px-0">
-                                        <CheckCircle2 className="h-4 w-4 sm:mr-2" />
-                                        <span className="hidden sm:inline">End Session</span>
-                                    </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent className="max-w-2xl">
-                                    <AlertDialogHeader>
-                                    <AlertDialogTitle>Confirm End of Session</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        The following characters will be awarded XP and potentially level up based on the session level ({session.level ?? 'Level TBD'}).
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <div className="py-4 space-y-4 max-h-[400px] overflow-auto">
-                                    <div className="grid grid-cols-3 font-bold text-sm border-b pb-2">
-                                        <span>Character</span>
-                                        <span className="text-center">XP Gain</span>
-                                        <span className="text-right">New Level</span>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="max-w-2xl">
+                            <AlertDialogHeader>
+                            <AlertDialogTitle>Confirm End of Session</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                The following characters will be awarded XP and potentially level up based on the session level ({session.level ?? 'Level TBD'}).
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <div className="py-4 space-y-4 max-h-[400px] overflow-auto">
+                            <div className="grid grid-cols-3 font-bold text-sm border-b pb-2">
+                                <span>Character</span>
+                                <span className="text-center">XP Gain</span>
+                                <span className="text-right">New Level</span>
+                            </div>
+                            {xpGainsPreview?.map((p) => (
+                                <div key={p.id} className="grid grid-cols-3 text-sm items-center py-2 border-b last:border-0">
+                                    <div className="flex flex-col">
+                                        <span className="font-semibold">{p.name}</span>
+                                        <span className="text-[10px] text-muted-foreground">Lvl {p.currentLvl} ({p.currentXp} XP)</span>
+                                        {p.isGMCharacter && <span className="text-[10px] text-primary flex items-center gap-1"><Shield className="h-2 w-2"/> GM</span>}
                                     </div>
-                                    {xpGainsPreview?.map((p) => (
-                                        <div key={p.id} className="grid grid-cols-3 text-sm items-center py-2 border-b last:border-0">
-                                            <div className="flex flex-col">
-                                                <span className="font-semibold">{p.name}</span>
-                                                <span className="text-[10px] text-muted-foreground">Lvl {p.currentLvl} ({p.currentXp} XP)</span>
-                                                {p.isGMCharacter && <span className="text-[10px] text-primary flex items-center gap-1"><Shield className="h-2 w-2"/> GM</span>}
-                                            </div>
-                                            <div className="text-center font-mono text-green-600">
-                                                +{p.xpGain}
-                                            </div>
-                                            <div className="text-right">
-                                                {p.newLvl > p.currentLvl ? (
-                                                    <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-[10px] font-bold">
-                                                        Lvl {p.newLvl} ↑
-                                                    </span>
-                                                ) : (
-                                                    <span>Lvl {p.newLvl}</span>
-                                                )}
-                                                <div className="text-[10px] text-muted-foreground">({p.newXp} XP)</div>
-                                            </div>
-                                        </div>
-                                    ))}
+                                    <div className="text-center font-mono text-green-600">
+                                        +{p.xpGain}
+                                    </div>
+                                    <div className="text-right">
+                                        {p.newLvl > p.currentLvl ? (
+                                            <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                                                Lvl {p.newLvl} ↑
+                                            </span>
+                                        ) : (
+                                            <span>Lvl {p.newLvl}</span>
+                                        )}
+                                        <div className="text-[10px] text-muted-foreground">({p.newXp} XP)</div>
+                                    </div>
                                 </div>
-                                <AlertDialogFooter className="flex-wrap justify-end">
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={handleLock} disabled={session.level === undefined}>Confirm & Award XP</AlertDialogAction>
-                                    <AlertDialogAction onClick={handleForceLock} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
-                                        Force Close (No XP)
-                                    </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-                        </>
-                    )}
-                    {!session.locked && (
-                        <SessionDialog 
-                            session={session} 
-                            trigger={
-                                <Button variant="outline" size="sm" className="sm:px-3 sm:w-auto w-9 px-0">
-                                    <Pencil className="h-4 w-4 sm:mr-2" />
-                                    <span className="hidden sm:inline">Edit Session</span>
-                                </Button>
-                            }
-                            hasWorld={true}
-                        />
-                    )}
+                            ))}
+                        </div>
+                        <AlertDialogFooter className="flex-wrap justify-end">
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleLock} disabled={session.level === undefined}>Confirm & Award XP</AlertDialogAction>
+                            {isAdmin && (
+                                <AlertDialogAction onClick={handleForceLock} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                                    Force Close (No XP)
+                                </AlertDialogAction>
+                            )}
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+                <SessionDialog 
+                    session={session} 
+                    trigger={
+                        <Button variant="outline" size="sm" className="sm:px-3 sm:w-auto w-9 px-0">
+                            <Pencil className="h-4 w-4 sm:mr-2" />
+                            <span className="hidden sm:inline">Edit Session</span>
+                        </Button>
+                    }
+                    hasWorld={true}
+                />
                 </>
+            )}
+            {isAdmin && session.locked && (
+                <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                        <Button variant="destructive" size="sm" className="sm:px-3 sm:w-auto w-9 px-0">
+                            <Unlock className="h-4 w-4 sm:mr-2" />
+                            <span className="hidden sm:inline">Unlock Session</span>
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Are you sure you want to unlock the session?</AlertDialogTitle>
+                            <AlertDialogDescription className="text-destructive font-bold">
+                                This will undo XP given to characters in this session.
+                                WARNING: This will break XP values if this isn&apos;t the latest session for these characters.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter className="flex-wrap justify-end">
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleUnlock} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                                Unlock (Revert XP)
+                            </AlertDialogAction>
+                            <AlertDialogAction onClick={handleForceUnlock} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                                Force Unlock (Keep XP)
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             )}
         </div>
       </div>
