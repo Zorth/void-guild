@@ -7,25 +7,25 @@
 }
 
 .session-joined {
-  background-color: rgba(16, 185, 129, 0.1); /* bg-green-100/50 */
-  border: 2px solid #6EE7B7; /* border-green-200 */
+  background-color: rgba(147, 51, 234, 0.1); /* bg-purple-100/50 */
+  border: 2px solid #D8B4FE; /* border-purple-300 */
 }
 
 .session-joined:hover {
-    background-color: rgba(16, 185, 129, 0.2);
+    background-color: rgba(147, 51, 234, 0.2);
 }
 
 .session-joined .session-world {
-  color: #047857; /* text-green-700 */
+  color: #7E22CE; /* text-purple-700 */
 }
 
 .session-admin-joined {
-    background-color: rgba(16, 185, 129, 0.1); /* bg-green-100/50 */
-    border: 2px solid #6EE7B7; /* border-green-200 */
+    background-color: rgba(147, 51, 234, 0.1); /* bg-purple-100/50 */
+    border: 2px solid #D8B4FE; /* border-purple-300 */
 }
 
 .session-admin-joined:hover {
-    background-color: rgba(16, 185, 129, 0.2);
+    background-color: rgba(147, 51, 234, 0.2);
 }
 
 .session-default:hover {
@@ -46,8 +46,8 @@
 }
 
 .day-box.day-box-joined {
-    border: 2px solid #6EE7B7; /* border-green-200 */
-    background-color: rgba(16, 185, 129, 0.1); /* bg-green-100/50 */
+    border: 2px solid #D8B4FE; /* border-purple-300 */
+    background-color: rgba(147, 51, 234, 0.1); /* bg-purple-100/50 */
 }
 
 .day-box-header {
