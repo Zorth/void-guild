@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { ChevronLeft, Crown, Shield, Swords } from 'lucide-react'
 import { useMemo, useEffect, useState } from 'react'
 import { getUsernames, UserMetadata } from './actions'
+import { Skeleton } from '@/components/ui/skeleton'
 
 export default function StatsPage() {
     const characters = useQuery(api.characters.listAllCharactersPublic);
@@ -80,7 +81,7 @@ export default function StatsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {sortedCharacters ? (
+            {sortedCharacters.length > 0 ? (
               <ul className="space-y-2">
                 {sortedCharacters.map((char, index) => (
                   <li key={char._id} className="flex justify-between items-center">
@@ -89,7 +90,13 @@ export default function StatsPage() {
                   </li>
                 ))}
               </ul>
-            ) : <p>Loading characters...</p>}
+            ) : characters === undefined ? (
+              <div className="space-y-2">
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
+              </div>
+            ) : <p className="text-muted-foreground italic">No characters found.</p>}
           </CardContent>
         </Card>
 
@@ -110,7 +117,13 @@ export default function StatsPage() {
                         </li>
                     ))}
                 </ul>
-             ) : <p>Loading GM stats...</p>}
+             ) : (
+                <div className="space-y-2">
+                  <Skeleton className="h-6 w-full" />
+                  <Skeleton className="h-6 w-full" />
+                  <Skeleton className="h-6 w-full" />
+                </div>
+             )}
           </CardContent>
         </Card>
 
@@ -131,7 +144,13 @@ export default function StatsPage() {
                         </li>
                     ))}
                 </ul>
-            ) : <p>Loading player stats...</p>}
+            ) : (
+              <div className="space-y-2">
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

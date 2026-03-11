@@ -17,6 +17,7 @@ import {
 import { FormEvent, useState } from 'react'
 import { Doc } from '../convex/_generated/dataModel'
 import { Shield } from 'lucide-react'
+import { Skeleton } from '@/components/ui/skeleton'
 
 export default function AdminCharacterList() {
   // All hooks must be called unconditionally at the top level
@@ -37,7 +38,7 @@ export default function AdminCharacterList() {
 
   // Handle loading states and non-admin access after all hooks are called
   if (isAdmin === undefined || (isAdmin && allCharacters === undefined)) {
-    return <p>Loading...</p>
+    return <Skeleton className="h-9 w-40" />
   }
 
   if (!isAdmin) {
@@ -88,7 +89,11 @@ export default function AdminCharacterList() {
         <div className="overflow-auto flex-grow py-4">
           <div className="space-y-4">
             {allCharacters === undefined ? (
-              <p>Loading all characters...</p>
+              <div className="space-y-3">
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+              </div>
             ) : allCharacters.map((char) => (
               <Card key={char._id} className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => openEditDialog(char)}>
                 <CardContent className="p-4 flex justify-between items-center">

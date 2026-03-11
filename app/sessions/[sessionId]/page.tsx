@@ -11,6 +11,7 @@ import Link from 'next/link'
 import { Book, Calendar, ChevronLeft, Lock as LockIcon, Trash2, Pencil, Unlock, Shield, CheckCircle2, MapPin, Clock } from 'lucide-react'
 import SessionDialog from '@/app/session-dialog'
 import { useAuth } from '@clerk/nextjs'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
     AlertDialog,
     AlertDialogAction,
@@ -73,7 +74,56 @@ export default function SessionDetails() {
   }, [session, router])
 
   if (session === undefined || userCharacters === undefined || userCharacters === null || isAdmin === undefined || (isAdmin && allCharacters === undefined)) {
-    return <div className="container mx-auto px-4 py-8 text-center">Loading session details...</div>
+    return (
+        <div className="container mx-auto px-4 py-8 max-w-4xl">
+            <div className="flex justify-between items-center mb-6">
+                <Skeleton className="h-9 w-32" />
+                <div className="flex gap-2">
+                    <Skeleton className="h-9 w-24" />
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="md:col-span-2 space-y-8">
+                    <Card>
+                        <CardHeader>
+                            <div className="flex justify-between items-start">
+                                <div className="space-y-4 flex-grow">
+                                    <Skeleton className="h-9 w-64" />
+                                    <Skeleton className="h-6 w-48" />
+                                    <div className="space-y-2">
+                                        <Skeleton className="h-4 w-72" />
+                                        <Skeleton className="h-4 w-60" />
+                                    </div>
+                                </div>
+                                <Skeleton className="h-7 w-20 rounded-full" />
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <Skeleton className="h-7 w-48 mb-4" />
+                            <div className="space-y-3">
+                                <Skeleton className="h-20 w-full" />
+                                <Skeleton className="h-20 w-full" />
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+                <div className="space-y-8">
+                    <Card>
+                        <CardHeader>
+                            <Skeleton className="h-7 w-32" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-4">
+                                <Skeleton className="h-10 w-full" />
+                                <Skeleton className="h-10 w-full" />
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+        </div>
+    )
   }
 
   if (session === null) {

@@ -8,6 +8,7 @@ import { useState, useEffect } from 'react'
 import SessionDialog from './session-dialog'
 import Link from 'next/link'
 import { Book, Lock } from 'lucide-react'
+import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import './sessions.css'
 import type { Doc } from '../convex/_generated/dataModel'
@@ -158,7 +159,18 @@ export default function Sessions() {
       </CardHeader>
       <CardContent>
         {sessions === undefined ? (
-          <p>Loading sessions...</p>
+          <div className="space-y-6">
+            <div className="grid grid-cols-7 gap-4 mb-4">
+              {[...Array(7)].map((_, i) => (
+                <Skeleton key={i} className="h-20 w-full" />
+              ))}
+            </div>
+            <div className="space-y-4">
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
+            </div>
+          </div>
         ) : (
           <>
             {sessions.length === 0 && <p>No {showPastSessions ? 'past' : 'upcoming'} sessions found.</p>}

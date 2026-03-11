@@ -30,6 +30,7 @@ import { Doc } from '../convex/_generated/dataModel'
 import Sessions from './sessions'
 import CreateCharacter from './create-character'
 import AdminCharacterList from './admin-character-list'
+import { Skeleton } from '@/components/ui/skeleton'
 
 export default function Characters() {
   const characters = useQuery(api.characters.listCharacters)
@@ -102,7 +103,11 @@ export default function Characters() {
           </CardHeader>
           <CardContent>
             {characters === undefined ? (
-              <p>Loading...</p>
+              <div className="space-y-3">
+                <Skeleton className="h-14 w-full" />
+                <Skeleton className="h-14 w-full" />
+                <Skeleton className="h-14 w-full" />
+              </div>
             ) : !characters || characters.length === 0 ? (
               <p>You have no characters yet.</p>
             ) : (
@@ -161,16 +166,18 @@ export default function Characters() {
         </Card>
 
         {/* World Management */}
-        {isGM && (
+        {(isGM || isGM === undefined) && (
           <Card className="mt-8">
             <CardHeader>
               <CardTitle>Your World</CardTitle>
             </CardHeader>
             <CardContent>
-              {world === undefined ? (
-                <p>Loading...</p>
-              ) : world === null ? (
-                <>
+              {world === undefined || isGM === undefined ? (
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-7 w-32" />
+                  <Skeleton className="h-9 w-20" />
+                </div>
+              ) : world === null ? (                <>
                   <p>You don&apos;t have a world yet.</p>
                   <Button className="mt-4" onClick={() => setShowCreateWorldDialog(true)}>
                     Create World
