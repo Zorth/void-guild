@@ -12,7 +12,7 @@ import { Book, Calendar, ChevronLeft, Lock as LockIcon, Trash2, Pencil, Unlock, 
 import SessionDialog from '@/app/session-dialog'
 import { useAuth } from '@clerk/nextjs'
 import { Skeleton } from '@/components/ui/skeleton'
-import { cn } from '@/lib/utils'
+import { cn, getLevelBadgeStyle } from '@/lib/utils'
 import { fireJoinParticles } from '@/lib/particles'
 import {
     AlertDialog,
@@ -522,8 +522,14 @@ export default function SessionDetails() {
                                     <Book size={16} />
                                 </a>
                             </div>
-                            <div className="text-sm text-muted-foreground">
-                              Lvl {char.lvl} {char.class}
+                            <div className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
+                              <span 
+                                className="inline-flex align-middle justify-center w-12 rounded-full px-2 py-0.5 text-[10px] font-bold"
+                                style={getLevelBadgeStyle(char.lvl)}
+                              >
+                                Lvl {char.lvl}
+                              </span>
+                              <span>{char.class}</span>
                             </div>
                             {char.websiteLink && (
                                 <a 
@@ -623,7 +629,15 @@ export default function SessionDetails() {
                                 <div key={p.id} className="grid grid-cols-3 text-sm items-center py-2 border-b last:border-0">
                                     <div className="flex flex-col">
                                         <span className="font-semibold">{p.name}</span>
-                                        <span className="text-[10px] text-muted-foreground">Lvl {p.currentLvl} ({p.currentXp} XP)</span>
+                                        <div className="flex items-center gap-1 mt-0.5">
+                                            <span 
+                                                className="inline-flex align-middle justify-center w-12 rounded-full px-1.5 py-0.5 text-[10px] font-bold"
+                                                style={getLevelBadgeStyle(p.currentLvl)}
+                                            >
+                                                Lvl {p.currentLvl}
+                                            </span>
+                                            <span className="text-[10px] text-muted-foreground">({p.currentXp} XP)</span>
+                                        </div>
                                         {p.isGMCharacter && <span className="text-[10px] text-primary flex items-center gap-1"><Shield className="h-2 w-2"/> GM</span>}
                                     </div>
                                     <div className="text-center font-mono text-green-600">
@@ -631,13 +645,25 @@ export default function SessionDetails() {
                                     </div>
                                     <div className="text-right">
                                         {p.newLvl > p.currentLvl ? (
-                                            <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-[10px] font-bold">
-                                                Lvl {p.newLvl} ↑
-                                            </span>
+                                            <div className="flex flex-col items-end">
+                                                <span 
+                                                    className="inline-flex align-middle justify-center w-14 rounded-full px-2 py-0.5 text-[10px] font-bold border-2 border-green-500 bg-green-100 text-green-700"
+                                                >
+                                                    Lvl {p.newLvl} ↑
+                                                </span>
+                                                <div className="text-[10px] text-muted-foreground">({p.newXp} XP)</div>
+                                            </div>
                                         ) : (
-                                            <span>Lvl {p.newLvl}</span>
+                                            <div className="flex flex-col items-end">
+                                                <span 
+                                                    className="inline-flex align-middle justify-center w-12 rounded-full px-1.5 py-0.5 text-[10px] font-bold"
+                                                    style={getLevelBadgeStyle(p.newLvl)}
+                                                >
+                                                    Lvl {p.newLvl}
+                                                </span>
+                                                <div className="text-[10px] text-muted-foreground">({p.newXp} XP)</div>
+                                            </div>
                                         )}
-                                        <div className="text-[10px] text-muted-foreground">({p.newXp} XP)</div>
                                     </div>
                                 </div>
                             ))}
