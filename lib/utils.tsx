@@ -16,7 +16,7 @@ export function CharacterRankIcon({ rank, className }: { rank?: string, classNam
   }
 
   if (rank === 'journeyman') {
-    return <Medal className={cn("text-slate-400", className)} size={16} title="Journeyman" />;
+    return <Medal className={cn("text-purple-500", className)} size={16} title="Journeyman" />;
   }
 
   return null;
