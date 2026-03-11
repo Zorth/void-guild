@@ -10,7 +10,7 @@
 *   **Session Scheduling:** Game Masters can create and manage upcoming and past sessions.
 *   **Session Participation:** Players can join and leave sessions with their characters.
 *   **XP Tracking:** Sessions award experience points to participating characters.
-*   **Visual Cues:** Sessions are highlighted with a yellow border if owned by the current user and a purple background if one of the user's characters has joined.
+*   **Visual Cues:** Sessions are highlighted with a gold border if owned by the current user and a purple background if one of the user's characters has joined.
 *   **7-Day Overview:** A calendar-like view of upcoming sessions for the next seven days, with visual cues for owned and joined sessions.
 *   **Character Website Links:** Characters can have an associated website link, editable by the owner and visible to all in session details.
 *   **Session Locking:** Game Masters can lock sessions to finalize attendance and XP awards.

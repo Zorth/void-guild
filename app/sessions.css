@@ -1,5 +1,12 @@
 .session-owner {
-  border: 2px solid #FBBF24; /* yellow-400 */
+  border: 2px solid transparent;
+  background: linear-gradient(var(--card), var(--card)) padding-box,
+              linear-gradient(to bottom right, #BF953F, #FCF6BA, #AA771C) border-box;
+}
+
+.session-owner:hover {
+  background: linear-gradient(rgba(212, 175, 55, 0.05), rgba(212, 175, 55, 0.05)) padding-box,
+              linear-gradient(to bottom right, #BF953F, #FCF6BA, #AA771C) border-box;
 }
 
 .session-joined {
@@ -38,7 +45,9 @@
 }
 
 .day-box.day-box-owner {
-    border: 2px solid #FBBF24; /* yellow-400 */
+    border: 2px solid transparent;
+    background: linear-gradient(var(--card), var(--card)) padding-box,
+                linear-gradient(to bottom right, #BF953F, #FCF6BA, #AA771C) border-box;
 }
 
 .day-box.day-box-joined {

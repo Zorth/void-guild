@@ -4,7 +4,7 @@ export const fireVoidParticles = (x: number, y: number) => {
   const count = 40;
   const defaults = {
     origin: { x: x / window.innerWidth, y: y / window.innerHeight },
-    colors: ['#7E22CE', '#D8B4FE', '#FBBF24', '#FFFFFF'], // Purple, Light Purple, Gold, White
+    colors: ['#7E22CE', '#D8B4FE', '#D4AF37', '#FFFFFF'], // Purple, Light Purple, Gold, White
   };
 
   confetti({
