@@ -245,6 +245,11 @@ export default function Sessions() {
                               </span>
                               {session.worldName}
                           </div>
+                          {session.characters.length >= session.maxPlayers && (
+                            <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800 uppercase tracking-wider">
+                              Full
+                            </span>
+                          )}
                           {session.locked && <Lock className="h-3 w-3 text-muted-foreground" />}
                         </div>
                         <div className="text-sm font-medium">
