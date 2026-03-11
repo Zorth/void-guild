@@ -27,6 +27,10 @@ export default defineSchema({
             oldXp: v.number()
         }))),
         owner: v.string(), // Clerk userId of the GM
+        interestedPlayers: v.optional(v.array(v.object({ // New field for interested players
+            userId: v.string(),
+            username: v.string(),
+        }))),
   }),
     worlds: defineTable({
         name: v.string(),

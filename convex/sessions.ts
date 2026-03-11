@@ -147,6 +147,7 @@ export const getSession = query({
       gmCharacterData: isOwner ? gmCharacterData : undefined,
       attendingCharacters: characterDocs.filter((c): c is Doc<'characters'> => c !== null),
       isOwner,
+      interestedPlayers: session.interestedPlayers || [], // Include interested players
     }
   },
 })
@@ -347,6 +348,43 @@ export const leaveSession = mutation({
       characters: session.characters.filter(id => id !== args.characterId),
     })
   }
+})
+
+export const expressInterest = mutation({
+  args: { sessionId: v.id('sessions') },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    const session = await ctx.db.get(args.sessionId)
+    if (!session) throw new Error('Session not found')
+
+    const interestedPlayers = session.interestedPlayers || []
+    if (interestedPlayers.some(p => p.userId === user.subject)) {
+      // User already expressed interest
+      return
+    }
+
+    const newInterestedPlayers = [...interestedPlayers, { userId: user.subject, username: user.name || user.nickname || 'Anonymous' }]
+
+    await ctx.db.patch(args.sessionId, { interestedPlayers: newInterestedPlayers })
+  },
+})
+
+export const withdrawInterest = mutation({
+  args: { sessionId: v.id('sessions') },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    const session = await ctx.db.get(args.sessionId)
+    if (!session) throw new Error('Session not found')
+
+    const interestedPlayers = session.interestedPlayers || []
+    const newInterestedPlayers = interestedPlayers.filter(p => p.userId !== user.subject)
+
+    await ctx.db.patch(args.sessionId, { interestedPlayers: newInterestedPlayers })
+  },
 })
 
 export const lockSession = mutation({

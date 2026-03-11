@@ -10,6 +10,7 @@ import { Id, Doc } from '@/convex/_generated/dataModel'
 import Link from 'next/link'
 import { Book, ChevronLeft, Lock as LockIcon, Trash2, Pencil, Unlock, Shield, CheckCircle2, MapPin, Clock } from 'lucide-react'
 import SessionDialog from '@/app/session-dialog'
+import { useAuth } from '@clerk/nextjs' // Import useAuth
 import {
     AlertDialog,
     AlertDialogAction,
@@ -27,6 +28,7 @@ interface SessionWithGM extends Doc<'sessions'> {
     isOwner: boolean;
     gmCharacterData?: Doc<'characters'> | null;
     worldName: string; // Add worldName to the interface
+    interestedPlayers?: { userId: string; username: string }[]; // New field
 }
 
 export default function SessionDetails() {
@@ -44,7 +46,10 @@ export default function SessionDetails() {
   const forceLockSession = useMutation(api.sessions.forceLockSession)
   const forceUnlockSession = useMutation(api.sessions.forceUnlockSession)
   const deleteSession = useMutation(api.sessions.deleteSession) // Moved to top
+  const expressInterest = useMutation(api.sessions.expressInterest) // New mutation
+  const withdrawInterest = useMutation(api.sessions.withdrawInterest) // New mutation
 
+  const { userId } = useAuth() // Get current user's ID
   const [selectedCharacterId, setSelectedCharacterId] = useState<Id<'characters'> | ''>('')
 
   // Handle redirection to home page if session is not found/deleted
@@ -125,6 +130,22 @@ export default function SessionDetails() {
     // This is within an AlertDialog, so the user has already confirmed deletion.
     await deleteSession({ sessionId: session._id })
     // The useEffect will handle the redirection after session becomes null
+  }
+
+  const handleExpressInterest = async () => {
+    try {
+        await expressInterest({ sessionId: session._id })
+    } catch (e) {
+        alert(e instanceof Error ? e.message : 'Failed to express interest')
+    }
+  }
+
+  const handleWithdrawInterest = async () => {
+    try {
+        await withdrawInterest({ sessionId: session._id })
+    } catch (e) {
+        alert(e instanceof Error ? e.message : 'Failed to withdraw interest')
+    }
   }
 
   const handleSendToDiscord = async () => {
@@ -430,9 +451,57 @@ export default function SessionDetails() {
               )}
             </CardContent>
           </Card>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl font-semibold mb-4">Interested Players</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {session.interestedPlayers && session.interestedPlayers.length > 0 ? (
+                <ul className="grid grid-cols-1 gap-3">
+                  {session.interestedPlayers.map((player) => (
+                    <li key={player.userId} className="flex items-center justify-between p-4 rounded-lg border bg-muted/20">
+                      <div className="font-bold">{player.username}</div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-muted-foreground italic">No players have expressed interest yet.</p>
+              )}
+            </CardContent>
+          </Card>
+
         </div>
 
+
         <div className="space-y-8">
+          {userId && !session.characters.some(charId => userCharacters.some(uc => uc._id === charId && uc.userId === userId)) && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Express Interest</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {session.locked ? (
+                  <div className="text-sm text-muted-foreground italic text-center p-4 bg-muted/30 rounded-md">
+                      This session has ended.
+                  </div>
+                ) : isFull ? (
+                  <div className="text-sm text-destructive italic text-center p-4 bg-destructive/5 rounded-md">
+                      This session is currently full, but you can still express interest.
+                  </div>
+                ) : session.interestedPlayers?.some(p => p.userId === userId) ? (
+                  <Button className="w-full" variant="outline" onClick={handleWithdrawInterest}>
+                    Withdraw Interest
+                  </Button>
+                ) : (
+                  <Button className="w-full" onClick={handleExpressInterest}>
+                    Express Interest
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle>Join Session</CardTitle>
