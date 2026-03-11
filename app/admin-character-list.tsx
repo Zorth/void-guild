@@ -36,7 +36,7 @@ export default function AdminCharacterList() {
   })
 
   // Handle loading states and non-admin access after all hooks are called
-  if (isAdmin === undefined || allCharacters === undefined) {
+  if (isAdmin === undefined || (isAdmin && allCharacters === undefined)) {
     return <p>Loading...</p>
   }
 
