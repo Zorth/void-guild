@@ -12,6 +12,7 @@ import { Book, Calendar, ChevronLeft, Lock as LockIcon, Trash2, Pencil, Unlock, 
 import SessionDialog from '@/app/session-dialog'
 import { useAuth } from '@clerk/nextjs'
 import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
 import {
     AlertDialog,
     AlertDialogAction,
@@ -491,11 +492,23 @@ export default function SessionDetails() {
               ) : (
                 <ul className="grid grid-cols-1 gap-3">
                   {session.attendingCharacters.map((char) => {
-                    const canRemove = !session.locked && (session.isOwner || userCharacters.some(uc => uc._id === char._id))
+                    const isUserCharacter = userCharacters.some(uc => uc._id === char._id)
+                    const canRemove = !session.locked && (session.isOwner || isUserCharacter)
                     return (
-                        <li key={char._id} className="flex items-center justify-between p-4 rounded-lg border bg-muted/20">
+                        <li 
+                            key={char._id} 
+                            className={cn(
+                                "flex items-center justify-between p-4 rounded-lg border transition-colors",
+                                isUserCharacter 
+                                    ? "bg-purple-500/10 border-purple-300 dark:border-purple-800 shadow-sm" 
+                                    : "bg-muted/20"
+                            )}
+                        >
                           <div>
-                            <div className="font-bold">{char.name}</div>
+                            <div className="font-bold flex items-center gap-2">
+                                {char.name}
+                                {isUserCharacter && <span className="text-[10px] bg-purple-200 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded-full uppercase tracking-wider font-bold">You</span>}
+                            </div>
                             <div className="text-sm text-muted-foreground">
                               Lvl {char.lvl} {char.class}
                             </div>
