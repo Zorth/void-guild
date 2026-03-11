@@ -86,10 +86,9 @@ export const listSessions = query({
     }
 
     const isAdminUser = await isAdmin(ctx)
-    const now = Date.now()
     const sessions = await ctx.db
       .query('sessions')
-      .filter((q) => (args.past ? q.lt(q.field('date'), now) : q.gte(q.field('date'), now)))
+      .filter((q) => q.eq(q.field('locked'), args.past))
       .collect()
 
     const sessionsWithDetails = await Promise.all(
