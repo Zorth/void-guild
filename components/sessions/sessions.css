@@ -5,8 +5,8 @@
 }
 
 .session-owner:hover {
-  background: linear-gradient(rgba(212, 175, 55, 0.05), rgba(212, 175, 55, 0.05)) padding-box,
-              linear-gradient(to bottom right, #BF953F, #FCF6BA, #AA771C) border-box;
+  background: linear-gradient(var(--muted), var(--muted)) padding-box,
+              linear-gradient(to bottom right, #D4AF37, #FFFFFF, #D4AF37) border-box;
 }
 
 .session-joined {
@@ -16,6 +16,7 @@
 
 .session-joined:hover {
     background-color: rgba(147, 51, 234, 0.2);
+    border-color: #E9D5FF;
 }
 
 .session-joined .session-world {
@@ -29,10 +30,11 @@
 
 .session-admin-joined:hover {
     background-color: rgba(147, 51, 234, 0.2);
+    border-color: #E9D5FF;
 }
 
 .session-default:hover {
-  background-color: hsl(var(--muted) / 0.5);
+  background-color: var(--muted);
 }
 
 

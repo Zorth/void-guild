@@ -35,7 +35,7 @@ export default function AttendingCharactersList({
                 className={cn(
                     "flex items-center justify-between p-4 rounded-lg border transition-colors",
                     isUserCharacter 
-                        ? "bg-purple-500/10 border-purple-300 dark:border-purple-800 shadow-sm" 
+                        ? "bg-[rgba(147,51,234,0.1)] border-2 border-[#D8B4FE] hover:border-[#E9D5FF] hover:bg-[rgba(147,51,234,0.2)] shadow-sm" 
                         : "bg-muted/20"
                 )}
             >
