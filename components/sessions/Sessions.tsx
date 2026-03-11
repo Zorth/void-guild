@@ -1,17 +1,17 @@
 'use client'
 
 import { useQuery } from 'convex/react'
-import { api } from '../convex/_generated/api'
+import { api } from '@/convex/_generated/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useState, useEffect } from 'react'
-import SessionDialog from './session-dialog'
+import SessionDialog from './SessionDialog'
 import Link from 'next/link'
 import { Book, Lock } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn, getLevelBadgeStyle } from '@/lib/utils'
 import './sessions.css'
-import type { Doc } from '../convex/_generated/dataModel'
+import type { Doc } from '@/convex/_generated/dataModel'
 
 type SessionWithDetails = Doc<'sessions'> & {
     isOwner: boolean;

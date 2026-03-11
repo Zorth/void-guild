@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery, useMutation } from 'convex/react'
-import { api } from '../convex/_generated/api'
+import { api } from '@/convex/_generated/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -15,7 +15,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { FormEvent, useState } from 'react'
-import { Doc } from '../convex/_generated/dataModel'
+import { Doc } from '@/convex/_generated/dataModel'
 import { Shield } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 

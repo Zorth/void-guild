@@ -2,7 +2,7 @@
 
 import { Authenticated, Unauthenticated, AuthLoading } from 'convex/react'
 import { SignInButton, UserButton } from '@clerk/nextjs'
-import Characters from './characters'
+import Characters from '@/components/characters/Characters'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'

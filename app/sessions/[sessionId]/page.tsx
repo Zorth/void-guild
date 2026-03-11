@@ -8,11 +8,10 @@ import { Button } from '@/components/ui/button'
 import { useState, useEffect } from 'react'
 import { Id, Doc } from '@/convex/_generated/dataModel'
 import Link from 'next/link'
-import { Book, Calendar, ChevronLeft, Lock as LockIcon, Trash2, Pencil, Unlock, Shield, CheckCircle2, MapPin, Clock } from 'lucide-react'
-import SessionDialog from '@/app/session-dialog'
+import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, Unlock } from 'lucide-react'
 import { useAuth } from '@clerk/nextjs'
 import { Skeleton } from '@/components/ui/skeleton'
-import { cn, getLevelBadgeStyle, CharacterRankIcon } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { fireJoinParticles } from '@/lib/particles'
 import {
     AlertDialog,
@@ -34,12 +33,18 @@ import {
     DialogDescription,
 } from '@/components/ui/dialog'
 
+// Sub-components
+import AttendingCharactersList from '@/components/sessions/details/AttendingCharactersList'
+import InterestedPlayersList from '@/components/sessions/details/InterestedPlayersList'
+import SessionManagement from '@/components/sessions/details/SessionManagement'
+import SessionJoinForm from '@/components/sessions/details/SessionJoinForm'
+
 interface SessionWithGM extends Doc<'sessions'> {
     attendingCharacters: Doc<'characters'>[];
     isOwner: boolean;
     gmCharacterData?: Doc<'characters'> | null;
-    worldName: string; // Add worldName to the interface
-    interestedPlayers?: { userId: string; username: string }[]; // New field
+    worldName: string;
+    interestedPlayers?: { userId: string; username: string }[];
 }
 
 export default function SessionDetails() {
@@ -56,7 +61,6 @@ export default function SessionDetails() {
   const unlockSession = useMutation(api.sessions.unlockSession)
   const forceLockSession = useMutation(api.sessions.forceLockSession)
   const forceUnlockSession = useMutation(api.sessions.forceUnlockSession)
-  const deleteSession = useMutation(api.sessions.deleteSession)
   const adminAddCharacterToSession = useMutation(api.sessions.adminAddCharacterToSession)
   const expressInterest = useMutation(api.sessions.expressInterest)
   const withdrawInterest = useMutation(api.sessions.withdrawInterest)
@@ -68,7 +72,6 @@ export default function SessionDetails() {
   const [selectedCharacterId, setSelectedCharacterId] = useState<Id<'characters'> | ''>('')
   const [selectedAdminCharacterId, setSelectedAdminCharacterId] = useState<Id<'characters'> | ''>('')
 
-  // Handle redirection to home page if session is not found/deleted
   useEffect(() => {
     if (session === null) {
       router.push('/')
@@ -128,21 +131,16 @@ export default function SessionDetails() {
     )
   }
 
-  if (session === null) {
-    return null;
-  }
+  if (session === null) return null;
 
-  // Check if the current user has any character already in the session
+  const userCharacterIds = new Set(userCharacters.map(c => c._id))
   const hasUserCharacterInSession = userCharacters.some(userChar =>
     session.attendingCharacters.some(sessionChar => sessionChar._id === userChar._id)
   )
 
   const handleJoin = async (event: React.MouseEvent) => {
     if (!selectedCharacterId) return
-
-    // Trigger particle effect at the mouse position
     fireJoinParticles(event.clientX, event.clientY);
-
     try {
         await joinSession({
             sessionId: session._id,
@@ -156,49 +154,30 @@ export default function SessionDetails() {
 
   const handleLeave = async (characterId: Id<'characters'>) => {
     try {
-        await leaveSession({
-            sessionId: session._id,
-            characterId,
-        })
+        await leaveSession({ sessionId: session._id, characterId })
     } catch (e) {
         alert(e instanceof Error ? e.message : 'Failed to leave session')
     }
   }
 
   const handleLock = async () => {
-    try {
-        await lockSession({ sessionId: session._id })
-    } catch (e) {
-        alert(e instanceof Error ? e.message : 'Failed to lock session')
-    }
+    try { await lockSession({ sessionId: session._id }) }
+    catch (e) { alert(e instanceof Error ? e.message : 'Failed to lock session') }
   }
 
   const handleUnlock = async () => {
-    try {
-        await unlockSession({ sessionId: session._id })
-    } catch (e) {
-        alert(e instanceof Error ? e.message : 'Failed to unlock session')
-    }
+    try { await unlockSession({ sessionId: session._id }) }
+    catch (e) { alert(e instanceof Error ? e.message : 'Failed to unlock session') }
   }
 
   const handleForceLock = async () => {
-    try {
-        await forceLockSession({ sessionId: session._id })
-    } catch (e) {
-        alert(e instanceof Error ? e.message : 'Failed to force close session')
-    }
+    try { await forceLockSession({ sessionId: session._id }) }
+    catch (e) { alert(e instanceof Error ? e.message : 'Failed to force close session') }
   }
 
   const handleForceUnlock = async () => {
-    try {
-        await forceUnlockSession({ sessionId: session._id })
-    } catch (e) {
-        alert(e instanceof Error ? e.message : 'Failed to force unlock session')
-    }
-  }
-
-  const handleDelete = async () => {
-    await deleteSession({ sessionId: session._id })
+    try { await forceUnlockSession({ sessionId: session._id }) }
+    catch (e) { alert(e instanceof Error ? e.message : 'Failed to force unlock session') }
   }
 
   const handleAdminAddCharacter = async () => {
@@ -215,19 +194,13 @@ export default function SessionDetails() {
   }
 
   const handleExpressInterest = async () => {
-    try {
-        await expressInterest({ sessionId: session._id })
-    } catch (e) {
-        alert(e instanceof Error ? e.message : 'Failed to express interest')
-    }
+    try { await expressInterest({ sessionId: session._id }) }
+    catch (e) { alert(e instanceof Error ? e.message : 'Failed to express interest') }
   }
 
   const handleWithdrawInterest = async () => {
-    try {
-        await withdrawInterest({ sessionId: session._id })
-    } catch (e) {
-        alert(e instanceof Error ? e.message : 'Failed to withdraw interest')
-    }
+    try { await withdrawInterest({ sessionId: session._id }) }
+    catch (e) { alert(e instanceof Error ? e.message : 'Failed to withdraw interest') }
   }
 
   const handleSendToDiscord = async () => {
@@ -245,48 +218,26 @@ export default function SessionDetails() {
       description: `A new session for "${session.worldName}" has been announced!`,
       color: 5814783,
       fields: [
-        {
-          name: 'Date & Time',
-          value: `${formattedDate} at ${formattedTime}`,
-          inline: false,
-        },
-        {
-          name: 'Level',
-          value: session.level ? `Level ${session.level}` : 'TBD',
-          inline: true,
-        },
-        {
-          name: 'Players',
-          value: `${session.attendingCharacters.length}/${session.maxPlayers}`,
-          inline: true,
-        },
+        { name: 'Date & Time', value: `${formattedDate} at ${formattedTime}`, inline: false },
+        { name: 'Level', value: session.level ? `Level ${session.level}` : 'TBD', inline: true },
+        { name: 'Players', value: `${session.attendingCharacters.length}/${session.maxPlayers}`, inline: true },
       ],
       timestamp: new Date().toISOString(),
       url: `${window.location.origin}/sessions/${session._id}`,
     }
 
     if (session.location) {
-        embed.fields.push({
-            name: 'Location',
-            value: `[View on Google Maps](${session.location})`,
-            inline: false,
-        })
+        embed.fields.push({ name: 'Location', value: `[View on Google Maps](${session.location})`, inline: false })
     }
 
     if (session.attendingCharacters && session.attendingCharacters.length > 0) {
-        embed.fields.push({
-            name: 'Attending Characters',
-            value: session.attendingCharacters.map(char => char.name).join(', '),
-            inline: false,
-        })
+        embed.fields.push({ name: 'Attending Characters', value: session.attendingCharacters.map(char => char.name).join(', '), inline: false })
     }
 
     try {
       await fetch(webhookUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ embeds: [embed] }),
       })
       alert('Session details sent to Discord!')
@@ -296,21 +247,11 @@ export default function SessionDetails() {
     }
   }
 
-  // Filter out characters already in the session
-  const availableCharacters = userCharacters.filter(
-    (char) => !session.characters.includes(char._id)
-  )
-
-  // Filter all characters for admin, excluding those already in session
-  const adminAvailableCharacters = allCharacters?.filter(
-    (char) => !session.characters.includes(char._id)
-  ) ?? []
-
+  const availableCharacters = userCharacters.filter(char => !session.characters.includes(char._id))
+  const adminAvailableCharacters = allCharacters?.filter(char => !session.characters.includes(char._id)) ?? []
   const isFull = session.characters.length >= session.maxPlayers
-
   const sessionTime = new Date(session.date)
   const arrivalEndTime = new Date(session.date + 30 * 60 * 1000)
-  
   const formatTime = (date: Date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
   const getGoogleCalendarLink = () => {
@@ -442,19 +383,13 @@ export default function SessionDetails() {
                     <DialogContent className="sm:max-w-[425px]">
                       <DialogHeader>
                         <DialogTitle>Admin: Add Character</DialogTitle>
-                        <DialogDescription>
-                          Select a character to add to this session.
-                        </DialogDescription>
+                        <DialogDescription>Select a character to add to this session.</DialogDescription>
                       </DialogHeader>
                       <div className="grid gap-4 py-4">
                         {session.locked ? (
-                          <p className="text-sm text-muted-foreground italic text-center p-4 bg-muted/30 rounded-md">
-                              This session has ended.
-                          </p>
+                          <p className="text-sm text-muted-foreground italic text-center p-4 bg-muted/30 rounded-md">This session has ended.</p>
                         ) : isFull ? (
-                          <p className="text-sm text-destructive italic text-center p-4 bg-destructive/5 rounded-md">
-                              This session is full, cannot add more.
-                          </p>
+                          <p className="text-sm text-destructive italic text-center p-4 bg-destructive/5 rounded-md">This session is full, cannot add more.</p>
                         ) : allCharacters && allCharacters.length > 0 ? (
                           <div className="space-y-4">
                             <div className="flex flex-col gap-2">
@@ -467,103 +402,27 @@ export default function SessionDetails() {
                               >
                                 <option value="">-- Choose a character --</option>
                                 {adminAvailableCharacters.map((char) => (
-                                  <option key={char._id} value={char._id}>
-                                    {char.name} (Lvl {char.lvl})
-                                  </option>
+                                  <option key={char._id} value={char._id}>{char.name} (Lvl {char.lvl})</option>
                                 ))}
                               </select>
                             </div>
-                            <Button
-                              className="w-full"
-                              disabled={!selectedAdminCharacterId}
-                              onClick={handleAdminAddCharacter}
-                            >
-                              Add Character (Admin)
-                            </Button>
+                            <Button className="w-full" disabled={!selectedAdminCharacterId} onClick={handleAdminAddCharacter}>Add Character (Admin)</Button>
                           </div>
                         ) : (
-                          <p className="text-sm text-muted-foreground italic text-center p-4 bg-muted/10 rounded-md">
-                            No characters available to add.
-                          </p>
+                          <p className="text-sm text-muted-foreground italic text-center p-4 bg-muted/10 rounded-md">No characters available to add.</p>
                         )}
                       </div>
                     </DialogContent>
                   </Dialog>
                 )}
               </h3>
-              {session.attendingCharacters.length === 0 ? (
-                <p className="text-muted-foreground italic">No characters have joined this session yet.</p>
-              ) : (
-                <ul className="grid grid-cols-1 gap-3">
-                  {session.attendingCharacters.map((char) => {
-                    const isUserCharacter = userCharacters.some(uc => uc._id === char._id)
-                    const canRemove = !session.locked && (session.isOwner || isUserCharacter)
-                    return (
-                        <li 
-                            key={char._id} 
-                            className={cn(
-                                "flex items-center justify-between p-4 rounded-lg border transition-colors",
-                                isUserCharacter 
-                                    ? "bg-purple-500/10 border-purple-300 dark:border-purple-800 shadow-sm" 
-                                    : "bg-muted/20"
-                            )}
-                        >
-                          <div>
-                            <div className="font-bold flex items-center gap-2">
-                                {char.name}
-                                {isUserCharacter && <span className="text-[10px] bg-purple-200 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded-full uppercase tracking-wider font-bold">You</span>}
-                                {/* Book Icon */}
-                                <a
-                                    href={`https://void.tarragon.be/Player-Characters/${char.name.replace(/\s+/g, '-')}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-muted-foreground hover:text-blue-500"
-                                >
-                                    <Book size={16} />
-                                </a>
-                            </div>
-                            <div className="text-[10px] text-muted-foreground mt-1">
-                              {char.class}
-                            </div>
-                            {char.websiteLink && (
-                                <a 
-                                    href={char.websiteLink} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer" 
-                                    className="text-[10px] text-blue-500 hover:underline"
-                                >
-                                    {char.websiteLink}
-                                </a>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="flex flex-col items-end">
-                                <div className="flex items-center gap-1">
-                                    <CharacterRankIcon rank={char.rank} />
-                                    <span 
-                                        className="inline-flex align-middle justify-center w-12 rounded-full px-2 py-0.5 text-[10px] font-bold"
-                                        style={getLevelBadgeStyle(char.lvl)}
-                                    >
-                                        Lvl {char.lvl}
-                                    </span>
-                                </div>
-                            </div>
-                            {canRemove && (
-                                <Button 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8"
-                                    onClick={() => handleLeave(char._id)}
-                                >
-                                    <Trash2 className="h-4 w-4" />
-                                </Button>
-                            )}
-                          </div>
-                        </li>
-                    )
-                  })}
-                </ul>
-              )}
+              <AttendingCharactersList 
+                characters={session.attendingCharacters}
+                userCharacterIds={userCharacterIds}
+                sessionLocked={session.locked}
+                isSessionOwner={session.isOwner}
+                onLeave={handleLeave}
+              />
             </CardContent>
           </Card>
           
@@ -572,123 +431,21 @@ export default function SessionDetails() {
               <CardTitle className="text-xl font-semibold mb-4">Interested Players</CardTitle>
             </CardHeader>
             <CardContent>
-              {session.interestedPlayers && session.interestedPlayers.length > 0 ? (
-                <ul className="grid grid-cols-1 gap-3">
-                  {session.interestedPlayers.map((player) => (
-                    <li key={player.userId} className="flex items-center justify-between p-4 rounded-lg border bg-muted/20">
-                      <div className="font-bold">{player.username}</div>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-muted-foreground italic">No players have expressed interest yet.</p>
-              )}
+              <InterestedPlayersList interestedPlayers={session.interestedPlayers || []} />
             </CardContent>
           </Card>
-
         </div>
-
 
         <div className="space-y-8">
           {(session.isOwner || isAdmin) && !session.locked && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Session Management</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button variant="outline" className="w-full justify-start" onClick={handleSendToDiscord}>
-                    <img src="/discord-icon.svg" alt="Discord" className="mr-2 h-4 w-4" />
-                    Announce on Discord
-                </Button>
-                
-                <SessionDialog 
-                    session={session} 
-                    trigger={
-                        <Button variant="outline" className="w-full justify-start">
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit Session
-                        </Button>
-                    }
-                    hasWorld={true}
-                />
-
-                <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                        <Button variant="default" className="w-full justify-start">
-                            <CheckCircle2 className="h-4 w-4 mr-2" />
-                            End Session
-                        </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent className="max-w-2xl">
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>Confirm End of Session</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                The following characters will be awarded XP and potentially level up based on the session level ({session.level ?? 'Level TBD'}).
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <div className="py-4 space-y-4 max-h-[400px] overflow-auto">
-                            <div className="grid grid-cols-3 font-bold text-sm border-b pb-2">
-                                <span>Character</span>
-                                <span className="text-center">XP Gain</span>
-                                <span className="text-right">New Level</span>
-                            </div>
-                            {xpGainsPreview?.map((p) => (
-                                <div key={p.id} className="grid grid-cols-3 text-sm items-center py-2 border-b last:border-0">
-                                    <div className="flex flex-col">
-                                        <span className="font-semibold">{p.name}</span>
-                                        <div className="flex items-center gap-1 mt-0.5">
-                                            <CharacterRankIcon rank={p.rank} />
-                                            <span 
-                                                className="inline-flex align-middle justify-center w-12 rounded-full px-1.5 py-0.5 text-[10px] font-bold"
-                                                style={getLevelBadgeStyle(p.currentLvl)}
-                                            >
-                                                Lvl {p.currentLvl}
-                                            </span>
-                                            <span className="text-[10px] text-muted-foreground">({p.currentXp} XP)</span>
-                                        </div>
-                                        {p.isGMCharacter && <span className="text-[10px] text-primary flex items-center gap-1"><Shield className="h-2 w-2"/> GM</span>}
-                                    </div>
-                                    <div className="text-center font-mono text-green-600">
-                                        +{p.xpGain}
-                                    </div>
-                                    <div className="text-right">
-                                        {p.newLvl > p.currentLvl ? (
-                                            <div className="flex flex-col items-end">
-                                                <span 
-                                                    className="inline-flex align-middle justify-center w-14 rounded-full px-2 py-0.5 text-[10px] font-bold border-2 border-green-500 bg-green-100 text-green-700"
-                                                >
-                                                    Lvl {p.newLvl} ↑
-                                                </span>
-                                                <div className="text-[10px] text-muted-foreground">({p.newXp} XP)</div>
-                                            </div>
-                                        ) : (
-                                            <div className="flex flex-col items-end">
-                                                <span 
-                                                    className="inline-flex align-middle justify-center w-12 rounded-full px-1.5 py-0.5 text-[10px] font-bold"
-                                                    style={getLevelBadgeStyle(p.newLvl)}
-                                                >
-                                                    Lvl {p.newLvl}
-                                                </span>
-                                                <div className="text-[10px] text-muted-foreground">({p.newXp} XP)</div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                        <AlertDialogFooter className="flex-wrap justify-end">
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleLock} disabled={session.level === undefined}>Confirm & Award XP</AlertDialogAction>
-                            {isAdmin && (
-                                <AlertDialogAction onClick={handleForceLock} variant="destructive">
-                                    Force Close (No XP)
-                                </AlertDialogAction>
-                            )}
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
-              </CardContent>
-            </Card>
+            <SessionManagement 
+                session={session}
+                isAdmin={isAdmin}
+                onSendToDiscord={handleSendToDiscord}
+                onLock={handleLock}
+                onForceLock={handleForceLock}
+                xpGainsPreview={xpGainsPreview || []}
+            />
           )}
 
           {userId !== session.owner && (
@@ -725,53 +482,16 @@ export default function SessionDetails() {
                 </Card>
               )}
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Join Session</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {session.locked ? (
-                    <div className="text-sm text-muted-foreground italic text-center p-4 bg-muted/30 rounded-md">
-                        This session has ended.
-                    </div>
-                  ) : isFull ? (
-                    <div className="text-sm text-destructive italic text-center p-4 bg-destructive/5 rounded-md">
-                        This session is currently full.
-                    </div>
-                  ) : availableCharacters.length === 0 ? (
-                    <p className="text-sm text-muted-foreground italic text-center p-4 bg-muted/10 rounded-md">
-                      {userCharacters.length === 0 
-                        ? "You don't have any characters yet. Create one on the home page!" 
-                        : "All your characters are already in this session."}
-                    </p>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="flex flex-col gap-2">
-                        <label className="text-sm font-medium">Select Character</label>
-                        <select
-                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                          value={selectedCharacterId}
-                          onChange={(e) => setSelectedCharacterId(e.target.value as Id<'characters'>)}
-                        >
-                          <option value="">-- Choose a character --</option>
-                          {availableCharacters.map((char) => (
-                            <option key={char._id} value={char._id}>
-                              {char.name} (Lvl {char.lvl})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <Button 
-                        className="w-full" 
-                        disabled={!selectedCharacterId || hasUserCharacterInSession} // Disable if no character selected or user has char in session
-                        onClick={(e) => handleJoin(e)}
-                      >
-                        Join Session
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <SessionJoinForm 
+                sessionLocked={session.locked}
+                isFull={isFull}
+                availableCharacters={availableCharacters}
+                userCharactersCount={userCharacters.length}
+                selectedCharacterId={selectedCharacterId}
+                hasUserCharacterInSession={hasUserCharacterInSession}
+                onCharacterSelect={setSelectedCharacterId}
+                onJoin={handleJoin}
+              />
             </>
           )}
         </div>

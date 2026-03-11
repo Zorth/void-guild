@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery, useMutation } from 'convex/react'
-import { api } from '../convex/_generated/api'
+import { api } from '@/convex/_generated/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -26,10 +26,10 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { FormEvent, useState } from 'react'
-import { Doc } from '../convex/_generated/dataModel'
-import Sessions from './sessions'
-import CreateCharacter from './create-character'
-import AdminCharacterList from './admin-character-list'
+import { Doc } from '@/convex/_generated/dataModel'
+import Sessions from '@/components/sessions/Sessions'
+import CreateCharacter from './CreateCharacter'
+import AdminCharacterList from './AdminCharacterList'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getLevelBadgeStyle, CharacterRankIcon } from '@/lib/utils'
 
