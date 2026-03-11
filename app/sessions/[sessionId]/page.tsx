@@ -569,7 +569,7 @@ export default function SessionDetails() {
 
 
         <div className="space-y-8">
-          {session.isOwner && !session.locked && (
+          {(session.isOwner || isAdmin) && !session.locked && (
             <Card>
               <CardHeader>
                 <CardTitle>Session Management</CardTitle>
@@ -649,7 +649,7 @@ export default function SessionDetails() {
             </Card>
           )}
 
-          {!session.isOwner && (
+          {userId !== session.owner && (
             <>
               {userId && !hasUserCharacterInSession && (
                 <Card>
