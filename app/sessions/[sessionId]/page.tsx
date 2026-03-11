@@ -566,7 +566,7 @@ export default function SessionDetails() {
           {userId && !hasUserCharacterInSession && (
             <Card>
               <CardHeader>
-                <CardTitle>Express Interest</CardTitle>
+                <CardTitle>Interested?</CardTitle>
               </CardHeader>
               <CardContent>
                 {session.locked ? (
@@ -582,11 +582,11 @@ export default function SessionDetails() {
                     )}
                     {session.interestedPlayers?.some(p => p.userId === userId) ? (
                       <Button className="w-full" variant="outline" onClick={handleWithdrawInterest}>
-                        Withdraw Interest
+                        Not anymore :(
                       </Button>
                     ) : (
                       <Button className="w-full" onClick={handleExpressInterest}>
-                        Express Interest
+                        Yes! :)
                       </Button>
                     )}
                   </div>
