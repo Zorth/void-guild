@@ -19,9 +19,10 @@ import { Doc } from '../convex/_generated/dataModel'
 import { Shield } from 'lucide-react'
 
 export default function AdminCharacterList() {
-  const allCharacters = useQuery(api.characters.listAllCharacters)
-  const adminUpdateCharacter = useMutation(api.characters.adminUpdateCharacter)
   const isAdmin = useQuery(api.sessions.isAdminQuery)
+  const allCharacters = useQuery(api.characters.listAllCharacters, isAdmin ? undefined : "skip")
+  const adminUpdateCharacter = useMutation(api.characters.adminUpdateCharacter)
+  if (!isAdmin) return null
 
   const [selectedCharacter, setSelectedCharacter] = useState<Doc<'characters'> | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -34,7 +35,6 @@ export default function AdminCharacterList() {
     websiteLink: '',
   })
 
-  if (!isAdmin) return null
 
   function openEditDialog(character: Doc<'characters'>) {
     setSelectedCharacter(character)
