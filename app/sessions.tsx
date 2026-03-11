@@ -93,7 +93,7 @@ function SevenDayOverview({ sessions, userCharacterIds }: { sessions: SessionWit
 
     return (
         <div className="seven-day-overview-container">
-            <div className={cn("grid gap-4", gridColsClass)}>
+            <div className={cn("grid gap-2", gridColsClass)}>
                 {nextDays.map(day => {
                     const dayString = day.toDateString();
                     const daySessions = sessionsByDay[dayString] || [];
@@ -115,7 +115,7 @@ function SevenDayOverview({ sessions, userCharacterIds }: { sessions: SessionWit
                             )}
                         >
                             <div className="day-box-header">
-                                {day.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
+                                {day.toLocaleDateString([], { weekday: 'short', day: 'numeric' })}
                             </div>
                             <div className="day-box-content">
                                 {daySessions.map(session => (
@@ -160,7 +160,7 @@ export default function Sessions() {
       <CardContent>
         {sessions === undefined ? (
           <div className="space-y-6">
-            <div className="grid grid-cols-7 gap-4 mb-4">
+            <div className="grid grid-cols-7 gap-2 mb-4">
               {[...Array(7)].map((_, i) => (
                 <Skeleton key={i} className="h-20 w-full" />
               ))}
