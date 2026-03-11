@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { useState, useEffect } from 'react'
 import { Id, Doc } from '@/convex/_generated/dataModel'
 import Link from 'next/link'
-import { Book, ChevronLeft, Lock as LockIcon, Trash2, Pencil, Unlock, Shield, CheckCircle2, MapPin, Clock } from 'lucide-react'
+import { Book, Calendar, ChevronLeft, Lock as LockIcon, Trash2, Pencil, Unlock, Shield, CheckCircle2, MapPin, Clock } from 'lucide-react'
 import SessionDialog from '@/app/session-dialog'
 import { useAuth } from '@clerk/nextjs'
 import {
@@ -257,6 +257,15 @@ export default function SessionDetails() {
   
   const formatTime = (date: Date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
+  const getGoogleCalendarLink = () => {
+    const start = new Date(session.date).toISOString().replace(/-|:|\.\d+/g, '')
+    const end = new Date(session.date + 4 * 3600000).toISOString().replace(/-|:|\.\d+/g, '')
+    const title = encodeURIComponent(`Void Guild: ${session.worldName}`)
+    const details = encodeURIComponent(`Session for world "${session.worldName}".\n\nLevel: ${session.level ?? 'TBD'}\nPlayers joined: ${session.attendingCharacters.length}/${session.maxPlayers}\nLink: ${window.location.origin}/sessions/${session._id}`)
+    const location = encodeURIComponent(session.location || '')
+    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${start}/${end}&details=${details}&location=${location}`
+  }
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="flex justify-between items-center mb-6">
@@ -267,6 +276,12 @@ export default function SessionDetails() {
           </Button>
         </Link>
         <div className="flex gap-2">
+            <Button variant="outline" size="sm" asChild className="sm:px-3 sm:w-auto w-9 px-0">
+                <a href={getGoogleCalendarLink()} target="_blank" rel="noopener noreferrer">
+                    <Calendar className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Add to Calendar</span>
+                </a>
+            </Button>
             {session.isOwner && !session.locked && (
                 <>
                     <Button variant="outline" size="sm" onClick={handleSendToDiscord} className="sm:px-3 sm:w-auto w-9 px-0">
