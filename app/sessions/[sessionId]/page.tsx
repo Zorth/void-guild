@@ -10,7 +10,7 @@ import { Id, Doc } from '@/convex/_generated/dataModel'
 import Link from 'next/link'
 import { Book, ChevronLeft, Lock as LockIcon, Trash2, Pencil, Unlock, Shield, CheckCircle2, MapPin, Clock } from 'lucide-react'
 import SessionDialog from '@/app/session-dialog'
-import { useAuth } from '@clerk/nextjs' // Import useAuth
+import { useAuth } from '@clerk/nextjs'
 import {
     AlertDialog,
     AlertDialogAction,
@@ -22,6 +22,14 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
   } from '@/components/ui/alert-dialog'
+import {
+    Dialog,
+    DialogTrigger,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+} from '@/components/ui/dialog'
 
 interface SessionWithGM extends Doc<'sessions'> {
     attendingCharacters: Doc<'characters'>[];
@@ -34,10 +42,10 @@ interface SessionWithGM extends Doc<'sessions'> {
 export default function SessionDetails() {
   const params = useParams()
   const sessionId = params.sessionId as Id<'sessions'>
-  const router = useRouter() // Initialize useRouter
+  const router = useRouter()
 
   const session = useQuery(api.sessions.getSession, { sessionId }) as SessionWithGM | undefined | null
-  const xpGainsPreview = useQuery(api.sessions.previewXPGains, session?._id ? { sessionId: session._id } : "skip") // Moved and arguments fixed
+  const xpGainsPreview = useQuery(api.sessions.previewXPGains, session?._id ? { sessionId: session._id } : "skip")
   const userCharacters = useQuery(api.characters.listCharacters)
   const joinSession = useMutation(api.sessions.joinSession)
   const leaveSession = useMutation(api.sessions.leaveSession)
@@ -45,12 +53,17 @@ export default function SessionDetails() {
   const unlockSession = useMutation(api.sessions.unlockSession)
   const forceLockSession = useMutation(api.sessions.forceLockSession)
   const forceUnlockSession = useMutation(api.sessions.forceUnlockSession)
-  const deleteSession = useMutation(api.sessions.deleteSession) // Moved to top
-  const expressInterest = useMutation(api.sessions.expressInterest) // New mutation
-  const withdrawInterest = useMutation(api.sessions.withdrawInterest) // New mutation
+  const deleteSession = useMutation(api.sessions.deleteSession)
+  const adminAddCharacterToSession = useMutation(api.sessions.adminAddCharacterToSession)
+  const expressInterest = useMutation(api.sessions.expressInterest)
+  const withdrawInterest = useMutation(api.sessions.withdrawInterest)
 
-  const { userId } = useAuth() // Get current user's ID
+  const { userId } = useAuth()
+  const isAdmin = useQuery(api.sessions.isAdminQuery)
+  const allCharacters = useQuery(api.characters.listAllCharacters, isAdmin ? undefined : "skip")
+
   const [selectedCharacterId, setSelectedCharacterId] = useState<Id<'characters'> | ''>('')
+  const [selectedAdminCharacterId, setSelectedAdminCharacterId] = useState<Id<'characters'> | ''>('')
 
   // Handle redirection to home page if session is not found/deleted
   useEffect(() => {
@@ -59,16 +72,18 @@ export default function SessionDetails() {
     }
   }, [session, router])
 
-  if (session === undefined || userCharacters === undefined || userCharacters === null) {
+  if (session === undefined || userCharacters === undefined || userCharacters === null || isAdmin === undefined || (isAdmin && allCharacters === undefined)) {
     return <div className="container mx-auto px-4 py-8 text-center">Loading session details...</div>
   }
 
-  // If session is null after the initial fetch, it means it doesn't exist (e.g., deleted)
-  // The useEffect above will handle the redirection.
-  // We can return null or a minimal loading/redirecting message
   if (session === null) {
-    return null; // Or a minimal loading/redirecting message
+    return null;
   }
+
+  // Check if the current user has any character already in the session
+  const hasUserCharacterInSession = userCharacters.some(userChar =>
+    session.attendingCharacters.some(sessionChar => sessionChar._id === userChar._id)
+  )
 
   const handleJoin = async () => {
     if (!selectedCharacterId) return
@@ -127,9 +142,20 @@ export default function SessionDetails() {
   }
 
   const handleDelete = async () => {
-    // This is within an AlertDialog, so the user has already confirmed deletion.
     await deleteSession({ sessionId: session._id })
-    // The useEffect will handle the redirection after session becomes null
+  }
+
+  const handleAdminAddCharacter = async () => {
+    if (!selectedAdminCharacterId) return
+    try {
+        await adminAddCharacterToSession({
+            sessionId: session._id,
+            characterId: selectedAdminCharacterId as Id<'characters'>,
+        })
+        setSelectedAdminCharacterId('')
+    } catch (e) {
+        alert(e instanceof Error ? e.message : 'Failed to add character as admin')
+    }
   }
 
   const handleExpressInterest = async () => {
@@ -159,9 +185,9 @@ export default function SessionDetails() {
     const formattedTime = sessionTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
 
     const embed = {
-      title: `New Session Alert: ${session.worldName}`, // Use session.worldName here
-      description: `A new session for "${session.worldName}" has been announced!`, // Use session.worldName here
-      color: 5814783, // A nice purple color
+      title: `New Session Alert: ${session.worldName}`,
+      description: `A new session for "${session.worldName}" has been announced!`,
+      color: 5814783,
       fields: [
         {
           name: 'Date & Time',
@@ -175,7 +201,7 @@ export default function SessionDetails() {
         },
         {
           name: 'Players',
-          value: `${session.characters.length}/${session.maxPlayers}`,
+          value: `${session.attendingCharacters.length}/${session.maxPlayers}`,
           inline: true,
         },
       ],
@@ -183,7 +209,6 @@ export default function SessionDetails() {
       url: `${window.location.origin}/sessions/${session._id}`,
     }
 
-    // Add location to embed if available
     if (session.location) {
         embed.fields.push({
             name: 'Location',
@@ -192,7 +217,6 @@ export default function SessionDetails() {
         })
     }
 
-    // Add attending characters to embed if available
     if (session.attendingCharacters && session.attendingCharacters.length > 0) {
         embed.fields.push({
             name: 'Attending Characters',
@@ -220,6 +244,11 @@ export default function SessionDetails() {
   const availableCharacters = userCharacters.filter(
     (char) => !session.characters.includes(char._id)
   )
+
+  // Filter all characters for admin, excluding those already in session
+  const adminAvailableCharacters = allCharacters?.filter(
+    (char) => !session.characters.includes(char._id)
+  ) ?? []
 
   const isFull = session.characters.length >= session.maxPlayers
 
@@ -338,7 +367,7 @@ export default function SessionDetails() {
                                     <span className="hidden sm:inline">Edit Session</span>
                                 </Button>
                             }
-                            hasWorld={true} // Assuming for editing, a world must exist
+                            hasWorld={true}
                         />
                     )}
                 </>
@@ -356,14 +385,13 @@ export default function SessionDetails() {
                     <CardTitle className="text-3xl font-bold flex items-center gap-3">
                         {session.worldName}
                         {session.locked && <LockIcon className="h-5 w-5 text-amber-500" />}
-                        {/* Book Icon */}
                         <a 
                             href={`https://void.tarragon.be/Session-Reports/${sessionTime.toISOString().slice(0, 10)}-${session.worldName.replace(/\s+/g, '-')}`} 
                             target="_blank" 
                             rel="noopener noreferrer"
-                            className="text-muted-foreground hover:text-blue-500" // Added styling for the icon
+                            className="text-muted-foreground hover:text-blue-500"
                         >
-                            <Book size={20} /> {/* Replaced Button with Book icon, slightly larger to fit title */}
+                            <Book size={20} />
                         </a>
                     </CardTitle>
                     <div className="text-lg text-muted-foreground mt-1">
@@ -398,7 +426,7 @@ export default function SessionDetails() {
                   </div>
                 </div>
                 <div className="bg-muted px-3 py-1 rounded-full text-sm font-semibold">
-                    {session.characters.length} / {session.maxPlayers} Players
+                    {session.attendingCharacters.length} / {session.maxPlayers} Players
                 </div>
               </div>
               {session.locked && (
@@ -409,7 +437,67 @@ export default function SessionDetails() {
               )}
             </CardHeader>
             <CardContent>
-              <h3 className="text-xl font-semibold mb-4">Attending Characters</h3>
+              <h3 className="text-xl font-semibold mb-4 flex items-center justify-between">
+                Attending Characters
+                {isAdmin && (
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm" className="ml-2 h-7 w-7 p-0">
+                        +
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                        <DialogTitle>Admin: Add Character</DialogTitle>
+                        <DialogDescription>
+                          Select a character to add to this session.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        {session.locked ? (
+                          <p className="text-sm text-muted-foreground italic text-center p-4 bg-muted/30 rounded-md">
+                              This session has ended.
+                          </p>
+                        ) : isFull ? (
+                          <p className="text-sm text-destructive italic text-center p-4 bg-destructive/5 rounded-md">
+                              This session is full, cannot add more.
+                          </p>
+                        ) : allCharacters && allCharacters.length > 0 ? (
+                          <div className="space-y-4">
+                            <div className="flex flex-col gap-2">
+                              <label htmlFor="admin-character-select" className="text-sm font-medium">Select Character</label>
+                              <select
+                                id="admin-character-select"
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                value={selectedAdminCharacterId}
+                                onChange={(e) => setSelectedAdminCharacterId(e.target.value as Id<'characters'>)}
+                              >
+                                <option value="">-- Choose a character --</option>
+                                {adminAvailableCharacters.map((char) => (
+                                  <option key={char._id} value={char._id}>
+                                    {char.name} (Lvl {char.lvl})
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <Button
+                              className="w-full"
+                              disabled={!selectedAdminCharacterId}
+                              onClick={handleAdminAddCharacter}
+                            >
+                              Add Character (Admin)
+                            </Button>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground italic text-center p-4 bg-muted/10 rounded-md">
+                            No characters available to add.
+                          </p>
+                        )}
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </h3>
               {session.attendingCharacters.length === 0 ? (
                 <p className="text-muted-foreground italic">No characters have joined this session yet.</p>
               ) : (
@@ -475,7 +563,7 @@ export default function SessionDetails() {
 
 
         <div className="space-y-8">
-          {userId && !session.characters.some(charId => userCharacters.some(uc => uc._id === charId && uc.userId === userId)) && (
+          {userId && !hasUserCharacterInSession && (
             <Card>
               <CardHeader>
                 <CardTitle>Express Interest</CardTitle>
@@ -485,18 +573,23 @@ export default function SessionDetails() {
                   <div className="text-sm text-muted-foreground italic text-center p-4 bg-muted/30 rounded-md">
                       This session has ended.
                   </div>
-                ) : isFull ? (
-                  <div className="text-sm text-destructive italic text-center p-4 bg-destructive/5 rounded-md">
-                      This session is currently full, but you can still express interest.
-                  </div>
-                ) : session.interestedPlayers?.some(p => p.userId === userId) ? (
-                  <Button className="w-full" variant="outline" onClick={handleWithdrawInterest}>
-                    Withdraw Interest
-                  </Button>
                 ) : (
-                  <Button className="w-full" onClick={handleExpressInterest}>
-                    Express Interest
-                  </Button>
+                  <div className="space-y-4">
+                    {isFull && !session.interestedPlayers?.some(p => p.userId === userId) && (
+                      <div className="text-sm text-destructive italic text-center p-4 bg-destructive/5 rounded-md">
+                          This session is currently full, but you can still express interest.
+                      </div>
+                    )}
+                    {session.interestedPlayers?.some(p => p.userId === userId) ? (
+                      <Button className="w-full" variant="outline" onClick={handleWithdrawInterest}>
+                        Withdraw Interest
+                      </Button>
+                    ) : (
+                      <Button className="w-full" onClick={handleExpressInterest}>
+                        Express Interest
+                      </Button>
+                    )}
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -540,7 +633,7 @@ export default function SessionDetails() {
                   </div>
                   <Button 
                     className="w-full" 
-                    disabled={!selectedCharacterId}
+                    disabled={!selectedCharacterId || hasUserCharacterInSession} // Disable if no character selected or user has char in session
                     onClick={handleJoin}
                   >
                     Join Session

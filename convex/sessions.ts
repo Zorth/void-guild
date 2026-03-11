@@ -314,10 +314,54 @@ export const joinSession = mutation({
       return
     }
 
+    // Check if the user already has a character in this session
+    const userCharactersInSession = await Promise.all(
+        session.characters.map(charId => ctx.db.get(charId))
+    );
+    const hasUserCharacterAlready = userCharactersInSession.some(
+        (char) => char && char.userId === user.subject
+    );
+
+    if (hasUserCharacterAlready) {
+        throw new Error('You can only join with one character per session.')
+    }
+
     await ctx.db.patch(args.sessionId, {
       characters: [...session.characters, args.characterId],
     })
   },
+})
+
+export const adminAddCharacterToSession = mutation({
+    args: {
+      sessionId: v.id('sessions'),
+      characterId: v.id('characters'),
+    },
+    handler: async (ctx, args) => {
+      const isAdminUser = await isAdmin(ctx)
+      if (!isAdminUser) {
+        throw new Error('Only admins can add characters to sessions this way.')
+      }
+  
+      const session = await ctx.db.get(args.sessionId)
+      if (!session) throw new Error('Session not found')
+  
+      if (session.locked) {
+        throw new Error('This session is locked. You cannot add characters.')
+      }
+
+      if (session.characters.length >= session.maxPlayers) {
+        throw new Error('This session is full.')
+      }
+  
+      if (session.characters.includes(args.characterId)) {
+        return // Character already in session
+      }
+  
+      await ctx.db.patch(args.sessionId, {
+        characters: [...session.characters, args.characterId],
+      })
+    },
 })
 
 export const leaveSession = mutation({

@@ -3,15 +3,17 @@
 import { useQuery } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Crown, Shield, Swords } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import Link from 'next/link'
+import { ChevronLeft, Crown, Shield, Swords } from 'lucide-react'
 import { useMemo, useEffect, useState } from 'react'
-import { getUsernames } from './actions'
+import { getUsernames, UserMetadata } from './actions'
 
 export default function StatsPage() {
     const characters = useQuery(api.characters.listAllCharactersPublic);
-    const gmStats = useQuery(api.sessions.getGMStats);
-    const playerStats = useQuery(api.sessions.getPlayerStats);
-    const [usernames, setUsernames] = useState<Record<string, string>>({});
+    const gmStatsRaw = useQuery(api.sessions.getGMStats);
+    const playerStatsRaw = useQuery(api.sessions.getPlayerStats);
+    const [userMetadata, setUserMetadata] = useState<Record<string, UserMetadata>>({});
   
     const sortedCharacters = useMemo(() => {
       if (!characters) return [];
@@ -19,22 +21,56 @@ export default function StatsPage() {
     }, [characters]);
 
     useEffect(() => {
-        if (gmStats && playerStats) {
+        if (gmStatsRaw && playerStatsRaw) {
             const userIds = new Set([
-                ...gmStats.map(s => s.userId),
-                ...playerStats.map(s => s.userId)
+                ...gmStatsRaw.map(s => s.userId),
+                ...playerStatsRaw.map(s => s.userId)
             ]);
             
             if (userIds.size > 0) {
-                getUsernames(Array.from(userIds)).then(setUsernames);
+                getUsernames(Array.from(userIds)).then(setUserMetadata);
             }
         }
-    }, [gmStats, playerStats]);
+    }, [gmStatsRaw, playerStatsRaw]);
+
+    const gmStats = useMemo(() => {
+        if (!gmStatsRaw) return null;
+        return gmStatsRaw.map(stat => {
+            const metadata = userMetadata[stat.userId];
+            const extra = metadata?.extraSessionsRan ?? 0;
+            return {
+                ...stat,
+                displayName: metadata?.name || `User ${stat.userId.slice(-4)}`,
+                totalCount: stat.count + extra
+            };
+        }).sort((a, b) => b.totalCount - a.totalCount);
+    }, [gmStatsRaw, userMetadata]);
+
+    const playerStats = useMemo(() => {
+        if (!playerStatsRaw) return null;
+        return playerStatsRaw.map(stat => {
+            const metadata = userMetadata[stat.userId];
+            const extra = metadata?.extraSessionsPlayed ?? 0;
+            return {
+                ...stat,
+                displayName: metadata?.name || `User ${stat.userId.slice(-4)}`,
+                totalCount: stat.count + extra
+            };
+        }).sort((a, b) => b.totalCount - a.totalCount);
+    }, [playerStatsRaw, userMetadata]);
   
 
   return (
-    <div className="container mx-auto py-8">
-      <h1 className="text-4xl font-bold mb-8 text-center">Server Statistics</h1>
+    <div className="container mx-auto py-8 px-4">
+      <div className="flex items-center mb-8">
+        <Link href="/">
+          <Button variant="ghost" size="sm" className="sm:px-3 sm:w-auto w-9 px-0">
+            <ChevronLeft className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Back to Home</span>
+          </Button>
+        </Link>
+        <h1 className="text-4xl font-bold flex-grow text-center pr-20">Server Statistics</h1>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {/* Character Leaderboard */}
         <Card>
@@ -67,15 +103,12 @@ export default function StatsPage() {
           <CardContent>
              {gmStats ? (
                 <ul className="space-y-2">
-                    {gmStats.map((stat, index) => {
-                        const displayName = usernames[stat.userId] || `User ${stat.userId.slice(-4)}`;
-                        return (
-                            <li key={stat.userId} className="flex justify-between items-center">
-                                <span>{index + 1}. {displayName}</span>
-                                <span className="font-semibold">{stat.count} sessions</span>
-                            </li>
-                        )
-                    })}
+                    {gmStats.map((stat, index) => (
+                        <li key={stat.userId} className="flex justify-between items-center">
+                            <span>{index + 1}. {stat.displayName}</span>
+                            <span className="font-semibold">{stat.totalCount} sessions</span>
+                        </li>
+                    ))}
                 </ul>
              ) : <p>Loading GM stats...</p>}
           </CardContent>
@@ -91,15 +124,12 @@ export default function StatsPage() {
           <CardContent>
             {playerStats ? (
                 <ul className="space-y-2">
-                    {playerStats.map((stat, index) => {
-                        const displayName = usernames[stat.userId] || `User ${stat.userId.slice(-4)}`;
-                        return (
-                            <li key={stat.userId} className="flex justify-between items-center">
-                                <span>{index + 1}. {displayName}</span>
-                                <span className="font-semibold">{stat.count} sessions</span>
-                            </li>
-                        )
-                    })}
+                    {playerStats.map((stat, index) => (
+                        <li key={stat.userId} className="flex justify-between items-center">
+                            <span>{index + 1}. {stat.displayName}</span>
+                            <span className="font-semibold">{stat.totalCount} sessions</span>
+                        </li>
+                    ))}
                 </ul>
             ) : <p>Loading player stats...</p>}
           </CardContent>

@@ -19,9 +19,10 @@ import { Doc } from '../convex/_generated/dataModel'
 import { Shield } from 'lucide-react'
 
 export default function AdminCharacterList() {
-  const allCharacters = useQuery(api.characters.listAllCharacters)
-  const adminUpdateCharacter = useMutation(api.characters.adminUpdateCharacter)
+  // All hooks must be called unconditionally at the top level
   const isAdmin = useQuery(api.sessions.isAdminQuery)
+  const allCharacters = useQuery(api.characters.listAllCharacters, isAdmin === true ? undefined : "skip")
+  const adminUpdateCharacter = useMutation(api.characters.adminUpdateCharacter)
 
   const [selectedCharacter, setSelectedCharacter] = useState<Doc<'characters'> | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -34,7 +35,16 @@ export default function AdminCharacterList() {
     websiteLink: '',
   })
 
-  if (!isAdmin) return null
+  // Handle loading states and non-admin access after all hooks are called
+  if (isAdmin === undefined || (isAdmin && allCharacters === undefined)) {
+    return <p>Loading...</p>
+  }
+
+  if (!isAdmin) {
+    return null
+  }
+
+
 
   function openEditDialog(character: Doc<'characters'>) {
     setSelectedCharacter(character)
