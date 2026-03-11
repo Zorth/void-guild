@@ -512,6 +512,15 @@ export default function SessionDetails() {
                             <div className="font-bold flex items-center gap-2">
                                 {char.name}
                                 {isUserCharacter && <span className="text-[10px] bg-purple-200 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded-full uppercase tracking-wider font-bold">You</span>}
+                                {/* Book Icon */}
+                                <a
+                                    href={`https://void.tarragon.be/Player-Characters/${char.name.replace(/\s+/g, '-')}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-muted-foreground hover:text-blue-500"
+                                >
+                                    <Book size={16} />
+                                </a>
                             </div>
                             <div className="text-sm text-muted-foreground">
                               Lvl {char.lvl} {char.class}
