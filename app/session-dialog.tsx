@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog'
 import { FormEvent, useState } from 'react'
 import { Id } from '../convex/_generated/dataModel'
+import { fireVoidParticles } from '@/lib/particles'
 
 import { Doc } from '../convex/_generated/dataModel'
 
@@ -102,6 +103,12 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
         location: locationVal,
       })
     } else {
+      // Trigger particle effect at the mouse position for new sessions
+      if ('clientX' in event.nativeEvent) {
+          const e = event.nativeEvent as MouseEvent;
+          fireVoidParticles(e.clientX, e.clientY);
+      }
+
       await createSession({
         date: sessionDateTime,
         // world, // Removed: world is now derived

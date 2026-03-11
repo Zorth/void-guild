@@ -13,6 +13,7 @@ import SessionDialog from '@/app/session-dialog'
 import { useAuth } from '@clerk/nextjs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
+import { fireJoinParticles } from '@/lib/particles'
 import {
     AlertDialog,
     AlertDialogAction,
@@ -136,8 +137,12 @@ export default function SessionDetails() {
     session.attendingCharacters.some(sessionChar => sessionChar._id === userChar._id)
   )
 
-  const handleJoin = async () => {
+  const handleJoin = async (event: React.MouseEvent) => {
     if (!selectedCharacterId) return
+
+    // Trigger particle effect at the mouse position
+    fireJoinParticles(event.clientX, event.clientY);
+
     try {
         await joinSession({
             sessionId: session._id,
@@ -717,7 +722,7 @@ export default function SessionDetails() {
                       <Button 
                         className="w-full" 
                         disabled={!selectedCharacterId || hasUserCharacterInSession} // Disable if no character selected or user has char in session
-                        onClick={handleJoin}
+                        onClick={(e) => handleJoin(e)}
                       >
                         Join Session
                       </Button>

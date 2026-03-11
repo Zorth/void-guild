@@ -13,6 +13,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { FormEvent, useState } from 'react'
+import { fireVoidParticles } from '@/lib/particles'
 
 export default function CreateCharacter() {
   const createCharacter = useMutation(api.characters.createCharacter)
@@ -22,6 +23,13 @@ export default function CreateCharacter() {
   async function handleCreateCharacter(event: FormEvent) {
     event.preventDefault()
     if (!newCharacterData.name) return
+
+    // Trigger particle effect at the mouse position
+    if ('clientX' in event.nativeEvent) {
+        const e = event.nativeEvent as MouseEvent;
+        fireVoidParticles(e.clientX, e.clientY);
+    }
+
     await createCharacter(newCharacterData)
     setNewCharacterData({ name: '', ancestry: '', class: '', websiteLink: '' })
     setIsOpen(false)
