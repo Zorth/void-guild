@@ -332,78 +332,6 @@ export default function SessionDetails() {
                     <span className="hidden sm:inline">Add to Calendar</span>
                 </a>
             </Button>
-            {session.isOwner && !session.locked && (
-                <>
-                    <Button variant="outline" size="sm" onClick={handleSendToDiscord} className="sm:px-3 sm:w-auto w-9 px-0">
-                        <img src="/discord-icon.svg" alt="Discord" className="sm:mr-2 h-4 w-4" />
-                        <span className="hidden sm:inline">Announce on Discord</span>
-                    </Button>
-                    <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                            <Button variant="default" size="sm" className="sm:px-3 sm:w-auto w-9 px-0">
-                                <CheckCircle2 className="h-4 w-4 sm:mr-2" />
-                                <span className="hidden sm:inline">End Session</span>
-                            </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent className="max-w-2xl">
-                            <AlertDialogHeader>
-                            <AlertDialogTitle>Confirm End of Session</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                The following characters will be awarded XP and potentially level up based on the session level ({session.level ?? 'Level TBD'}).
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <div className="py-4 space-y-4 max-h-[400px] overflow-auto">
-                            <div className="grid grid-cols-3 font-bold text-sm border-b pb-2">
-                                <span>Character</span>
-                                <span className="text-center">XP Gain</span>
-                                <span className="text-right">New Level</span>
-                            </div>
-                            {xpGainsPreview?.map((p) => (
-                                <div key={p.id} className="grid grid-cols-3 text-sm items-center py-2 border-b last:border-0">
-                                    <div className="flex flex-col">
-                                        <span className="font-semibold">{p.name}</span>
-                                        <span className="text-[10px] text-muted-foreground">Lvl {p.currentLvl} ({p.currentXp} XP)</span>
-                                        {p.isGMCharacter && <span className="text-[10px] text-primary flex items-center gap-1"><Shield className="h-2 w-2"/> GM</span>}
-                                    </div>
-                                    <div className="text-center font-mono text-green-600">
-                                        +{p.xpGain}
-                                    </div>
-                                    <div className="text-right">
-                                        {p.newLvl > p.currentLvl ? (
-                                            <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-[10px] font-bold">
-                                                Lvl {p.newLvl} ↑
-                                            </span>
-                                        ) : (
-                                            <span>Lvl {p.newLvl}</span>
-                                        )}
-                                        <div className="text-[10px] text-muted-foreground">({p.newXp} XP)</div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                        <AlertDialogFooter className="flex-wrap justify-end">
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleLock} disabled={session.level === undefined}>Confirm & Award XP</AlertDialogAction>
-                            {isAdmin && (
-                                <AlertDialogAction onClick={handleForceLock} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
-                                    Force Close (No XP)
-                                </AlertDialogAction>
-                            )}
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
-                <SessionDialog 
-                    session={session} 
-                    trigger={
-                        <Button variant="outline" size="sm" className="sm:px-3 sm:w-auto w-9 px-0">
-                            <Pencil className="h-4 w-4 sm:mr-2" />
-                            <span className="hidden sm:inline">Edit Session</span>
-                        </Button>
-                    }
-                    hasWorld={true}
-                />
-                </>
-            )}
             {isAdmin && session.locked && (
                 <AlertDialog>
                     <AlertDialogTrigger asChild>
@@ -623,85 +551,169 @@ export default function SessionDetails() {
 
 
         <div className="space-y-8">
-          {userId && !hasUserCharacterInSession && (
+          {session.isOwner && !session.locked && (
             <Card>
               <CardHeader>
-                <CardTitle>Interested?</CardTitle>
+                <CardTitle>Session Management</CardTitle>
               </CardHeader>
-              <CardContent>
-                {session.locked ? (
-                  <div className="text-sm text-muted-foreground italic text-center p-4 bg-muted/30 rounded-md">
-                      This session has ended.
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {isFull && !session.interestedPlayers?.some(p => p.userId === userId) && (
-                      <div className="text-sm text-destructive italic text-center p-4 bg-destructive/5 rounded-md">
-                          This session is currently full, but you can still express interest.
-                      </div>
-                    )}
-                    {session.interestedPlayers?.some(p => p.userId === userId) ? (
-                      <Button className="w-full" variant="outline" onClick={handleWithdrawInterest}>
-                        Not anymore :(
-                      </Button>
-                    ) : (
-                      <Button className="w-full" onClick={handleExpressInterest}>
-                        Yes! :)
-                      </Button>
-                    )}
-                  </div>
-                )}
+              <CardContent className="space-y-3">
+                <Button variant="outline" className="w-full justify-start" onClick={handleSendToDiscord}>
+                    <img src="/discord-icon.svg" alt="Discord" className="mr-2 h-4 w-4" />
+                    Announce on Discord
+                </Button>
+                
+                <SessionDialog 
+                    session={session} 
+                    trigger={
+                        <Button variant="outline" className="w-full justify-start">
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit Session
+                        </Button>
+                    }
+                    hasWorld={true}
+                />
+
+                <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                        <Button variant="default" className="w-full justify-start">
+                            <CheckCircle2 className="h-4 w-4 mr-2" />
+                            End Session
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="max-w-2xl">
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Confirm End of Session</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                The following characters will be awarded XP and potentially level up based on the session level ({session.level ?? 'Level TBD'}).
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <div className="py-4 space-y-4 max-h-[400px] overflow-auto">
+                            <div className="grid grid-cols-3 font-bold text-sm border-b pb-2">
+                                <span>Character</span>
+                                <span className="text-center">XP Gain</span>
+                                <span className="text-right">New Level</span>
+                            </div>
+                            {xpGainsPreview?.map((p) => (
+                                <div key={p.id} className="grid grid-cols-3 text-sm items-center py-2 border-b last:border-0">
+                                    <div className="flex flex-col">
+                                        <span className="font-semibold">{p.name}</span>
+                                        <span className="text-[10px] text-muted-foreground">Lvl {p.currentLvl} ({p.currentXp} XP)</span>
+                                        {p.isGMCharacter && <span className="text-[10px] text-primary flex items-center gap-1"><Shield className="h-2 w-2"/> GM</span>}
+                                    </div>
+                                    <div className="text-center font-mono text-green-600">
+                                        +{p.xpGain}
+                                    </div>
+                                    <div className="text-right">
+                                        {p.newLvl > p.currentLvl ? (
+                                            <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                                                Lvl {p.newLvl} ↑
+                                            </span>
+                                        ) : (
+                                            <span>Lvl {p.newLvl}</span>
+                                        )}
+                                        <div className="text-[10px] text-muted-foreground">({p.newXp} XP)</div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <AlertDialogFooter className="flex-wrap justify-end">
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleLock} disabled={session.level === undefined}>Confirm & Award XP</AlertDialogAction>
+                            {isAdmin && (
+                                <AlertDialogAction onClick={handleForceLock} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                                    Force Close (No XP)
+                                </AlertDialogAction>
+                            )}
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
               </CardContent>
             </Card>
           )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Join Session</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {session.locked ? (
-                <div className="text-sm text-muted-foreground italic text-center p-4 bg-muted/30 rounded-md">
-                    This session has ended.
-                </div>
-              ) : isFull ? (
-                <div className="text-sm text-destructive italic text-center p-4 bg-destructive/5 rounded-md">
-                    This session is currently full.
-                </div>
-              ) : availableCharacters.length === 0 ? (
-                <p className="text-sm text-muted-foreground italic text-center p-4 bg-muted/10 rounded-md">
-                  {userCharacters.length === 0 
-                    ? "You don't have any characters yet. Create one on the home page!" 
-                    : "All your characters are already in this session."}
-                </p>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex flex-col gap-2">
-                    <label className="text-sm font-medium">Select Character</label>
-                    <select
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      value={selectedCharacterId}
-                      onChange={(e) => setSelectedCharacterId(e.target.value as Id<'characters'>)}
-                    >
-                      <option value="">-- Choose a character --</option>
-                      {availableCharacters.map((char) => (
-                        <option key={char._id} value={char._id}>
-                          {char.name} (Lvl {char.lvl})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <Button 
-                    className="w-full" 
-                    disabled={!selectedCharacterId || hasUserCharacterInSession} // Disable if no character selected or user has char in session
-                    onClick={handleJoin}
-                  >
-                    Join Session
-                  </Button>
-                </div>
+          {!session.isOwner && (
+            <>
+              {userId && !hasUserCharacterInSession && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Interested?</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {session.locked ? (
+                      <div className="text-sm text-muted-foreground italic text-center p-4 bg-muted/30 rounded-md">
+                          This session has ended.
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {isFull && !session.interestedPlayers?.some(p => p.userId === userId) && (
+                          <div className="text-sm text-destructive italic text-center p-4 bg-destructive/5 rounded-md">
+                              This session is currently full, but you can still express interest.
+                          </div>
+                        )}
+                        {session.interestedPlayers?.some(p => p.userId === userId) ? (
+                          <Button className="w-full" variant="outline" onClick={handleWithdrawInterest}>
+                            Not anymore :(
+                          </Button>
+                        ) : (
+                          <Button className="w-full" onClick={handleExpressInterest}>
+                            Yes! :)
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               )}
-            </CardContent>
-          </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Join Session</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {session.locked ? (
+                    <div className="text-sm text-muted-foreground italic text-center p-4 bg-muted/30 rounded-md">
+                        This session has ended.
+                    </div>
+                  ) : isFull ? (
+                    <div className="text-sm text-destructive italic text-center p-4 bg-destructive/5 rounded-md">
+                        This session is currently full.
+                    </div>
+                  ) : availableCharacters.length === 0 ? (
+                    <p className="text-sm text-muted-foreground italic text-center p-4 bg-muted/10 rounded-md">
+                      {userCharacters.length === 0 
+                        ? "You don't have any characters yet. Create one on the home page!" 
+                        : "All your characters are already in this session."}
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex flex-col gap-2">
+                        <label className="text-sm font-medium">Select Character</label>
+                        <select
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                          value={selectedCharacterId}
+                          onChange={(e) => setSelectedCharacterId(e.target.value as Id<'characters'>)}
+                        >
+                          <option value="">-- Choose a character --</option>
+                          {availableCharacters.map((char) => (
+                            <option key={char._id} value={char._id}>
+                              {char.name} (Lvl {char.lvl})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <Button 
+                        className="w-full" 
+                        disabled={!selectedCharacterId || hasUserCharacterInSession} // Disable if no character selected or user has char in session
+                        onClick={handleJoin}
+                      >
+                        Join Session
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          )}
         </div>
       </div>
       <div className="text-center mt-8 text-sm text-muted-foreground">
