@@ -522,37 +522,43 @@ export default function SessionDetails() {
                                     <Book size={16} />
                                 </a>
                             </div>
-                            <div className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
-                              <CharacterRankIcon rank={char.rank} />
-                              <span 
-                                className="inline-flex align-middle justify-center w-12 rounded-full px-2 py-0.5 text-[10px] font-bold"
-                                style={getLevelBadgeStyle(char.lvl)}
-                              >
-                                Lvl {char.lvl}
-                              </span>
-                              <span>{char.class}</span>
+                            <div className="text-[10px] text-muted-foreground mt-1">
+                              {char.class}
                             </div>
                             {char.websiteLink && (
                                 <a 
                                     href={char.websiteLink} 
                                     target="_blank" 
                                     rel="noopener noreferrer" 
-                                    className="text-xs text-blue-500 hover:underline"
+                                    className="text-[10px] text-blue-500 hover:underline"
                                 >
                                     {char.websiteLink}
                                 </a>
                             )}
                           </div>
-                          {canRemove && (
-                            <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                onClick={() => handleLeave(char._id)}
-                            >
-                                <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
+                          <div className="flex items-center gap-2">
+                            <div className="flex flex-col items-end">
+                                <div className="flex items-center gap-1">
+                                    <CharacterRankIcon rank={char.rank} />
+                                    <span 
+                                        className="inline-flex align-middle justify-center w-12 rounded-full px-2 py-0.5 text-[10px] font-bold"
+                                        style={getLevelBadgeStyle(char.lvl)}
+                                    >
+                                        Lvl {char.lvl}
+                                    </span>
+                                </div>
+                            </div>
+                            {canRemove && (
+                                <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8"
+                                    onClick={() => handleLeave(char._id)}
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                            )}
+                          </div>
                         </li>
                     )
                   })}

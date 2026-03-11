@@ -120,9 +120,21 @@ export default function Characters() {
                     onClick={() => openDetailsDialog(character)}
                   >
                     <div className="flex flex-col">
-                      <span className="font-medium">
-                          {character.name}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">
+                            {character.name}
+                        </span>
+                        {/* Book Icon moved here */}
+                        <a 
+                            href={`https://void.tarragon.be/Player-Characters/${character.name.replace(/\s+/g, '-')}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()} // Prevent dialog from opening
+                            className="text-muted-foreground hover:text-blue-500" // Added styling for the icon
+                        >
+                            <Book size={16} />
+                        </a>
+                      </div>
                       <span className="text-[10px] text-muted-foreground">
                           {character.ancestry} {character.class}
                       </span>
@@ -138,17 +150,7 @@ export default function Characters() {
                         </a>
                       )}
                     </div>
-                    <div className="flex items-center gap-2"> {/* Changed to flex-row for icon and level/XP block */}
-                        {/* Book Icon */}
-                        <a 
-                            href={`https://void.tarragon.be/Player-Characters/${character.name.replace(/\s+/g, '-')}`} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()} // Prevent dialog from opening
-                            className="text-muted-foreground hover:text-blue-500" // Added styling for the icon
-                        >
-                            <Book size={16} /> {/* Replaced Button with Book icon */}
-                        </a>
+                    <div className="flex items-center gap-2"> 
                         <div className="flex flex-col items-end"> {/* Vertical alignment for Level and XP */}
                             <div className="flex items-center gap-1">
                                 <CharacterRankIcon rank={character.rank} />
