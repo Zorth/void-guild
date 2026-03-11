@@ -356,14 +356,13 @@ export default function SessionDetails() {
                         </AlertDialogHeader>
                         <AlertDialogFooter className="flex-wrap justify-end">
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleUnlock} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                            <AlertDialogAction onClick={handleUnlock} variant="destructive">
                                 Unlock (Revert XP)
                             </AlertDialogAction>
                             <AlertDialogAction onClick={handleForceUnlock} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
                                 Force Unlock (Keep XP)
                             </AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
+                        </AlertDialogFooter>                    </AlertDialogContent>
                 </AlertDialog>
             )}
         </div>
