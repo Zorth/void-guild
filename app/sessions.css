@@ -2,10 +2,6 @@
   border: 2px solid #FBBF24; /* yellow-400 */
 }
 
-.session-owner .session-world {
-  color: #FBBF24; /* yellow-400 */
-}
-
 .session-joined {
   background-color: rgba(147, 51, 234, 0.1); /* bg-purple-100/50 */
   border: 2px solid #D8B4FE; /* border-purple-300 */
