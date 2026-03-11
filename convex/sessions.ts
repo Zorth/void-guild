@@ -328,6 +328,7 @@ export const joinSession = mutation({
 
     await ctx.db.patch(args.sessionId, {
       characters: [...session.characters, args.characterId],
+      interestedPlayers: session.interestedPlayers?.filter(p => p.userId !== user.subject)
     })
   },
 })
@@ -357,9 +358,13 @@ export const adminAddCharacterToSession = mutation({
       if (session.characters.includes(args.characterId)) {
         return // Character already in session
       }
+
+      const character = await ctx.db.get(args.characterId)
+      if (!character) throw new Error('Character not found')
   
       await ctx.db.patch(args.sessionId, {
         characters: [...session.characters, args.characterId],
+        interestedPlayers: session.interestedPlayers?.filter(p => p.userId !== character.userId)
       })
     },
 })
