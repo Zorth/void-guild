@@ -69,7 +69,7 @@ export default function SessionDetails() {
     }
   }, [session, router])
 
-  if (session === undefined || userCharacters === undefined || userCharacters === null || isAdmin === undefined || allCharacters === undefined) {
+  if (session === undefined || userCharacters === undefined || userCharacters === null || isAdmin === undefined || (isAdmin && allCharacters === undefined)) {
     return <div className="container mx-auto px-4 py-8 text-center">Loading session details...</div>
   }
 
@@ -227,9 +227,9 @@ export default function SessionDetails() {
   )
 
   // Filter all characters for admin, excluding those already in session
-  const adminAvailableCharacters = allCharacters.filter(
+  const adminAvailableCharacters = allCharacters?.filter(
     (char) => !session.characters.includes(char._id)
-  )
+  ) ?? []
 
   const isFull = session.characters.length >= session.maxPlayers
 
