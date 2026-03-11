@@ -47,6 +47,7 @@
 
 .day-box.day-box-joined {
     border: 2px solid #6EE7B7; /* border-green-200 */
+    background-color: rgba(16, 185, 129, 0.1); /* bg-green-100/50 */
 }
 
 .day-box-header {
