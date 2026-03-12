@@ -19,30 +19,34 @@ export default function LevelUpListener() {
       
       // Level Up Check
       if (prev !== undefined && char.lvl > prev.lvl) {
-        toast(`Congratulations! ${char.name} leveled up!`, {
-          duration: 5000,
-          description: `Achievement Unlocked: Level ${char.lvl}`,
-          icon: '✨',
-          className: 'achievement-toast',
-          descriptionClassName: 'achievement-description'
-        })
-        fireJoinParticles(window.innerWidth / 2, window.innerHeight / 2)
+        setTimeout(() => {
+            toast(`Congratulations! ${char.name} leveled up!`, {
+                duration: 5000,
+                description: `Achievement Unlocked: Level ${char.lvl}`,
+                icon: '✨',
+                className: 'achievement-toast',
+                descriptionClassName: 'achievement-description'
+            })
+            fireJoinParticles(window.innerWidth / 2, window.innerHeight / 2)
+        }, 500);
       }
 
       // Rank Promotion Check
       if (prev !== undefined && char.rank && char.rank !== prev.rank) {
         if (char.rank === 'journeyman' || char.rank === 'guildmaster') {
           const rankTitle = char.rank.charAt(0).toUpperCase() + char.rank.slice(1)
-          toast(`Promoted! ${char.name} is now a ${rankTitle}!`, {
-            duration: 8000,
-            description: char.rank === 'guildmaster' 
-                ? "A legendary achievement in the Void!" 
-                : "A significant step in your journey!",
-            icon: char.rank === 'guildmaster' ? '👑' : '🎖️',
-            className: 'achievement-toast',
-            descriptionClassName: 'achievement-description'
-          })
-          fireJoinParticles(window.innerWidth / 2, window.innerHeight / 2)
+          setTimeout(() => {
+              toast(`Promoted! ${char.name} is now a ${rankTitle}!`, {
+                duration: 8000,
+                description: char.rank === 'guildmaster' 
+                    ? "A legendary achievement in the Void!" 
+                    : "A significant step in your journey!",
+                icon: char.rank === 'guildmaster' ? '👑' : '🎖️',
+                className: 'achievement-toast',
+                descriptionClassName: 'achievement-description'
+              })
+              fireJoinParticles(window.innerWidth / 2, window.innerHeight / 2)
+          }, 1000);
         }
       }
 
