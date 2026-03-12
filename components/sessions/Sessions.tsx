@@ -36,6 +36,31 @@ type SessionWithDetails = Doc<'sessions'> & {
     worldName: string; // Add worldName to the type
 }
 
+function useWindowSize() {
+  const [windowSize, setWindowSize] = useState({
+    width: typeof window !== 'undefined' ? window.innerWidth : 0,
+    height: typeof window !== 'undefined' ? window.innerHeight : 0,
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const handleResize = () => {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []); 
+
+  return windowSize;
+}
+
 function UserCharacterPreview({ userId }: { userId: string }) {
     const characters = useQuery(api.characters.listCharactersByUserId, { userId });
 
@@ -323,31 +348,6 @@ function MonthOverview({
     );
 }
 
-function useWindowSize() {
-  const [windowSize, setWindowSize] = useState({
-    width: typeof window !== 'undefined' ? window.innerWidth : 0,
-    height: typeof window !== 'undefined' ? window.innerHeight : 0,
-  });
-
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    const handleResize = () => {
-      setWindowSize({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []); 
-
-  return windowSize;
-}
-
 function SevenDayOverview({ sessions, userCharacterIds }: { sessions: SessionWithDetails[], userCharacterIds: Set<string> }) {
     const { width } = useWindowSize();
     let numberOfDaysToShow = 7;
@@ -437,6 +437,7 @@ function SevenDayOverview({ sessions, userCharacterIds }: { sessions: SessionWit
 }
 
 export default function Sessions() {
+  const { width } = useWindowSize()
   const [activeTab, setActiveTab] = useState<'upcoming' | 'planning' | 'past'>('upcoming')
   const [viewDate, setViewDate] = useState(new Date())
   const sessions = useQuery(api.sessions.listSessions, { past: activeTab === 'past' }) as SessionWithDetails[]
@@ -465,9 +466,15 @@ export default function Sessions() {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4">
+      <CardHeader className={cn(
+        "flex flex-row flex-wrap items-center justify-between gap-4",
+        width < 1015 && "flex-col items-center justify-center text-center"
+      )}>
         <CardTitle>Sessions</CardTitle>
-        <div className="flex items-center gap-4">
+        <div className={cn(
+          "flex items-center gap-4",
+          width < 1015 && "flex-wrap justify-center w-full"
+        )}>
           {activeTab === 'upcoming' && isGM && <SessionDialog hasWorld={!!world} />}
           <div className="flex bg-muted p-1 rounded-md h-9 relative">
             {(['upcoming', 'planning', 'past'] as const).map((tab) => (

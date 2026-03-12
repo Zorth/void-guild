@@ -60,33 +60,37 @@ export default function Home() {
 
   return (
     <main className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-4xl font-bold">Guild of The Void</h1>
-          <p className="text-sm text-muted-foreground mt-1">Management tool for The Void Campaign, currently in Open Beta.</p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8">
+        <div className="flex flex-col gap-1 w-full sm:w-auto">
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Guild of The Void</h1>
+          <p className="text-sm text-muted-foreground max-w-[300px] sm:max-w-none">
+            Management tool for The Void Campaign, currently in Open Beta.
+          </p>
         </div>
         <Authenticated>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 self-start sm:self-auto">
             <a href="https://void.tarragon.be/" target="_blank" rel="noopener noreferrer">
-              <Button variant="outline" size="sm" className="flex items-center gap-2">
+              <Button variant="outline" size="sm" className="flex items-center gap-2 h-9 w-9 sm:w-auto sm:px-3 p-0">
                 <Book className="h-4 w-4" />
-                Wiki
+                <span className="hidden sm:inline">Wiki</span>
               </Button>
             </a>
             <Link href="/stats">
-              <Button variant="outline" size="sm" className="flex items-center gap-2">
+              <Button variant="outline" size="sm" className="flex items-center gap-2 h-9 w-9 sm:w-auto sm:px-3 p-0">
                 <Trophy className="h-4 w-4" />
-                Stats
+                <span className="hidden sm:inline">Stats</span>
               </Button>
             </Link>
             <UserButton />
           </div>
         </Authenticated>
         <AuthLoading>
-            <Skeleton className="h-8 w-8 rounded-full" />
+            <Skeleton className="h-8 w-8 rounded-full self-start sm:self-auto" />
         </AuthLoading>
         <Unauthenticated>
-          <SignInButton />
+          <div className="self-start sm:self-auto">
+            <SignInButton />
+          </div>
         </Unauthenticated>
       </div>
 
