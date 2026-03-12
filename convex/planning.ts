@@ -73,7 +73,7 @@ export const toggleAvailability = mutation({
       await ctx.db.insert('availability', {
         userId: identity.subject,
         date: args.date,
-        username: identity.username || identity.nickname || identity.name || 'Anonymous',
+        username: (identity.username || identity.nickname || identity.name || 'Anonymous') as string,
         isGM,
       })
     }

@@ -110,6 +110,32 @@ export const listSessions = query({
   },
 })
 
+export const listUserJoinedSessions = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) return null
+
+    const userCharacters = await ctx.db
+      .query('characters')
+      .withIndex('by_userId', (q) => q.eq('userId', user.subject))
+      .collect()
+    
+    const userCharacterIds = new Set(userCharacters.map(c => c._id))
+
+    const allSessions = await ctx.db.query('sessions').collect()
+    
+    return allSessions.filter(session => 
+        session.characters.some(charId => userCharacterIds.has(charId))
+    ).map(session => ({
+        _id: session._id,
+        locked: session.locked,
+        world: session.world,
+        date: session.date
+    }))
+  }
+})
+
 export const getSession = query({
   args: { sessionId: v.id('sessions') },
   handler: async (ctx, args) => {

@@ -6,6 +6,7 @@ import ConvexClientProvider from '@/components/ConvexClientProvider'
 import { Analytics } from "@vercel/analytics/next"
 import { Toaster } from 'sonner'
 import LevelUpListener from '@/components/LevelUpListener'
+import SessionClosedListener from '@/components/SessionClosedListener'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -35,6 +36,7 @@ export default function RootLayout({
             {children}
             <Toaster position="bottom-right" theme="dark" />
             <LevelUpListener />
+            <SessionClosedListener />
           </ConvexClientProvider>
         </ClerkProvider>
         <Analytics />
