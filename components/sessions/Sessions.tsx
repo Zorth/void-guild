@@ -165,6 +165,7 @@ function MonthOverview({
   onNextMonth: () => void,
   canPrevMonth: boolean
 }) {
+    const { userId } = useAuth();
     const year = viewDate.getFullYear();
     const month = viewDate.getMonth();
     
