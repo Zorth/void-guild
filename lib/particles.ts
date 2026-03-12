@@ -26,3 +26,12 @@ export const fireJoinParticles = (x: number, y: number) => {
       colors: ['#7E22CE', '#D8B4FE', '#FFFFFF'],
     });
 };
+
+export const fireGoldParticles = (x: number, y: number) => {
+    confetti({
+      particleCount: 150,
+      spread: 100,
+      origin: { x: x / window.innerWidth, y: y / window.innerHeight },
+      colors: ['#BF953F', '#FCF6BA', '#AA771C', '#D4AF37'], // Various Gold tones
+    });
+};

@@ -12,7 +12,8 @@ import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, U
 import { useAuth } from '@clerk/nextjs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn, formatDate, formatTime as formatTimeUtil } from '@/lib/utils'
-import { fireJoinParticles } from '@/lib/particles'
+import { fireJoinParticles, fireGoldParticles } from '@/lib/particles'
+import { toast } from 'sonner'
 import {
     AlertDialog,
     AlertDialogAction,
@@ -161,7 +162,15 @@ export default function SessionDetails() {
   }
 
   const handleLock = async () => {
-    try { await lockSession({ sessionId: session._id }) }
+    try { 
+        await lockSession({ sessionId: session._id }) 
+        fireGoldParticles(window.innerWidth / 2, window.innerHeight / 2);
+        toast.success("Thank you, Voidmaster!", {
+            description: "Running a session means a lot to us. Your work and effort are very much appreciated!",
+            duration: 8000,
+            icon: '🏆'
+        });
+    }
     catch (e) { alert(e instanceof Error ? e.message : 'Failed to lock session') }
   }
 
@@ -171,7 +180,15 @@ export default function SessionDetails() {
   }
 
   const handleForceLock = async () => {
-    try { await forceLockSession({ sessionId: session._id }) }
+    try { 
+        await forceLockSession({ sessionId: session._id }) 
+        fireGoldParticles(window.innerWidth / 2, window.innerHeight / 2);
+        toast.success("Thank you, Voidmaster!", {
+            description: "Running a session means a lot to us. Your work and effort are very much appreciated!",
+            duration: 8000,
+            icon: '🏆'
+        });
+    }
     catch (e) { alert(e instanceof Error ? e.message : 'Failed to force close session') }
   }
 
