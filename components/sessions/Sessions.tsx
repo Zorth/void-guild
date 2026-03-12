@@ -213,6 +213,10 @@ function MonthOverview({
                     const dayNum = day.getDate();
                     const daySessions = sessionsByDay[dayNum] || [];
                     const dayAvailability = availabilityByDay[dayNum] || [];
+
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const isPast = day < today;
                     
                     let dayBoxClass = "";
                     if (daySessions.some(s => s.isOwner)) {
@@ -223,10 +227,11 @@ function MonthOverview({
 
                     return (
                         <Dialog key={dayNum}>
-                            <DialogTrigger asChild>
+                            <DialogTrigger asChild disabled={isPast}>
                                 <div
                                     className={cn(
-                                        "day-box border border-border/50 overflow-hidden aspect-square flex flex-col relative transition-colors hover:bg-muted/20 cursor-pointer p-0",
+                                        "day-box border border-border/50 overflow-hidden aspect-square flex flex-col relative transition-colors p-0",
+                                        isPast ? "bg-muted/10 opacity-50 grayscale cursor-not-allowed pointer-events-none" : "hover:bg-muted/20 cursor-pointer",
                                         dayBoxClass
                                     )}
                                 >
@@ -234,7 +239,7 @@ function MonthOverview({
                                         {dayNum}
                                     </div>
                                     <div className="flex-grow flex items-center justify-center p-1">
-                                        {dayAvailability.length > 0 && (
+                                        {!isPast && dayAvailability.length > 0 && (
                                             <div className="flex flex-col items-center">
                                                 <span className="text-sm sm:text-lg font-bold leading-none">{dayAvailability.length}</span>
                                                 <span className="text-[6px] sm:text-[8px] text-muted-foreground uppercase font-bold">Free</span>
@@ -243,12 +248,14 @@ function MonthOverview({
                                     </div>
                                 </div>
                             </DialogTrigger>
-                            <AvailabilityDialog 
-                                date={day} 
-                                availability={dayAvailability}
-                                onToggle={() => toggleAvailability({ date: day.getTime() })}
-                                userMetadata={userMetadata}
-                            />
+                            {!isPast && (
+                                <AvailabilityDialog 
+                                    date={day} 
+                                    availability={dayAvailability}
+                                    onToggle={() => toggleAvailability({ date: day.getTime() })}
+                                    userMetadata={userMetadata}
+                                />
+                            )}
                         </Dialog>
                     );
                 })}
