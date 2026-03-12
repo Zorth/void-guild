@@ -4,6 +4,7 @@ import { Book, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Doc, Id } from '@/convex/_generated/dataModel'
 import { cn, getLevelBadgeStyle, CharacterRankIcon } from '@/lib/utils'
+import { UserMetadata } from '@/app/stats/actions'
 
 interface AttendingCharactersListProps {
   characters: Doc<'characters'>[]
@@ -11,6 +12,7 @@ interface AttendingCharactersListProps {
   sessionLocked: boolean
   isSessionOwner: boolean
   onLeave: (characterId: Id<'characters'>) => void
+  userMetadata?: Record<string, UserMetadata>
 }
 
 export default function AttendingCharactersList({ 
@@ -18,7 +20,8 @@ export default function AttendingCharactersList({
   userCharacterIds, 
   sessionLocked, 
   isSessionOwner, 
-  onLeave 
+  onLeave,
+  userMetadata
 }: AttendingCharactersListProps) {
   if (characters.length === 0) {
     return <p className="text-muted-foreground italic">No characters have joined this session yet.</p>
@@ -29,6 +32,8 @@ export default function AttendingCharactersList({
       {characters.map((char) => {
         const isUserCharacter = userCharacterIds.has(char._id)
         const canRemove = !sessionLocked && (isSessionOwner || isUserCharacter)
+        const metadata = userMetadata?.[char.userId]
+        
         return (
             <li 
                 key={char._id} 
@@ -39,33 +44,42 @@ export default function AttendingCharactersList({
                         : "bg-muted/20"
                 )}
             >
-              <div>
-                <div className="font-bold flex items-center gap-2">
-                    {char.name}
-                    {isUserCharacter && <span className="text-[10px] bg-purple-200 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded-full uppercase tracking-wider font-bold">You</span>}
-                    {/* Book Icon */}
-                    <a
-                        href={`https://void.tarragon.be/Player-Characters/${char.name.replace(/\s+/g, '-')}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-muted-foreground hover:text-blue-500"
-                    >
-                        <Book size={16} />
-                    </a>
-                </div>
-                <div className="text-[10px] text-muted-foreground mt-1">
-                  {char.class}
-                </div>
-                {char.websiteLink && (
-                    <a 
-                        href={char.websiteLink} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="text-[10px] text-blue-500 hover:underline"
-                    >
-                        {char.websiteLink}
-                    </a>
+              <div className="flex items-center gap-3">
+                {metadata?.imageUrl && (
+                    <img 
+                        src={metadata.imageUrl} 
+                        alt={metadata.name} 
+                        className="w-8 h-8 rounded-full border border-border"
+                    />
                 )}
+                <div>
+                    <div className="font-bold flex items-center gap-2">
+                        {char.name}
+                        {isUserCharacter && <span className="text-[10px] bg-purple-200 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded-full uppercase tracking-wider font-bold">You</span>}
+                        {/* Book Icon */}
+                        <a
+                            href={`https://void.tarragon.be/Player-Characters/${char.name.replace(/\s+/g, '-')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-muted-foreground hover:text-blue-500"
+                        >
+                            <Book size={16} />
+                        </a>
+                    </div>
+                    <div className="text-[10px] text-muted-foreground mt-1">
+                      {char.class}
+                    </div>
+                    {char.websiteLink && (
+                        <a 
+                            href={char.websiteLink} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-[10px] text-blue-500 hover:underline"
+                        >
+                            {char.websiteLink}
+                        </a>
+                    )}
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <div className="flex flex-col items-end">

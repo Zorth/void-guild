@@ -31,7 +31,7 @@ import Sessions from '@/components/sessions/Sessions'
 import CreateCharacter from './CreateCharacter'
 import AdminCharacterList from './AdminCharacterList'
 import { Skeleton } from '@/components/ui/skeleton'
-import { getLevelBadgeStyle, CharacterRankIcon } from '@/lib/utils'
+import { getLevelBadgeStyle, CharacterRankIcon, getXPBarStyles } from '@/lib/utils'
 
 export default function Characters() {
   const characters = useQuery(api.characters.listCharacters)
@@ -116,55 +116,64 @@ export default function Characters() {
                 {characters.map((character) => (
                   <li
                     key={character._id}
-                    className="flex justify-between items-center cursor-pointer hover:bg-muted/50 p-2 rounded-md transition-colors"
+                    className="flex flex-col cursor-pointer hover:bg-muted/50 p-2 rounded-md transition-colors"
                     onClick={() => openDetailsDialog(character)}
                   >
-                    <div className="flex flex-col">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">
-                            {character.name}
+                    <div className="flex justify-between items-center w-full">
+                        <div className="flex flex-col">
+                        <div className="flex items-center gap-2">
+                            <span className="font-medium">
+                                {character.name}
+                            </span>
+                            {/* Book Icon moved here */}
+                            <a 
+                                href={`https://void.tarragon.be/Player-Characters/${character.name.replace(/\s+/g, '-')}`} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()} // Prevent dialog from opening
+                                className="text-muted-foreground hover:text-blue-500" // Added styling for the icon
+                            >
+                                <Book size={16} />
+                            </a>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground">
+                            {character.ancestry} {character.class}
                         </span>
-                        {/* Book Icon moved here */}
-                        <a 
-                            href={`https://void.tarragon.be/Player-Characters/${character.name.replace(/\s+/g, '-')}`} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()} // Prevent dialog from opening
-                            className="text-muted-foreground hover:text-blue-500" // Added styling for the icon
-                        >
-                            <Book size={16} />
-                        </a>
-                      </div>
-                      <span className="text-[10px] text-muted-foreground">
-                          {character.ancestry} {character.class}
-                      </span>
-                      {character.websiteLink && (
-                        <a 
-                            href={character.websiteLink} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="text-[10px] text-blue-500 hover:underline"
-                            onClick={(e) => e.stopPropagation()} // Prevent dialog from opening when clicking the link
-                        >
-                            {character.websiteLink}
-                        </a>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2"> 
-                        <div className="flex flex-col items-end"> {/* Vertical alignment for Level and XP */}
-                            <div className="flex items-center gap-1">
-                                <CharacterRankIcon rank={character.rank} />
-                                <span 
-                                    className="inline-flex align-middle justify-center w-14 rounded-full px-2 py-0.5 text-[10px] font-bold"
-                                    style={getLevelBadgeStyle(character.lvl)}
-                                >
-                                    Lvl {character.lvl}
+                        {character.websiteLink && (
+                            <a 
+                                href={character.websiteLink} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="text-[10px] text-blue-500 hover:underline"
+                                onClick={(e) => e.stopPropagation()} // Prevent dialog from opening when clicking the link
+                            >
+                                {character.websiteLink}
+                            </a>
+                        )}
+                        </div>
+                        <div className="flex items-center gap-2"> 
+                            <div className="flex flex-col items-end"> {/* Vertical alignment for Level and XP */}
+                                <div className="flex items-center gap-1">
+                                    <CharacterRankIcon rank={character.rank} />
+                                    <span 
+                                        className="inline-flex align-middle justify-center w-14 rounded-full px-2 py-0.5 text-[10px] font-bold"
+                                        style={getLevelBadgeStyle(character.lvl)}
+                                    >
+                                        Lvl {character.lvl}
+                                    </span>
+                                </div>
+                                <span className="text-[10px] text-muted-foreground">
+                                    {character.xp} XP
                                 </span>
                             </div>
-                            <span className="text-[10px] text-muted-foreground">
-                                {character.xp} XP
-                            </span>
                         </div>
+                    </div>
+                    {/* XP Bar */}
+                    <div className="w-full bg-muted/30 h-1 rounded-full mt-2 overflow-hidden">
+                        <div 
+                            className="h-full transition-all duration-500 ease-out" 
+                            style={getXPBarStyles(character.lvl, character.xp)}
+                        />
                     </div>
                   </li>
                 ))}

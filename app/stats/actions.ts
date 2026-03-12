@@ -4,6 +4,7 @@ import { createClerkClient } from '@clerk/backend';
 
 export interface UserMetadata {
   name: string;
+  imageUrl?: string;
   extraSessionsPlayed?: number;
   extraSessionsRan?: number;
 }
@@ -44,6 +45,7 @@ export async function getUsernames(userIds: string[]): Promise<Record<string, Us
       
       usernameMap[user.id] = {
         name: displayName || `User ${user.id.slice(-4)}`,
+        imageUrl: user.imageUrl,
         extraSessionsPlayed: user.publicMetadata.extraSessionsPlayed as number | undefined,
         extraSessionsRan: user.publicMetadata.extraSessionsRan as number | undefined,
       };
