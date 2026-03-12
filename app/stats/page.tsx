@@ -74,7 +74,7 @@ export default function StatsPage() {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {/* Character Leaderboard */}
-        <Card>
+        <Card className="animate-in fade-in slide-in-from-bottom-full duration-700 fill-mode-both">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Swords /> Character Leaderboard
@@ -101,7 +101,7 @@ export default function StatsPage() {
         </Card>
 
         {/* Game Master Leaderboard */}
-        <Card>
+        <Card className="animate-in fade-in slide-in-from-bottom-full duration-700 delay-150 fill-mode-both">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Crown /> Game Master Leaderboard
@@ -128,7 +128,7 @@ export default function StatsPage() {
         </Card>
 
         {/* Player Leaderboard */}
-        <Card>
+        <Card className="animate-in fade-in slide-in-from-bottom-full duration-700 delay-300 fill-mode-both">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Shield /> Player Leaderboard

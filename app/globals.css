@@ -148,3 +148,20 @@
     color: #FCF6BA !important;
     opacity: 0.9;
 }
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    filter: blur(8px);
+    transform: scale(0.98) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-page-in {
+  animation: page-in 0.3s ease-out forwards;
+}
