@@ -10,6 +10,7 @@ import { Toaster } from 'sonner'
 import LevelUpListener from '@/components/LevelUpListener'
 import SessionClosedListener from '@/components/SessionClosedListener'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { ThemeToggle } from '@/components/ThemeToggle'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -48,13 +49,27 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  const savedTheme = localStorage.getItem('theme') || 'dark';
+                  document.documentElement.classList.add(savedTheme);
+                } catch (e) {}
+              })()
+            `,
+          }}
+        />
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable} ${oxProto.variable} antialiased font-sans`}>
         <ClerkProvider>
           <ConvexClientProvider>
             <TooltipProvider>
                 {children}
-                <Toaster position="bottom-right" theme="dark" />
+                <Toaster position="bottom-right" />
                 <LevelUpListener />
                 <SessionClosedListener />
             </TooltipProvider>

@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Trophy, Book } from 'lucide-react'
 import ActivityFeed from '@/components/ActivityFeed'
+import { ThemeToggle } from '@/components/ThemeToggle'
 
 export default function Home() {
   const HomeSkeleton = (
@@ -81,6 +82,7 @@ export default function Home() {
                 <span className="hidden sm:inline">Stats</span>
               </Button>
             </Link>
+            <ThemeToggle />
             <UserButton />
           </div>
         </Authenticated>
