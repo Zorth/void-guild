@@ -27,7 +27,7 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 
 type SessionWithDetails = Doc<'sessions'> & {
     isOwner: boolean;
@@ -253,7 +253,13 @@ function MonthOverview({
                     </div>
                 ))}
                 {calendarDays.map((day, idx) => {
-                    if (!day) return <div key={`empty-${idx}`} className="bg-muted/5 rounded-md aspect-square" />;
+                    if (!day) return <motion.div 
+                        key={`empty-${idx}`} 
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: Math.min(idx * 0.01, 0.2) }}
+                        className="bg-muted/5 rounded-md aspect-square" 
+                    />;
                     
                     const dayNum = day.getDate();
                     const daySessions = sessionsByDay[dayNum] || [];
@@ -273,7 +279,10 @@ function MonthOverview({
                     return (
                         <Dialog key={dayNum}>
                             <DialogTrigger asChild disabled={isPast}>
-                                <div
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ delay: Math.min(idx * 0.01, 0.2) }}
                                     className={cn(
                                         "day-box border border-border/50 overflow-hidden aspect-square flex flex-col relative transition-colors p-0",
                                         isPast ? "bg-muted/10 opacity-50 grayscale cursor-not-allowed pointer-events-none" : "hover:bg-muted/20 cursor-pointer",
@@ -291,7 +300,7 @@ function MonthOverview({
                                             </div>
                                         )}
                                     </div>
-                                </div>
+                                </motion.div>
                             </DialogTrigger>
                             {!isPast && (
                                 <AvailabilityDialog 
@@ -478,111 +487,127 @@ export default function Sessions() {
           </div>
         </div>
       </CardHeader>
-      <CardContent key={activeTab + viewDate.getTime()} className="animate-in fade-in duration-200">
-        {activeTab === 'planning' ? (
-          sessions === undefined ? (
-            <div className="space-y-4">
-              <Skeleton className="h-8 w-48" />
-              <div className="grid grid-cols-7 gap-2">
-                {[...Array(35)].map((_, i) => (
-                  <Skeleton key={i} className="h-20 w-full" />
-                ))}
+      <CardContent className="overflow-hidden">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab + viewDate.getTime()}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+          >
+            {activeTab === 'planning' ? (
+              sessions === undefined ? (
+                <div className="space-y-4">
+                  <Skeleton className="h-8 w-48" />
+                  <div className="grid grid-cols-7 gap-2">
+                    {[...Array(35)].map((_, i) => (
+                      <Skeleton key={i} className="h-20 w-full" />
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <MonthOverview 
+                  sessions={sessions} 
+                  userCharacterIds={userCharacterIds} 
+                  viewDate={viewDate}
+                  onPrevMonth={handlePrevMonth}
+                  onNextMonth={handleNextMonth}
+                  canPrevMonth={canPrevMonth}
+                />
+              )
+            ) : sessions === undefined ? (
+              <div className="space-y-6">
+                {activeTab === 'upcoming' && (
+                  <div className="grid grid-cols-7 gap-2 mb-4">
+                    {[...Array(7)].map((_, i) => (
+                      <Skeleton key={i} className="h-20 w-full" />
+                    ))}
+                  </div>
+                )}
+                <div className="space-y-4">
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                </div>
               </div>
-            </div>
-          ) : (
-            <MonthOverview 
-              sessions={sessions} 
-              userCharacterIds={userCharacterIds} 
-              viewDate={viewDate}
-              onPrevMonth={handlePrevMonth}
-              onNextMonth={handleNextMonth}
-              canPrevMonth={canPrevMonth}
-            />
-          )
-        ) : sessions === undefined ? (
-          <div className="space-y-6">
-            {activeTab === 'upcoming' && (
-              <div className="grid grid-cols-7 gap-2 mb-4">
-                {[...Array(7)].map((_, i) => (
-                  <Skeleton key={i} className="h-20 w-full" />
-                ))}
-              </div>
-            )}
-            <div className="space-y-4">
-              <Skeleton className="h-16 w-full" />
-              <Skeleton className="h-16 w-full" />
-              <Skeleton className="h-16 w-full" />
-            </div>
-          </div>
-        ) : (
-          <>
-            {sessions.length === 0 && <p>No {activeTab} sessions found.</p>}
-            {activeTab === 'upcoming' && sessions.length > 0 && <SevenDayOverview sessions={sessions} userCharacterIds={userCharacterIds} />}
-            <ul className={cn("space-y-4", activeTab === 'upcoming' && sessions.length > 0 && "mt-8")}>
-              {sessions.map((session) => {
-                const hasJoined = activeTab === 'upcoming' && session.characters.some(id => userCharacterIds.has(id))
-                
-                return (
-                  <li key={session._id} className="border-b pb-2 last:border-0 flex justify-between items-start">
-                    <Link
-                      href={`/sessions/${session._id}`}
-                      className={cn(
-                          "flex-grow p-2 rounded-md transition-colors relative flex justify-between items-start",
-                          session.isOwner 
-                              ? "session-owner" 
-                              : isGM && hasJoined 
-                                  ? "session-admin-joined" 
-                                  : hasJoined 
-                                      ? "session-joined" 
-                                      : "session-default"
-                      )}
-                    >
-                      <div className="flex flex-col">
-                        <div className="flex items-center gap-2">
-                          <div className={cn("font-semibold", "session-world", "flex items-center")}>
-                              <span 
-                                className="inline-flex align-middle justify-center w-20 rounded-full px-2.5 py-0.5 text-xs font-semibold mr-2"
-                                style={getLevelBadgeStyle(session.level)}
-                              >
-                                  Lvl {session.level ?? 'TBD'}
-                              </span>
-                              {session.worldName}
-                          </div>
-                          {session.characters.length >= session.maxPlayers && (
-                            <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800 uppercase tracking-wider">
-                              Full
-                            </span>
+            ) : (
+              <>
+                {sessions.length === 0 && <p>No {activeTab} sessions found.</p>}
+                {activeTab === 'upcoming' && sessions.length > 0 && <SevenDayOverview sessions={sessions} userCharacterIds={userCharacterIds} />}
+                <ul className={cn("space-y-4", activeTab === 'upcoming' && sessions.length > 0 && "mt-8")}>
+                  {sessions.map((session, i) => {
+                    const hasJoined = activeTab === 'upcoming' && session.characters.some(id => userCharacterIds.has(id))
+                    
+                    return (
+                      <motion.li 
+                        key={session._id}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: Math.min(i * 0.03, 0.2), duration: 0.2 }}
+                        className="border-b pb-2 last:border-0 flex justify-between items-start"
+                      >
+                        <Link
+                          href={`/sessions/${session._id}`}
+                          className={cn(
+                              "flex-grow p-2 rounded-md transition-colors relative flex justify-between items-start",
+                              session.isOwner 
+                                  ? "session-owner" 
+                                  : isGM && hasJoined 
+                                      ? "session-admin-joined" 
+                                      : hasJoined 
+                                          ? "session-joined" 
+                                          : "session-default"
                           )}
-                          {session.locked && <Lock className="h-3 w-3 text-muted-foreground" />}
-                        </div>
-                        <div className="text-sm font-medium">
-                          {formatDate(session.date)} at {formatTime(session.date)}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {session.characters.length} / {session.maxPlayers} players
-                        </div>
-                      </div>
-                      {activeTab === 'past' && (
-                          <Button 
-                              variant="outline" 
-                              size="sm" 
-                              className="h-6 text-xs px-2 mt-1"
-                              onClick={(e) => {
-                                e.stopPropagation(); // Prevent clicking the parent Link
-                                e.preventDefault(); // Prevent any default action of the button or parent that might cause navigation
-                                window.open(`https://void.tarragon.be/Session-Reports/${new Date(session.date).toISOString().slice(0, 10)}-${session.worldName.replace(/\s+/g, '-')}`, '_blank');
-                              }}
-                          >
-                              <Book size={32} />
-                          </Button>
-                      )}
-                    </Link>
-                  </li>
-                )
-              })}
-            </ul>
-          </>
-        )}
+                        >
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-2">
+                              <div className={cn("font-semibold", "session-world", "flex items-center")}>
+                                  <span 
+                                    className="inline-flex align-middle justify-center w-20 rounded-full px-2.5 py-0.5 text-xs font-semibold mr-2"
+                                    style={getLevelBadgeStyle(session.level)}
+                                  >
+                                      Lvl {session.level ?? 'TBD'}
+                                  </span>
+                                  {session.worldName}
+                              </div>
+                              {session.characters.length >= session.maxPlayers && (
+                                <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800 uppercase tracking-wider">
+                                  Full
+                                </span>
+                              )}
+                              {session.locked && <Lock className="h-3 w-3 text-muted-foreground" />}
+                            </div>
+                            <div className="text-sm font-medium">
+                              {formatDate(session.date)} at {formatTime(session.date)}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {session.characters.length} / {session.maxPlayers} players
+                            </div>
+                          </div>
+                          {activeTab === 'past' && (
+                              <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="h-6 text-xs px-2 mt-1"
+                                  onClick={(e) => {
+                                    e.stopPropagation(); // Prevent clicking the parent Link
+                                    e.preventDefault(); // Prevent any default action of the button or parent that might cause navigation
+                                    window.open(`https://void.tarragon.be/Session-Reports/${new Date(session.date).toISOString().slice(0, 10)}-${session.worldName.replace(/\s+/g, '-')}`, '_blank');
+                                  }}
+                              >
+                                  <Book size={32} />
+                              </Button>
+                          )}
+                        </Link>
+                      </motion.li>
+                    )
+                  })}
+                </ul>
+              </>
+            )}
+          </motion.div>
+        </AnimatePresence>
       </CardContent>
     </Card>
   )
