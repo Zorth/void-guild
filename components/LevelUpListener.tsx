@@ -42,8 +42,8 @@ export default function LevelUpListener() {
                     ? "A legendary achievement in the Void!" 
                     : "A significant step in your journey!",
                 icon: char.rank === 'guildmaster' ? '👑' : '🎖️',
-                className: 'achievement-toast',
-                descriptionClassName: 'achievement-description'
+                className: 'rank-toast',
+                descriptionClassName: 'rank-description'
               })
               fireJoinParticles(window.innerWidth / 2, window.innerHeight / 2)
           }, 1000);

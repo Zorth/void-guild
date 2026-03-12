@@ -136,3 +136,15 @@
     color: #E9D5FF !important;
     opacity: 0.9;
 }
+
+.rank-toast {
+    background: rgba(191, 149, 63, 0.1) !important;
+    border: 2px solid #BF953F !important;
+    color: #FCF6BA !important;
+    border-radius: 0.75rem !important;
+}
+
+.rank-description {
+    color: #FCF6BA !important;
+    opacity: 0.9;
+}
