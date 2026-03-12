@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog'
 import { FormEvent, useState } from 'react'
 import { fireVoidParticles } from '@/lib/particles'
+import { track } from '@vercel/analytics'
 
 export default function CreateCharacter() {
   const createCharacter = useMutation(api.characters.createCharacter)
@@ -31,6 +32,7 @@ export default function CreateCharacter() {
     }
 
     await createCharacter(newCharacterData)
+    track('character_created', { name: newCharacterData.name })
     setNewCharacterData({ name: '', ancestry: '', class: '', websiteLink: '' })
     setIsOpen(false)
   }

@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn, formatDate, formatTime as formatTimeUtil } from '@/lib/utils'
 import { fireJoinParticles, fireGoldParticles } from '@/lib/particles'
 import { toast } from 'sonner'
+import { track } from '@vercel/analytics'
 import { getUsernames, UserMetadata } from '@/app/stats/actions'
 import {
     AlertDialog,
@@ -156,6 +157,7 @@ export default function SessionDetails() {
             sessionId: session._id,
             characterId: selectedCharacterId as Id<'characters'>,
         })
+        track('session_joined', { worldName: session.worldName })
         setSelectedCharacterId('')
     } catch (e) {
         alert(e instanceof Error ? e.message : 'Failed to join session')
@@ -220,7 +222,10 @@ export default function SessionDetails() {
   }
 
   const handleExpressInterest = async () => {
-    try { await expressInterest({ sessionId: session._id }) }
+    try { 
+        await expressInterest({ sessionId: session._id }) 
+        track('session_interest_expressed', { worldName: session.worldName })
+    }
     catch (e) { alert(e instanceof Error ? e.message : 'Failed to express interest') }
   }
 
@@ -349,6 +354,7 @@ export default function SessionDetails() {
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="text-muted-foreground hover:text-blue-500"
+                            onClick={() => track('session_report_viewed', { worldName: session.worldName })}
                         >
                             <Book size={20} />
                         </a>

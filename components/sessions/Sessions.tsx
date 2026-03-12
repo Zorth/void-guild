@@ -28,6 +28,7 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { motion, AnimatePresence } from 'framer-motion'
+import { track } from '@vercel/analytics'
 
 type SessionWithDetails = Doc<'sessions'> & {
     isOwner: boolean;
@@ -442,6 +443,7 @@ export default function Sessions() {
   const userCharacterIds = new Set(userCharacters?.map(c => c._id) ?? [])
 
   const handlePrevMonth = () => {
+    track('month_nav_prev');
     const today = new Date();
     const prev = new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1);
     if (prev >= new Date(today.getFullYear(), today.getMonth(), 1)) {
@@ -450,6 +452,7 @@ export default function Sessions() {
   };
 
   const handleNextMonth = () => {
+    track('month_nav_next');
     setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1));
   };
 
@@ -466,7 +469,10 @@ export default function Sessions() {
             {(['upcoming', 'planning', 'past'] as const).map((tab) => (
               <button
                 key={tab}
-                onClick={() => setActiveTab(tab)}
+                onClick={() => {
+                    setActiveTab(tab);
+                    track('tab_switch', { tab });
+                }}
                 className={cn(
                   "px-3 py-1 text-sm font-medium rounded-sm transition-colors capitalize relative z-10",
                   activeTab === tab 
