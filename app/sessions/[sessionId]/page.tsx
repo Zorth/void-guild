@@ -1,6 +1,6 @@
 'use client'
 
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, notFound } from 'next/navigation'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -52,7 +52,7 @@ interface SessionWithGM extends Doc<'sessions'> {
 
 export default function SessionDetails() {
   const params = useParams()
-  const sessionId = params.sessionId as Id<'sessions'>
+  const sessionId = params.sessionId as string
   const router = useRouter()
 
   const session = useQuery(api.sessions.getSession, { sessionId }) as SessionWithGM | undefined | null
@@ -77,17 +77,16 @@ export default function SessionDetails() {
   const [userMetadata, setUserMetadata] = useState<Record<string, UserMetadata>>({})
 
   useEffect(() => {
-    if (session === null) {
-      router.push('/')
-    }
-  }, [session, router])
-
-  useEffect(() => {
     if (session?.attendingCharacters) {
         const userIds = Array.from(new Set(session.attendingCharacters.map(c => c.userId)))
         getUsernames(userIds).then(setUserMetadata)
     }
   }, [session?.attendingCharacters])
+
+  if (session === null) {
+    notFound()
+    return null
+  }
 
   if (session === undefined || userCharacters === undefined || userCharacters === null || isAdmin === undefined || (isAdmin && allCharacters === undefined)) {
     return (
@@ -141,8 +140,6 @@ export default function SessionDetails() {
         </div>
     )
   }
-
-  if (session === null) return null;
 
   const userCharacterIds = new Set(userCharacters.map(c => c._id))
   const hasUserCharacterInSession = userCharacters.some(userChar =>

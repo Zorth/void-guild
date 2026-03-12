@@ -138,15 +138,18 @@ export const listUserJoinedSessions = query({
 })
 
 export const getSession = query({
-  args: { sessionId: v.id('sessions') },
+  args: { sessionId: v.string() },
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
     if (!user) {
       return null
     }
 
+    const sessionId = ctx.db.normalizeId('sessions', args.sessionId)
+    if (!sessionId) return null
+
     const isAdminUser = await isAdmin(ctx)
-    const session = await ctx.db.get(args.sessionId)
+    const session = await ctx.db.get(sessionId)
     if (!session) return null
 
     const characterDocs = await Promise.all(
@@ -179,12 +182,15 @@ export const getSession = query({
 })
 
 export const previewXPGains = query({
-    args: { sessionId: v.id('sessions') },
+    args: { sessionId: v.string() },
     handler: async (ctx, args) => {
         const user = await ctx.auth.getUserIdentity()
         if (!user) return null
         
-        const session = await ctx.db.get(args.sessionId)
+        const sessionId = ctx.db.normalizeId('sessions', args.sessionId)
+        if (!sessionId) return null
+
+        const session = await ctx.db.get(sessionId)
         if (!session) return null
 
         if (session.level === undefined) {
