@@ -133,8 +133,8 @@ function SevenDayOverview({ sessions, userCharacterIds }: { sessions: SessionWit
 }
 
 export default function Sessions() {
-  const [showPastSessions, setShowPastSessions] = useState(false)
-  const sessions = useQuery(api.sessions.listSessions, { past: showPastSessions }) as SessionWithDetails[]
+  const [activeTab, setActiveTab] = useState<'upcoming' | 'planning' | 'past'>('upcoming')
+  const sessions = useQuery(api.sessions.listSessions, { past: activeTab === 'past' }) as SessionWithDetails[]
   const isGM = useQuery(api.sessions.isGameMasterQuery)
   const userCharacters = useQuery(api.characters.listCharacters)
   const world = useQuery(api.worlds.getWorldByOwner) // Query for the user's world
@@ -144,26 +144,41 @@ export default function Sessions() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>{showPastSessions ? 'Past Sessions' : 'Upcoming Sessions'}</CardTitle>
+        <div className="flex items-center gap-4">
+          <CardTitle>Sessions</CardTitle>
+          <div className="flex bg-muted p-1 rounded-md h-9">
+            {(['upcoming', 'planning', 'past'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={cn(
+                  "px-3 py-1 text-sm font-medium rounded-sm transition-all capitalize",
+                  activeTab === tab 
+                    ? "bg-background text-foreground shadow-sm" 
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="flex gap-2">
-          {isGM && <SessionDialog hasWorld={!!world} />}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowPastSessions(!showPastSessions)}
-          >
-            {showPastSessions ? 'Upcoming' : 'Past'}
-          </Button>
+          {activeTab === 'upcoming' && isGM && <SessionDialog hasWorld={!!world} />}
         </div>
       </CardHeader>
       <CardContent>
-        {sessions === undefined ? (
+        {activeTab === 'planning' ? (
+          <p>No planning sessions found.</p>
+        ) : sessions === undefined ? (
           <div className="space-y-6">
-            <div className="grid grid-cols-7 gap-2 mb-4">
-              {[...Array(7)].map((_, i) => (
-                <Skeleton key={i} className="h-20 w-full" />
-              ))}
-            </div>
+            {activeTab === 'upcoming' && (
+              <div className="grid grid-cols-7 gap-2 mb-4">
+                {[...Array(7)].map((_, i) => (
+                  <Skeleton key={i} className="h-20 w-full" />
+                ))}
+              </div>
+            )}
             <div className="space-y-4">
               <Skeleton className="h-16 w-full" />
               <Skeleton className="h-16 w-full" />
@@ -172,11 +187,11 @@ export default function Sessions() {
           </div>
         ) : (
           <>
-            {sessions.length === 0 && <p>No {showPastSessions ? 'past' : 'upcoming'} sessions found.</p>}
-            {!showPastSessions && sessions.length > 0 && <SevenDayOverview sessions={sessions} userCharacterIds={userCharacterIds} />}
+            {sessions.length === 0 && <p>No {activeTab} sessions found.</p>}
+            {activeTab === 'upcoming' && sessions.length > 0 && <SevenDayOverview sessions={sessions} userCharacterIds={userCharacterIds} />}
             <ul className="space-y-4 mt-8">
               {sessions.map((session) => {
-                const hasJoined = !showPastSessions && session.characters.some(id => userCharacterIds.has(id))
+                const hasJoined = activeTab === 'upcoming' && session.characters.some(id => userCharacterIds.has(id))
                 
                 return (
                   <li key={session._id} className="border-b pb-2 last:border-0 flex justify-between items-start">
@@ -222,7 +237,7 @@ export default function Sessions() {
                           {session.characters.length} / {session.maxPlayers} players
                         </div>
                       </div>
-                      {showPastSessions && (
+                      {activeTab === 'past' && (
                           <Button 
                               variant="outline" 
                               size="sm" 
