@@ -241,8 +241,8 @@ export default function SessionDetails() {
       return
     }
     const sessionTime = new Date(session.date)
-    const formattedDate = formatDate(sessionTime)
-    const formattedTime = formatTimeUtil(sessionTime)
+    const unixTimestamp = Math.floor(session.date / 1000)
+    const discordTimestamp = `<t:${unixTimestamp}:F> (<t:${unixTimestamp}:R>)`
     const roleId = session.system === 'PF' 
         ? process.env.NEXT_PUBLIC_DISCORD_ROLE_ID_PF 
         : process.env.NEXT_PUBLIC_DISCORD_ROLE_ID_DND
@@ -259,11 +259,11 @@ export default function SessionDetails() {
         const spotsLeft = session.maxPlayers - session.attendingCharacters.length
         const daysLeft = Math.ceil((session.date - Date.now()) / (1000 * 60 * 60 * 24))
         embedTitle = `Reminder: ${session.worldName}`
-        embedDescription = `There are still ${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} left! The session starts in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}.`
+        embedDescription = `There are still ${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} left! The session starts ${discordTimestamp}.`
         embedColor = 16776960 // Yellow
     } else if (type === 'cancel') {
         embedTitle = `SESSION CANCELLED: ${session.worldName}`
-        embedDescription = `The session for "${session.worldName}" on ${formattedDate} has been cancelled and will no longer be happening.`
+        embedDescription = `The session for "${session.worldName}" on ${discordTimestamp} has been cancelled and will no longer be happening.`
         embedColor = 15158332 // Red
     }
 
@@ -275,7 +275,7 @@ export default function SessionDetails() {
         { name: 'System', value: session.system === 'PF' ? '<:Pathfinder:1322734594864320522> Pathfinder 2e' : '<:DnD:1322734981524754473> D&D 5e', inline: true },
         { name: 'Level', value: session.level ? `Level ${session.level}` : 'TBD', inline: true },
         { name: 'Players', value: `${session.attendingCharacters.length}/${session.maxPlayers}`, inline: true },
-        { name: 'Date & Time', value: `${formattedDate} at ${formattedTime}`, inline: false },
+        { name: 'Date & Time', value: discordTimestamp, inline: false },
       ],
       timestamp: new Date().toISOString(),
       url: `${window.location.origin}/sessions/${session._id}`,
