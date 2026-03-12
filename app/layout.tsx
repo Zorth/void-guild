@@ -7,6 +7,7 @@ import { Analytics } from "@vercel/analytics/next"
 import { Toaster } from 'sonner'
 import LevelUpListener from '@/components/LevelUpListener'
 import SessionClosedListener from '@/components/SessionClosedListener'
+import { TooltipProvider } from '@/components/ui/tooltip'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -33,10 +34,12 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ClerkProvider>
           <ConvexClientProvider>
-            {children}
-            <Toaster position="bottom-right" theme="dark" />
-            <LevelUpListener />
-            <SessionClosedListener />
+            <TooltipProvider>
+                {children}
+                <Toaster position="bottom-right" theme="dark" />
+                <LevelUpListener />
+                <SessionClosedListener />
+            </TooltipProvider>
           </ConvexClientProvider>
         </ClerkProvider>
         <Analytics />

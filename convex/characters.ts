@@ -1,5 +1,6 @@
 import { query, mutation, QueryCtx } from './_generated/server'
 import { v } from 'convex/values'
+import { internal } from './_generated/api'
 
 /**
  * Checks if the authenticated user has Admin permissions.
@@ -27,6 +28,18 @@ export const listCharacters = query({
     const characters = await ctx.db
       .query('characters')
       .filter((q) => q.eq(q.field('userId'), user.subject))
+      .collect()
+    
+    return characters.sort((a, b) => (b.lvl * 1000 + b.xp) - (a.lvl * 1000 + a.xp))
+  },
+})
+
+export const listCharactersByUserId = query({
+  args: { userId: v.string() },
+  handler: async (ctx, args) => {
+    const characters = await ctx.db
+      .query('characters')
+      .withIndex('by_userId', (q) => q.eq('userId', args.userId))
       .collect()
     
     return characters.sort((a, b) => (b.lvl * 1000 + b.xp) - (a.lvl * 1000 + a.xp))
@@ -65,7 +78,7 @@ export const createCharacter = mutation({
     if (!user) {
       throw new Error('Not authenticated')
     }
-    await ctx.db.insert('characters', {
+    const characterId = await ctx.db.insert('characters', {
       name: args.name,
       ancestry: args.ancestry,
       class: args.class,
@@ -74,6 +87,13 @@ export const createCharacter = mutation({
       lvl: 1,
       xp: 0,
       rank: 'none',
+    })
+
+    await ctx.scheduler.runAfter(0, internal.activity.logActivity, {
+        type: 'character_created',
+        message: `{user} created a new character: ${args.name}!`,
+        userId: user.subject,
+        metadata: { characterId, name: args.name }
     })
   },
 })
@@ -118,6 +138,9 @@ export const adminUpdateCharacter = mutation({
     if (!isAdminUser) {
       throw new Error('Only admins can update any character')
     }
+
+    const oldCharacter = await ctx.db.get(args.characterId)
+
     await ctx.db.patch(args.characterId, {
       name: args.name,
       lvl: args.lvl,
@@ -127,6 +150,22 @@ export const adminUpdateCharacter = mutation({
       websiteLink: args.websiteLink,
       rank: args.rank,
     })
+
+    if (args.rank && args.rank !== 'none' && args.rank !== oldCharacter?.rank) {
+        await ctx.scheduler.runAfter(0, internal.activity.logActivity, {
+            type: 'rank_promotion',
+            message: `${args.name} was promoted to ${args.rank.charAt(0).toUpperCase() + args.rank.slice(1)}!`,
+            metadata: { characterId: args.characterId, rank: args.rank }
+        })
+    }
+
+    if (oldCharacter && args.lvl > oldCharacter.lvl) {
+        await ctx.scheduler.runAfter(0, internal.activity.logActivity, {
+            type: 'level_up',
+            message: `${args.name} reached Level ${args.lvl}!`,
+            metadata: { characterId: args.characterId, newLvl: args.lvl }
+        })
+    }
   },
 })
 

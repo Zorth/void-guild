@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Trophy, Book } from 'lucide-react'
+import ActivityFeed from '@/components/ActivityFeed'
 
 export default function Home() {
   const HomeSkeleton = (
@@ -95,6 +96,7 @@ export default function Home() {
 
       <Authenticated>
         <Characters />
+        <ActivityFeed />
       </Authenticated>
 
       <Unauthenticated>

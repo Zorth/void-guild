@@ -1,6 +1,7 @@
 import { query, mutation, QueryCtx } from './_generated/server'
 import { v } from 'convex/values'
 import { Doc, Id } from './_generated/dataModel'
+import { internal } from './_generated/api'
 
 /**
  * Checks if the authenticated user has Game Master permissions.
@@ -184,7 +185,7 @@ export const previewXPGains = query({
         if (!user) return null
         
         const session = await ctx.db.get(args.sessionId)
-        if (!session) throw new Error('Session not found')
+        if (!session) return null
 
         if (session.level === undefined) {
             return []
@@ -244,7 +245,7 @@ export const createSession = mutation({
         throw new Error('Game Master must have a world to create a session.')
     }
 
-    return await ctx.db.insert('sessions', {
+    const sessionId = await ctx.db.insert('sessions', {
       date: args.date,
       world: gmWorld._id,
       level: args.level,
@@ -255,6 +256,15 @@ export const createSession = mutation({
       location: args.location,
       owner: identity!.subject,
     })
+
+    await ctx.scheduler.runAfter(0, internal.activity.logActivity, {
+        type: 'session_created',
+        message: `{user} posted a new session for ${gmWorld.name}!`,
+        userId: identity.subject,
+        metadata: { sessionId, worldName: gmWorld.name }
+    })
+
+    return sessionId
   },
 })
 
@@ -513,6 +523,19 @@ export const lockSession = mutation({
             lvl: newLvl,
             xp: newXp,
           })
+
+          if (newLvl > character.lvl) {
+            await ctx.scheduler.runAfter(0, internal.activity.logActivity, {
+                type: 'level_up',
+                message: `${character.name} reached Level ${newLvl}!`,
+                metadata: { characterId, newLvl }
+            })
+          }
+
+          if (character.rank !== undefined && character.rank !== 'none') {
+              // Note: Ranks are usually manual, but if we ever automate rank gain based on level/session, log here.
+              // For now we check if rank changed during this patch (if we added logic for it)
+          }
         }
       }
   
