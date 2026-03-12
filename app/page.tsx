@@ -60,7 +60,10 @@ export default function Home() {
   return (
     <main className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-4xl font-bold">Guild of The Void</h1>
+        <div>
+          <h1 className="text-4xl font-bold">Guild of The Void</h1>
+          <p className="text-sm text-muted-foreground mt-1">Management tool for The Void Campaign, currently in Open Beta.</p>
+        </div>
         <Authenticated>
           <div className="flex items-center gap-2">
             <Link href="/stats">
