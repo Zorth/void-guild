@@ -4,6 +4,8 @@ import './globals.css'
 import { ClerkProvider } from '@clerk/nextjs'
 import ConvexClientProvider from '@/components/ConvexClientProvider'
 import { Analytics } from "@vercel/analytics/next"
+import { Toaster } from 'sonner'
+import LevelUpListener from '@/components/LevelUpListener'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -29,8 +31,13 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ClerkProvider>
-          <ConvexClientProvider>{children}</ConvexClientProvider>
+          <ConvexClientProvider>
+            {children}
+            <Toaster position="bottom-right" theme="dark" />
+            <LevelUpListener />
+          </ConvexClientProvider>
         </ClerkProvider>
+        <Analytics />
       </body>
     </html>
   )

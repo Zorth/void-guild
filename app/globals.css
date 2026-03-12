@@ -124,3 +124,15 @@
     @apply bg-background text-foreground;
   }
 }
+
+.achievement-toast {
+    background: rgba(147, 51, 234, 0.1) !important;
+    border: 2px solid #D8B4FE !important;
+    color: #D8B4FE !important;
+    border-radius: 0.75rem !important;
+}
+
+.achievement-description {
+    color: #E9D5FF !important;
+    opacity: 0.9;
+}
