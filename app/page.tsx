@@ -40,7 +40,7 @@ export default function Home() {
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Upcoming Sessions</CardTitle>
+          <CardTitle>Sessions</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-6">

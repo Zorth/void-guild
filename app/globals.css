@@ -118,6 +118,9 @@
 
 .parchment {
   --radius: 0.125rem;
+  --font-sans: var(--font-sabon), serif;
+  --font-ox-proto: var(--font-sabon);
+  --font-geist-sans: var(--font-sabon);
   --background: oklch(0.96 0.02 85);
   --foreground: oklch(0.28 0.01 0);
   --card: oklch(0.98 0.01 85);
@@ -149,6 +152,30 @@
   --sidebar-accent-foreground: oklch(0.28 0.01 0);
   --sidebar-border: oklch(0.75 0.03 85);
   --sidebar-ring: oklch(0.42 0.12 28);
+}
+
+.parchment body, 
+.parchment input, 
+.parchment button, 
+.parchment textarea, 
+.parchment select {
+  font-family: var(--font-sabon), serif !important;
+}
+
+.parchment h1 {
+  font-family: var(--font-taroca), serif !important;
+}
+
+.dark h1 {
+  font-family: var(--font-taroca), serif !important;
+}
+
+.parchment h2,
+.parchment h3,
+.parchment h4,
+.parchment h5,
+.parchment h6 {
+  font-family: var(--font-gin), serif !important;
 }
 
 .parchment body {

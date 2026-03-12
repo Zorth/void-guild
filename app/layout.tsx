@@ -38,6 +38,42 @@ const oxProto = localFont({
   variable: '--font-ox-proto',
 })
 
+const taroca = localFont({
+  src: '../public/fonts/taroca-regular/Taroca-Regular.ttf',
+  variable: '--font-taroca',
+})
+
+const gin = localFont({
+  src: '../public/fonts/gin-test/GinTest-Regular.otf',
+  variable: '--font-gin',
+})
+
+const sabon = localFont({
+  src: [
+    {
+      path: '../public/fonts/sabon/Sabon.ttf',
+      weight: '400',
+      style: 'normal',
+    },
+    {
+      path: '../public/fonts/sabon/SabonBold.ttf',
+      weight: '700',
+      style: 'normal',
+    },
+    {
+      path: '../public/fonts/sabon/SabonItalic.ttf',
+      weight: '400',
+      style: 'italic',
+    },
+    {
+      path: '../public/fonts/sabon/SabonBoldItalic.ttf',
+      weight: '700',
+      style: 'italic',
+    },
+  ],
+  variable: '--font-sabon',
+})
+
 export const metadata: Metadata = {
   title: 'Void Guild',
   description: 'Character Manager for the Guild of The Void',
@@ -64,7 +100,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} ${oxProto.variable} antialiased font-sans`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} ${oxProto.variable} ${taroca.variable} ${gin.variable} ${sabon.variable} antialiased font-sans`}>
         <ClerkProvider>
           <ConvexClientProvider>
             <TooltipProvider>
