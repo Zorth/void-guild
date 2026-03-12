@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Trophy } from 'lucide-react'
+import { Trophy, Book } from 'lucide-react'
 
 export default function Home() {
   const HomeSkeleton = (
@@ -66,6 +66,12 @@ export default function Home() {
         </div>
         <Authenticated>
           <div className="flex items-center gap-2">
+            <a href="https://void.tarragon.be/" target="_blank" rel="noopener noreferrer">
+              <Button variant="outline" size="sm" className="flex items-center gap-2">
+                <Book className="h-4 w-4" />
+                Wiki
+              </Button>
+            </a>
             <Link href="/stats">
               <Button variant="outline" size="sm" className="flex items-center gap-2">
                 <Trophy className="h-4 w-4" />
