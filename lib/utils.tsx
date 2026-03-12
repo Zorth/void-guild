@@ -12,11 +12,19 @@ export function CharacterRankIcon({ rank, className }: { rank?: string, classNam
   if (!rank || rank === 'none') return null;
 
   if (rank === 'guildmaster') {
-    return <Crown className={cn("text-amber-500", className)} size={16} title="Guildmaster" />;
+    return (
+      <span title="Guildmaster">
+        <Crown className={cn("text-amber-500", className)} size={16} />
+      </span>
+    );
   }
 
   if (rank === 'journeyman') {
-    return <Medal className={cn("text-purple-500", className)} size={16} title="Journeyman" />;
+    return (
+      <span title="Journeyman">
+        <Medal className={cn("text-purple-500", className)} size={16} />
+      </span>
+    );
   }
 
   return null;
