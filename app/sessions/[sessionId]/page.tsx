@@ -234,7 +234,7 @@ export default function SessionDetails() {
     catch (e) { alert(e instanceof Error ? e.message : 'Failed to withdraw interest') }
   }
 
-  const handleSendToDiscord = async () => {
+  const handleSendToDiscord = async (type: 'new' | 'remind' | 'cancel') => {
     const webhookUrl = process.env.NEXT_PUBLIC_DISCORD_WEBHOOK_URL
     if (!webhookUrl) {
       alert('Discord Webhook URL is not configured.')
@@ -243,11 +243,32 @@ export default function SessionDetails() {
     const sessionTime = new Date(session.date)
     const formattedDate = formatDate(sessionTime)
     const formattedTime = formatTimeUtil(sessionTime)
+    const roleId = process.env.NEXT_PUBLIC_DISCORD_ROLE_ID
+
+    let content = roleId ? `<@&${roleId}>` : undefined
+    let embedTitle = ""
+    let embedDescription = ""
+    let embedColor = 5814783 // Blueish
+
+    if (type === 'new') {
+        embedTitle = `New Session Alert: ${session.worldName}`
+        embedDescription = `A new session for "${session.worldName}" has been announced!`
+    } else if (type === 'remind') {
+        const spotsLeft = session.maxPlayers - session.attendingCharacters.length
+        const daysLeft = Math.ceil((session.date - Date.now()) / (1000 * 60 * 60 * 24))
+        embedTitle = `Reminder: ${session.worldName}`
+        embedDescription = `There are still ${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} left! The session starts in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}.`
+        embedColor = 16776960 // Yellow
+    } else if (type === 'cancel') {
+        embedTitle = `SESSION CANCELLED: ${session.worldName}`
+        embedDescription = `The session for "${session.worldName}" on ${formattedDate} has been cancelled and will no longer be happening.`
+        embedColor = 15158332 // Red
+    }
 
     const embed = {
-      title: `New Session Alert: ${session.worldName}`,
-      description: `A new session for "${session.worldName}" has been announced!`,
-      color: 5814783,
+      title: embedTitle,
+      description: embedDescription,
+      color: embedColor,
       fields: [
         { name: 'Date & Time', value: `${formattedDate} at ${formattedTime}`, inline: false },
         { name: 'Level', value: session.level ? `Level ${session.level}` : 'TBD', inline: true },
@@ -257,24 +278,20 @@ export default function SessionDetails() {
       url: `${window.location.origin}/sessions/${session._id}`,
     }
 
-    if (session.location) {
+    if (session.location && type !== 'cancel') {
         embed.fields.push({ name: 'Location', value: `[View on Google Maps](${session.location})`, inline: false })
-    }
-
-    if (session.attendingCharacters && session.attendingCharacters.length > 0) {
-        embed.fields.push({ name: 'Attending Characters', value: session.attendingCharacters.map(char => char.name).join(', '), inline: false })
     }
 
     try {
       await fetch(webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ embeds: [embed] }),
+        body: JSON.stringify({ content, embeds: [embed] }),
       })
-      alert('Session details sent to Discord!')
+      toast.success(`Discord ${type} notification sent!`)
     } catch (error) {
       console.error('Failed to send to Discord:', error)
-      alert('Failed to send session details to Discord.')
+      toast.error('Failed to send session details to Discord.')
     }
   }
 

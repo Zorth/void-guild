@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { Pencil, CheckCircle2, Shield } from 'lucide-react'
+import { Pencil, CheckCircle2, Shield, Send } from 'lucide-react'
 import SessionDialog from '@/components/sessions/SessionDialog'
 import {
     AlertDialog,
@@ -15,13 +15,21 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
   } from '@/components/ui/alert-dialog'
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+    DialogDescription,
+} from '@/components/ui/dialog'
 import { getLevelBadgeStyle, CharacterRankIcon } from '@/lib/utils'
 import { Doc } from '@/convex/_generated/dataModel'
 
 interface SessionManagementProps {
   session: any // Using any for simplicity as it includes combined GM data
   isAdmin: boolean
-  onSendToDiscord: () => void
+  onSendToDiscord: (type: 'new' | 'remind' | 'cancel') => void
   onLock: () => void
   onForceLock: () => void
   xpGainsPreview?: any[]
@@ -41,10 +49,33 @@ export default function SessionManagement({
         <CardTitle>Session Management</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <Button variant="outline" className="w-full justify-start" onClick={onSendToDiscord}>
-            <img src="/discord-icon.svg" alt="Discord" className="mr-2 h-4 w-4" />
-            Announce on Discord
-        </Button>
+        <Dialog>
+            <DialogTrigger asChild>
+                <Button variant="outline" className="w-full justify-start">
+                    <img src="/discord-icon.svg" alt="Discord" className="mr-2 h-4 w-4" />
+                    Announce on Discord
+                </Button>
+            </DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Discord Notification</DialogTitle>
+                    <DialogDescription>
+                        Choose the type of notification you want to send to the community.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="grid grid-cols-1 gap-3 py-4">
+                    <Button onClick={() => onSendToDiscord('new')} className="w-full justify-start gap-2 bg-blue-600 hover:bg-blue-700">
+                        <span className="font-bold">New Session</span> - Announce this session for the first time.
+                    </Button>
+                    <Button onClick={() => onSendToDiscord('remind')} className="w-full justify-start gap-2 bg-amber-600 hover:bg-amber-700">
+                        <span className="font-bold">Reminder</span> - Remind players of available spots and time left.
+                    </Button>
+                    <Button variant="destructive" onClick={() => onSendToDiscord('cancel')} className="w-full justify-start gap-2">
+                        <span className="font-bold">Cancellation</span> - Notify everyone that the session is cancelled.
+                    </Button>
+                </div>
+            </DialogContent>
+        </Dialog>
         
         <SessionDialog 
             session={session} 
