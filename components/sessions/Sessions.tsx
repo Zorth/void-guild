@@ -307,10 +307,13 @@ function MonthOverview({
                                 <AvailabilityDialog 
                                     date={day} 
                                     availability={dayAvailability}
-                                    onToggle={() => toggleAvailability({ date: day.getTime() })}
+                                    onToggle={() => {
+                                        toggleAvailability({ date: day.getTime() });
+                                        const isCurrentlyAvailable = dayAvailability.some(a => a.userId === userId);
+                                        track('availability_toggled', { action: isCurrentlyAvailable ? 'removed' : 'added' });
+                                    }}
                                     userMetadata={userMetadata}
-                                />
-                            )}
+                                />                            )}
                         </Dialog>
                     );
                 })}

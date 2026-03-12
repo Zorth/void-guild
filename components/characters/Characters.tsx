@@ -32,6 +32,7 @@ import CreateCharacter from './CreateCharacter'
 import AdminCharacterList from './AdminCharacterList'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getLevelBadgeStyle, CharacterRankIcon, getXPBarStyles } from '@/lib/utils'
+import { track } from '@vercel/analytics'
 
 export default function Characters() {
   const characters = useQuery(api.characters.listCharacters)
@@ -56,6 +57,7 @@ export default function Characters() {
   async function handleCreateWorld(event: FormEvent) {
     event.preventDefault()
     await createWorld({ name: newWorldName })
+    track('world_created', { name: newWorldName })
     setNewWorldName('')
     setShowCreateWorldDialog(false)
   }
@@ -64,6 +66,7 @@ export default function Characters() {
     event.preventDefault()
     if (!world) return
     await renameWorld({ worldId: world._id, newName: renameWorldName })
+    track('world_renamed', { oldName: world.name, newName: renameWorldName })
     setRenameWorldName('')
     setShowRenameWorldDialog(false)
   }
@@ -185,6 +188,7 @@ export default function Characters() {
                     href="https://void.tarragon.be/_META/_getting_started" 
                     target="_blank" 
                     rel="noopener noreferrer"
+                    onClick={() => track('help_getting_started_clicked')}
                 >
                     <Button variant="outline" size="icon" className="h-9 w-9">
                         <CircleHelp className="h-5 w-5" />

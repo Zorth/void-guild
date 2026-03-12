@@ -4,6 +4,7 @@ import './globals.css'
 import { ClerkProvider } from '@clerk/nextjs'
 import ConvexClientProvider from '@/components/ConvexClientProvider'
 import { Analytics } from "@vercel/analytics/next"
+import { SpeedInsights } from "@vercel/speed-insights/next"
 import { Toaster } from 'sonner'
 import LevelUpListener from '@/components/LevelUpListener'
 import SessionClosedListener from '@/components/SessionClosedListener'
@@ -43,6 +44,7 @@ export default function RootLayout({
           </ConvexClientProvider>
         </ClerkProvider>
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   )
