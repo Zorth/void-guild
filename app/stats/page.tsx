@@ -5,7 +5,7 @@ import { api } from '@/convex/_generated/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import { ChevronLeft, Crown, Shield, Swords } from 'lucide-react'
+import { ChevronLeft, Crown, Shield, Swords, Book } from 'lucide-react'
 import { useMemo, useEffect, useState } from 'react'
 import { getUsernames, UserMetadata } from './actions'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -85,7 +85,17 @@ export default function StatsPage() {
               <ul className="space-y-2">
                 {sortedCharacters.map((char, index) => (
                   <li key={char._id} className="flex justify-between items-center">
-                    <span>{index + 1}. {char.name}</span>
+                    <span className="flex items-center gap-2">
+                      {index + 1}. {char.name}
+                      <a 
+                          href={`https://void.tarragon.be/Player-Characters/${char.name.replace(/\s+/g, '-')}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-muted-foreground hover:text-blue-500"
+                      >
+                          <Book size={14} />
+                      </a>
+                    </span>
                     <span className="font-semibold">Lvl {char.lvl}</span>
                   </li>
                 ))}
