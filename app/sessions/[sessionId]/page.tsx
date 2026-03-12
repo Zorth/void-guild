@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn, formatDate, formatTime as formatTimeUtil } from '@/lib/utils'
 import { fireJoinParticles, fireGoldParticles } from '@/lib/particles'
 import { toast } from 'sonner'
+import { getUsernames, UserMetadata } from '@/app/stats/actions'
 import {
     AlertDialog,
     AlertDialogAction,
@@ -72,12 +73,20 @@ export default function SessionDetails() {
 
   const [selectedCharacterId, setSelectedCharacterId] = useState<Id<'characters'> | ''>('')
   const [selectedAdminCharacterId, setSelectedAdminCharacterId] = useState<Id<'characters'> | ''>('')
+  const [userMetadata, setUserMetadata] = useState<Record<string, UserMetadata>>({})
 
   useEffect(() => {
     if (session === null) {
       router.push('/')
     }
   }, [session, router])
+
+  useEffect(() => {
+    if (session?.attendingCharacters) {
+        const userIds = Array.from(new Set(session.attendingCharacters.map(c => c.userId)))
+        getUsernames(userIds).then(setUserMetadata)
+    }
+  }, [session?.attendingCharacters])
 
   if (session === undefined || userCharacters === undefined || userCharacters === null || isAdmin === undefined || (isAdmin && allCharacters === undefined)) {
     return (
@@ -438,6 +447,7 @@ export default function SessionDetails() {
                 sessionLocked={session.locked}
                 isSessionOwner={session.isOwner}
                 onLeave={handleLeave}
+                userMetadata={userMetadata}
               />
             </CardContent>
           </Card>

@@ -44,4 +44,10 @@ export default defineSchema({
         username: v.string(),
         isGM: v.boolean(),
     }).index('by_date', ['date']).index('by_user_date', ['userId', 'date']),
+    activity: defineTable({
+        type: v.string(), // "session_created", "level_up", "rank_promotion", "character_created"
+        message: v.string(),
+        userId: v.optional(v.string()), // The user who triggered the activity
+        metadata: v.any(),
+    }),
 })

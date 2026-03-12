@@ -84,3 +84,13 @@ export function getLevelBadgeStyle(level: number | undefined) {
     border: luminance > 0.9 ? '1px solid #e5e7eb' : 'none'
   };
 }
+
+export function getXPBarStyles(level: number, xp: number) {
+    const currentStyle = getLevelBadgeStyle(level);
+    const nextStyle = getLevelBadgeStyle(level + 1);
+    
+    return {
+        width: `${(xp / 1000) * 100}%`,
+        background: `linear-gradient(to right, ${currentStyle.backgroundColor}, ${nextStyle.backgroundColor})`
+    };
+}

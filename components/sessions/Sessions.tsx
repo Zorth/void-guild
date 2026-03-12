@@ -22,11 +22,51 @@ import {
 } from '@/components/ui/dialog'
 import { useAuth } from '@clerk/nextjs'
 import { getUsernames, UserMetadata } from '@/app/stats/actions'
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 type SessionWithDetails = Doc<'sessions'> & {
     isOwner: boolean;
     characterNames: string[];
     worldName: string; // Add worldName to the type
+}
+
+function UserCharacterPreview({ userId, username }: { userId: string, username: string }) {
+    const characters = useQuery(api.characters.listCharactersByUserId, { userId });
+
+    return (
+        <div className="p-2 space-y-2 min-w-[150px]">
+            <p className="text-xs font-bold border-b pb-1">{username}&apos;s Characters</p>
+            {characters === undefined ? (
+                <div className="space-y-1">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-full" />
+                </div>
+            ) : characters.length === 0 ? (
+                <p className="text-[10px] text-muted-foreground italic">No characters found.</p>
+            ) : (
+                <ul className="space-y-1">
+                    {characters.map(char => (
+                        <li key={char._id} className="flex items-center justify-between gap-4 text-[10px]">
+                            <div className="flex items-center gap-1">
+                                <CharacterRankIcon rank={char.rank} className="w-3 h-3" />
+                                <span>{char.name}</span>
+                            </div>
+                            <span 
+                                className="px-1.5 rounded-full font-bold"
+                                style={getLevelBadgeStyle(char.lvl)}
+                            >
+                                Lvl {char.lvl}
+                            </span>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
 }
 
 function AvailabilityDialog({ 
@@ -50,6 +90,19 @@ function AvailabilityDialog({
         return userMetadata[a.userId]?.name || a.username || `User ${a.userId.slice(-4)}`;
     }
 
+    const UserItem = ({ a }: { a: Doc<'availability'> }) => (
+        <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+                <li key={a.userId} className="text-sm flex items-center gap-2 bg-muted/30 px-2 py-1 rounded-md cursor-help hover:bg-muted/50 transition-colors">
+                    <User className="h-3 w-3" /> {getDisplayName(a)}
+                </li>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="p-0 overflow-hidden">
+                <UserCharacterPreview userId={a.userId} username={getDisplayName(a)} />
+            </TooltipContent>
+        </Tooltip>
+    );
+
     return (
         <DialogContent>
             <DialogHeader>
@@ -63,11 +116,7 @@ function AvailabilityDialog({
                         </h4>
                         {gms.length > 0 ? (
                             <ul className="space-y-1">
-                                {gms.map(a => (
-                                    <li key={a.userId} className="text-sm flex items-center gap-2 bg-muted/30 px-2 py-1 rounded-md">
-                                        <User className="h-3 w-3" /> {getDisplayName(a)}
-                                    </li>
-                                ))}
+                                {gms.map(a => <UserItem key={a.userId} a={a} />)}
                             </ul>
                         ) : (
                             <p className="text-xs text-muted-foreground italic">No GMs available.</p>
@@ -79,11 +128,7 @@ function AvailabilityDialog({
                         </h4>
                         {players.length > 0 ? (
                             <ul className="space-y-1">
-                                {players.map(a => (
-                                    <li key={a.userId} className="text-sm flex items-center gap-2 bg-muted/30 px-2 py-1 rounded-md">
-                                        <User className="h-3 w-3" /> {getDisplayName(a)}
-                                    </li>
-                                ))}
+                                {players.map(a => <UserItem key={a.userId} a={a} />)}
                             </ul>
                         ) : (
                             <p className="text-xs text-muted-foreground italic">No players available.</p>
@@ -426,7 +471,7 @@ export default function Sessions() {
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent key={activeTab + viewDate.getTime()} className="animate-in fade-in duration-200">
         {activeTab === 'planning' ? (
           sessions === undefined ? (
             <div className="space-y-4">
