@@ -295,8 +295,12 @@ export default function SessionDetails() {
     }
   }
 
-  const availableCharacters = userCharacters.filter(char => !session.characters.includes(char._id))
-  const adminAvailableCharacters = allCharacters?.filter(char => !session.characters.includes(char._id)) ?? []
+  const availableCharacters = userCharacters.filter(char => 
+    !session.characters.includes(char._id) && char.system === session.system
+  )
+  const adminAvailableCharacters = allCharacters?.filter(char => 
+    !session.characters.includes(char._id) && char.system === session.system
+  ) ?? []
   const isFull = session.characters.length >= session.maxPlayers
   const sessionTime = new Date(session.date)
   const arrivalEndTime = new Date(session.date + 30 * 60 * 1000)

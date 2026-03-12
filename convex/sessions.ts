@@ -350,6 +350,10 @@ export const joinSession = mutation({
       throw new Error('Character not found or you do not own it')
     }
 
+    if (character.system !== session.system) {
+        throw new Error(`This is a ${session.system} session, but your character is ${character.system}.`)
+    }
+
     if (session.characters.includes(args.characterId)) {
       return
     }
@@ -401,6 +405,10 @@ export const adminAddCharacterToSession = mutation({
 
       const character = await ctx.db.get(args.characterId)
       if (!character) throw new Error('Character not found')
+
+      if (character.system !== session.system) {
+          throw new Error(`This is a ${session.system} session, but this character is ${character.system}.`)
+      }
   
       await ctx.db.patch(args.sessionId, {
         characters: [...session.characters, args.characterId],
