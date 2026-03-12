@@ -78,12 +78,15 @@ export default function Characters() {
       characterId: selectedCharacter._id,
       ...editedCharacterData,
     })
+    track('character_updated', { name: selectedCharacter.name })
     setIsDetailsDialogOpen(false)
   }
 
   async function handleDeleteCharacter() {
     if (!selectedCharacter) return
+    const name = selectedCharacter.name
     await deleteCharacter({ characterId: selectedCharacter._id })
+    track('character_deleted', { name })
     setIsDetailsDialogOpen(false)
   }
 
@@ -94,6 +97,7 @@ export default function Characters() {
       class: character.class ?? '',
       websiteLink: character.websiteLink ?? '',
     })
+    track('character_details_expanded', { name: character.name })
     setIsDetailsDialogOpen(true)
   }
 

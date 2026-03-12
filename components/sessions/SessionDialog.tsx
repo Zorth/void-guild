@@ -15,6 +15,7 @@ import {
 import { FormEvent, useState } from 'react'
 import { Id, Doc } from '@/convex/_generated/dataModel'
 import { fireVoidParticles } from '@/lib/particles'
+import { track } from '@vercel/analytics'
 
 interface SessionDialogProps {
   session?: Doc<'sessions'>
@@ -100,6 +101,7 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
         gmCharacter: gmCharId,
         location: locationVal,
       })
+      track('session_updated', { worldName: worldName?.name });
     } else {
       // Trigger particle effect at the mouse position for new sessions
       if ('clientX' in event.nativeEvent) {
@@ -116,6 +118,7 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
         gmCharacter: gmCharId,
         location: locationVal,
       })
+      track('session_created', { worldName: worldName?.name });
     }
     setIsOpen(false)
   }
@@ -123,6 +126,7 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
   async function handleDelete() {
     if (session) {
       await deleteSession({ sessionId: session._id })
+      track('session_deleted', { worldName: worldName?.name });
       setIsOpen(false)
     }
   }
