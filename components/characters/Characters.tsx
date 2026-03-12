@@ -5,7 +5,7 @@ import { api } from '@/convex/_generated/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Book } from 'lucide-react'
+import { Book, CircleHelp } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -170,7 +170,18 @@ export default function Characters() {
                 ))}
               </ul>
             )}
-            <CreateCharacter />
+            <div className="flex items-center gap-2 mt-4">
+                <CreateCharacter />
+                <a 
+                    href="https://void.tarragon.be/_META/_getting_started" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                >
+                    <Button variant="outline" size="icon" className="h-9 w-9">
+                        <CircleHelp className="h-5 w-5" />
+                    </Button>
+                </a>
+            </div>
           </CardContent>
         </Card>
 

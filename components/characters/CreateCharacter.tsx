@@ -38,7 +38,7 @@ export default function CreateCharacter() {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button className="mt-4">New Character</Button>
+        <Button>New Character</Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
