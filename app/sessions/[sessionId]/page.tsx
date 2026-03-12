@@ -243,7 +243,9 @@ export default function SessionDetails() {
     const sessionTime = new Date(session.date)
     const formattedDate = formatDate(sessionTime)
     const formattedTime = formatTimeUtil(sessionTime)
-    const roleId = process.env.NEXT_PUBLIC_DISCORD_ROLE_ID
+    const roleId = session.system === 'PF' 
+        ? process.env.NEXT_PUBLIC_DISCORD_ROLE_ID_PF 
+        : process.env.NEXT_PUBLIC_DISCORD_ROLE_ID_DND
 
     let content = (roleId && type !== 'cancel') ? `<@&${roleId}>` : undefined
     let embedTitle = ""
@@ -270,9 +272,10 @@ export default function SessionDetails() {
       description: embedDescription,
       color: embedColor,
       fields: [
-        { name: 'Date & Time', value: `${formattedDate} at ${formattedTime}`, inline: false },
+        { name: 'System', value: session.system === 'PF' ? '<:Pathfinder:1322734594864320522> Pathfinder 2e' : '<:DnD:1322734981524754473> D&D 5e', inline: true },
         { name: 'Level', value: session.level ? `Level ${session.level}` : 'TBD', inline: true },
         { name: 'Players', value: `${session.attendingCharacters.length}/${session.maxPlayers}`, inline: true },
+        { name: 'Date & Time', value: `${formattedDate} at ${formattedTime}`, inline: false },
       ],
       timestamp: new Date().toISOString(),
       url: `${window.location.origin}/sessions/${session._id}`,
