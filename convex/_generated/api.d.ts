@@ -9,6 +9,7 @@
  */
 
 import type * as characters from "../characters.js";
+import type * as planning from "../planning.js";
 import type * as sessions from "../sessions.js";
 import type * as worlds from "../worlds.js";
 
@@ -20,6 +21,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   characters: typeof characters;
+  planning: typeof planning;
   sessions: typeof sessions;
   worlds: typeof worlds;
 }>;

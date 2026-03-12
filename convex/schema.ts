@@ -38,4 +38,10 @@ export default defineSchema({
         owner: v.string(), // Clerk userId of the world owner
         link: v.optional(v.string()),
     }).index('by_owner', ['owner']),
+    availability: defineTable({
+        userId: v.string(),
+        date: v.number(), // Start of day timestamp
+        username: v.string(),
+        isGM: v.boolean(),
+    }).index('by_date', ['date']).index('by_user_date', ['userId', 'date']),
 })
