@@ -143,9 +143,9 @@ export default function Sessions() {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4">
+        <CardTitle>Sessions</CardTitle>
         <div className="flex items-center gap-4">
-          <CardTitle>Sessions</CardTitle>
           <div className="flex bg-muted p-1 rounded-md h-9">
             {(['upcoming', 'planning', 'past'] as const).map((tab) => (
               <button
@@ -162,8 +162,6 @@ export default function Sessions() {
               </button>
             ))}
           </div>
-        </div>
-        <div className="flex gap-2">
           {activeTab === 'upcoming' && isGM && <SessionDialog hasWorld={!!world} />}
         </div>
       </CardHeader>
@@ -189,7 +187,7 @@ export default function Sessions() {
           <>
             {sessions.length === 0 && <p>No {activeTab} sessions found.</p>}
             {activeTab === 'upcoming' && sessions.length > 0 && <SevenDayOverview sessions={sessions} userCharacterIds={userCharacterIds} />}
-            <ul className="space-y-4 mt-8">
+            <ul className={cn("space-y-4", activeTab === 'upcoming' && sessions.length > 0 && "mt-8")}>
               {sessions.map((session) => {
                 const hasJoined = activeTab === 'upcoming' && session.characters.some(id => userCharacterIds.has(id))
                 
