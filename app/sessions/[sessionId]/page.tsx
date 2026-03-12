@@ -505,7 +505,7 @@ export default function SessionDetails() {
                 userCharactersCount={userCharacters.length}
                 selectedCharacterId={selectedCharacterId}
                 hasUserCharacterInSession={hasUserCharacterInSession}
-                onCharacterSelect={setSelectedCharacterId}
+                onCharacterSelect={(id) => setSelectedCharacterId(id)}
                 onJoin={handleJoin}
               />
             </>

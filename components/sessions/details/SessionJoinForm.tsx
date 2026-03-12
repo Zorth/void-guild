@@ -9,9 +9,9 @@ interface SessionJoinFormProps {
   isFull: boolean
   availableCharacters: Doc<'characters'>[]
   userCharactersCount: number
-  selectedCharacterId: string
+  selectedCharacterId: Id<'characters'> | ''
   hasUserCharacterInSession: boolean
-  onCharacterSelect: (id: string) => void
+  onCharacterSelect: (id: Id<'characters'> | '') => void
   onJoin: (e: React.MouseEvent) => void
 }
 
@@ -52,7 +52,7 @@ export default function SessionJoinForm({
               <select
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 value={selectedCharacterId}
-                onChange={(e) => onCharacterSelect(e.target.value)}
+                onChange={(e) => onCharacterSelect(e.target.value as Id<'characters'> | '')}
               >
                 <option value="">-- Choose a character --</option>
                 {availableCharacters.map((char) => (
