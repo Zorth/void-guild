@@ -245,7 +245,7 @@ export default function SessionDetails() {
     const formattedTime = formatTimeUtil(sessionTime)
     const roleId = process.env.NEXT_PUBLIC_DISCORD_ROLE_ID
 
-    let content = roleId ? `<@&${roleId}>` : undefined
+    let content = (roleId && type !== 'cancel') ? `<@&${roleId}>` : undefined
     let embedTitle = ""
     let embedDescription = ""
     let embedColor = 5814783 // Blueish
