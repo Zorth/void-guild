@@ -354,7 +354,7 @@ export const joinSession = mutation({
 
     await ctx.db.patch(args.sessionId, {
       characters: [...session.characters, args.characterId],
-      interestedPlayers: session.interestedPlayers?.filter(p => p.userId !== user.subject)
+      interestedPlayers: (session.interestedPlayers || []).filter(p => p.userId !== user.subject)
     })
   },
 })
@@ -390,7 +390,7 @@ export const adminAddCharacterToSession = mutation({
   
       await ctx.db.patch(args.sessionId, {
         characters: [...session.characters, args.characterId],
-        interestedPlayers: session.interestedPlayers?.filter(p => p.userId !== character.userId)
+        interestedPlayers: (session.interestedPlayers || []).filter(p => p.userId !== character.userId)
       })
     },
 })
@@ -440,7 +440,16 @@ export const expressInterest = mutation({
       return
     }
 
-    const newInterestedPlayers = [...interestedPlayers, { userId: user.subject, username: user.name || user.nickname || 'Anonymous' }]
+    // Check if user already has a character in the session
+    const charactersInSession = await Promise.all(
+        session.characters.map(id => ctx.db.get(id))
+    )
+    if (charactersInSession.some(c => c && c.userId === user.subject)) {
+        return // Already in session
+    }
+
+    const username = (user.username || user.nickname || user.name || 'Anonymous') as string
+    const newInterestedPlayers = [...interestedPlayers, { userId: user.subject, username }]
 
     await ctx.db.patch(args.sessionId, { interestedPlayers: newInterestedPlayers })
   },
