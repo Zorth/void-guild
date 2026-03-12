@@ -27,6 +27,7 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { motion } from 'framer-motion'
 
 type SessionWithDetails = Doc<'sessions'> & {
     isOwner: boolean;
@@ -452,18 +453,25 @@ export default function Sessions() {
         <CardTitle>Sessions</CardTitle>
         <div className="flex items-center gap-4">
           {activeTab === 'upcoming' && isGM && <SessionDialog hasWorld={!!world} />}
-          <div className="flex bg-muted p-1 rounded-md h-9">
+          <div className="flex bg-muted p-1 rounded-md h-9 relative">
             {(['upcoming', 'planning', 'past'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={cn(
-                  "px-3 py-1 text-sm font-medium rounded-sm transition-all capitalize",
+                  "px-3 py-1 text-sm font-medium rounded-sm transition-colors capitalize relative z-10",
                   activeTab === tab 
-                    ? "bg-background text-foreground shadow-sm" 
+                    ? "text-foreground" 
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
+                {activeTab === tab && (
+                  <motion.div
+                    layoutId="activeTab"
+                    className="absolute inset-0 bg-background rounded-sm shadow-sm z-[-1]"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                  />
+                )}
                 {tab}
               </button>
             ))}
