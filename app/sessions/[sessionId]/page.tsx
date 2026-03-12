@@ -83,11 +83,6 @@ export default function SessionDetails() {
     }
   }, [session?.attendingCharacters])
 
-  if (session === null) {
-    notFound()
-    return null
-  }
-
   if (session === undefined || userCharacters === undefined || userCharacters === null || isAdmin === undefined || (isAdmin && allCharacters === undefined)) {
     return (
         <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -139,6 +134,11 @@ export default function SessionDetails() {
             </div>
         </div>
     )
+  }
+
+  if (session === null) {
+    notFound()
+    return null
   }
 
   const userCharacterIds = new Set(userCharacters.map(c => c._id))

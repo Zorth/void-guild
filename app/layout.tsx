@@ -36,16 +36,19 @@ const oxProto = localFont({
     },
   ],
   variable: '--font-ox-proto',
+  preload: false,
 })
 
 const taroca = localFont({
   src: '../public/fonts/taroca-regular/Taroca-Regular.ttf',
   variable: '--font-taroca',
+  preload: false,
 })
 
 const gin = localFont({
   src: '../public/fonts/gin-test/GinTest-Regular.otf',
   variable: '--font-gin',
+  preload: false,
 })
 
 const sabon = localFont({
@@ -72,6 +75,7 @@ const sabon = localFont({
     },
   ],
   variable: '--font-sabon',
+  preload: false,
 })
 
 export const metadata: Metadata = {
