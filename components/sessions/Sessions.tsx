@@ -9,7 +9,7 @@ import SessionDialog from './SessionDialog'
 import Link from 'next/link'
 import { Book, Lock, ChevronLeft, ChevronRight, User, Shield } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
-import { cn, getLevelBadgeStyle, formatDate, formatTime } from '@/lib/utils'
+import { cn, getLevelBadgeStyle, formatDate, formatTime, CharacterRankIcon } from '@/lib/utils'
 import './sessions.css'
 import type { Doc } from '@/convex/_generated/dataModel'
 import {
@@ -34,29 +34,28 @@ type SessionWithDetails = Doc<'sessions'> & {
     worldName: string; // Add worldName to the type
 }
 
-function UserCharacterPreview({ userId, username }: { userId: string, username: string }) {
+function UserCharacterPreview({ userId }: { userId: string }) {
     const characters = useQuery(api.characters.listCharactersByUserId, { userId });
 
     return (
-        <div className="p-2 space-y-2 min-w-[150px]">
-            <p className="text-xs font-bold border-b pb-1">{username}&apos;s Characters</p>
+        <div className="p-3 space-y-3 min-w-[180px]">
             {characters === undefined ? (
-                <div className="space-y-1">
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-full" />
+                <div className="space-y-2">
+                    <Skeleton className="h-5 w-full" />
+                    <Skeleton className="h-5 w-full" />
                 </div>
             ) : characters.length === 0 ? (
-                <p className="text-[10px] text-muted-foreground italic">No characters found.</p>
+                <p className="text-sm text-muted-foreground italic">No characters found.</p>
             ) : (
-                <ul className="space-y-1">
+                <ul className="space-y-2">
                     {characters.map(char => (
-                        <li key={char._id} className="flex items-center justify-between gap-4 text-[10px]">
-                            <div className="flex items-center gap-1">
-                                <CharacterRankIcon rank={char.rank} className="w-3 h-3" />
-                                <span>{char.name}</span>
+                        <li key={char._id} className="flex items-center justify-between gap-6 text-sm">
+                            <div className="flex items-center gap-2">
+                                <CharacterRankIcon rank={char.rank} className="w-4 h-4" />
+                                <span className="font-medium text-foreground">{char.name}</span>
                             </div>
                             <span 
-                                className="px-1.5 rounded-full font-bold"
+                                className="px-2 py-0.5 rounded-full font-bold text-xs"
                                 style={getLevelBadgeStyle(char.lvl)}
                             >
                                 Lvl {char.lvl}
@@ -97,8 +96,8 @@ function AvailabilityDialog({
                     <User className="h-3 w-3" /> {getDisplayName(a)}
                 </li>
             </TooltipTrigger>
-            <TooltipContent side="right" className="p-0 overflow-hidden">
-                <UserCharacterPreview userId={a.userId} username={getDisplayName(a)} />
+            <TooltipContent side="right" className="p-0 border border-border bg-card text-card-foreground shadow-xl">
+                <UserCharacterPreview userId={a.userId} />
             </TooltipContent>
         </Tooltip>
     );
