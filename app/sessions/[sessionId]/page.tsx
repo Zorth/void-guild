@@ -11,7 +11,7 @@ import Link from 'next/link'
 import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, Unlock } from 'lucide-react'
 import { useAuth } from '@clerk/nextjs'
 import { Skeleton } from '@/components/ui/skeleton'
-import { cn } from '@/lib/utils'
+import { cn, formatDate, formatTime as formatTimeUtil } from '@/lib/utils'
 import { fireJoinParticles } from '@/lib/particles'
 import {
     AlertDialog,
@@ -210,8 +210,8 @@ export default function SessionDetails() {
       return
     }
     const sessionTime = new Date(session.date)
-    const formattedDate = sessionTime.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
-    const formattedTime = sessionTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+    const formattedDate = formatDate(sessionTime)
+    const formattedTime = formatTimeUtil(sessionTime)
 
     const embed = {
       title: `New Session Alert: ${session.worldName}`,
@@ -252,7 +252,6 @@ export default function SessionDetails() {
   const isFull = session.characters.length >= session.maxPlayers
   const sessionTime = new Date(session.date)
   const arrivalEndTime = new Date(session.date + 30 * 60 * 1000)
-  const formatTime = (date: Date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
   const getGoogleCalendarLink = () => {
     const start = new Date(session.date).toISOString().replace(/-|:|\.\d+/g, '')
@@ -329,14 +328,14 @@ export default function SessionDetails() {
                         </a>
                     </CardTitle>
                     <div className="text-lg text-muted-foreground mt-1">
-                        {sessionTime.toLocaleDateString()} at {formatTime(sessionTime)}
+                        {formatDate(sessionTime)} at {formatTimeUtil(sessionTime)}
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Clock className="h-4 w-4" />
-                        <span>Please arrive between {formatTime(sessionTime)} and {formatTime(arrivalEndTime)}</span>
+                        <span>Please arrive between {formatTimeUtil(sessionTime)} and {formatTimeUtil(arrivalEndTime)}</span>
                     </div>
                     {session.location && (
                         <div className="flex items-center gap-2 text-sm text-primary hover:underline">

@@ -9,7 +9,7 @@ import SessionDialog from './SessionDialog'
 import Link from 'next/link'
 import { Book, Lock } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
-import { cn, getLevelBadgeStyle } from '@/lib/utils'
+import { cn, getLevelBadgeStyle, formatDate, formatTime } from '@/lib/utils'
 import './sessions.css'
 import type { Doc } from '@/convex/_generated/dataModel'
 
@@ -146,6 +146,7 @@ export default function Sessions() {
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4">
         <CardTitle>Sessions</CardTitle>
         <div className="flex items-center gap-4">
+          {activeTab === 'upcoming' && isGM && <SessionDialog hasWorld={!!world} />}
           <div className="flex bg-muted p-1 rounded-md h-9">
             {(['upcoming', 'planning', 'past'] as const).map((tab) => (
               <button
@@ -162,7 +163,6 @@ export default function Sessions() {
               </button>
             ))}
           </div>
-          {activeTab === 'upcoming' && isGM && <SessionDialog hasWorld={!!world} />}
         </div>
       </CardHeader>
       <CardContent>
@@ -225,11 +225,7 @@ export default function Sessions() {
                           {session.locked && <Lock className="h-3 w-3 text-muted-foreground" />}
                         </div>
                         <div className="text-sm font-medium">
-                          {new Date(session.date).toLocaleDateString()} at{' '}
-                          {new Date(session.date).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
+                          {formatDate(session.date)} at {formatTime(session.date)}
                         </div>
                         <div className="text-sm text-muted-foreground">
                           {session.characters.length} / {session.maxPlayers} players

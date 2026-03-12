@@ -22,6 +22,21 @@ export function CharacterRankIcon({ rank, className }: { rank?: string, classNam
   return null;
 }
 
+export function formatDate(date: Date | number | string) {
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = (d.getMonth() + 1).toString().padStart(2, '0');
+  const day = d.getDate().toString().padStart(2, '0');
+  return `${year}/${month}/${day}`;
+}
+
+export function formatTime(date: Date | number | string) {
+  const d = new Date(date);
+  const hours = d.getHours().toString().padStart(2, '0');
+  const minutes = d.getMinutes().toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
 export function getLevelBadgeStyle(level: number | undefined) {
   if (level === undefined || level === 0) return { backgroundColor: '#1f2937', color: '#f9fafb' }; // Inverted (dark) for TBD
 
