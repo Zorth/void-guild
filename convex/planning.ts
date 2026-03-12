@@ -22,14 +22,35 @@ export const getAvailabilityForMonth = query({
   handler: async (ctx, args) => {
     return await ctx.db
       .query('availability')
-      .filter((q) => 
-        q.and(
-          q.gte(q.field('date'), args.startOfMonth),
-          q.lte(q.field('date'), args.endOfMonth)
-        )
+      .withIndex('by_date', (q) => 
+        q.gte('date', args.startOfMonth).lte('date', args.endOfMonth)
       )
       .collect()
   }
+})
+
+/**
+ * Periodically called via crons to delete availability records older than 1 day.
+ */
+export const cleanupOldAvailability = mutation({
+    args: {},
+    handler: async (ctx) => {
+        const yesterday = new Date();
+        yesterday.setHours(0, 0, 0, 0);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const threshold = yesterday.getTime();
+
+        const oldRecords = await ctx.db
+            .query('availability')
+            .withIndex('by_date', (q) => q.lt('date', threshold))
+            .collect();
+
+        for (const record of oldRecords) {
+            await ctx.db.delete(record._id);
+        }
+        
+        return oldRecords.length;
+    }
 })
 
 export const toggleAvailability = mutation({
