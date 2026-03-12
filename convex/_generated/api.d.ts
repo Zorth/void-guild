@@ -11,6 +11,7 @@
 import type * as activity from "../activity.js";
 import type * as characters from "../characters.js";
 import type * as crons from "../crons.js";
+import type * as migrations from "../migrations.js";
 import type * as planning from "../planning.js";
 import type * as sessions from "../sessions.js";
 import type * as worlds from "../worlds.js";
@@ -25,6 +26,7 @@ declare const fullApi: ApiFromModules<{
   activity: typeof activity;
   characters: typeof characters;
   crons: typeof crons;
+  migrations: typeof migrations;
   planning: typeof planning;
   sessions: typeof sessions;
   worlds: typeof worlds;

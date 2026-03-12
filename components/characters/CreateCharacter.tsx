@@ -18,7 +18,13 @@ import { track } from '@vercel/analytics'
 
 export default function CreateCharacter() {
   const createCharacter = useMutation(api.characters.createCharacter)
-  const [newCharacterData, setNewCharacterData] = useState({ name: '', ancestry: '', class: '', websiteLink: '' })
+  const [newCharacterData, setNewCharacterData] = useState({ 
+    name: '', 
+    ancestry: '', 
+    class: '', 
+    websiteLink: '',
+    system: 'PF' as 'PF' | 'DnD'
+  })
   const [isOpen, setIsOpen] = useState(false)
 
   async function handleCreateCharacter(event: FormEvent) {
@@ -32,8 +38,8 @@ export default function CreateCharacter() {
     }
 
     await createCharacter(newCharacterData)
-    track('character_created', { name: newCharacterData.name })
-    setNewCharacterData({ name: '', ancestry: '', class: '', websiteLink: '' })
+    track('character_created', { name: newCharacterData.name, system: newCharacterData.system })
+    setNewCharacterData({ name: '', ancestry: '', class: '', websiteLink: '', system: 'PF' })
     setIsOpen(false)
   }
 
@@ -47,6 +53,17 @@ export default function CreateCharacter() {
           <DialogTitle>Create a New Character</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleCreateCharacter} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium">System</label>
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              value={newCharacterData.system}
+              onChange={(e) => setNewCharacterData({ ...newCharacterData, system: e.target.value as 'PF' | 'DnD' })}
+            >
+              <option value="PF">Pathfinder</option>
+              <option value="DnD">Dungeons & Dragons</option>
+            </select>
+          </div>
           <Input
             value={newCharacterData.name}
             onChange={(e) => setNewCharacterData({ ...newCharacterData, name: e.target.value })}

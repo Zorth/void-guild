@@ -37,6 +37,7 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
   const [maxPlayers, setMaxPlayers] = useState(session?.maxPlayers?.toString() || '4')
   const [gmCharacter, setGmCharacter] = useState<Id<'characters'> | ''>(session?.gmCharacter || '')
   const [location, setLocation] = useState(session?.location || '')
+  const [system, setSystem] = useState<'PF' | 'DnD'>(session?.system || 'PF')
   const [isOpen, setIsOpen] = useState(false)
 
   const handleOpenChange = (open: boolean) => {
@@ -61,6 +62,7 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
         setMaxPlayers(session.maxPlayers.toString())
         setGmCharacter(session.gmCharacter || '')
         setLocation(session.location || '')
+        setSystem(session.system || 'PF')
       } else {
         setDate('')
         setTime('')
@@ -69,6 +71,7 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
         setMaxPlayers('4')
         setGmCharacter('')
         setLocation('')
+        setSystem('PF')
       }
     }
   }
@@ -100,8 +103,9 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
         characters: session.characters,
         gmCharacter: gmCharId,
         location: locationVal,
+        system: system,
       })
-      track('session_updated', { worldName: worldName?.name });
+      track('session_updated', { worldName: worldName?.name, system });
     } else {
       // Trigger particle effect at the mouse position for new sessions
       if ('clientX' in event.nativeEvent) {
@@ -117,8 +121,9 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
         characters: [],
         gmCharacter: gmCharId,
         location: locationVal,
+        system: system,
       })
-      track('session_created', { worldName: worldName?.name });
+      track('session_created', { worldName: worldName?.name, system });
     }
     setIsOpen(false)
   }
@@ -145,6 +150,17 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
           <DialogTitle>{session ? 'Edit Session' : 'Create a New Session'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium">System</label>
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              value={system}
+              onChange={(e) => setSystem(e.target.value as 'PF' | 'DnD')}
+            >
+              <option value="PF">Pathfinder</option>
+              <option value="DnD">Dungeons & Dragons</option>
+            </select>
+          </div>
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium">World</label>
             <Input

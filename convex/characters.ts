@@ -72,6 +72,7 @@ export const createCharacter = mutation({
     ancestry: v.optional(v.string()),
     class: v.optional(v.string()),
     websiteLink: v.optional(v.string()),
+    system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
   },
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
@@ -87,6 +88,7 @@ export const createCharacter = mutation({
       lvl: 1,
       xp: 0,
       rank: 'none',
+      system: args.system || 'PF',
     })
 
     await ctx.scheduler.runAfter(0, internal.activity.logActivity, {
@@ -104,6 +106,7 @@ export const updateCharacter = mutation({
     ancestry: v.optional(v.string()),
     class: v.optional(v.string()),
     websiteLink: v.optional(v.string()),
+    system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
   },
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
@@ -118,6 +121,7 @@ export const updateCharacter = mutation({
       ancestry: args.ancestry,
       class: args.class,
       websiteLink: args.websiteLink,
+      system: args.system,
     })
   },
 })
@@ -132,6 +136,7 @@ export const adminUpdateCharacter = mutation({
     class: v.optional(v.string()),
     websiteLink: v.optional(v.string()),
     rank: v.optional(v.string()),
+    system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
   },
   handler: async (ctx, args) => {
     const isAdminUser = await isAdmin(ctx)
@@ -149,6 +154,7 @@ export const adminUpdateCharacter = mutation({
       class: args.class,
       websiteLink: args.websiteLink,
       rank: args.rank,
+      system: args.system,
     })
 
     if (args.rank && args.rank !== 'none' && args.rank !== oldCharacter?.rank) {

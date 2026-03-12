@@ -224,6 +224,7 @@ export const createSession = mutation({
     characters: v.array(v.id('characters')),
     gmCharacter: v.optional(v.id('characters')),
     location: v.optional(v.string()),
+    system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
   },
   handler: async (ctx, args) => {
     const isGM = await isGameMaster(ctx)
@@ -255,6 +256,7 @@ export const createSession = mutation({
       gmCharacter: args.gmCharacter,
       location: args.location,
       owner: identity!.subject,
+      system: args.system || 'PF',
     })
 
     await ctx.scheduler.runAfter(0, internal.activity.logActivity, {
@@ -278,6 +280,7 @@ export const updateSession = mutation({
     characters: v.array(v.id('characters')),
     gmCharacter: v.optional(v.id('characters')),
     location: v.optional(v.string()),
+    system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
   },
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
@@ -301,6 +304,7 @@ export const updateSession = mutation({
       characters: args.characters,
       gmCharacter: args.gmCharacter,
       location: args.location,
+      system: args.system,
     })
   },
 })

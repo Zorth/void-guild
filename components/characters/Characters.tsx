@@ -33,15 +33,26 @@ import AdminCharacterList from './AdminCharacterList'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getLevelBadgeStyle, CharacterRankIcon, getXPBarStyles } from '@/lib/utils'
 import { track } from '@vercel/analytics'
+import { useMemo } from 'react'
 
-export default function Characters() {
-  const characters = useQuery(api.characters.listCharacters)
+export default function Characters({ filters }: { filters?: { pf: boolean, dnd: boolean } }) {
+  const charactersRaw = useQuery(api.characters.listCharacters)
   const updateCharacter = useMutation(api.characters.updateCharacter)
   const deleteCharacter = useMutation(api.characters.deleteCharacter)
 
+  const characters = useMemo(() => {
+    if (!charactersRaw) return charactersRaw;
+    if (!filters) return charactersRaw;
+    return charactersRaw.filter(char => {
+        if (char.system === 'PF' && !filters.pf) return false;
+        if (char.system === 'DnD' && !filters.dnd) return false;
+        return true;
+    });
+  }, [charactersRaw, filters]);
+
   const [selectedCharacter, setSelectedCharacter] = useState<Doc<'characters'> | null>(null)
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false)
-  const [editedCharacterData, setEditedCharacterData] = useState({ ancestry: '', class: '', websiteLink: '' })
+  const [editedCharacterData, setEditedCharacterData] = useState({ ancestry: '', class: '', websiteLink: '', system: 'PF' as 'PF' | 'DnD' })
 
   const [showCreateWorldDialog, setShowCreateWorldDialog] = useState(false)
   const [newWorldName, setNewWorldName] = useState('')
@@ -96,6 +107,7 @@ export default function Characters() {
       ancestry: character.ancestry ?? '',
       class: character.class ?? '',
       websiteLink: character.websiteLink ?? '',
+      system: (character.system as 'PF' | 'DnD') ?? 'PF',
     })
     track('character_details_expanded', { name: character.name })
     setIsDetailsDialogOpen(true)
@@ -162,6 +174,13 @@ export default function Characters() {
                             <div className="flex flex-col items-end"> {/* Vertical alignment for Level and XP */}
                                 <div className="flex items-center gap-1">
                                     <CharacterRankIcon rank={character.rank} />
+                                    {character.system && (
+                                        <img 
+                                            src={character.system === 'PF' ? '/PFVoid.svg' : '/DnDVoid.svg'} 
+                                            alt={character.system} 
+                                            className="h-4 w-4 mx-0.5"
+                                        />
+                                    )}
                                     <span 
                                         className="inline-flex align-middle justify-center w-14 rounded-full px-2 py-0.5 text-[10px] font-bold"
                                         style={getLevelBadgeStyle(character.lvl)}
@@ -236,7 +255,7 @@ export default function Characters() {
         )}
       </div>
 
-      <Sessions />
+      <Sessions filters={filters} />
 
 
       {selectedCharacter && (
@@ -246,6 +265,13 @@ export default function Characters() {
               <DialogTitle>{selectedCharacter.name}</DialogTitle>
               <DialogDescription className="flex items-center gap-2 mt-1">
                 <CharacterRankIcon rank={selectedCharacter.rank} />
+                {selectedCharacter.system && (
+                    <img 
+                        src={selectedCharacter.system === 'PF' ? '/PFVoid.svg' : '/DnDVoid.svg'} 
+                        alt={selectedCharacter.system} 
+                        className="h-4 w-4"
+                    />
+                )}
                 <span 
                   className="inline-flex align-middle justify-center w-14 rounded-full px-2 py-0.5 text-[10px] font-bold"
                   style={getLevelBadgeStyle(selectedCharacter.lvl)}
@@ -256,6 +282,17 @@ export default function Characters() {
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleUpdateCharacter} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium">System</label>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  value={editedCharacterData.system}
+                  onChange={(e) => setEditedCharacterData({ ...editedCharacterData, system: e.target.value as 'PF' | 'DnD' })}
+                >
+                  <option value="PF">Pathfinder</option>
+                  <option value="DnD">Dungeons & Dragons</option>
+                </select>
+              </div>
               <Input
                 value={editedCharacterData.ancestry}
                 onChange={(e) => setEditedCharacterData({ ...editedCharacterData, ancestry: e.target.value })}

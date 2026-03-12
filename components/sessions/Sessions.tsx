@@ -79,6 +79,13 @@ function UserCharacterPreview({ userId }: { userId: string }) {
                         <li key={char._id} className="flex items-center justify-between gap-6 text-sm">
                             <div className="flex items-center gap-2">
                                 <CharacterRankIcon rank={char.rank} className="w-4 h-4" />
+                                {char.system && (
+                                    <img 
+                                        src={char.system === 'PF' ? '/PFVoid.svg' : '/DnDVoid.svg'} 
+                                        alt={char.system} 
+                                        className="h-3 w-3 mx-0.5"
+                                    />
+                                )}
                                 <span className="font-medium text-foreground">{char.name}</span>
                             </div>
                             <span 
@@ -436,11 +443,22 @@ function SevenDayOverview({ sessions, userCharacterIds }: { sessions: SessionWit
     );
 }
 
-export default function Sessions() {
+export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: boolean } }) {
   const { width } = useWindowSize()
   const [activeTab, setActiveTab] = useState<'upcoming' | 'planning' | 'past'>('upcoming')
   const [viewDate, setViewDate] = useState(new Date())
-  const sessions = useQuery(api.sessions.listSessions, { past: activeTab === 'past' }) as SessionWithDetails[]
+  const sessionsRaw = useQuery(api.sessions.listSessions, { past: activeTab === 'past' }) as SessionWithDetails[]
+  
+  const sessions = useMemo(() => {
+    if (!sessionsRaw) return sessionsRaw;
+    if (!filters) return sessionsRaw;
+    return sessionsRaw.filter(session => {
+        if (session.system === 'PF' && !filters.pf) return false;
+        if (session.system === 'DnD' && !filters.dnd) return false;
+        return true;
+    });
+  }, [sessionsRaw, filters]);
+
   const isGM = useQuery(api.sessions.isGameMasterQuery)
   const userCharacters = useQuery(api.characters.listCharacters)
   const world = useQuery(api.worlds.getWorldByOwner) // Query for the user's world
@@ -586,6 +604,13 @@ export default function Sessions() {
                                   >
                                       Lvl {session.level ?? 'TBD'}
                                   </span>
+                                  {session.system && (
+                                    <img 
+                                        src={session.system === 'PF' ? '/PFVoid.svg' : '/DnDVoid.svg'} 
+                                        alt={session.system} 
+                                        className="h-5 w-5 mr-2"
+                                    />
+                                  )}
                                   {session.worldName}
                               </div>
                               {session.characters.length >= session.maxPlayers && (

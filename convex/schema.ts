@@ -11,6 +11,7 @@ export default defineSchema({
         class: v.optional(v.string()),
         websiteLink: v.optional(v.string()),
         rank: v.optional(v.string()), // none, journeyman, guildmaster
+        system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
     }).index('by_userId', ['userId']),
     sessions: defineTable({
         date: v.number(),
@@ -32,6 +33,7 @@ export default defineSchema({
             userId: v.string(),
             username: v.string(),
         }))),
+        system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
   }),
     worlds: defineTable({
         name: v.string(),

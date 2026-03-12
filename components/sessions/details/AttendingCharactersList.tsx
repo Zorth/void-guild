@@ -85,6 +85,13 @@ export default function AttendingCharactersList({
                 <div className="flex flex-col items-end">
                     <div className="flex items-center gap-1">
                         <CharacterRankIcon rank={char.rank} />
+                        {char.system && (
+                            <img 
+                                src={char.system === 'PF' ? '/PFVoid.svg' : '/DnDVoid.svg'} 
+                                alt={char.system} 
+                                className="h-4 w-4 mx-0.5"
+                            />
+                        )}
                         <span 
                             className="inline-flex align-middle justify-center w-12 rounded-full px-2 py-0.5 text-[10px] font-bold"
                             style={getLevelBadgeStyle(char.lvl)}

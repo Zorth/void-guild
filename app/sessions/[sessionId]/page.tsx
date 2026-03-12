@@ -400,9 +400,23 @@ export default function SessionDetails() {
                     <span className="text-sm font-medium px-2 py-0.5 bg-secondary rounded-md">
                         Session Level {session.level ?? 'TBD'}
                     </span>
+                    {session.system && (
+                        <img 
+                            src={session.system === 'PF' ? '/PFVoid.svg' : '/DnDVoid.svg'} 
+                            alt={session.system} 
+                            className="h-5 w-5"
+                        />
+                    )}
                     {session.isOwner && session.gmCharacterData && (
                         <span className="text-sm font-medium px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded-md flex items-center gap-1">
                             <Shield className="h-3 w-3" /> GM: {session.gmCharacterData.name}
+                            {session.gmCharacterData.system && (
+                                <img 
+                                    src={session.gmCharacterData.system === 'PF' ? '/PFVoid.svg' : '/DnDVoid.svg'} 
+                                    alt={session.gmCharacterData.system} 
+                                    className="h-3.5 w-3.5 ml-0.5"
+                                />
+                            )}
                         </span>
                     )}
                   </div>
