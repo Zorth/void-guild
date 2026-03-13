@@ -78,6 +78,15 @@ export default function SessionClient() {
   const [isJoining, setIsJoining] = useState(false)
   const [isExpressingInterest, setIsExpressingInterest] = useState(false)
   const [leavingCharacterId, setLeavingCharacterId] = useState<string | null>(null)
+  const [optimisticInterestedPlayers, setOptimisticInterestedPlayers] = useState<{ userId: string; username: string }[] | null>(null)
+
+  useEffect(() => {
+    if (session?.interestedPlayers) {
+      setOptimisticInterestedPlayers(null)
+    }
+  }, [session?.interestedPlayers])
+
+  const currentInterestedPlayers = optimisticInterestedPlayers ?? session?.interestedPlayers ?? []
 
   useEffect(() => {
     if (session) {
@@ -240,19 +249,36 @@ export default function SessionClient() {
   }
 
   const handleExpressInterest = async () => {
+    if (!session || !userId) return
+    
+    // Optimistic Update
+    const userDisplay = userCharacters?.[0]?.name || 'You'
+    setOptimisticInterestedPlayers([...currentInterestedPlayers, { userId, username: userDisplay }])
+    
     setIsExpressingInterest(true)
     try { 
         await expressInterest({ sessionId: session._id }) 
         track('session_interest_expressed', { worldName: session.worldName })
     }
-    catch (e) { alert(e instanceof Error ? e.message : 'Failed to express interest') }
+    catch (e) { 
+        setOptimisticInterestedPlayers(null)
+        alert(e instanceof Error ? e.message : 'Failed to express interest') 
+    }
     finally { setIsExpressingInterest(false) }
   }
 
   const handleWithdrawInterest = async () => {
+    if (!session || !userId) return
+
+    // Optimistic Update
+    setOptimisticInterestedPlayers(currentInterestedPlayers.filter(p => p.userId !== userId))
+
     setIsExpressingInterest(true)
     try { await withdrawInterest({ sessionId: session._id }) }
-    catch (e) { alert(e instanceof Error ? e.message : 'Failed to withdraw interest') }
+    catch (e) { 
+        setOptimisticInterestedPlayers(null)
+        alert(e instanceof Error ? e.message : 'Failed to withdraw interest') 
+    }
     finally { setIsExpressingInterest(false) }
   }
 
@@ -534,7 +560,7 @@ export default function SessionClient() {
             </CardHeader>
             <CardContent>
               <InterestedPlayersList 
-                interestedPlayers={session.interestedPlayers || []} 
+                interestedPlayers={currentInterestedPlayers} 
                 userMetadata={userMetadata}
               />
             </CardContent>
@@ -568,12 +594,12 @@ export default function SessionClient() {
                         </div>
                         ) : (
                         <div className="space-y-4">
-                            {isFull && !session.interestedPlayers?.some(p => p.userId === userId) && (
+                            {isFull && !currentInterestedPlayers?.some(p => p.userId === userId) && (
                             <div className="text-sm text-destructive italic text-center p-4 bg-destructive/5 rounded-md">
                                 This session is currently full, but you can still express interest.
                             </div>
                             )}
-                            {session.interestedPlayers?.some(p => p.userId === userId) ? (
+                            {currentInterestedPlayers?.some(p => p.userId === userId) ? (
                             <Button className="w-full" variant="outline" onClick={handleWithdrawInterest} disabled={isExpressingInterest}>
                                 {isExpressingInterest ? 'Updating...' : 'Not anymore :('}
                             </Button>
@@ -582,8 +608,7 @@ export default function SessionClient() {
                                 {isExpressingInterest ? 'Updating...' : 'Yes! :)'}
                             </Button>
                             )}
-                            </div>
-                            )}
+                        </div>                            )}
                             </CardContent>
                             </Card>
                             )}

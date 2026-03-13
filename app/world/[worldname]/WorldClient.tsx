@@ -760,12 +760,17 @@ export default function WorldClient() {
   
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming')
   const [userMetadata, setUserMetadata] = useState<Record<string, UserMetadata>>({})
+  const [sessionsLimit, setSessionsLimit] = useState(5)
 
   useEffect(() => {
     if (world) {
       getUsernames([world.owner]).then(setUserMetadata)
     }
   }, [world])
+
+  useEffect(() => {
+    setSessionsLimit(5)
+  }, [activeTab])
 
   const userCharacterIds = useMemo(() => new Set(userCharacters?.map(c => c._id) ?? []), [userCharacters])
 
@@ -802,7 +807,9 @@ export default function WorldClient() {
   const ownerMetadata = userMetadata[world.owner]
   const ownerName = ownerMetadata?.name || `User ${world.owner.slice(-4)}`
 
-  const filteredSessions = sessions?.filter(s => activeTab === 'past' ? s.locked : !s.locked) || []
+  const allFilteredSessions = sessions?.filter(s => activeTab === 'past' ? s.locked : !s.locked) || []
+  const filteredSessions = allFilteredSessions.slice(0, sessionsLimit)
+  const hasMoreSessions = allFilteredSessions.length > sessionsLimit
 
   return (
     <div className="container mx-auto py-8 px-4 max-w-7xl">
@@ -967,6 +974,16 @@ export default function WorldClient() {
                     })}
                   </motion.ul>
                 </AnimatePresence>
+              )}
+
+              {hasMoreSessions && (
+                <Button 
+                  variant="ghost" 
+                  className="w-full mt-4 text-muted-foreground hover:text-primary border-dashed border-2 hover:bg-primary/5"
+                  onClick={() => setSessionsLimit(prev => prev + 5)}
+                >
+                  Load More {activeTab} Sessions ({allFilteredSessions.length - sessionsLimit} remaining)
+                </Button>
               )}
             </CardContent>
           </Card>

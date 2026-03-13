@@ -27,11 +27,25 @@ export default function CreateCharacter() {
   })
   const [isOpen, setIsOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errors, setErrors] = useState<{ name?: string }>({})
 
   async function handleCreateCharacter(event: FormEvent) {
     event.preventDefault()
-    if (!newCharacterData.name) return
+    
+    // Validation
+    const newErrors: { name?: string } = {}
+    if (!newCharacterData.name.trim()) {
+      newErrors.name = "Character name is required"
+    } else if (newCharacterData.name.length < 2) {
+      newErrors.name = "Name must be at least 2 characters"
+    }
 
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors)
+      return
+    }
+
+    setErrors({})
     setIsSubmitting(true)
     try {
       // Trigger particle effect at the mouse position
@@ -49,8 +63,16 @@ export default function CreateCharacter() {
     }
   }
 
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open)
+    if (!open) {
+      setErrors({})
+      setNewCharacterData({ name: '', ancestry: '', class: '', websiteLink: '', system: 'PF' })
+    }
+  }
+
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button>New Character</Button>
       </DialogTrigger>
@@ -70,11 +92,18 @@ export default function CreateCharacter() {
               <option value="DnD">Dungeons & Dragons</option>
             </select>
           </div>
-          <Input
-            value={newCharacterData.name}
-            onChange={(e) => setNewCharacterData({ ...newCharacterData, name: e.target.value })}
-            placeholder="Character Name"
-          />
+          <div className="space-y-1">
+            <Input
+              value={newCharacterData.name}
+              onChange={(e) => {
+                setNewCharacterData({ ...newCharacterData, name: e.target.value })
+                if (errors.name) setErrors({ ...errors, name: undefined })
+              }}
+              placeholder="Character Name"
+              className={errors.name ? "border-destructive focus-visible:ring-destructive" : ""}
+            />
+            {errors.name && <p className="text-[10px] text-destructive font-medium px-1">{errors.name}</p>}
+          </div>
           <Input
             value={newCharacterData.ancestry}
             onChange={(e) => setNewCharacterData({ ...newCharacterData, ancestry: e.target.value })}

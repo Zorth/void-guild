@@ -40,9 +40,13 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
   const [system, setSystem] = useState<'PF' | 'DnD'>(session?.system || 'PF')
   const [isOpen, setIsOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open)
+    if (!open) {
+      setErrors({})
+    }
     if (open) {
       if (session) {
         const d = new Date(session.date)
@@ -79,8 +83,30 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
-    if (!date || !time || !level || !maxPlayers) return // Removed world validation
+    
+    // Validation
+    const newErrors: Record<string, string> = {}
+    if (!date) newErrors.date = "Date is required"
+    if (!time) newErrors.time = "Time is required"
+    
+    const maxPlayersNum = parseInt(maxPlayers)
+    if (isNaN(maxPlayersNum) || maxPlayersNum < 1) {
+      newErrors.maxPlayers = "At least 1 player required"
+    } else if (maxPlayersNum > 20) {
+      newErrors.maxPlayers = "Max 20 players"
+    }
 
+    const levelNum = parseInt(level)
+    if (level && (isNaN(levelNum) || levelNum < 1 || levelNum > 20)) {
+      newErrors.level = "Level must be 1-20"
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors)
+      return
+    }
+
+    setErrors({})
     const sessionDateTime = new Date(`${date}T${time}`).getTime()
     if (isNaN(sessionDateTime)) return
 
@@ -88,8 +114,6 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
     if (isNaN(levelValue) || levelValue === 0) {
       levelValue = undefined
     }
-    const maxPlayersNum = parseInt(maxPlayers)
-    if (isNaN(maxPlayersNum)) return
 
     const gmCharId = gmCharacter === '' ? undefined : gmCharacter as Id<'characters'>
     const locationVal = location === '' ? undefined : location
@@ -181,8 +205,13 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
                 type="number"
                 max="20"
                 value={level}
-                onChange={(e) => setLevel(e.target.value)}
+                onChange={(e) => {
+                  setLevel(e.target.value)
+                  if (errors.level) setErrors({ ...errors, level: '' })
+                }}
+                className={errors.level ? "border-destructive focus-visible:ring-destructive" : ""}
                 />
+                {errors.level && <p className="text-[10px] text-destructive font-medium">{errors.level}</p>}
             </div>
             <div className="flex-1 flex flex-col gap-2">
                 <label className="text-sm font-medium">Max Players</label>
@@ -191,9 +220,14 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
                 min="1"
                 max="20"
                 value={maxPlayers}
-                onChange={(e) => setMaxPlayers(e.target.value)}
+                onChange={(e) => {
+                  setMaxPlayers(e.target.value)
+                  if (errors.maxPlayers) setErrors({ ...errors, maxPlayers: '' })
+                }}
                 required
+                className={errors.maxPlayers ? "border-destructive focus-visible:ring-destructive" : ""}
                 />
+                {errors.maxPlayers && <p className="text-[10px] text-destructive font-medium">{errors.maxPlayers}</p>}
             </div>
           </div>
           <div className="flex flex-col gap-2">
@@ -224,18 +258,28 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
             <Input
               type="date"
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={(e) => {
+                setDate(e.target.value)
+                if (errors.date) setErrors({ ...errors, date: '' })
+              }}
               required
+              className={errors.date ? "border-destructive focus-visible:ring-destructive" : ""}
             />
+            {errors.date && <p className="text-[10px] text-destructive font-medium">{errors.date}</p>}
           </div>
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium">When can people arrive at the location? Session starts 30 min after.</label>
             <Input
               type="time"
               value={time}
-              onChange={(e) => setTime(e.target.value)}
+              onChange={(e) => {
+                setTime(e.target.value)
+                if (errors.time) setErrors({ ...errors, time: '' })
+              }}
               required
+              className={errors.time ? "border-destructive focus-visible:ring-destructive" : ""}
             />
+            {errors.time && <p className="text-[10px] text-destructive font-medium">{errors.time}</p>}
           </div>
           <DialogFooter className="flex flex-col-reverse sm:flex-row justify-between items-center sm:gap-2 pt-4">
             {session && (
