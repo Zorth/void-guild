@@ -59,3 +59,32 @@ export const renameWorld = mutation({
     await ctx.db.patch(args.worldId, { name: args.newName })
   },
 })
+
+export const getWorldByName = query({
+  args: { name: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query('worlds')
+      .filter((q) => q.eq(q.field('name'), args.name))
+      .first()
+  },
+})
+
+export const getSessionsByWorld = query({
+  args: { worldId: v.id('worlds') },
+  handler: async (ctx, args) => {
+    const sessions = await ctx.db
+      .query('sessions')
+      .filter((q) => q.eq(q.field('world'), args.worldId))
+      .collect()
+
+    return sessions.sort((a, b) => b.date - a.date)
+  },
+})
+
+export const listAllWorlds = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query('worlds').collect()
+  },
+})

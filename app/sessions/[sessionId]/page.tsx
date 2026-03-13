@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { useState, useEffect } from 'react'
 import { Id, Doc } from '@/convex/_generated/dataModel'
 import Link from 'next/link'
-import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, Unlock } from 'lucide-react'
+import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, Unlock, Globe } from 'lucide-react'
 import { useAuth } from '@clerk/nextjs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn, formatDate, formatTime as formatTimeUtil } from '@/lib/utils'
@@ -370,15 +370,24 @@ export default function SessionDetails() {
                     <CardTitle className="text-3xl font-bold flex items-center gap-3">
                         {session.worldName}
                         {session.locked && <LockIcon className="h-5 w-5 text-amber-500" />}
-                        <a 
-                            href={`https://void.tarragon.be/Session-Reports/${sessionTime.toISOString().slice(0, 10)}-${session.worldName.replace(/\s+/g, '-')}`} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-muted-foreground hover:text-purple-500"
-                            onClick={() => track('session_report_viewed', { worldName: session.worldName })}
-                        >
-                            <Book size={20} />
-                        </a>
+                        <div className="flex items-center gap-2">
+                            <a 
+                                href={`https://void.tarragon.be/Session-Reports/${sessionTime.toISOString().slice(0, 10)}-${session.worldName.replace(/\s+/g, '-')}`} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-muted-foreground hover:text-purple-500"
+                                onClick={() => track('session_report_viewed', { worldName: session.worldName })}
+                            >
+                                <Book size={20} />
+                            </a>
+                            <Link 
+                                href={`/world/${encodeURIComponent(session.worldName)}`}
+                                className="text-muted-foreground hover:text-purple-500"
+                                title="View World Details"
+                            >
+                                <Globe size={20} />
+                            </Link>
+                        </div>
                     </CardTitle>
                     <div className="text-lg text-muted-foreground mt-1">
                         {formatDate(sessionTime)} at {formatTimeUtil(sessionTime)}

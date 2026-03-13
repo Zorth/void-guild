@@ -53,7 +53,7 @@ export default function SessionManagement({
             <DialogTrigger asChild>
                 <Button variant="outline" className="w-full justify-start">
                     <img src="/discord-icon.svg" alt="Discord" className="mr-2 h-4 w-4" />
-                    Announce on Discord
+                    Post Message
                 </Button>
             </DialogTrigger>
             <DialogContent>
