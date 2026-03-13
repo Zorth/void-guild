@@ -141,9 +141,6 @@ export const getSession = query({
   args: { sessionId: v.string() },
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
-    if (!user) {
-      return null
-    }
 
     const sessionId = ctx.db.normalizeId('sessions', args.sessionId)
     if (!sessionId) return null
@@ -156,7 +153,7 @@ export const getSession = query({
       session.characters.map((id) => ctx.db.get(id))
     )
 
-    const isOwner = user.subject === session.owner || isAdminUser
+    const isOwner = user ? (user.subject === session.owner || isAdminUser) : false
     let gmCharacterData = null
 
     if (isOwner && session.gmCharacter) {

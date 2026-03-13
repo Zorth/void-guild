@@ -1,7 +1,7 @@
 'use client'
 
 import { useParams, useRouter, notFound } from 'next/navigation'
-import { useQuery, useMutation } from 'convex/react'
+import { useQuery, useMutation, Authenticated, Unauthenticated } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -9,7 +9,7 @@ import { useState, useEffect } from 'react'
 import { Id, Doc } from '@/convex/_generated/dataModel'
 import Link from 'next/link'
 import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, Unlock, Globe } from 'lucide-react'
-import { useAuth } from '@clerk/nextjs'
+import { useAuth, SignInButton } from '@clerk/nextjs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn, formatDate, formatTime as formatTimeUtil } from '@/lib/utils'
 import { fireJoinParticles, fireGoldParticles } from '@/lib/particles'
@@ -55,6 +55,7 @@ export default function SessionDetails() {
   const sessionId = params.sessionId as string
   const router = useRouter()
 
+  const { userId } = useAuth()
   const session = useQuery(api.sessions.getSession, { sessionId }) as SessionWithGM | undefined | null
   const xpGainsPreview = useQuery(api.sessions.previewXPGains, session?._id ? { sessionId: session._id } : "skip")
   const userCharacters = useQuery(api.characters.listCharacters)
@@ -68,7 +69,6 @@ export default function SessionDetails() {
   const expressInterest = useMutation(api.sessions.expressInterest)
   const withdrawInterest = useMutation(api.sessions.withdrawInterest)
 
-  const { userId } = useAuth()
   const isAdmin = useQuery(api.sessions.isAdminQuery)
   const allCharacters = useQuery(api.characters.listAllCharacters, isAdmin ? undefined : "skip")
 
@@ -91,7 +91,11 @@ export default function SessionDetails() {
     }
   }, [session?.attendingCharacters, session?.interestedPlayers])
 
-  if (session === undefined || userCharacters === undefined || userCharacters === null || isAdmin === undefined || (isAdmin && allCharacters === undefined)) {
+  const isLoading = session === undefined || 
+                    isAdmin === undefined || 
+                    (isAdmin && allCharacters === undefined);
+
+  if (isLoading) {
     return (
         <div className="container mx-auto px-4 py-8 max-w-4xl">
             <div className="flex justify-between items-center mb-6">
@@ -149,8 +153,8 @@ export default function SessionDetails() {
     return null
   }
 
-  const userCharacterIds = new Set(userCharacters.map(c => c._id))
-  const hasUserCharacterInSession = userCharacters.some(userChar =>
+  const userCharacterIds = new Set(userCharacters?.map(c => c._id) ?? [])
+  const hasUserCharacterInSession = (userCharacters ?? []).some(userChar =>
     session.attendingCharacters.some(sessionChar => sessionChar._id === userChar._id)
   )
 
@@ -303,7 +307,7 @@ export default function SessionDetails() {
     }
   }
 
-  const availableCharacters = userCharacters.filter(char => 
+  const availableCharacters = (userCharacters ?? []).filter(char => 
     !session.characters.includes(char._id) && char.system === session.system
   )
   const adminAvailableCharacters = allCharacters?.filter(char => 
@@ -535,52 +539,70 @@ export default function SessionDetails() {
             />
           )}
 
-          {userId !== session.owner && (
+          {userId !== session.owner ? (
             <>
-              {userId && !hasUserCharacterInSession && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Interested?</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {session.locked ? (
-                      <div className="text-sm text-muted-foreground italic text-center p-4 bg-muted/30 rounded-md">
-                          This session has ended.
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {isFull && !session.interestedPlayers?.some(p => p.userId === userId) && (
-                          <div className="text-sm text-destructive italic text-center p-4 bg-destructive/5 rounded-md">
-                              This session is currently full, but you can still express interest.
-                          </div>
-                        )}
-                        {session.interestedPlayers?.some(p => p.userId === userId) ? (
-                          <Button className="w-full" variant="outline" onClick={handleWithdrawInterest}>
-                            Not anymore :(
-                          </Button>
+              <Authenticated>
+                {!hasUserCharacterInSession && (
+                    <Card>
+                    <CardHeader>
+                        <CardTitle>Interested?</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {session.locked ? (
+                        <div className="text-sm text-muted-foreground italic text-center p-4 bg-muted/30 rounded-md">
+                            This session has ended.
+                        </div>
                         ) : (
-                          <Button className="w-full" onClick={handleExpressInterest}>
-                            Yes! :)
-                          </Button>
+                        <div className="space-y-4">
+                            {isFull && !session.interestedPlayers?.some(p => p.userId === userId) && (
+                            <div className="text-sm text-destructive italic text-center p-4 bg-destructive/5 rounded-md">
+                                This session is currently full, but you can still express interest.
+                            </div>
+                            )}
+                            {session.interestedPlayers?.some(p => p.userId === userId) ? (
+                            <Button className="w-full" variant="outline" onClick={handleWithdrawInterest}>
+                                Not anymore :(
+                            </Button>
+                            ) : (
+                            <Button className="w-full" onClick={handleExpressInterest}>
+                                Yes! :)
+                            </Button>
+                            )}
+                        </div>
                         )}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
+                    </CardContent>
+                    </Card>
+                )}
 
-              <SessionJoinForm 
-                sessionLocked={session.locked}
-                isFull={isFull}
-                availableCharacters={availableCharacters}
-                userCharactersCount={userCharacters.length}
-                selectedCharacterId={selectedCharacterId}
-                hasUserCharacterInSession={hasUserCharacterInSession}
-                onCharacterSelect={(id) => setSelectedCharacterId(id)}
-                onJoin={handleJoin}
-              />
+                <SessionJoinForm 
+                    sessionLocked={session.locked}
+                    isFull={isFull}
+                    availableCharacters={availableCharacters}
+                    userCharactersCount={userCharacters?.length ?? 0}
+                    selectedCharacterId={selectedCharacterId}
+                    hasUserCharacterInSession={hasUserCharacterInSession}
+                    onCharacterSelect={(id) => setSelectedCharacterId(id)}
+                    onJoin={handleJoin}
+                />
+              </Authenticated>
+
+              <Unauthenticated>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Join the Void</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-sm text-muted-foreground mb-4">
+                            Sign in to join this session, express interest, or manage your characters.
+                        </p>
+                        <SignInButton mode="modal">
+                            <Button className="w-full">Sign In / Sign Up</Button>
+                        </SignInButton>
+                    </CardContent>
+                </Card>
+              </Unauthenticated>
             </>
-          )}
+          ) : null}
         </div>
       </div>
       <div className="text-center mt-8 text-sm text-muted-foreground">
