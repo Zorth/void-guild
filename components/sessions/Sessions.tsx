@@ -118,6 +118,7 @@ function AvailabilityDialog({
     
     const gms = availability.filter(a => a.isGM)
     const players = availability.filter(a => !a.isGM)
+    const isOptimal = availability.length >= 4 && gms.length >= 1
 
     const getDisplayName = (a: Doc<'availability'>) => {
         return userMetadata[a.userId]?.name || a.username || `User ${a.userId.slice(-4)}`;
@@ -142,6 +143,14 @@ function AvailabilityDialog({
                 <DialogTitle>Availability for {formatDate(date)}</DialogTitle>
             </DialogHeader>
             <div className="py-4 space-y-6">
+                {isOptimal && (
+                    <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 flex items-center gap-3 animate-in fade-in zoom-in duration-300">
+                        <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse shrink-0" />
+                        <p className="text-xs font-medium text-green-700 dark:text-green-400">
+                            This day is <span className="font-bold">optimal</span> for a session! We have a Game Master and at least 3 players available.
+                        </p>
+                    </div>
+                )}
                 <div className="space-y-4">
                     <div>
                         <h4 className="text-sm font-bold flex items-center gap-2 mb-2">
@@ -313,6 +322,7 @@ function MonthOverview({
                     const isUserAvailable = dayAvailability.some(a => a.userId === userId);
                     const gmCount = dayAvailability.filter(a => a.isGM).length;
                     const playerCount = dayAvailability.length - gmCount;
+                    const isOptimal = dayAvailability.length >= 4 && gmCount >= 1;
 
                     return (
                         <Dialog key={dayNum}>
@@ -324,11 +334,15 @@ function MonthOverview({
                                     className={cn(
                                         "day-box border border-border/50 overflow-hidden aspect-square flex flex-col relative transition-colors p-0",
                                         isPast ? "bg-muted/10 opacity-50 grayscale cursor-not-allowed pointer-events-none" : "hover:bg-muted/20 cursor-pointer",
+                                        !isPast && isOptimal && !dayBoxClass && "ring-2 ring-inset ring-green-500/30 bg-green-500/5",
                                         dayBoxClass
                                     )}
                                 >
-                                    <div className="day-box-header py-0.5 px-1 text-[9px] sm:text-[10px] bg-muted/30">
+                                    <div className="day-box-header py-0.5 px-1 text-[9px] sm:text-[10px] bg-muted/30 flex justify-between items-center">
                                         {dayNum}
+                                        {!isPast && isOptimal && (
+                                            <div className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" title="Optimal for a session!" />
+                                        )}
                                     </div>
                                     <div className="flex-grow flex items-center justify-center p-1">
                                         {!isPast && dayAvailability.length > 0 && (
