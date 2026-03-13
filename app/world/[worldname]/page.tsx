@@ -9,7 +9,7 @@ import Link from 'next/link'
 import { 
   ChevronLeft, Globe, Calendar, Book, Lock, Shield, User, MapPin, Users, 
   Plus, Minus, Eye, EyeOff, Settings, Trash2, ChevronDown, Check, Info, 
-  Layers, ChevronRight, LayoutGrid, Handshake, Scroll
+  Layers, ChevronRight, LayoutGrid, Handshake, Scroll, Pencil, X, Filter
 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn, formatDate, formatTime, getLevelBadgeStyle } from '@/lib/utils'
@@ -37,8 +37,8 @@ function WorldDescription({ worldId, initialDescription, isOwner }: { worldId: I
   }
 
   return (
-    <Card className="md:col-span-2 min-h-[300px] flex flex-col bg-card/50 relative group">
-      <CardHeader className="flex flex-row items-center justify-between pb-4 border-b border-border/50">
+    <Card className="md:col-span-2 flex flex-col bg-card/50 relative group">
+      <CardHeader className="flex flex-row items-center justify-between px-6 py-2 border-b border-border/50">
         <CardTitle className="text-xl font-bold flex items-center gap-2">
           <Scroll className="h-5 w-5 text-primary" />
           World Overview
@@ -47,7 +47,7 @@ function WorldDescription({ worldId, initialDescription, isOwner }: { worldId: I
           <Button 
             variant="ghost" 
             size="sm" 
-            className="gap-2 opacity-0 group-hover:opacity-100 transition-opacity"
+            className="gap-2 opacity-0 group-hover:opacity-100 transition-opacity h-8"
             onClick={() => setIsEditing(!isEditing)}
           >
             <Settings className="h-4 w-4" />
@@ -55,9 +55,12 @@ function WorldDescription({ worldId, initialDescription, isOwner }: { worldId: I
           </Button>
         )}
       </CardHeader>
-      <CardContent className="pt-6 max-w-none flex-grow">
+      <CardContent className="px-6 pt-2 pb-6 max-w-none flex-grow">
         {isEditing ? (
-          <div className="space-y-4 h-full flex flex-col">
+          <div className="space-y-3 h-full flex flex-col">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Supports Markdown</span>
+            </div>
             <Textarea 
               className="min-h-[250px] font-mono text-xs flex-grow bg-muted/30"
               value={description}
@@ -69,18 +72,107 @@ function WorldDescription({ worldId, initialDescription, isOwner }: { worldId: I
             </div>
           </div>
         ) : (
-          <div className="min-h-[200px] text-sm leading-relaxed space-y-4 [&>h1]:text-2xl [&>h1]:font-bold [&>h2]:text-xl [&>h2]:font-bold [&>h3]:text-lg [&>h3]:font-bold [&>p]:mb-4 [&>ul]:list-disc [&>ul]:pl-6 [&>ol]:list-decimal [&>ol]:pl-6 [&>blockquote]:border-l-4 [&>blockquote]:pl-4 [&>blockquote]:italic">
+          <div className="text-sm leading-relaxed [&>*:first-child]:mt-0 [&>h1]:text-2xl [&>h1]:font-bold [&>h1]:mt-6 [&>h2]:text-xl [&>h2]:font-bold [&>h2]:mt-5 [&>h3]:text-lg [&>h3]:font-bold [&>h3]:mt-4 [&>p]:mt-3 [&>ul]:list-disc [&>ul]:pl-6 [&>ul]:mt-3 [&>ol]:list-decimal [&>ol]:pl-6 [&>ol]:mt-3 [&>blockquote]:border-l-4 [&>blockquote]:pl-4 [&>blockquote]:italic [&>blockquote]:mt-3">
             {description ? (
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {description}
               </ReactMarkdown>
             ) : (
-              <p className="text-muted-foreground italic">No description has been provided for this world yet.</p>
+              <p className="text-muted-foreground italic mt-0">No description has been provided for this world yet.</p>
             )}
           </div>
         )}
       </CardContent>
     </Card>
+  )
+}
+
+function ReputationCell({ 
+  worldId, 
+  charId, 
+  faction, 
+  value, 
+  isOwner 
+}: { 
+  worldId: Id<'worlds'>, 
+  charId: Id<'characters'>, 
+  faction: string, 
+  value: number, 
+  isOwner: boolean 
+}) {
+  const updateReputation = useMutation(api.worlds.updateReputation)
+  const setReputation = useMutation(api.worlds.setReputation)
+  const [localValue, setLocalValue] = useState(value.toString())
+
+  useEffect(() => {
+    setLocalValue(value.toString())
+  }, [value])
+
+  const handleBlur = async () => {
+    const newVal = parseInt(localValue)
+    if (!isNaN(newVal) && newVal !== value) {
+      await setReputation({ worldId, characterId: charId, factionName: faction, value: newVal })
+    } else {
+      setLocalValue(value.toString())
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      (e.target as HTMLInputElement).blur()
+    }
+    if (e.key === 'Escape') {
+      setLocalValue(value.toString())
+      (e.target as HTMLInputElement).blur()
+    }
+  }
+
+  return (
+    <div className="flex items-center justify-center gap-3">
+      {isOwner && (
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-6 w-6 rounded-full shrink-0"
+          onClick={() => updateReputation({ worldId, characterId: charId, factionName: faction, delta: -1 })}
+        >
+          <Minus className="h-3 w-3" />
+        </Button>
+      )}
+      
+      {isOwner ? (
+        <div className="relative w-12 flex justify-center">
+          <Input
+            className={cn(
+              "h-7 w-12 text-center p-0 font-bold border-none bg-transparent focus-visible:ring-1 focus-visible:ring-primary/30 transition-all tabular-nums",
+              value > 0 ? "text-green-500" : value < 0 ? "text-red-500" : "text-muted-foreground"
+            )}
+            value={localValue}
+            onChange={(e) => setLocalValue(e.target.value)}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
+          />
+        </div>
+      ) : (
+        <span className={cn(
+          "text-sm font-bold min-w-[1.5rem] tabular-nums",
+          value > 0 ? "text-green-500" : value < 0 ? "text-red-500" : "text-muted-foreground"
+        )}>
+          {value > 0 ? `+${value}` : value}
+        </span>
+      )}
+
+      {isOwner && (
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-6 w-6 rounded-full shrink-0"
+          onClick={() => updateReputation({ worldId, characterId: charId, factionName: faction, delta: 1 })}
+        >
+          <Plus className="h-3 w-3" />
+        </Button>
+      )}
+    </div>
   )
 }
 
@@ -90,14 +182,21 @@ function ReputationSystem({ worldId, worldName, userCharacterIds }: { worldId: I
   
   const addFaction = useMutation(api.worlds.addFaction)
   const removeFaction = useMutation(api.worlds.removeFaction)
+  const renameFaction = useMutation(api.worlds.renameFaction)
   const addFactionGroup = useMutation(api.worlds.addFactionGroup)
   const removeFactionGroup = useMutation(api.worlds.removeFactionGroup)
+  const renameFactionGroup = useMutation(api.worlds.renameFactionGroup)
+  const updateFactionGroupMembers = useMutation(api.worlds.updateFactionGroupMembers)
   const updateReputation = useMutation(api.worlds.updateReputation)
   const toggleVisibility = useMutation(api.worlds.toggleReputationVisibility)
   
   const [sessionFilter, setSessionFilter] = useState<string>('all')
+  const [groupFilter, setGroupFilter] = useState<string>('all')
+  const [addMode, setAddMode] = useState<'choice' | 'group' | 'standalone'>('choice')
   const [newFactionName, setNewFactionName] = useState('')
   const [newGroupName, setNewGroupName] = useState('')
+  const [subFactions, setSubFactions] = useState<string[]>([])
+  const [currentSubFactionInput, setCurrentSubFactionInput] = useState('')
   const [selectedFactionsForGroup, setSelectedFactionsForGroup] = useState<string[]>([])
   const [isManageFactionsOpen, setIsManageFactionsOpen] = useState(false)
 
@@ -123,36 +222,40 @@ function ReputationSystem({ worldId, worldName, userCharacterIds }: { worldId: I
   }
 
   const sortedCharacters = useMemo(() => {
-    if (!charactersRaw || factions.length === 0) return charactersRaw || []
+    if (!charactersRaw) return []
     
-    return [...charactersRaw].map(char => {
-      let total = 0
-      factions.forEach(f => {
-        total += getRepValue(char._id, f)
-      })
-      const average = total / factions.length
-      return { ...char, overallAverage: average }
-    }).sort((a, b) => b.overallAverage - a.overallAverage)
-  }, [charactersRaw, factions, reputations])
+    return [...charactersRaw].sort((a, b) => a.name.localeCompare(b.name))
+  }, [charactersRaw])
 
   const handleAddFaction = async () => {
     if (!newFactionName.trim()) return
     await addFaction({ worldId, name: newFactionName.trim() })
     setNewFactionName('')
+    setAddMode('choice')
+    setIsManageFactionsOpen(false)
   }
 
   const handleAddGroup = async () => {
-    if (!newGroupName.trim() || selectedFactionsForGroup.length === 0) return
-    await addFactionGroup({ worldId, name: newGroupName.trim(), factions: selectedFactionsForGroup })
+    if (!newGroupName.trim()) return
+    
+    for (const sub of subFactions) {
+      if (!factions.includes(sub)) {
+        await addFaction({ worldId, name: sub })
+      }
+    }
+
+    const allGroupFactions = [...selectedFactionsForGroup, ...subFactions]
+    await addFactionGroup({ worldId, name: newGroupName.trim(), factions: allGroupFactions })
+    
     setNewGroupName('')
     setSelectedFactionsForGroup([])
+    setSubFactions([])
+    setAddMode('choice')
+    setIsManageFactionsOpen(false)
   }
 
-  const toggleFactionForGroup = (faction: string) => {
-    setSelectedFactionsForGroup(prev => 
-      prev.includes(faction) ? prev.filter(f => f !== faction) : [...prev, faction]
-    )
-  }
+  const activeGroup = factionGroups.find(g => g.name === groupFilter)
+  const displayedFactions = groupFilter === 'all' ? factions : (activeGroup?.factions || [])
 
   if (data === undefined || sessions === undefined) return <Skeleton className="h-[400px] w-full" />
 
@@ -182,122 +285,231 @@ function ReputationSystem({ worldId, worldName, userCharacterIds }: { worldId: I
                 {isVisible ? "Public" : "Private"}
               </Button>
 
-              <Popover open={isManageFactionsOpen} onOpenChange={setIsManageFactionsOpen}>
+              <Popover open={isManageFactionsOpen} onOpenChange={(open) => {
+                setIsManageFactionsOpen(open)
+                if (!open) setAddMode('choice')
+              }}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="sm" className="gap-2">
-                    <Settings className="h-4 w-4" />
-                    Manage
+                    <Plus className="h-4 w-4" />
+                    Add Faction
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-80 p-0 overflow-hidden" align="end">
-                  <div className="p-4 bg-muted/50 border-b">
-                    <h4 className="font-bold leading-none">Reputation Settings</h4>
+                  <div className="p-4 bg-muted/50 border-b flex items-center justify-between">
+                    <h4 className="font-bold leading-none">
+                      {addMode === 'choice' && "Choose Type"}
+                      {addMode === 'group' && "New Faction Group"}
+                      {addMode === 'standalone' && "New Standalone Faction"}
+                    </h4>
+                    {addMode !== 'choice' && (
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setAddMode('choice')}>
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
-                  <div className="p-4 space-y-6 max-h-[400px] overflow-auto">
-                    {/* Factions Section */}
-                    <div className="space-y-3">
-                      <h5 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                        <LayoutGrid className="h-3 w-3" /> Factions
-                      </h5>
-                      <div className="space-y-1.5">
-                        {factions.map(f => (
-                          <div key={f} className="flex items-center justify-between bg-muted/30 p-2 rounded-md group">
-                            <span className="text-sm font-medium">{f}</span>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-7 w-7 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={() => removeFaction({ worldId, name: f })}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        ))}
+                  <div className="p-4 space-y-4">
+                    {addMode === 'choice' && (
+                      <div className="grid grid-cols-1 gap-2">
+                        <Button variant="outline" className="h-auto py-4 flex-col gap-1 items-start whitespace-normal" onClick={() => setAddMode('group')}>
+                          <span className="font-bold">Faction Group</span>
+                          <span className="text-[10px] text-muted-foreground text-left leading-tight">A collection of factions with an aggregated reputation score.</span>
+                        </Button>
+                        <Button variant="outline" className="h-auto py-4 flex-col gap-1 items-start whitespace-normal" onClick={() => setAddMode('standalone')}>
+                          <span className="font-bold">Standalone Faction</span>
+                          <span className="text-[10px] text-muted-foreground text-left leading-tight">A single organization without any sub-factions.</span>
+                        </Button>
                       </div>
-                      <div className="flex gap-2 pt-1">
+                    )}
+
+                    {addMode === 'standalone' && (
+                      <div className="space-y-3">
                         <Input 
-                          placeholder="New faction..." 
-                          className="h-8 text-xs"
+                          placeholder="Faction name (e.g. Iron Shields)" 
                           value={newFactionName}
                           onChange={(e) => setNewFactionName(e.target.value)}
                           onKeyDown={(e) => e.key === 'Enter' && handleAddFaction()}
+                          autoFocus
                         />
-                        <Button size="sm" className="h-8 px-3" onClick={handleAddFaction}>Add</Button>
+                        <Button className="w-full" onClick={handleAddFaction}>Create Faction</Button>
                       </div>
-                    </div>
+                    )}
 
-                    {/* Groups Section */}
-                    <div className="space-y-3 border-t pt-6">
-                      <h5 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                        <Layers className="h-3 w-3" /> Faction Groups
-                      </h5>
-                      <div className="space-y-1.5">
-                        {factionGroups.map(g => (
-                          <div key={g.name} className="flex flex-col bg-muted/30 p-2 rounded-md group">
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-bold">{g.name}</span>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-7 w-7 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                                onClick={() => removeFactionGroup({ worldId, name: g.name })}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                            <p className="text-[10px] text-muted-foreground mt-0.5 italic">
-                              {g.factions.join(', ')}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="space-y-3 pt-2">
-                        <Input 
-                          placeholder="Group name..." 
-                          className="h-8 text-xs"
-                          value={newGroupName}
-                          onChange={(e) => setNewGroupName(e.target.value)}
-                        />
-                        <div className="grid grid-cols-2 gap-2 max-h-[100px] overflow-auto p-2 border rounded-md bg-background">
-                          {factions.map(f => (
-                            <div key={f} className="flex items-center gap-2">
-                              <Checkbox 
-                                id={`group-fact-${f}`} 
-                                checked={selectedFactionsForGroup.includes(f)}
-                                onCheckedChange={() => toggleFactionForGroup(f)}
-                              />
-                              <label htmlFor={`group-fact-${f}`} className="text-[10px] truncate cursor-pointer">{f}</label>
-                            </div>
-                          ))}
+                    {addMode === 'group' && (
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold uppercase text-muted-foreground">Group Identity</label>
+                          <Input 
+                            placeholder="Group name (e.g. The Merchant Guilds)" 
+                            value={newGroupName}
+                            onChange={(e) => setNewGroupName(e.target.value)}
+                            autoFocus
+                          />
                         </div>
-                        <Button 
-                          size="sm" 
-                          className="w-full h-8" 
-                          disabled={!newGroupName.trim() || selectedFactionsForGroup.length === 0}
-                          onClick={handleAddGroup}
-                        >
-                          Create Group
+
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold uppercase text-muted-foreground">Add Sub-Factions</label>
+                          <div className="flex gap-2">
+                            <Input 
+                              placeholder="New sub-faction name..." 
+                              className="text-xs"
+                              value={currentSubFactionInput}
+                              onChange={(e) => setCurrentSubFactionInput(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && currentSubFactionInput.trim()) {
+                                  setSubFactions([...subFactions, currentSubFactionInput.trim()])
+                                  setCurrentSubFactionInput('')
+                                }
+                              }}
+                            />
+                            <Button size="sm" onClick={() => {
+                              if (currentSubFactionInput.trim()) {
+                                setSubFactions([...subFactions, currentSubFactionInput.trim()])
+                                setCurrentSubFactionInput('')
+                              }
+                            }}>Add</Button>
+                          </div>
+                          
+                          {subFactions.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {subFactions.map(s => (
+                                <span key={s} className="bg-primary/10 text-primary text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1">
+                                  {s}
+                                  <X className="h-2 w-2 cursor-pointer" onClick={() => setSubFactions(subFactions.filter(f => f !== s))} />
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {factions.length > 0 && (
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-bold uppercase text-muted-foreground">Include Existing Factions</label>
+                            <select 
+                              className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                              value=""
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val && !selectedFactionsForGroup.includes(val)) {
+                                  setSelectedFactionsForGroup([...selectedFactionsForGroup, val]);
+                                }
+                              }}
+                            >
+                              <option value="">-- Choose existing faction --</option>
+                              {factions
+                                .filter(f => !selectedFactionsForGroup.includes(f) && !subFactions.includes(f))
+                                .map(f => (
+                                  <option key={f} value={f}>{f}</option>
+                                ))
+                              }
+                            </select>
+                            
+                            {selectedFactionsForGroup.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {selectedFactionsForGroup.map(s => (
+                                  <span key={s} className="bg-muted text-muted-foreground text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 border border-border/50">
+                                    {s}
+                                    <X className="h-2.5 w-2.5 cursor-pointer hover:text-destructive transition-colors" onClick={() => setSelectedFactionsForGroup(selectedFactionsForGroup.filter(f => f !== s))} />
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <Button className="w-full h-10 font-bold" disabled={!newGroupName.trim()} onClick={handleAddGroup}>
+                          Create Group & Factions
                         </Button>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </PopoverContent>
               </Popover>
             </>
           )}
 
-          <select 
-            className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            value={sessionFilter}
-            onChange={(e) => setSessionFilter(e.target.value)}
-          >
-            <option value="all">All Participants</option>
-            {unlockedSessions.map(s => (
-              <option key={s._id} value={s._id}>
-                Session: {formatDate(s.date)} {formatTime(s.date)}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className={cn("gap-2", groupFilter !== 'all' && "border-primary text-primary bg-primary/5")}
+                  title="Filter Factions"
+                >
+                  <Filter className="h-4 w-4" />
+                  <span className="hidden sm:inline">
+                    {groupFilter === 'all' ? "All Factions" : groupFilter}
+                  </span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56 p-2" align="end">
+                <div className="space-y-1">
+                  <Button 
+                    variant={groupFilter === 'all' ? "secondary" : "ghost"} 
+                    className="w-full justify-start font-normal text-xs h-8"
+                    onClick={() => setGroupFilter('all')}
+                  >
+                    All Factions
+                  </Button>
+                  {factionGroups.map(g => (
+                    <Button 
+                      key={g.name}
+                      variant={groupFilter === g.name ? "secondary" : "ghost"} 
+                      className="w-full justify-start font-normal text-xs h-8"
+                      onClick={() => setGroupFilter(g.name)}
+                    >
+                      <Layers className="h-3 w-3 mr-2 opacity-50" />
+                      {g.name}
+                    </Button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className={cn("gap-2", sessionFilter !== 'all' && "border-primary text-primary bg-primary/5")}
+                  title="Filter by Session"
+                >
+                  <Calendar className="h-4 w-4" />
+                  <span className="hidden sm:inline">
+                    {sessionFilter === 'all' ? "All Participants" : 
+                      (() => {
+                        const s = unlockedSessions.find(x => x._id === sessionFilter);
+                        return s ? formatDate(s.date) : "Select Session";
+                      })()
+                    }
+                  </span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-2" align="end">
+                <div className="space-y-1">
+                  <Button 
+                    variant={sessionFilter === 'all' ? "secondary" : "ghost"} 
+                    className="w-full justify-start font-normal text-xs h-8"
+                    onClick={() => setSessionFilter('all')}
+                  >
+                    All Participants
+                  </Button>
+                  {unlockedSessions.map(s => (
+                    <Button 
+                      key={s._id}
+                      variant={sessionFilter === s._id ? "secondary" : "ghost"} 
+                      className="w-full justify-start font-normal text-xs h-8"
+                      onClick={() => setSessionFilter(s._id)}
+                    >
+                      <Calendar className="h-3 w-3 mr-2 opacity-50" />
+                      {formatDate(s.date)} {formatTime(s.date)}
+                    </Button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
       </CardHeader>
       
@@ -315,7 +527,7 @@ function ReputationSystem({ worldId, worldName, userCharacterIds }: { worldId: I
             <Info className="h-12 w-12 opacity-20" />
             <div className="text-center">
               <h3 className="font-bold">No Factions Defined</h3>
-              <p className="text-sm">Add factions using the settings button above.</p>
+              <p className="text-sm">Click "Add Faction" above to get started.</p>
             </div>
           </div>
         ) : (
@@ -323,13 +535,109 @@ function ReputationSystem({ worldId, worldName, userCharacterIds }: { worldId: I
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-muted/30">
-                  <th className="text-left p-4 font-bold border-b border-border/50 sticky left-0 bg-background z-20">Character</th>
-                  <th className="p-4 font-bold border-b border-border/50 text-center bg-primary/5">Overall</th>
-                  {factionGroups.map(g => (
-                    <th key={g.name} className="p-4 font-bold border-b border-border/50 text-center bg-muted/50">{g.name}</th>
+                  <th className="text-left p-4 font-bold border-b border-border/50 sticky left-0 bg-background z-20 min-w-[180px]">Character</th>
+                  
+                  {groupFilter === 'all' && (
+                    <th className="p-4 font-bold border-b border-border/50 text-center bg-primary/5 min-w-[100px]">Overall</th>
+                  )}
+
+                  {factionGroups.filter(g => groupFilter === 'all' || g.name === groupFilter).map(g => (
+                    <th key={g.name} className="p-4 font-bold border-b border-border/50 text-center bg-muted/50 min-w-[120px]">
+                      <div className="flex flex-col items-center gap-1">
+                        <div className="flex items-center gap-1.5 group/header">
+                          <span className="truncate max-w-[100px]">{g.name}</span>
+                          {isOwner && (
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-5 w-5 opacity-0 group-hover/header:opacity-100 transition-opacity">
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-64 p-4">
+                                <div className="space-y-4">
+                                  <div className="space-y-2">
+                                    <label className="text-[10px] font-bold uppercase text-muted-foreground">Rename Group</label>
+                                    <Input 
+                                      defaultValue={g.name} 
+                                      className="h-8 text-xs" 
+                                      onKeyDown={async (e) => {
+                                        if (e.key === 'Enter') {
+                                          const val = (e.target as HTMLInputElement).value
+                                          if (val && val !== g.name) {
+                                            await renameFactionGroup({ worldId, oldName: g.name, newName: val })
+                                          }
+                                        }
+                                      }}
+                                    />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <label className="text-[10px] font-bold uppercase text-muted-foreground">Edit Members</label>
+                                    <div className="space-y-1.5 max-h-[150px] overflow-auto border rounded-md p-2 bg-background">
+                                      {factions.map(f => (
+                                        <div key={f} className="flex items-center gap-2">
+                                          <Checkbox 
+                                            id={`edit-group-${g.name}-${f}`}
+                                            checked={g.factions.includes(f)}
+                                            onCheckedChange={async (checked) => {
+                                              const newFactions = checked 
+                                                ? [...g.factions, f]
+                                                : g.factions.filter(x => x !== f)
+                                              await updateFactionGroupMembers({ worldId, name: g.name, factions: newFactions })
+                                            }}
+                                          />
+                                          <label htmlFor={`edit-group-${g.name}-${f}`} className="text-[10px] truncate cursor-pointer">{f}</label>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <Button variant="destructive" size="sm" className="w-full gap-2 h-8" onClick={() => removeFactionGroup({ worldId, name: g.name })}>
+                                    <Trash2 className="h-3 w-3" /> Delete Group
+                                  </Button>
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          )}
+                        </div>
+                        <span className="text-[9px] uppercase tracking-tighter text-muted-foreground opacity-60">Avg Score</span>
+                      </div>
+                    </th>
                   ))}
-                  {factions.map(f => (
-                    <th key={f} className="p-4 font-bold border-b border-border/50 text-center">{f}</th>
+
+                  {displayedFactions.map(f => (
+                    <th key={f} className="p-4 font-bold border-b border-border/50 text-center min-w-[120px]">
+                      <div className="flex items-center justify-center gap-1 group/header">
+                        <span className="truncate max-w-[100px]">{f}</span>
+                        {isOwner && (
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-5 w-5 opacity-0 group-hover/header:opacity-100 transition-opacity">
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-64 p-4" align="center">
+                              <div className="space-y-3">
+                                <label className="text-[10px] font-bold uppercase text-muted-foreground">Rename Faction</label>
+                                <Input 
+                                  defaultValue={f} 
+                                  className="h-8 text-xs"
+                                  onKeyDown={async (e) => {
+                                    if (e.key === 'Enter') {
+                                      const val = (e.target as HTMLInputElement).value
+                                      if (val && val !== f) {
+                                        await renameFaction({ worldId, oldName: f, newName: val })
+                                      }
+                                    }
+                                  }}
+                                />
+                                <Button variant="destructive" size="sm" className="w-full gap-2 h-8" onClick={() => removeFaction({ worldId, name: f })}>
+                                  <Trash2 className="h-3 w-3" /> Delete Faction
+                                </Button>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        )}
+                      </div>
+                    </th>
                   ))}
                 </tr>
               </thead>
@@ -338,24 +646,30 @@ function ReputationSystem({ worldId, worldName, userCharacterIds }: { worldId: I
                   [...Array(3)].map((_, i) => (
                     <tr key={i}>
                       <td className="p-4 border-b border-border/50"><Skeleton className="h-6 w-32" /></td>
-                      <td className="p-4 border-b border-border/50 bg-primary/5"><Skeleton className="h-6 w-12 mx-auto" /></td>
-                      {factionGroups.map(g => (
+                      {groupFilter === 'all' && (
+                        <td className="p-4 border-b border-border/50 bg-primary/5"><Skeleton className="h-6 w-12 mx-auto" /></td>
+                      )}
+                      {factionGroups.filter(g => groupFilter === 'all' || g.name === groupFilter).map(g => (
                         <td key={g.name} className="p-4 border-b border-border/50 bg-muted/50"><Skeleton className="h-6 w-12 mx-auto" /></td>
                       ))}
-                      {factions.map(f => (
+                      {displayedFactions.map(f => (
                         <td key={f} className="p-4 border-b border-border/50"><Skeleton className="h-6 w-12 mx-auto" /></td>
                       ))}
                     </tr>
                   ))
                 ) : sortedCharacters.length === 0 ? (
                   <tr>
-                    <td colSpan={1 + 1 + factionGroups.length + factions.length} className="p-8 text-center text-muted-foreground italic">
+                    <td colSpan={10} className="p-8 text-center text-muted-foreground italic">
                       No characters found for this filter.
                     </td>
                   </tr>
                 ) : (
                   sortedCharacters.map(char => {
-                    const overallAvg = (char as any).overallAverage || 0
+                    let totalRep = 0
+                    factions.forEach(f => {
+                      totalRep += getRepValue(char._id, f)
+                    })
+                    const overallAvg = factions.length > 0 ? totalRep / factions.length : 0
                     const isUserCharacter = userCharacterIds.has(char._id)
 
                     return (
@@ -379,23 +693,27 @@ function ReputationSystem({ worldId, worldName, userCharacterIds }: { worldId: I
                             )}
                           </div>
                         </td>
-                        <td className={cn(
-                          "p-4 border-b border-border/50 text-center bg-primary/5",
-                          isUserCharacter && "bg-purple-100/20 dark:bg-purple-800/10"
-                        )}>
-                          <span className={cn(
-                            "text-sm font-bold",
-                            overallAvg > 0 ? "text-green-500" : overallAvg < 0 ? "text-red-500" : "text-muted-foreground"
+                        
+                        {groupFilter === 'all' && (
+                          <td className={cn(
+                            "p-4 border-b border-border/50 text-center bg-primary/5",
+                            isUserCharacter && "bg-purple-100/20 dark:bg-purple-800/10"
                           )}>
-                            {overallAvg > 0 ? `+${overallAvg.toFixed(1)}` : overallAvg.toFixed(1)}
-                          </span>
-                        </td>
-                        {factionGroups.map(g => {
+                            <span className={cn(
+                              "text-sm font-bold",
+                              overallAvg > 0 ? "text-green-500" : overallAvg < 0 ? "text-red-500" : "text-muted-foreground"
+                            )}>
+                              {overallAvg > 0 ? `+${overallAvg.toFixed(1)}` : overallAvg.toFixed(1)}
+                            </span>
+                          </td>
+                        )}
+
+                        {factionGroups.filter(g => groupFilter === 'all' || g.name === groupFilter).map(g => {
                           let groupTotal = 0
                           g.factions.forEach(f => {
                             groupTotal += getRepValue(char._id, f)
                           })
-                          const groupAvg = groupTotal / g.factions.length
+                          const groupAvg = g.factions.length > 0 ? groupTotal / g.factions.length : 0
                           return (
                             <td key={g.name} className={cn(
                               "p-4 border-b border-border/50 text-center bg-muted/50",
@@ -410,49 +728,28 @@ function ReputationSystem({ worldId, worldName, userCharacterIds }: { worldId: I
                             </td>
                           )
                         })}
-                        {factions.map(f => {
+
+                        {displayedFactions.map(f => {
                           const val = getRepValue(char._id, f)
                           return (
                             <td key={f} className={cn(
                               "p-4 border-b border-border/50 text-center",
                               isUserCharacter && "bg-purple-50/30 dark:bg-purple-900/5"
                             )}>
-                              <div className="flex items-center justify-center gap-3">
-                                {isOwner && (
-                                  <Button 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    className="h-6 w-6 rounded-full"
-                                    onClick={() => updateReputation({ worldId, characterId: char._id, factionName: f, delta: -1 })}
-                                  >
-                                    <Minus className="h-3 w-3" />
-                                  </Button>
-                                )}
-                                <span className={cn(
-                                  "text-sm font-bold min-w-[1.5rem]",
-                                  val > 0 ? "text-green-500" : val < 0 ? "text-red-500" : "text-muted-foreground"
-                                )}>
-                                  {val > 0 ? `+${val}` : val}
-                                </span>
-                                {isOwner && (
-                                  <Button 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    className="h-6 w-6 rounded-full"
-                                    onClick={() => updateReputation({ worldId, characterId: char._id, factionName: f, delta: 1 })}
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                  </Button>
-                                )}
-                              </div>
+                              <ReputationCell
+                                worldId={worldId}
+                                charId={char._id}
+                                faction={f}
+                                value={val}
+                                isOwner={isOwner}
+                              />
                             </td>
                           )
                         })}
                       </tr>
                     )
                   })
-                )
-}
+                )}
               </tbody>
             </table>
           </div>
@@ -703,4 +1000,3 @@ export default function WorldPage() {
     </div>
   )
 }
-

@@ -130,6 +130,77 @@ export const getReputationData = query({
   },
 })
 
+export const renameFaction = mutation({
+  args: { worldId: v.id('worlds'), oldName: v.string(), newName: v.string() },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    const world = await ctx.db.get(args.worldId)
+    if (!world || world.owner !== user?.subject) {
+      throw new Error('Unauthorized')
+    }
+
+    const factions = world.factions ?? []
+    const newFactions = factions.map(f => f === args.oldName ? args.newName : f)
+
+    const groups = world.factionGroups ?? []
+    const newGroups = groups.map(g => ({
+      ...g,
+      factions: g.factions.map(f => f === args.oldName ? args.newName : f)
+    }))
+
+    await ctx.db.patch(args.worldId, {
+      factions: newFactions,
+      factionGroups: newGroups,
+    })
+
+    // Update all reputations for this faction in this world
+    const reps = await ctx.db
+      .query('reputations')
+      .withIndex('by_world_faction', (q) => q.eq('worldId', args.worldId).eq('factionName', args.oldName))
+      .collect()
+
+    for (const rep of reps) {
+      await ctx.db.patch(rep._id, { factionName: args.newName })
+    }
+  },
+})
+
+export const renameFactionGroup = mutation({
+  args: { worldId: v.id('worlds'), oldName: v.string(), newName: v.string() },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    const world = await ctx.db.get(args.worldId)
+    if (!world || world.owner !== user?.subject) {
+      throw new Error('Unauthorized')
+    }
+
+    const groups = world.factionGroups ?? []
+    const newGroups = groups.map(g => g.name === args.oldName ? { ...g, name: args.newName } : g)
+
+    await ctx.db.patch(args.worldId, {
+      factionGroups: newGroups,
+    })
+  },
+})
+
+export const updateFactionGroupMembers = mutation({
+  args: { worldId: v.id('worlds'), name: v.string(), factions: v.array(v.string()) },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    const world = await ctx.db.get(args.worldId)
+    if (!world || world.owner !== user?.subject) {
+      throw new Error('Unauthorized')
+    }
+
+    const groups = world.factionGroups ?? []
+    const newGroups = groups.map(g => g.name === args.name ? { ...g, factions: args.factions } : g)
+
+    await ctx.db.patch(args.worldId, {
+      factionGroups: newGroups,
+    })
+  },
+})
+
 export const addFactionGroup = mutation({
   args: { 
     worldId: v.id('worlds'), 
@@ -212,6 +283,41 @@ export const removeFaction = mutation({
     
     for (const rep of reps) {
         await ctx.db.delete(rep._id)
+    }
+  },
+})
+
+export const setReputation = mutation({
+  args: { 
+    worldId: v.id('worlds'), 
+    characterId: v.id('characters'), 
+    factionName: v.string(), 
+    value: v.number() 
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    const world = await ctx.db.get(args.worldId)
+    if (!world || world.owner !== user?.subject) {
+      throw new Error('Unauthorized')
+    }
+
+    const existing = await ctx.db
+      .query('reputations')
+      .withIndex('by_world_character', (q) => q.eq('worldId', args.worldId).eq('characterId', args.characterId))
+      .filter((q) => q.eq(q.field('factionName'), args.factionName))
+      .first()
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        value: args.value,
+      })
+    } else {
+      await ctx.db.insert('reputations', {
+        worldId: args.worldId,
+        characterId: args.characterId,
+        factionName: args.factionName,
+        value: args.value,
+      })
     }
   },
 })
