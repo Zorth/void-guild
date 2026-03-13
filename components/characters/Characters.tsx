@@ -5,7 +5,7 @@ import { api } from '@/convex/_generated/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Book, CircleHelp } from 'lucide-react'
+import { Book, CircleHelp, Globe, Shield } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -34,6 +34,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { getLevelBadgeStyle, CharacterRankIcon, getXPBarStyles } from '@/lib/utils'
 import { track } from '@vercel/analytics'
 import { useMemo } from 'react'
+import Link from 'next/link'
 
 export default function Characters({ filters }: { filters?: { pf: boolean, dnd: boolean } }) {
   const charactersRaw = useQuery(api.characters.listCharacters)
@@ -115,7 +116,7 @@ export default function Characters({ filters }: { filters?: { pf: boolean, dnd: 
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-      <div>
+      <div className="flex flex-col">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle>Your Characters</CardTitle>
@@ -144,13 +145,12 @@ export default function Characters({ filters }: { filters?: { pf: boolean, dnd: 
                             <span className="font-medium">
                                 {character.name}
                             </span>
-                            {/* Book Icon moved here */}
                             <a 
                                 href={`https://void.tarragon.be/Player-Characters/${character.name.replace(/\s+/g, '-')}`} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
-                                onClick={(e) => e.stopPropagation()} // Prevent dialog from opening
-                                className="text-muted-foreground hover:text-purple-500" // Added styling for the icon
+                                onClick={(e) => e.stopPropagation()} 
+                                className="text-muted-foreground hover:text-purple-500"
                             >
                                 <Book size={16} />
                             </a>
@@ -164,14 +164,14 @@ export default function Characters({ filters }: { filters?: { pf: boolean, dnd: 
                                 target="_blank" 
                                 rel="noopener noreferrer" 
                                 className="text-[10px] text-blue-500 hover:underline"
-                                onClick={(e) => e.stopPropagation()} // Prevent dialog from opening when clicking the link
+                                onClick={(e) => e.stopPropagation()} 
                             >
                                 {character.websiteLink}
                             </a>
                         )}
                         </div>
                         <div className="flex items-center gap-2"> 
-                            <div className="flex flex-col items-end"> {/* Vertical alignment for Level and XP */}
+                            <div className="flex flex-col items-end">
                                 <div className="flex items-center gap-1">
                                     <CharacterRankIcon rank={character.rank} />
                                     {character.system && (
@@ -194,7 +194,6 @@ export default function Characters({ filters }: { filters?: { pf: boolean, dnd: 
                             </div>
                         </div>
                     </div>
-                    {/* XP Bar */}
                     <div className="w-full bg-muted/30 h-1 rounded-full mt-2 overflow-hidden">
                         <div 
                             className="h-full transition-all duration-500 ease-out" 
@@ -221,38 +220,41 @@ export default function Characters({ filters }: { filters?: { pf: boolean, dnd: 
           </CardContent>
         </Card>
 
-        {/* World Management */}
-        {(isGM || isGM === undefined) && (
-          <Card className="mt-8">
-            <CardHeader>
-              <CardTitle>Your World</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {world === undefined || isGM === undefined ? (
-                <div className="flex items-center justify-between">
-                  <Skeleton className="h-7 w-32" />
-                  <Skeleton className="h-9 w-20" />
-                </div>
-              ) : world === null ? (                <>
-                  <p>You don&apos;t have a world yet.</p>
-                  <Button className="mt-4" onClick={() => setShowCreateWorldDialog(true)}>
-                    Create World
-                  </Button>
-                </>
+        {/* World Management Actions */}
+        <div className="flex flex-col gap-3 mt-6 w-full">
+          <Link href="/world" className="w-full">
+            <Button variant="default" className="w-full flex items-center justify-center gap-3 h-12 text-md font-bold shadow-md hover:shadow-lg transition-all rounded-xl">
+              <Globe className="h-5 w-5" />
+              Browse Worlds
+            </Button>
+          </Link>
+
+          {isGM && (
+            <div className="w-full">
+              {world === undefined ? (
+                <Skeleton className="h-12 w-full rounded-xl" />
+              ) : world === null ? (
+                <Button 
+                  variant="outline" 
+                  className="w-full flex items-center justify-center gap-3 h-12 text-md font-semibold rounded-xl border-2 border-dashed" 
+                  onClick={() => setShowCreateWorldDialog(true)}
+                >
+                  Create Your World
+                </Button>
               ) : (
-                <div className="flex items-center justify-between">
-                  <p className="text-lg font-medium">{world.name}</p>
-                  <Button variant="outline" onClick={() => {
-                    setRenameWorldName(world.name)
-                    setShowRenameWorldDialog(true)
-                  }}>
-                    Rename
+                <Link href={`/world/${encodeURIComponent(world.name)}`} className="w-full">
+                  <Button 
+                    variant="outline" 
+                    className="w-full flex items-center justify-center gap-3 h-12 text-md font-bold border-2 border-amber-500/50 hover:bg-amber-500/10 hover:border-amber-500 transition-all rounded-xl"
+                  >
+                    <Shield className="h-5 w-5 text-amber-500" />
+                    Your World: {world.name}
                   </Button>
-                </div>
+                </Link>
               )}
-            </CardContent>
-          </Card>
-        )}
+            </div>
+          )}
+        </div>
       </div>
 
       <Sessions filters={filters} />
@@ -357,28 +359,7 @@ export default function Characters({ filters }: { filters?: { pf: boolean, dnd: 
         </Dialog>
       )}
 
-      {/* Rename World Dialog */}
-      {isGM && (
-        <Dialog open={showRenameWorldDialog} onOpenChange={setShowRenameWorldDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Rename World</DialogTitle>
-              <DialogDescription>Enter a new name for your world.</DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleRenameWorld} className="flex flex-col gap-4">
-              <Input
-                value={renameWorldName}
-                onChange={(e) => setRenameWorldName(e.target.value)}
-                placeholder="New World Name"
-                required
-              />
-              <DialogFooter>
-                <Button type="submit">Rename</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-      )}
+      {/* Rename World Dialog moved to world page or handled via buttons if needed */}
     </div>
   )
 }
