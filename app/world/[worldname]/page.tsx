@@ -23,7 +23,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import '@/components/sessions/sessions.css'
 import { Id } from '@/convex/_generated/dataModel'
 
-function ReputationSystem({ worldId, worldName }: { worldId: Id<'worlds'>, worldName: string }) {
+function ReputationSystem({ worldId, worldName, userCharacterIds }: { worldId: Id<'worlds'>, worldName: string, userCharacterIds: Set<Id<'characters'>> }) {
   const data = useQuery(api.worlds.getReputationData, { worldName })
   const sessions = useQuery(api.worlds.getSessionsByWorld, { worldId })
   
@@ -295,13 +295,33 @@ function ReputationSystem({ worldId, worldName }: { worldId: Id<'worlds'>, world
                 ) : (
                   sortedCharacters.map(char => {
                     const overallAvg = (char as any).overallAverage || 0
-                    
+                    const isUserCharacter = userCharacterIds.has(char._id)
+
                     return (
-                      <tr key={char._id} className="hover:bg-muted/20 transition-colors group">
-                        <td className="p-4 border-b border-border/50 font-medium sticky left-0 bg-background group-hover:bg-muted/20 z-10">
-                          {char.name}
+                      <tr 
+                        key={char._id} 
+                        className={cn(
+                          "transition-colors group",
+                          isUserCharacter ? "bg-purple-50/50 dark:bg-purple-900/10" : "hover:bg-muted/20"
+                        )}
+                      >
+                        <td className={cn(
+                          "p-4 border-b border-border/50 font-bold sticky left-0 z-10 transition-colors",
+                          isUserCharacter 
+                            ? "bg-[#fdfaff] dark:bg-[#1a1025] text-purple-700 dark:text-purple-300 border-l-4 border-l-[#D8B4FE]" 
+                            : "bg-background group-hover:bg-muted/20"
+                        )}>
+                          <div className="flex items-center gap-2">
+                            {char.name}
+                            {isUserCharacter && (
+                              <span className="text-[8px] bg-purple-200 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-1 py-0.5 rounded-full uppercase tracking-wider font-bold">You</span>
+                            )}
+                          </div>
                         </td>
-                        <td className="p-4 border-b border-border/50 text-center bg-primary/5">
+                        <td className={cn(
+                          "p-4 border-b border-border/50 text-center bg-primary/5",
+                          isUserCharacter && "bg-purple-100/20 dark:bg-purple-800/10"
+                        )}>
                           <span className={cn(
                             "text-sm font-bold",
                             overallAvg > 0 ? "text-green-500" : overallAvg < 0 ? "text-red-500" : "text-muted-foreground"
@@ -316,7 +336,10 @@ function ReputationSystem({ worldId, worldName }: { worldId: Id<'worlds'>, world
                           })
                           const groupAvg = groupTotal / g.factions.length
                           return (
-                            <td key={g.name} className="p-4 border-b border-border/50 text-center bg-muted/50">
+                            <td key={g.name} className={cn(
+                              "p-4 border-b border-border/50 text-center bg-muted/50",
+                              isUserCharacter && "bg-purple-100/30 dark:bg-purple-800/20"
+                            )}>
                               <span className={cn(
                                 "text-sm font-bold",
                                 groupAvg > 0 ? "text-green-500" : groupAvg < 0 ? "text-red-500" : "text-muted-foreground"
@@ -329,7 +352,10 @@ function ReputationSystem({ worldId, worldName }: { worldId: Id<'worlds'>, world
                         {factions.map(f => {
                           const val = getRepValue(char._id, f)
                           return (
-                            <td key={f} className="p-4 border-b border-border/50 text-center">
+                            <td key={f} className={cn(
+                              "p-4 border-b border-border/50 text-center",
+                              isUserCharacter && "bg-purple-50/30 dark:bg-purple-900/5"
+                            )}>
                               <div className="flex items-center justify-center gap-3">
                                 {isOwner && (
                                   <Button 
@@ -364,7 +390,8 @@ function ReputationSystem({ worldId, worldName }: { worldId: Id<'worlds'>, world
                       </tr>
                     )
                   })
-                )}
+                )
+}
               </tbody>
             </table>
           </div>
@@ -600,7 +627,7 @@ export default function WorldPage() {
 
         {/* Right Column: Bento Grid */}
         <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-          <ReputationSystem worldId={world._id} worldName={world.name} />
+          <ReputationSystem worldId={world._id} worldName={world.name} userCharacterIds={userCharacterIds} />
           
           <Card className="min-h-[200px] flex flex-col items-center justify-center bg-muted/5 border-dashed relative group">
             <div className="text-muted-foreground text-center z-10 p-6">
