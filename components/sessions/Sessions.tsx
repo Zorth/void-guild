@@ -311,6 +311,8 @@ function MonthOverview({
                     }
 
                     const isUserAvailable = dayAvailability.some(a => a.userId === userId);
+                    const gmCount = dayAvailability.filter(a => a.isGM).length;
+                    const playerCount = dayAvailability.length - gmCount;
 
                     return (
                         <Dialog key={dayNum}>
@@ -330,19 +332,23 @@ function MonthOverview({
                                     </div>
                                     <div className="flex-grow flex items-center justify-center p-1">
                                         {!isPast && dayAvailability.length > 0 && (
-                                            <div className="flex flex-col items-center">
-                                                <span className={cn(
-                                                    "text-sm sm:text-lg font-bold leading-none",
-                                                    isUserAvailable && "text-purple-600 dark:text-purple-400"
-                                                )}>
-                                                    {dayAvailability.length}
-                                                </span>
-                                                <span className={cn(
-                                                    "text-[6px] sm:text-[8px] uppercase font-bold",
-                                                    isUserAvailable ? "text-purple-600 dark:text-purple-400" : "text-muted-foreground"
-                                                )}>
-                                                    Free
-                                                </span>
+                                            <div className="flex flex-col items-center gap-0.5">
+                                                {gmCount > 0 && (
+                                                    <span className={cn(
+                                                        "text-[8px] sm:text-[10px] font-bold leading-none",
+                                                        isUserAvailable && "text-purple-600 dark:text-purple-400"
+                                                    )}>
+                                                        {gmCount} GM
+                                                    </span>
+                                                )}
+                                                {playerCount > 0 && (
+                                                    <span className={cn(
+                                                        "text-[8px] sm:text-[10px] font-bold leading-none",
+                                                        isUserAvailable && "text-purple-600 dark:text-purple-400"
+                                                    )}>
+                                                        {playerCount} PL
+                                                    </span>
+                                                )}
                                             </div>
                                         )}
                                     </div>
