@@ -215,7 +215,11 @@ function ReputationSystem({ worldId, worldName, userCharacterIds }: { worldId: I
 
   const charactersRaw = useQuery(api.characters.getCharactersByIds, characterIds.length > 0 ? { ids: characterIds } : 'skip')
 
-  const { factions, factionGroups, reputations, isOwner, isVisible } = data || { factions: [], factionGroups: [], reputations: [], isOwner: false, isVisible: false }
+  const factions = (data?.factions || []) as string[]
+  const factionGroups = (data?.factionGroups || []) as { name: string, factions: string[] }[]
+  const reputations = (data?.reputations || []) as any[]
+  const isOwner = data?.isOwner ?? false
+  const isVisible = data?.isVisible ?? false
 
   const getRepValue = (charId: Id<'characters'>, faction: string) => {
     return reputations.find(r => r.characterId === charId && r.factionName === faction)?.value ?? 0
