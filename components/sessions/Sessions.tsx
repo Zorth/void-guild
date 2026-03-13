@@ -310,6 +310,8 @@ function MonthOverview({
                         dayBoxClass = "day-box-joined";
                     }
 
+                    const isUserAvailable = dayAvailability.some(a => a.userId === userId);
+
                     return (
                         <Dialog key={dayNum}>
                             <DialogTrigger asChild disabled={isPast}>
@@ -329,8 +331,18 @@ function MonthOverview({
                                     <div className="flex-grow flex items-center justify-center p-1">
                                         {!isPast && dayAvailability.length > 0 && (
                                             <div className="flex flex-col items-center">
-                                                <span className="text-sm sm:text-lg font-bold leading-none">{dayAvailability.length}</span>
-                                                <span className="text-[6px] sm:text-[8px] text-muted-foreground uppercase font-bold">Free</span>
+                                                <span className={cn(
+                                                    "text-sm sm:text-lg font-bold leading-none",
+                                                    isUserAvailable && "text-purple-600 dark:text-purple-400"
+                                                )}>
+                                                    {dayAvailability.length}
+                                                </span>
+                                                <span className={cn(
+                                                    "text-[6px] sm:text-[8px] uppercase font-bold",
+                                                    isUserAvailable ? "text-purple-600 dark:text-purple-400" : "text-muted-foreground"
+                                                )}>
+                                                    Free
+                                                </span>
                                             </div>
                                         )}
                                     </div>
