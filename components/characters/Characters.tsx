@@ -5,7 +5,7 @@ import { api } from '@/convex/_generated/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Book, CircleHelp, Globe, Shield } from 'lucide-react'
+import { Book, CircleHelp, Globe, Shield, Handshake } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -247,10 +247,11 @@ export default function Characters({ filters }: { filters?: { pf: boolean, dnd: 
                     variant="outline" 
                     className="w-full flex items-center justify-center gap-3 h-12 text-md font-bold border-2 border-amber-500/50 hover:bg-amber-500/10 hover:border-amber-500 transition-all rounded-xl"
                   >
-                    <Shield className="h-5 w-5 text-amber-500" />
+                    <Handshake className="h-5 w-5 text-amber-500" />
                     Your World: {world.name}
                   </Button>
                 </Link>
+
               )}
             </div>
           )}

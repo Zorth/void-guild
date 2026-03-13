@@ -66,6 +66,14 @@ export const listAllCharactersPublic = query({
   },
 })
 
+export const getCharactersByIds = query({
+  args: { ids: v.array(v.id('characters')) },
+  handler: async (ctx, args) => {
+    const characters = await Promise.all(args.ids.map((id) => ctx.db.get(id)))
+    return characters.filter((c) => c !== null)
+  },
+})
+
 export const createCharacter = mutation({
   args: {
     name: v.string(),

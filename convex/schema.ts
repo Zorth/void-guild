@@ -39,7 +39,19 @@ export default defineSchema({
         name: v.string(),
         owner: v.string(), // Clerk userId of the world owner
         link: v.optional(v.string()),
+        factions: v.optional(v.array(v.string())),
+        factionGroups: v.optional(v.array(v.object({ 
+            name: v.string(), 
+            factions: v.array(v.string()) 
+        }))),
+        reputationVisible: v.optional(v.boolean()),
     }).index('by_owner', ['owner']),
+    reputations: defineTable({
+        worldId: v.id('worlds'),
+        characterId: v.id('characters'),
+        factionName: v.string(),
+        value: v.number(),
+    }).index('by_world_character', ['worldId', 'characterId']).index('by_world_faction', ['worldId', 'factionName']),
     availability: defineTable({
         userId: v.string(),
         date: v.number(), // Start of day timestamp
