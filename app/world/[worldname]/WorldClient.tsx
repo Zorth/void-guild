@@ -199,6 +199,9 @@ function ReputationSystem({ worldId, worldName, userCharacterIds }: { worldId: I
   const [currentSubFactionInput, setCurrentSubFactionInput] = useState('')
   const [selectedFactionsForGroup, setSelectedFactionsForGroup] = useState<string[]>([])
   const [isManageFactionsOpen, setIsManageFactionsOpen] = useState(false)
+  const [editingFaction, setEditingFaction] = useState<string | null>(null)
+  const [editingGroup, setEditingGroup] = useState<string | null>(null)
+  const [editValue, setEditValue] = useState('')
 
   const unlockedSessions = useMemo(() => sessions?.filter(s => !s.locked) ?? [], [sessions])
 
@@ -535,33 +538,54 @@ function ReputationSystem({ worldId, worldName, userCharacterIds }: { worldId: I
                     <th key={g.name} className="p-4 font-bold border-b border-border/50 text-center bg-muted/50 min-w-[120px]">
                       <div className="flex flex-col items-center gap-1">
                         <div className="flex items-center gap-1.5 group/header">
-                          <span className="truncate max-w-[100px]">{g.name}</span>
+                          {editingGroup === g.name ? (
+                            <Input
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              className="h-7 text-xs w-[100px] bg-background"
+                              autoFocus
+                              onBlur={async () => {
+                                if (editValue && editValue !== g.name) {
+                                  await renameFactionGroup({ worldId, oldName: g.name, newName: editValue })
+                                }
+                                setEditingGroup(null)
+                              }}
+                              onKeyDown={async (e) => {
+                                if (e.key === 'Enter') {
+                                  if (editValue && editValue !== g.name) {
+                                    await renameFactionGroup({ worldId, oldName: g.name, newName: editValue })
+                                  }
+                                  setEditingGroup(null)
+                                } else if (e.key === 'Escape') {
+                                  setEditingGroup(null)
+                                }
+                              }}
+                            />
+                          ) : (
+                            <span 
+                              className={cn("truncate max-w-[100px]", isOwner && "cursor-text hover:text-primary transition-colors")}
+                              onClick={() => {
+                                if (isOwner) {
+                                  setEditingGroup(g.name)
+                                  setEditValue(g.name)
+                                }
+                              }}
+                              title={isOwner ? "Click to rename group" : undefined}
+                            >
+                              {g.name}
+                            </span>
+                          )}
                           {isOwner && (
                             <Popover>
                               <PopoverTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-5 w-5 transition-opacity">
-                                  <Pencil className="h-3 w-3" />
+                                  <Settings className="h-3 w-3" />
                                 </Button>
                               </PopoverTrigger>
                               <PopoverContent className="w-64 p-4">
                                 <div className="space-y-4">
                                   <div className="space-y-2">
-                                    <label className="text-[10px] font-bold uppercase text-muted-foreground">Rename Group</label>
-                                    <Input 
-                                      defaultValue={g.name} 
-                                      className="h-8 text-xs" 
-                                      onKeyDown={async (e) => {
-                                        if (e.key === 'Enter') {
-                                          const val = (e.target as HTMLInputElement).value
-                                          if (val && val !== g.name) {
-                                            await renameFactionGroup({ worldId, oldName: g.name, newName: val })
-                                          }
-                                        }
-                                      }}
-                                    />
-                                  </div>
-                                  <div className="space-y-2">
-                                    <label className="text-[10px] font-bold uppercase text-muted-foreground">Edit Members</label>
+                                    <label className="text-[10px] font-bold uppercase text-muted-foreground">Manage Members</label>
                                     <div className="space-y-1.5 max-h-[150px] overflow-auto border rounded-md p-2 bg-background">
                                       {factions.map(f => (
                                         <div key={f} className="flex items-center gap-2">
@@ -596,33 +620,54 @@ function ReputationSystem({ worldId, worldName, userCharacterIds }: { worldId: I
                   {displayedFactions.map(f => (
                     <th key={f} className="p-4 font-bold border-b border-border/50 text-center min-w-[120px]">
                       <div className="flex items-center justify-center gap-1 group/header">
-                        <span className="truncate max-w-[100px]">{f}</span>
+                        {editingFaction === f ? (
+                          <Input
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            className="h-7 text-xs w-[100px] bg-background"
+                            autoFocus
+                            onBlur={async () => {
+                              if (editValue && editValue !== f) {
+                                await renameFaction({ worldId, oldName: f, newName: editValue })
+                              }
+                              setEditingFaction(null)
+                            }}
+                            onKeyDown={async (e) => {
+                              if (e.key === 'Enter') {
+                                if (editValue && editValue !== f) {
+                                  await renameFaction({ worldId, oldName: f, newName: editValue })
+                                }
+                                setEditingFaction(null)
+                              } else if (e.key === 'Escape') {
+                                setEditingFaction(null)
+                              }
+                            }}
+                          />
+                        ) : (
+                          <span 
+                            className={cn("truncate max-w-[100px]", isOwner && "cursor-text hover:text-primary transition-colors")}
+                            onClick={() => {
+                              if (isOwner) {
+                                setEditingFaction(f)
+                                setEditValue(f)
+                              }
+                            }}
+                            title={isOwner ? "Click to rename faction" : undefined}
+                          >
+                            {f}
+                          </span>
+                        )}
                         {isOwner && (
                           <Popover>
                             <PopoverTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-5 w-5 transition-opacity">
-                                <Pencil className="h-3 w-3" />
+                                <Settings className="h-3 w-3" />
                               </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-64 p-4" align="center">
-                              <div className="space-y-3">
-                                <label className="text-[10px] font-bold uppercase text-muted-foreground">Rename Faction</label>
-                                <Input 
-                                  defaultValue={f} 
-                                  className="h-8 text-xs"
-                                  onKeyDown={async (e) => {
-                                    if (e.key === 'Enter') {
-                                      const val = (e.target as HTMLInputElement).value
-                                      if (val && val !== f) {
-                                        await renameFaction({ worldId, oldName: f, newName: val })
-                                      }
-                                    }
-                                  }}
-                                />
-                                <Button variant="destructive" size="sm" className="w-full gap-2 h-8" onClick={() => removeFaction({ worldId, name: f })}>
-                                  <Trash2 className="h-3 w-3" /> Delete Faction
-                                </Button>
-                              </div>
+                            <PopoverContent className="w-48 p-4" align="center">
+                              <Button variant="destructive" size="sm" className="w-full gap-2 h-8" onClick={() => removeFaction({ worldId, name: f })}>
+                                <Trash2 className="h-3 w-3" /> Delete Faction
+                              </Button>
                             </PopoverContent>
                           </Popover>
                         )}
