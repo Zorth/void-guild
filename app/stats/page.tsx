@@ -67,12 +67,12 @@ export default function StatsPage() {
   return (
     <div className="container mx-auto py-8 px-4">
       <div className="flex items-center mb-8">
-        <Link href="/">
-          <Button variant="ghost" size="sm" className="sm:px-3 sm:w-auto w-9 px-0">
+        <Button variant="ghost" size="sm" className="sm:px-3 sm:w-auto w-9 px-0" asChild>
+          <Link href="/">
             <ChevronLeft className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Back to Home</span>
-          </Button>
-        </Link>
+          </Link>
+        </Button>
         <h1 className="text-4xl font-bold flex-grow text-center pr-20">Server Statistics</h1>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">

@@ -24,12 +24,12 @@ export default function WorldsListPage() {
   return (
     <div className="container mx-auto py-8 px-4 max-w-4xl">
       <div className="flex items-center mb-8">
-        <Link href="/">
-          <Button variant="ghost" size="sm" className="sm:px-3 sm:w-auto w-9 px-0">
+        <Button variant="ghost" size="sm" className="sm:px-3 sm:w-auto w-9 px-0" asChild>
+          <Link href="/">
             <ChevronLeft className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Back to Home</span>
-          </Button>
-        </Link>
+          </Link>
+        </Button>
         <h1 className="text-4xl font-bold flex-grow text-center pr-20">All Worlds</h1>
       </div>
 

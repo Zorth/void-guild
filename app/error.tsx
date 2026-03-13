@@ -38,12 +38,12 @@ export default function GlobalError({
             <RefreshCw className="mr-2 h-4 w-4 transition-transform group-hover:rotate-180" />
             Try again
           </Button>
-          <a href="/">
-            <Button variant="outline" className="w-full sm:w-auto">
+          <Button variant="outline" className="w-full sm:w-auto" asChild>
+            <a href="/">
               <Home className="mr-2 h-4 w-4" />
               Go Home
-            </Button>
-          </a>
+            </a>
+          </Button>
         </div>
       </div>
     </div>

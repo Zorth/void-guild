@@ -807,12 +807,12 @@ export default function WorldClient() {
   return (
     <div className="container mx-auto py-8 px-4 max-w-7xl">
       <div className="flex items-center mb-8">
-        <Link href="/">
-          <Button variant="ghost" size="sm" className="sm:px-3 sm:w-auto w-9 px-0">
+        <Button variant="ghost" size="sm" className="sm:px-3 sm:w-auto w-9 px-0" asChild>
+          <Link href="/">
             <ChevronLeft className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Back to Home</span>
-          </Button>
-        </Link>
+          </Link>
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">

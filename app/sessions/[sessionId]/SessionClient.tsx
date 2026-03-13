@@ -329,12 +329,12 @@ export default function SessionClient() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="flex justify-between items-center mb-6">
-        <Link href="/">
-          <Button variant="ghost" size="sm" className="sm:px-3 sm:w-auto w-9 px-0">
+        <Button variant="ghost" size="sm" className="sm:px-3 sm:w-auto w-9 px-0" asChild>
+          <Link href="/">
             <ChevronLeft className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Back to Home</span>
-          </Button>
-        </Link>
+          </Link>
+        </Button>
         <div className="flex gap-2">
             <Button variant="outline" size="sm" asChild className="sm:px-3 sm:w-auto w-9 px-0">
                 <a href={getGoogleCalendarLink()} target="_blank" rel="noopener noreferrer">

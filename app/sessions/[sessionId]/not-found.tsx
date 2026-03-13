@@ -15,12 +15,12 @@ export default function SessionNotFound() {
       <p className="text-muted-foreground mb-8 max-w-md mx-auto">
         This session seems to have slipped into the Void. It either never existed or has been unmade by a Voidmaster.
       </p>
-      <a href="/">
-        <Button variant="outline" className="group">
+      <Button variant="outline" className="group" asChild>
+        <a href="/">
           <ChevronLeft className="mr-2 h-4 w-4 transition-transform group-hover:-translate-x-1" />
           Return to the Guild
-        </Button>
-      </a>
+        </a>
+      </Button>
     </div>
   )
 }
