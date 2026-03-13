@@ -150,7 +150,7 @@ export default function Characters({ filters }: { filters?: { pf: boolean, dnd: 
                                 target="_blank" 
                                 rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()} // Prevent dialog from opening
-                                className="text-muted-foreground hover:text-blue-500" // Added styling for the icon
+                                className="text-muted-foreground hover:text-purple-500" // Added styling for the icon
                             >
                                 <Book size={16} />
                             </a>

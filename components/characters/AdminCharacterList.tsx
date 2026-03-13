@@ -105,7 +105,7 @@ export default function AdminCharacterList() {
                     <div className="flex items-center gap-2">
                         <p className="font-bold">{char.name}</p>
                         {char.rank === 'guildmaster' && <span className="text-xs text-amber-500 font-bold uppercase tracking-wider">GM</span>}
-                        {char.rank === 'journeyman' && <span className="text-xs text-blue-500 font-bold uppercase tracking-wider">JRN</span>}
+                        {char.rank === 'journeyman' && <span className="text-xs text-purple-500 font-bold uppercase tracking-wider">JRN</span>}
                     </div>
                     <p className="text-xs text-muted-foreground">{char.ancestry} {char.class}</p>
                   </div>

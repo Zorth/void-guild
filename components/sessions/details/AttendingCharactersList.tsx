@@ -61,7 +61,7 @@ export default function AttendingCharactersList({
                             href={`https://void.tarragon.be/Player-Characters/${char.name.replace(/\s+/g, '-')}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-muted-foreground hover:text-blue-500"
+                            className="text-muted-foreground hover:text-purple-500"
                         >
                             <Book size={16} />
                         </a>

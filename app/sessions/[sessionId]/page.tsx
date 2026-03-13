@@ -374,7 +374,7 @@ export default function SessionDetails() {
                             href={`https://void.tarragon.be/Session-Reports/${sessionTime.toISOString().slice(0, 10)}-${session.worldName.replace(/\s+/g, '-')}`} 
                             target="_blank" 
                             rel="noopener noreferrer"
-                            className="text-muted-foreground hover:text-blue-500"
+                            className="text-muted-foreground hover:text-purple-500"
                             onClick={() => track('session_report_viewed', { worldName: session.worldName })}
                         >
                             <Book size={20} />
