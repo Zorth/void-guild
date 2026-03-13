@@ -37,25 +37,25 @@ function WorldDescription({ worldId, initialDescription, isOwner }: { worldId: I
   }
 
   return (
-    <Card className="md:col-span-2 flex flex-col bg-card/50 relative group">
-      <CardHeader className="flex flex-row items-center justify-between px-6 py-2 border-b border-border/50">
-        <CardTitle className="text-xl font-bold flex items-center gap-2">
-          <Scroll className="h-5 w-5 text-primary" />
+    <Card className="md:col-span-2 flex flex-col bg-card/50 relative group border-border/40 gap-0 py-0 overflow-hidden">
+      <CardHeader className="flex flex-row items-center justify-between px-6 py-2 border-b border-border/50 pb-2">
+        <CardTitle className="text-lg font-bold flex items-center gap-2">
+          <Scroll className="h-4 w-4 text-primary" />
           World Overview
         </CardTitle>
         {isOwner && (
           <Button 
             variant="ghost" 
             size="sm" 
-            className="gap-2 opacity-0 group-hover:opacity-100 transition-opacity h-8"
+            className="gap-2 opacity-0 group-hover:opacity-100 transition-opacity h-7 px-2"
             onClick={() => setIsEditing(!isEditing)}
           >
-            <Settings className="h-4 w-4" />
-            {isEditing ? "Cancel" : "Edit Description"}
+            <Settings className="h-3.5 w-3.5" />
+            {isEditing ? "Cancel" : "Edit"}
           </Button>
         )}
       </CardHeader>
-      <CardContent className="px-6 pt-2 pb-6 max-w-none flex-grow">
+      <CardContent className="px-6 pt-3 pb-6 max-w-none">
         {isEditing ? (
           <div className="space-y-3 h-full flex flex-col">
             <div className="flex items-center justify-between">
@@ -72,7 +72,7 @@ function WorldDescription({ worldId, initialDescription, isOwner }: { worldId: I
             </div>
           </div>
         ) : (
-          <div className="text-sm leading-relaxed [&>*:first-child]:mt-0 [&>h1]:text-2xl [&>h1]:font-bold [&>h1]:mt-6 [&>h2]:text-xl [&>h2]:font-bold [&>h2]:mt-5 [&>h3]:text-lg [&>h3]:font-bold [&>h3]:mt-4 [&>p]:mt-3 [&>ul]:list-disc [&>ul]:pl-6 [&>ul]:mt-3 [&>ol]:list-decimal [&>ol]:pl-6 [&>ol]:mt-3 [&>blockquote]:border-l-4 [&>blockquote]:pl-4 [&>blockquote]:italic [&>blockquote]:mt-3">
+          <div className="text-sm leading-relaxed [&_>_*:first-child]:mt-0 [&>h1]:text-2xl [&>h1]:font-bold [&>h1]:mt-6 [&>h2]:text-xl [&>h2]:font-bold [&>h2]:mt-5 [&>h3]:text-lg [&>h3]:font-bold [&>h3]:mt-4 [&>p]:mt-3 [&>ul]:list-disc [&>ul]:pl-6 [&>ul]:mt-3 [&>ol]:list-decimal [&>ol]:pl-6 [&>ol]:mt-3 [&>blockquote]:border-l-4 [&>blockquote]:pl-4 [&>blockquote]:italic [&>blockquote]:mt-3">
             {description ? (
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {description}
@@ -216,6 +216,8 @@ function ReputationSystem({ worldId, worldName, userCharacterIds }: { worldId: I
   const charactersRaw = useQuery(api.characters.getCharactersByIds, characterIds.length > 0 ? { ids: characterIds } : 'skip')
 
   const { factions, factionGroups, reputations, isOwner, isVisible } = data || { factions: [], factionGroups: [], reputations: [], isOwner: false, isVisible: false }
+
+  if (!isOwner && !isVisible) return null
 
   const getRepValue = (charId: Id<'characters'>, faction: string) => {
     return reputations.find(r => r.characterId === charId && r.factionName === faction)?.value ?? 0
@@ -514,24 +516,7 @@ function ReputationSystem({ worldId, worldName, userCharacterIds }: { worldId: I
       </CardHeader>
       
       <CardContent className="p-0 overflow-auto">
-        {!isOwner && !isVisible ? (
-          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground opacity-50 space-y-4">
-            <Lock className="h-12 w-12" />
-            <div className="text-center">
-              <h3 className="font-bold text-lg">Reputation is Private</h3>
-              <p className="text-sm">Only the world director can see reputation scores.</p>
-            </div>
-          </div>
-        ) : factions.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground space-y-4">
-            <Info className="h-12 w-12 opacity-20" />
-            <div className="text-center">
-              <h3 className="font-bold">No Factions Defined</h3>
-              <p className="text-sm">Click "Add Faction" above to get started.</p>
-            </div>
-          </div>
-        ) : (
-          <div className="min-w-full">
+        <div className="min-w-full">
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-muted/30">
@@ -753,7 +738,6 @@ function ReputationSystem({ worldId, worldName, userCharacterIds }: { worldId: I
               </tbody>
             </table>
           </div>
-        )}
       </CardContent>
     </Card>
   )
