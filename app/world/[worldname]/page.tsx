@@ -217,8 +217,6 @@ function ReputationSystem({ worldId, worldName, userCharacterIds }: { worldId: I
 
   const { factions, factionGroups, reputations, isOwner, isVisible } = data || { factions: [], factionGroups: [], reputations: [], isOwner: false, isVisible: false }
 
-  if (!isOwner && !isVisible) return null
-
   const getRepValue = (charId: Id<'characters'>, faction: string) => {
     return reputations.find(r => r.characterId === charId && r.factionName === faction)?.value ?? 0
   }
@@ -228,6 +226,9 @@ function ReputationSystem({ worldId, worldName, userCharacterIds }: { worldId: I
     
     return [...charactersRaw].sort((a, b) => a.name.localeCompare(b.name))
   }, [charactersRaw])
+
+  // Move the early return here, after all hooks (useQuery, useMemo, etc.) have been called.
+  if (data !== undefined && !isOwner && !isVisible) return null
 
   const handleAddFaction = async () => {
     if (!newFactionName.trim()) return
