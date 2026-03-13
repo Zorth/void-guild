@@ -808,8 +808,8 @@ export default function WorldClient() {
   const ownerName = ownerMetadata?.name || `User ${world.owner.slice(-4)}`
 
   const allFilteredSessions = sessions?.filter(s => activeTab === 'past' ? s.locked : !s.locked) || []
-  const filteredSessions = allFilteredSessions.slice(0, sessionsLimit)
-  const hasMoreSessions = allFilteredSessions.length > sessionsLimit
+  const filteredSessions = activeTab === 'past' ? allFilteredSessions.slice(0, sessionsLimit) : allFilteredSessions
+  const hasMoreSessions = activeTab === 'past' && allFilteredSessions.length > sessionsLimit
 
   return (
     <div className="container mx-auto py-8 px-4 max-w-7xl">
@@ -982,7 +982,7 @@ export default function WorldClient() {
                   className="w-full mt-4 text-muted-foreground hover:text-primary border-dashed border-2 hover:bg-primary/5"
                   onClick={() => setSessionsLimit(prev => prev + 5)}
                 >
-                  Load More {activeTab} Sessions ({allFilteredSessions.length - sessionsLimit} remaining)
+                  Load More Past Sessions ({allFilteredSessions.length - sessionsLimit} remaining)
                 </Button>
               )}
             </CardContent>
