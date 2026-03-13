@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { Pencil, CheckCircle2, Shield, Send } from 'lucide-react'
+import { Pencil, CheckCircle2, Shield, Send, Bell, XCircle } from 'lucide-react'
 import SessionDialog from '@/components/sessions/SessionDialog'
 import {
     AlertDialog,
@@ -63,16 +63,47 @@ export default function SessionManagement({
                         Choose the type of notification you want to send to the community.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="grid grid-cols-1 gap-3 py-4">
-                    <Button onClick={() => onSendToDiscord('new')} className="w-full justify-start gap-2 bg-blue-600 hover:bg-blue-700">
-                        <span className="font-bold">New Session</span> - Announce this session for the first time.
-                    </Button>
-                    <Button onClick={() => onSendToDiscord('remind')} className="w-full justify-start gap-2 bg-amber-600 hover:bg-amber-700">
-                        <span className="font-bold">Reminder</span> - Remind players of available spots and time left.
-                    </Button>
-                    <Button variant="destructive" onClick={() => onSendToDiscord('cancel')} className="w-full justify-start gap-2">
-                        <span className="font-bold">Cancellation</span> - Notify everyone that the session is cancelled.
-                    </Button>
+                <div className="grid grid-cols-1 gap-6 py-4">
+                    <div className="space-y-2">
+                        <Button 
+                            onClick={() => onSendToDiscord('new')} 
+                            className="w-full justify-start gap-2 bg-[#5865F2] hover:bg-[#4752C4] text-white border-none"
+                        >
+                            <Send className="h-4 w-4" />
+                            <span className="font-bold">New Session Alert</span>
+                        </Button>
+                        <p className="text-[11px] text-muted-foreground px-1">
+                            Announce this session for the first time to the community.
+                        </p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Button 
+                            onClick={() => onSendToDiscord('remind')} 
+                            variant="outline"
+                            className="w-full justify-start gap-2 border-amber-500/50 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+                        >
+                            <Bell className="h-4 w-4" />
+                            <span className="font-bold">Send Reminder</span>
+                        </Button>
+                        <p className="text-[11px] text-muted-foreground px-1">
+                            Remind players of available spots and time left before start.
+                        </p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Button 
+                            variant="destructive" 
+                            onClick={() => onSendToDiscord('cancel')} 
+                            className="w-full justify-start gap-2"
+                        >
+                            <XCircle className="h-4 w-4" />
+                            <span className="font-bold">Cancel Session</span>
+                        </Button>
+                        <p className="text-[11px] text-muted-foreground px-1">
+                            Notify everyone that the session is cancelled and will no longer happen.
+                        </p>
+                    </div>
                 </div>
             </DialogContent>
         </Dialog>

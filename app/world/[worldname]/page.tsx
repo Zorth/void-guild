@@ -119,11 +119,11 @@ function ReputationCell({
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      (e.target as HTMLInputElement).blur()
+      (e.target as HTMLInputElement).blur();
     }
     if (e.key === 'Escape') {
-      setLocalValue(value.toString())
-      (e.target as HTMLInputElement).blur()
+      setLocalValue(value.toString());
+      (e.target as HTMLInputElement).blur();
     }
   }
 
