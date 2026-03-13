@@ -70,10 +70,19 @@ export const toggleAvailability = mutation({
       await ctx.db.delete(existing._id)
     } else {
       const isGM = await isGameMaster(ctx)
+      
+      let displayName = identity.givenName;
+      if (displayName && identity.familyName) {
+        displayName += ` ${identity.familyName.charAt(0).toUpperCase()}.`;
+      }
+      if (!displayName) {
+        displayName = (identity.username || identity.nickname || identity.name || 'Anonymous') as string;
+      }
+
       await ctx.db.insert('availability', {
         userId: identity.subject,
         date: args.date,
-        username: (identity.username || identity.nickname || identity.name || 'Anonymous') as string,
+        username: displayName,
         isGM,
       })
     }

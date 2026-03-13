@@ -32,14 +32,16 @@ export async function getUsernames(userIds: string[]): Promise<Record<string, Us
     const usernameMap: Record<string, UserMetadata> = {};
     users.data.forEach(user => {
 
-      let displayName = user.username;
-      if (!displayName && user.firstName) {
+      let displayName = "";
+      
+      if (user.firstName) {
         displayName = user.firstName;
         if (user.lastName) {
-          displayName += ` ${user.lastName}`;
+          displayName += ` ${user.lastName.charAt(0).toUpperCase()}.`;
         }
-      }
-      if (!displayName && user.emailAddresses.length > 0) {
+      } else if (user.username) {
+        displayName = user.username;
+      } else if (user.emailAddresses.length > 0) {
         displayName = user.emailAddresses[0].emailAddress.split('@')[0];
       }
       

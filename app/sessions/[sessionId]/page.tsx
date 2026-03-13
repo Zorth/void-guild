@@ -77,11 +77,19 @@ export default function SessionDetails() {
   const [userMetadata, setUserMetadata] = useState<Record<string, UserMetadata>>({})
 
   useEffect(() => {
-    if (session?.attendingCharacters) {
-        const userIds = Array.from(new Set(session.attendingCharacters.map(c => c.userId)))
-        getUsernames(userIds).then(setUserMetadata)
+    if (session) {
+        const userIds = new Set<string>();
+        if (session.attendingCharacters) {
+            session.attendingCharacters.forEach(c => userIds.add(c.userId));
+        }
+        if (session.interestedPlayers) {
+            session.interestedPlayers.forEach(p => userIds.add(p.userId));
+        }
+        if (userIds.size > 0) {
+            getUsernames(Array.from(userIds)).then(setUserMetadata);
+        }
     }
-  }, [session?.attendingCharacters])
+  }, [session?.attendingCharacters, session?.interestedPlayers])
 
   if (session === undefined || userCharacters === undefined || userCharacters === null || isAdmin === undefined || (isAdmin && allCharacters === undefined)) {
     return (
@@ -507,7 +515,10 @@ export default function SessionDetails() {
               <CardTitle className="text-xl font-semibold mb-4">Interested Players</CardTitle>
             </CardHeader>
             <CardContent>
-              <InterestedPlayersList interestedPlayers={session.interestedPlayers || []} />
+              <InterestedPlayersList 
+                interestedPlayers={session.interestedPlayers || []} 
+                userMetadata={userMetadata}
+              />
             </CardContent>
           </Card>
         </div>

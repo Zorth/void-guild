@@ -476,8 +476,15 @@ export const expressInterest = mutation({
         return // Already in session
     }
 
-    const username = (user.username || user.nickname || user.name || 'Anonymous') as string
-    const newInterestedPlayers = [...interestedPlayers, { userId: user.subject, username }]
+    let displayName = user.givenName;
+    if (displayName && user.familyName) {
+      displayName += ` ${user.familyName.charAt(0).toUpperCase()}.`;
+    }
+    if (!displayName) {
+      displayName = (user.username || user.nickname || user.name || 'Anonymous') as string;
+    }
+
+    const newInterestedPlayers = [...interestedPlayers, { userId: user.subject, username: displayName }]
 
     await ctx.db.patch(args.sessionId, { interestedPlayers: newInterestedPlayers })
   },
