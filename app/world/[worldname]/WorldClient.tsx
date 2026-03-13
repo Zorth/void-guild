@@ -47,7 +47,7 @@ function WorldDescription({ worldId, initialDescription, isOwner }: { worldId: I
           <Button 
             variant="ghost" 
             size="sm" 
-            className="gap-2 opacity-0 group-hover:opacity-100 transition-opacity h-7 px-2"
+            className="gap-2 transition-opacity h-7 px-2"
             onClick={() => setIsEditing(!isEditing)}
           >
             <Settings className="h-3.5 w-3.5" />
@@ -539,7 +539,7 @@ function ReputationSystem({ worldId, worldName, userCharacterIds }: { worldId: I
                           {isOwner && (
                             <Popover>
                               <PopoverTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-5 w-5 opacity-0 group-hover/header:opacity-100 transition-opacity">
+                                <Button variant="ghost" size="icon" className="h-5 w-5 transition-opacity">
                                   <Pencil className="h-3 w-3" />
                                 </Button>
                               </PopoverTrigger>
@@ -600,7 +600,7 @@ function ReputationSystem({ worldId, worldName, userCharacterIds }: { worldId: I
                         {isOwner && (
                           <Popover>
                             <PopoverTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-5 w-5 opacity-0 group-hover/header:opacity-100 transition-opacity">
+                              <Button variant="ghost" size="icon" className="h-5 w-5 transition-opacity">
                                 <Pencil className="h-3 w-3" />
                               </Button>
                             </PopoverTrigger>
