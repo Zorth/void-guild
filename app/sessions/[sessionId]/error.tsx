@@ -35,12 +35,12 @@ export default function SessionError({
         <p className="text-muted-foreground mb-8 max-w-md mx-auto">
           The session ID provided is malformed. Please check the URL and try again.
         </p>
-        <Link href="/">
+        <a href="/">
           <Button variant="outline" className="group">
             <ChevronLeft className="mr-2 h-4 w-4 transition-transform group-hover:-translate-x-1" />
             Return to the Guild
           </Button>
-        </Link>
+        </a>
       </div>
     )
   }
@@ -59,12 +59,12 @@ export default function SessionError({
       </p>
       <div className="flex gap-4 justify-center">
         <Button onClick={() => reset()}>Try again</Button>
-        <Link href="/">
+        <a href="/">
           <Button variant="outline">
             <ChevronLeft className="mr-2 h-4 w-4" />
             Back to Home
           </Button>
-        </Link>
+        </a>
       </div>
     </div>
   )

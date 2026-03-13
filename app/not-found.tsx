@@ -15,12 +15,12 @@ export default function NotFound() {
       <p className="text-muted-foreground mb-8 max-w-md mx-auto">
         The page you are looking for has vanished into the aether.
       </p>
-      <Link href="/">
+      <a href="/">
         <Button variant="outline" className="group">
           <ChevronLeft className="mr-2 h-4 w-4 transition-transform group-hover:-translate-x-1" />
           Back to Safety
         </Button>
-      </Link>
+      </a>
     </div>
   )
 }
