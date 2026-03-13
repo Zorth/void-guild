@@ -9,7 +9,7 @@ import Link from 'next/link'
 import { 
   ChevronLeft, Globe, Calendar, Book, Lock, Shield, User, MapPin, Users, 
   Plus, Minus, Eye, EyeOff, Settings, Trash2, ChevronDown, Check, Info, 
-  Layers, ChevronRight, LayoutGrid, Handshake
+  Layers, ChevronRight, LayoutGrid, Handshake, Scroll
 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn, formatDate, formatTime, getLevelBadgeStyle } from '@/lib/utils'
@@ -20,8 +20,69 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Textarea } from '@/components/ui/textarea'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import '@/components/sessions/sessions.css'
 import { Id } from '@/convex/_generated/dataModel'
+
+function WorldDescription({ worldId, initialDescription, isOwner }: { worldId: Id<'worlds'>, initialDescription: string, isOwner: boolean }) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [description, setDescription] = useState(initialDescription)
+  const updateDescription = useMutation(api.worlds.updateWorldDescription)
+
+  const handleSave = async () => {
+    await updateDescription({ worldId, description })
+    setIsEditing(false)
+  }
+
+  return (
+    <Card className="md:col-span-2 min-h-[300px] flex flex-col bg-card/50 relative group">
+      <CardHeader className="flex flex-row items-center justify-between pb-4 border-b border-border/50">
+        <CardTitle className="text-xl font-bold flex items-center gap-2">
+          <Scroll className="h-5 w-5 text-primary" />
+          World Overview
+        </CardTitle>
+        {isOwner && (
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="gap-2 opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={() => setIsEditing(!isEditing)}
+          >
+            <Settings className="h-4 w-4" />
+            {isEditing ? "Cancel" : "Edit Description"}
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent className="pt-6 max-w-none flex-grow">
+        {isEditing ? (
+          <div className="space-y-4 h-full flex flex-col">
+            <Textarea 
+              className="min-h-[250px] font-mono text-xs flex-grow bg-muted/30"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Enter world description in Markdown..."
+            />
+            <div className="flex justify-end gap-2">
+              <Button size="sm" onClick={handleSave}>Save Changes</Button>
+            </div>
+          </div>
+        ) : (
+          <div className="min-h-[200px] text-sm leading-relaxed space-y-4 [&>h1]:text-2xl [&>h1]:font-bold [&>h2]:text-xl [&>h2]:font-bold [&>h3]:text-lg [&>h3]:font-bold [&>p]:mb-4 [&>ul]:list-disc [&>ul]:pl-6 [&>ol]:list-decimal [&>ol]:pl-6 [&>blockquote]:border-l-4 [&>blockquote]:pl-4 [&>blockquote]:italic">
+            {description ? (
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {description}
+              </ReactMarkdown>
+            ) : (
+              <p className="text-muted-foreground italic">No description has been provided for this world yet.</p>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
 
 function ReputationSystem({ worldId, worldName, userCharacterIds }: { worldId: Id<'worlds'>, worldName: string, userCharacterIds: Set<Id<'characters'>> }) {
   const data = useQuery(api.worlds.getReputationData, { worldName })
@@ -626,32 +687,17 @@ export default function WorldPage() {
         </div>
 
         {/* Right Column: Bento Grid */}
-        <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-          <ReputationSystem worldId={world._id} worldName={world.name} userCharacterIds={userCharacterIds} />
-          
-          <Card className="min-h-[200px] flex flex-col items-center justify-center bg-muted/5 border-dashed relative group">
-            <div className="text-muted-foreground text-center z-10 p-6">
-              <MapPin className="h-10 w-10 mx-auto mb-4 opacity-20 group-hover:opacity-40 transition-opacity" />
-              <h3 className="text-lg font-bold text-foreground mb-1">Key Locations</h3>
-              <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold">Placeholder</p>
-            </div>
-          </Card>
-          
-          <Card className="min-h-[200px] flex flex-col items-center justify-center bg-muted/5 border-dashed relative group">
-            <div className="text-muted-foreground text-center z-10 p-6">
-              <Shield className="h-10 w-10 mx-auto mb-4 opacity-20 group-hover:opacity-40 transition-opacity" />
-              <h3 className="text-lg font-bold text-foreground mb-1">Notable NPCs</h3>
-              <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold">Placeholder</p>
-            </div>
-          </Card>
-
-          <Card className="md:col-span-2 min-h-[150px] flex flex-col items-center justify-center bg-muted/5 border-dashed relative group">
-            <div className="text-muted-foreground text-center z-10 p-4">
-              <User className="h-8 w-8 mx-auto mb-3 opacity-20 group-hover:opacity-40 transition-opacity" />
-              <h3 className="text-md font-bold text-foreground mb-1">Lore & Mythology</h3>
-              <p className="text-xs text-muted-foreground">Deep dive into the myths and legends of {world.name}.</p>
-            </div>
-          </Card>
+        <div className="lg:col-span-8 flex flex-col gap-8">
+          <WorldDescription 
+            worldId={world._id} 
+            initialDescription={world.description || ''} 
+            isOwner={userId === world.owner} 
+          />
+          <ReputationSystem 
+            worldId={world._id} 
+            worldName={world.name} 
+            userCharacterIds={userCharacterIds} 
+          />
         </div>
       </div>
     </div>

@@ -265,3 +265,18 @@ export const toggleReputationVisibility = mutation({
     })
   },
 })
+
+export const updateWorldDescription = mutation({
+  args: { worldId: v.id('worlds'), description: v.string() },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    const world = await ctx.db.get(args.worldId)
+    if (!world || world.owner !== user?.subject) {
+      throw new Error('Unauthorized')
+    }
+
+    await ctx.db.patch(args.worldId, {
+      description: args.description,
+    })
+  },
+})
