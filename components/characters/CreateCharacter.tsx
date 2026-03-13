@@ -26,21 +26,27 @@ export default function CreateCharacter() {
     system: 'PF' as 'PF' | 'DnD'
   })
   const [isOpen, setIsOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   async function handleCreateCharacter(event: FormEvent) {
     event.preventDefault()
     if (!newCharacterData.name) return
 
-    // Trigger particle effect at the mouse position
-    if ('clientX' in event.nativeEvent) {
-        const e = event.nativeEvent as MouseEvent;
-        fireVoidParticles(e.clientX, e.clientY);
-    }
+    setIsSubmitting(true)
+    try {
+      // Trigger particle effect at the mouse position
+      if ('clientX' in event.nativeEvent) {
+          const e = event.nativeEvent as MouseEvent;
+          fireVoidParticles(e.clientX, e.clientY);
+      }
 
-    await createCharacter(newCharacterData)
-    track('character_created', { name: newCharacterData.name, system: newCharacterData.system })
-    setNewCharacterData({ name: '', ancestry: '', class: '', websiteLink: '', system: 'PF' })
-    setIsOpen(false)
+      await createCharacter(newCharacterData)
+      track('character_created', { name: newCharacterData.name, system: newCharacterData.system })
+      setNewCharacterData({ name: '', ancestry: '', class: '', websiteLink: '', system: 'PF' })
+      setIsOpen(false)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -85,8 +91,8 @@ export default function CreateCharacter() {
             placeholder="Website Link (Optional)"
           />
           <DialogFooter>
-            <Button type="submit" disabled={!newCharacterData.name}>
-              Create Character
+            <Button type="submit" disabled={!newCharacterData.name || isSubmitting}>
+              {isSubmitting ? 'Creating...' : 'Create Character'}
             </Button>
           </DialogFooter>
         </form>

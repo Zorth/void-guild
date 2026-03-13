@@ -1,6 +1,6 @@
 'use client'
 
-import { Book, Trash2 } from 'lucide-react'
+import { Book, Trash2, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Doc, Id } from '@/convex/_generated/dataModel'
 import { cn, getLevelBadgeStyle, CharacterRankIcon } from '@/lib/utils'
@@ -13,6 +13,7 @@ interface AttendingCharactersListProps {
   isSessionOwner: boolean
   onLeave: (characterId: Id<'characters'>) => void
   userMetadata?: Record<string, UserMetadata>
+  leavingCharacterId?: string | null
 }
 
 export default function AttendingCharactersList({ 
@@ -21,7 +22,8 @@ export default function AttendingCharactersList({
   sessionLocked, 
   isSessionOwner, 
   onLeave,
-  userMetadata
+  userMetadata,
+  leavingCharacterId
 }: AttendingCharactersListProps) {
   if (characters.length === 0) {
     return <p className="text-muted-foreground italic">No characters have joined this session yet.</p>
@@ -106,8 +108,13 @@ export default function AttendingCharactersList({
                         size="icon" 
                         className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8"
                         onClick={() => onLeave(char._id)}
+                        disabled={leavingCharacterId === char._id}
                     >
-                        <Trash2 className="h-4 w-4" />
+                        {leavingCharacterId === char._id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                            <Trash2 className="h-4 w-4" />
+                        )}
                     </Button>
                 )}
               </div>

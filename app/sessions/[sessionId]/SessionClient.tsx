@@ -75,6 +75,9 @@ export default function SessionClient() {
   const [selectedCharacterId, setSelectedCharacterId] = useState<Id<'characters'> | ''>('')
   const [selectedAdminCharacterId, setSelectedAdminCharacterId] = useState<Id<'characters'> | ''>('')
   const [userMetadata, setUserMetadata] = useState<Record<string, UserMetadata>>({})
+  const [isJoining, setIsJoining] = useState(false)
+  const [isExpressingInterest, setIsExpressingInterest] = useState(false)
+  const [leavingCharacterId, setLeavingCharacterId] = useState<string | null>(null)
 
   useEffect(() => {
     if (session) {
@@ -160,6 +163,7 @@ export default function SessionClient() {
 
   const handleJoin = async (event: React.MouseEvent) => {
     if (!selectedCharacterId) return
+    setIsJoining(true)
     fireJoinParticles(event.clientX, event.clientY);
     try {
         await joinSession({
@@ -170,14 +174,19 @@ export default function SessionClient() {
         setSelectedCharacterId('')
     } catch (e) {
         alert(e instanceof Error ? e.message : 'Failed to join session')
+    } finally {
+        setIsJoining(false)
     }
   }
 
   const handleLeave = async (characterId: Id<'characters'>) => {
+    setLeavingCharacterId(characterId)
     try {
         await leaveSession({ sessionId: session._id, characterId })
     } catch (e) {
         alert(e instanceof Error ? e.message : 'Failed to leave session')
+    } finally {
+        setLeavingCharacterId(null)
     }
   }
 
@@ -231,16 +240,20 @@ export default function SessionClient() {
   }
 
   const handleExpressInterest = async () => {
+    setIsExpressingInterest(true)
     try { 
         await expressInterest({ sessionId: session._id }) 
         track('session_interest_expressed', { worldName: session.worldName })
     }
     catch (e) { alert(e instanceof Error ? e.message : 'Failed to express interest') }
+    finally { setIsExpressingInterest(false) }
   }
 
   const handleWithdrawInterest = async () => {
+    setIsExpressingInterest(true)
     try { await withdrawInterest({ sessionId: session._id }) }
     catch (e) { alert(e instanceof Error ? e.message : 'Failed to withdraw interest') }
+    finally { setIsExpressingInterest(false) }
   }
 
   const handleSendToDiscord = async (type: 'new' | 'remind' | 'cancel') => {
@@ -510,6 +523,7 @@ export default function SessionClient() {
                 isSessionOwner={session.isOwner}
                 onLeave={handleLeave}
                 userMetadata={userMetadata}
+                leavingCharacterId={leavingCharacterId}
               />
             </CardContent>
           </Card>
@@ -560,31 +574,31 @@ export default function SessionClient() {
                             </div>
                             )}
                             {session.interestedPlayers?.some(p => p.userId === userId) ? (
-                            <Button className="w-full" variant="outline" onClick={handleWithdrawInterest}>
-                                Not anymore :(
+                            <Button className="w-full" variant="outline" onClick={handleWithdrawInterest} disabled={isExpressingInterest}>
+                                {isExpressingInterest ? 'Updating...' : 'Not anymore :('}
                             </Button>
                             ) : (
-                            <Button className="w-full" onClick={handleExpressInterest}>
-                                Yes! :)
+                            <Button className="w-full" onClick={handleExpressInterest} disabled={isExpressingInterest}>
+                                {isExpressingInterest ? 'Updating...' : 'Yes! :)'}
                             </Button>
                             )}
-                        </div>
-                        )}
-                    </CardContent>
-                    </Card>
-                )}
+                            </div>
+                            )}
+                            </CardContent>
+                            </Card>
+                            )}
 
-                <SessionJoinForm 
-                    sessionLocked={session.locked}
-                    isFull={isFull}
-                    availableCharacters={availableCharacters}
-                    userCharactersCount={userCharacters?.length ?? 0}
-                    selectedCharacterId={selectedCharacterId}
-                    hasUserCharacterInSession={hasUserCharacterInSession}
-                    onCharacterSelect={(id) => setSelectedCharacterId(id)}
-                    onJoin={handleJoin}
-                />
-              </Authenticated>
+                            <SessionJoinForm 
+                            sessionLocked={session.locked}
+                            isFull={isFull}
+                            availableCharacters={availableCharacters}
+                            userCharactersCount={userCharacters?.length ?? 0}
+                            selectedCharacterId={selectedCharacterId}
+                            hasUserCharacterInSession={hasUserCharacterInSession}
+                            onCharacterSelect={(id) => setSelectedCharacterId(id)}
+                            onJoin={handleJoin}
+                            isJoining={isJoining}
+                            />              </Authenticated>
 
               <Unauthenticated>
                 <Card>

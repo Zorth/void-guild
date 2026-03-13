@@ -39,6 +39,7 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
   const [location, setLocation] = useState(session?.location || '')
   const [system, setSystem] = useState<'PF' | 'DnD'>(session?.system || 'PF')
   const [isOpen, setIsOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open)
@@ -93,39 +94,44 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
     const gmCharId = gmCharacter === '' ? undefined : gmCharacter as Id<'characters'>
     const locationVal = location === '' ? undefined : location
 
-    if (session) {
-      await updateSession({
-        sessionId: session._id,
-        date: sessionDateTime,
-        world: session.world, // Use existing session world
-        level: levelValue,
-        maxPlayers: maxPlayersNum,
-        characters: session.characters,
-        gmCharacter: gmCharId,
-        location: locationVal,
-        system: system,
-      })
-      track('session_updated', { worldName: worldName?.name, system });
-    } else {
-      // Trigger particle effect at the mouse position for new sessions
-      if ('clientX' in event.nativeEvent) {
-          const e = event.nativeEvent as MouseEvent;
-          fireVoidParticles(e.clientX, e.clientY);
-      }
+    setIsSubmitting(true)
+    try {
+      if (session) {
+        await updateSession({
+          sessionId: session._id,
+          date: sessionDateTime,
+          world: session.world, // Use existing session world
+          level: levelValue,
+          maxPlayers: maxPlayersNum,
+          characters: session.characters,
+          gmCharacter: gmCharId,
+          location: locationVal,
+          system: system,
+        })
+        track('session_updated', { worldName: worldName?.name, system });
+      } else {
+        // Trigger particle effect at the mouse position for new sessions
+        if ('clientX' in event.nativeEvent) {
+            const e = event.nativeEvent as MouseEvent;
+            fireVoidParticles(e.clientX, e.clientY);
+        }
 
-      await createSession({
-        date: sessionDateTime,
-        // world, // Removed: world is now derived
-        level: levelValue,
-        maxPlayers: maxPlayersNum,
-        characters: [],
-        gmCharacter: gmCharId,
-        location: locationVal,
-        system: system,
-      })
-      track('session_created', { worldName: worldName?.name, system });
+        await createSession({
+          date: sessionDateTime,
+          // world, // Removed: world is now derived
+          level: levelValue,
+          maxPlayers: maxPlayersNum,
+          characters: [],
+          gmCharacter: gmCharId,
+          location: locationVal,
+          system: system,
+        })
+        track('session_created', { worldName: worldName?.name, system });
+      }
+      setIsOpen(false)
+    } finally {
+      setIsSubmitting(false)
     }
-    setIsOpen(false)
   }
 
   async function handleDelete() {
@@ -238,11 +244,11 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
               </Button>
             )}
             <div className="flex gap-2 w-full sm:w-auto">
-              <Button type="button" variant="ghost" onClick={() => setIsOpen(false)} className="flex-1">
+              <Button type="button" variant="ghost" onClick={() => setIsOpen(false)} className="flex-1" disabled={isSubmitting}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={!date || !time || !maxPlayers}>
-                {session ? 'Update' : 'Create'}
+              <Button type="submit" disabled={!date || !time || !maxPlayers || isSubmitting}>
+                {isSubmitting ? (session ? 'Updating...' : 'Creating...') : (session ? 'Update' : 'Create')}
               </Button>
             </div>
           </DialogFooter>

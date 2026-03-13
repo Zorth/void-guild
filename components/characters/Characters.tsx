@@ -59,6 +59,7 @@ export default function Characters({ filters }: { filters?: { pf: boolean, dnd: 
   const [newWorldName, setNewWorldName] = useState('')
   const [showRenameWorldDialog, setShowRenameWorldDialog] = useState(false)
   const [renameWorldName, setRenameWorldName] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const world = useQuery(api.worlds.getWorldByOwner)
   const createWorld = useMutation(api.worlds.createWorld)
@@ -68,30 +69,45 @@ export default function Characters({ filters }: { filters?: { pf: boolean, dnd: 
 
   async function handleCreateWorld(event: FormEvent) {
     event.preventDefault()
-    await createWorld({ name: newWorldName })
-    track('world_created', { name: newWorldName })
-    setNewWorldName('')
-    setShowCreateWorldDialog(false)
+    setIsSubmitting(true)
+    try {
+      await createWorld({ name: newWorldName })
+      track('world_created', { name: newWorldName })
+      setNewWorldName('')
+      setShowCreateWorldDialog(false)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   async function handleRenameWorld(event: FormEvent) {
     event.preventDefault()
     if (!world) return
-    await renameWorld({ worldId: world._id, newName: renameWorldName })
-    track('world_renamed', { oldName: world.name, newName: renameWorldName })
-    setRenameWorldName('')
-    setShowRenameWorldDialog(false)
+    setIsSubmitting(true)
+    try {
+      await renameWorld({ worldId: world._id, newName: renameWorldName })
+      track('world_renamed', { oldName: world.name, newName: renameWorldName })
+      setRenameWorldName('')
+      setShowRenameWorldDialog(false)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   async function handleUpdateCharacter(event: FormEvent) {
     event.preventDefault()
     if (!selectedCharacter) return
-    await updateCharacter({
-      characterId: selectedCharacter._id,
-      ...editedCharacterData,
-    })
-    track('character_updated', { name: selectedCharacter.name })
-    setIsDetailsDialogOpen(false)
+    setIsSubmitting(true)
+    try {
+      await updateCharacter({
+        characterId: selectedCharacter._id,
+        ...editedCharacterData,
+      })
+      track('character_updated', { name: selectedCharacter.name })
+      setIsDetailsDialogOpen(false)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   async function handleDeleteCharacter() {
@@ -130,7 +146,11 @@ export default function Characters({ filters }: { filters?: { pf: boolean, dnd: 
                 <Skeleton className="h-14 w-full" />
               </div>
             ) : !characters || characters.length === 0 ? (
-              <p>You have no characters yet.</p>
+              <div className="flex flex-col items-center justify-center py-8 text-center bg-muted/20 rounded-lg border border-dashed border-border/50">
+                <Shield className="h-12 w-12 text-muted-foreground/30 mb-3" />
+                <p className="text-muted-foreground font-medium">No heroes yet.</p>
+                <p className="text-xs text-muted-foreground/80 mt-1">Create your first character to begin your journey.</p>
+              </div>
             ) : (
               <ul className="space-y-2">
                 {characters.map((character) => (
@@ -331,7 +351,9 @@ export default function Characters({ filters }: { filters?: { pf: boolean, dnd: 
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
-                <Button type="submit">Update</Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? 'Updating...' : 'Update'}
+                </Button>
               </DialogFooter>
             </form>
           </DialogContent>
@@ -353,7 +375,9 @@ export default function Characters({ filters }: { filters?: { pf: boolean, dnd: 
                 required
               />
               <DialogFooter>
-                <Button type="submit">Create</Button>
+                <Button type="submit" disabled={isSubmitting || !newWorldName}>
+                  {isSubmitting ? 'Creating...' : 'Create'}
+                </Button>
               </DialogFooter>
             </form>
           </DialogContent>

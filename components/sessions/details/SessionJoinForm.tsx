@@ -13,6 +13,7 @@ interface SessionJoinFormProps {
   hasUserCharacterInSession: boolean
   onCharacterSelect: (id: Id<'characters'> | '') => void
   onJoin: (e: React.MouseEvent) => void
+  isJoining?: boolean
 }
 
 export default function SessionJoinForm({
@@ -23,7 +24,8 @@ export default function SessionJoinForm({
   selectedCharacterId,
   hasUserCharacterInSession,
   onCharacterSelect,
-  onJoin
+  onJoin,
+  isJoining
 }: SessionJoinFormProps) {
   return (
     <Card>
@@ -40,11 +42,16 @@ export default function SessionJoinForm({
               This session is currently full.
           </div>
         ) : availableCharacters.length === 0 ? (
-          <p className="text-sm text-muted-foreground italic text-center p-4 bg-muted/10 rounded-md">
+          <div className="text-sm text-muted-foreground italic text-center p-4 bg-muted/10 rounded-md flex flex-col items-center gap-2">
             {userCharactersCount === 0 
-              ? "You don't have any characters yet. Create one on the home page!" 
-              : "All your characters are already in this session."}
-          </p>
+              ? (
+                <>
+                  <p>You don't have any characters yet.</p>
+                  <a href="/" className="text-primary hover:underline font-semibold not-italic">Go to Home to create one!</a>
+                </>
+              )
+              : <p>All your characters are already in this session.</p>}
+          </div>
         ) : (
           <div className="space-y-4">
             <div className="flex flex-col gap-2">
@@ -53,6 +60,7 @@ export default function SessionJoinForm({
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 value={selectedCharacterId}
                 onChange={(e) => onCharacterSelect(e.target.value as Id<'characters'> | '')}
+                disabled={isJoining}
               >
                 <option value="">-- Choose a character --</option>
                 {availableCharacters.map((char) => (
@@ -64,10 +72,10 @@ export default function SessionJoinForm({
             </div>
             <Button 
               className="w-full" 
-              disabled={!selectedCharacterId || hasUserCharacterInSession}
+              disabled={!selectedCharacterId || hasUserCharacterInSession || isJoining}
               onClick={onJoin}
             >
-              Join Session
+              {isJoining ? 'Joining...' : 'Join Session'}
             </Button>
           </div>
         )}
