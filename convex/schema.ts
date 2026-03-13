@@ -34,6 +34,7 @@ export default defineSchema({
             username: v.string(),
         }))),
         system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
+        discordThreadId: v.optional(v.string()),
   }),
     worlds: defineTable({
         name: v.string(),

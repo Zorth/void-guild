@@ -258,8 +258,12 @@ export const createSession = mutation({
       characters: args.characters,
       gmCharacter: args.gmCharacter,
       location: args.location,
-      owner: identity!.subject,
-      system: args.system || 'PF',
+      owner: identity.subject,
+      system: args.system,
+    })
+
+    await ctx.scheduler.runAfter(0, internal.discord.syncSessionToDiscord, {
+        sessionId
     })
 
     await ctx.scheduler.runAfter(0, internal.activity.logActivity, {
@@ -377,6 +381,10 @@ export const joinSession = mutation({
       characters: [...session.characters, args.characterId],
       interestedPlayers: (session.interestedPlayers || []).filter(p => p.userId !== user.subject)
     })
+
+    await ctx.scheduler.runAfter(0, internal.discord.syncSessionToDiscord, {
+        sessionId: args.sessionId
+    })
   },
 })
 
@@ -417,6 +425,10 @@ export const adminAddCharacterToSession = mutation({
         characters: [...session.characters, args.characterId],
         interestedPlayers: (session.interestedPlayers || []).filter(p => p.userId !== character.userId)
       })
+
+      await ctx.scheduler.runAfter(0, internal.discord.syncSessionToDiscord, {
+          sessionId: args.sessionId
+      })
     },
 })
 
@@ -446,6 +458,10 @@ export const leaveSession = mutation({
 
     await ctx.db.patch(args.sessionId, {
       characters: session.characters.filter(id => id !== args.characterId),
+    })
+
+    await ctx.scheduler.runAfter(0, internal.discord.syncSessionToDiscord, {
+        sessionId: args.sessionId
     })
   }
 })
