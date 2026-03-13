@@ -35,6 +35,9 @@ importers:
       convex:
         specifier: ^1.32.0
         version: 1.32.0(react@19.2.3)
+      discord-interactions:
+        specifier: ^4.4.0
+        version: 4.4.0
       framer-motion:
         specifier: ^12.35.2
         version: 12.35.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -2294,6 +2297,10 @@ packages:
   diff@8.0.3:
     resolution: {integrity: sha512-qejHi7bcSD4hQAZE0tNAawRK1ZtafHDmMTMkrrIGgSLl7hTnQHmKCeB45xAcbfTqK2zowkM3j3bHt/4b/ARbYQ==}
     engines: {node: '>=0.3.1'}
+
+  discord-interactions@4.4.0:
+    resolution: {integrity: sha512-jjJx8iwAeJcj8oEauV43fue9lNqkf38fy60aSs2+G8D1nJmDxUIrk08o3h0F3wgwuBWWJUZO+X/VgfXsxpCiJA==}
+    engines: {node: '>=18.4.0'}
 
   doctrine@2.1.0:
     resolution: {integrity: sha512-35mSku4ZXK0vfCuHEDAwt55dg2jNajHZ1odvF+8SSr82EsZY4QmXfuWso8oEd8zRhVObSN18aM0CjSdoBX7zIw==}
@@ -6473,6 +6480,8 @@ snapshots:
       dequal: 2.0.3
 
   diff@8.0.3: {}
+
+  discord-interactions@4.4.0: {}
 
   doctrine@2.1.0:
     dependencies:

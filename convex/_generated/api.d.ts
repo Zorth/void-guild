@@ -11,6 +11,8 @@
 import type * as activity from "../activity.js";
 import type * as characters from "../characters.js";
 import type * as crons from "../crons.js";
+import type * as discord from "../discord.js";
+import type * as http from "../http.js";
 import type * as migrations from "../migrations.js";
 import type * as planning from "../planning.js";
 import type * as sessions from "../sessions.js";
@@ -26,6 +28,8 @@ declare const fullApi: ApiFromModules<{
   activity: typeof activity;
   characters: typeof characters;
   crons: typeof crons;
+  discord: typeof discord;
+  http: typeof http;
   migrations: typeof migrations;
   planning: typeof planning;
   sessions: typeof sessions;
