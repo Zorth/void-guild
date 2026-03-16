@@ -30,8 +30,8 @@ export async function POST(req: Request) {
       return new Response('Missing security headers', { status: 401 });
     }
 
-    // VERIFY SIGNATURE
-    const isValidRequest = verifyKey(body, signature, timestamp, publicKey);
+    // VERIFY SIGNATURE (Must await because it returns a Promise in some environments/versions)
+    const isValidRequest = await verifyKey(body, signature, timestamp, publicKey);
     console.log(`[Discord] Security Check: ${isValidRequest ? "PASS" : "FAIL"}`);
 
     if (!isValidRequest) {
