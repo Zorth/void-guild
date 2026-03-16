@@ -109,7 +109,7 @@ export default function AdminCharacterList() {
                     </div>
                     <p className="text-xs text-muted-foreground">{char.ancestry} {char.class}</p>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right whitespace-nowrap">
                     <p className="text-sm font-semibold">Lvl {char.lvl}</p>
                     <p className="text-[10px] text-muted-foreground">{char.xp} XP</p>
                   </div>

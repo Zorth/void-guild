@@ -89,7 +89,7 @@ function UserCharacterPreview({ userId }: { userId: string }) {
                                 <span className="font-medium text-foreground">{char.name}</span>
                             </div>
                             <span 
-                                className="px-2 py-0.5 rounded-full font-bold text-xs"
+                                className="inline-flex align-middle justify-center w-14 rounded-full px-2 py-0.5 text-xs font-bold whitespace-nowrap"
                                 style={getLevelBadgeStyle(char.lvl)}
                             >
                                 Lvl {char.lvl}

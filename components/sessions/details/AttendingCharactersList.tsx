@@ -95,7 +95,7 @@ export default function AttendingCharactersList({
                             />
                         )}
                         <span 
-                            className="inline-flex align-middle justify-center w-12 rounded-full px-2 py-0.5 text-[10px] font-bold"
+                            className="inline-flex align-middle justify-center w-14 rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap"
                             style={getLevelBadgeStyle(char.lvl)}
                         >
                             Lvl {char.lvl}

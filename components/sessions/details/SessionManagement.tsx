@@ -146,7 +146,7 @@ export default function SessionManagement({
                                 <div className="flex items-center gap-1 mt-0.5">
                                     <CharacterRankIcon rank={p.rank} />
                                     <span 
-                                        className="inline-flex align-middle justify-center w-12 rounded-full px-1.5 py-0.5 text-[10px] font-bold"
+                                        className="inline-flex align-middle justify-center w-14 rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap"
                                         style={getLevelBadgeStyle(p.currentLvl)}
                                     >
                                         Lvl {p.currentLvl}
@@ -162,7 +162,7 @@ export default function SessionManagement({
                                 {p.newLvl > p.currentLvl ? (
                                     <div className="flex flex-col items-end">
                                         <span 
-                                            className="inline-flex align-middle justify-center w-14 rounded-full px-2 py-0.5 text-[10px] font-bold border-2 border-green-500 bg-green-100 text-green-700"
+                                            className="inline-flex align-middle justify-center w-14 rounded-full px-2 py-0.5 text-[10px] font-bold border-2 border-green-500 bg-green-100 text-green-700 whitespace-nowrap"
                                         >
                                             Lvl {p.newLvl} ↑
                                         </span>
@@ -171,7 +171,7 @@ export default function SessionManagement({
                                 ) : (
                                     <div className="flex flex-col items-end">
                                         <span 
-                                            className="inline-flex align-middle justify-center w-12 rounded-full px-1.5 py-0.5 text-[10px] font-bold"
+                                            className="inline-flex align-middle justify-center w-14 rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap"
                                             style={getLevelBadgeStyle(p.newLvl)}
                                         >
                                             Lvl {p.newLvl}

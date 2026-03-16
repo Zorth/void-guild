@@ -202,7 +202,7 @@ export default function Characters({ filters }: { filters?: { pf: boolean, dnd: 
                                         />
                                     )}
                                     <span 
-                                        className="inline-flex align-middle justify-center w-14 rounded-full px-2 py-0.5 text-[10px] font-bold"
+                                        className="inline-flex align-middle justify-center w-14 rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap"
                                         style={getLevelBadgeStyle(character.lvl)}
                                     >
                                         Lvl {character.lvl}
@@ -296,7 +296,7 @@ export default function Characters({ filters }: { filters?: { pf: boolean, dnd: 
                     />
                 )}
                 <span 
-                  className="inline-flex align-middle justify-center w-14 rounded-full px-2 py-0.5 text-[10px] font-bold"
+                  className="inline-flex align-middle justify-center w-14 rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap"
                   style={getLevelBadgeStyle(selectedCharacter.lvl)}
                 >
                   Lvl {selectedCharacter.lvl}

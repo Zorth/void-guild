@@ -113,7 +113,7 @@ export default function StatsPage() {
                             <Book size={14} />
                         </a>
                       </span>
-                      <span className={cn("font-bold text-sm sm:text-base shrink-0 sm:ml-auto", isUser && "text-purple-600 dark:text-purple-400")}>Lvl {char.lvl}</span>
+                      <span className={cn("font-bold text-sm sm:text-base shrink-0 sm:ml-auto whitespace-nowrap", isUser && "text-purple-600 dark:text-purple-400")}>Lvl {char.lvl}</span>
                     </li>
                   );
                 })}
