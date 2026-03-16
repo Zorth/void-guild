@@ -86,7 +86,6 @@ export const listSessions = query({
       return null
     }
 
-    const isAdminUser = await isAdmin(ctx)
     const sessions = await ctx.db
       .query('sessions')
       .filter((q) => q.eq(q.field('locked'), args.past))
@@ -97,12 +96,39 @@ export const listSessions = query({
         const characterDocs = await Promise.all(
           session.characters.map((id) => ctx.db.get(id))
         )
-        const worldDoc = await ctx.db.get(session.world as Id<'worlds'>) // Explicitly cast to Id<'worlds'>
+        const worldDoc = await ctx.db.get(session.world as Id<'worlds'>)
         return {
           ...session,
-          worldName: worldDoc ? (worldDoc as Doc<'worlds'>).name : 'Unknown World', // Assert type before accessing name
+          worldName: worldDoc ? (worldDoc as Doc<'worlds'>).name : 'Unknown World',
           characterNames: characterDocs.filter((c): c is Doc<'characters'> => c !== null).map((c) => c.name),
           isOwner: user.subject === session.owner,
+        }
+      })
+    )
+
+    return sessionsWithDetails.sort((a, b) => (args.past ? b.date - a.date : a.date - b.date))
+  },
+})
+
+export const publicListSessions = query({
+  args: { past: v.boolean() },
+  handler: async (ctx, args) => {
+    const sessions = await ctx.db
+      .query('sessions')
+      .filter((q) => q.eq(q.field('locked'), args.past))
+      .collect()
+
+    const sessionsWithDetails = await Promise.all(
+      sessions.map(async (session) => {
+        const characterDocs = await Promise.all(
+          session.characters.map((id) => ctx.db.get(id))
+        )
+        const worldDoc = await ctx.db.get(session.world as Id<'worlds'>)
+        return {
+          ...session,
+          worldName: worldDoc ? (worldDoc as Doc<'worlds'>).name : 'Unknown World',
+          characterNames: characterDocs.filter((c): c is Doc<'characters'> => c !== null).map((c) => c.name),
+          isOwner: false,
         }
       })
     )
