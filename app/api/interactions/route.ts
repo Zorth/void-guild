@@ -26,6 +26,8 @@ export async function POST(req: Request) {
 
     const publicKey = process.env.DISCORD_PUBLIC_KEY || process.env.NEXT_PUBLIC_DISCORD_PUBLIC_KEY;
 
+    console.log(`[Discord] Interaction received. Sig: ${!!signature}, TS: ${!!timestamp}, PK: ${!!publicKey}, Body length: ${body.length}`);
+
     if (!signature || !timestamp || !publicKey) {
       console.error("[Discord] Missing signature, timestamp, or public key configuration");
       return new Response('Missing headers or configuration', { status: 401 });
