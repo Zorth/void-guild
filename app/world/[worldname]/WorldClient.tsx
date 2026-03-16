@@ -822,6 +822,12 @@ export default function WorldClient() {
 
   const userCharacterIds = useMemo(() => new Set(userCharacters?.map(c => c._id) ?? []), [userCharacters])
 
+  const allFilteredSessions = useMemo(() => {
+    if (!sessions) return []
+    const filtered = sessions.filter(s => activeTab === 'past' ? s.locked : !s.locked)
+    return filtered.sort((a, b) => activeTab === 'past' ? b.date - a.date : a.date - b.date)
+  }, [sessions, activeTab])
+
   if (world === undefined) {
     return (
       <div className="container mx-auto py-8 px-4 max-w-7xl">
@@ -855,11 +861,6 @@ export default function WorldClient() {
   const ownerMetadata = userMetadata[world.owner]
   const ownerName = ownerMetadata?.name || `User ${world.owner.slice(-4)}`
 
-  const allFilteredSessions = useMemo(() => {
-    if (!sessions) return []
-    const filtered = sessions.filter(s => activeTab === 'past' ? s.locked : !s.locked)
-    return filtered.sort((a, b) => activeTab === 'past' ? b.date - a.date : a.date - b.date)
-  }, [sessions, activeTab])
   const filteredSessions = activeTab === 'past' ? allFilteredSessions.slice(0, sessionsLimit) : allFilteredSessions
   const hasMoreSessions = activeTab === 'past' && allFilteredSessions.length > sessionsLimit
 
