@@ -27,6 +27,7 @@ export async function POST(req: Request) {
     const publicKey = process.env.DISCORD_PUBLIC_KEY || process.env.NEXT_PUBLIC_DISCORD_PUBLIC_KEY;
 
     console.log(`[Discord] Interaction received. Sig: ${!!signature}, TS: ${!!timestamp}, PK: ${!!publicKey}, Body length: ${body.length}`);
+    console.log(`[Discord] Body sample: ${body.substring(0, 100)}`);
 
     if (!signature || !timestamp || !publicKey) {
       console.error("[Discord] Missing signature, timestamp, or public key configuration");
@@ -41,7 +42,7 @@ export async function POST(req: Request) {
     );
 
     if (!isValidRequest) {
-      console.error("[Discord] Bad request signature");
+      console.log("[Discord] Invalid signature check failed (this is expected for Discord's security tests)");
       return new Response('Bad request signature', { status: 401 });
     }
 
@@ -49,8 +50,11 @@ export async function POST(req: Request) {
 
     // Handle PING from Discord (mandatory for endpoint verification)
     if (interaction.type === 1) { // InteractionType.PING
-      console.log("[Discord] Received PING, sending PONG");
-      return NextResponse.json({ type: 1 });
+      console.log("[Discord] Valid PING received, sending PONG");
+      return new Response(JSON.stringify({ type: 1 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
     // Handle /sessions command
