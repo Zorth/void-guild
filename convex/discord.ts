@@ -40,7 +40,7 @@ export const syncSessionToDiscord = internalAction({
       title: `${session.worldName} | ${session.system === 'PF' ? 'Pathfinder 2e' : 'D&D 5e'}`,
       description: `**Date:** ${discordTimestamp}\n**Level:** ${session.level ?? 'TBD'}\n**Players:** ${session.attendingCharacters.length}/${session.maxPlayers}\n\n**Participants:**\n${characterList}`,
       color: session.system === 'PF' ? 0xde2e2e : 0xe81123,
-      url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://void.tarragon.be'}/sessions/${session._id}`,
+      url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'}/sessions/${session._id}`,
       timestamp: new Date().toISOString(),
       footer: { text: "Void Guild Session Tracker" }
     };

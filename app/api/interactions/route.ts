@@ -75,7 +75,7 @@ export async function POST(req: Request) {
           return NextResponse.json({
             type: 4, // CHANNEL_MESSAGE_WITH_SOURCE
             data: {
-              content: `### ⚔️ Upcoming Sessions\n${sessionList}\n\n[View Full Schedule](${process.env.NEXT_PUBLIC_BASE_URL || 'https://void.tarragon.be'})`,
+              content: `### ⚔️ Upcoming Sessions\n${sessionList}\n\n[View Full Schedule](${process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'})`,
             },
           });
         } catch (e) {

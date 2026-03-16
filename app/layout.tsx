@@ -79,7 +79,7 @@ const sabon = localFont({
 })
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'https://void.tarragon.be'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'),
   title: 'Void Guild',
   description: 'Character Manager for the Guild of The Void',
 }
