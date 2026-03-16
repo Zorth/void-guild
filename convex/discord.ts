@@ -60,7 +60,7 @@ export const syncSessionToDiscord = internalAction({
       `**System**: ${systemName}\n` +
       `**Location**: ${locationInfo}\n` +
       `**Date**: ${dateInfo}\n\n` +
-      `[**⚔️ VIEW SESSION ON GUILD**]( ${sessionLink} )\n\n` +
+      `[**VIEW SESSION ON GUILD**]( ${sessionLink} )\n\n` +
       (isPlanning 
         ? `*This session is currently in the planning phase. Click the link above to **show your interest** and make it easier for everyone to pick a date by filling in the Planning tab!*`
         : `*Click the link above to **sign up with your character**! Voidmasters encourage you to use this thread to discuss your plans and prepare for this session!*`);
@@ -78,7 +78,7 @@ export const syncSessionToDiscord = internalAction({
             : "_No interest expressed yet._")
         : characterList,
       color: session.system === 'PF' ? 0xde2e2e : 0xe81123,
-      url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'}/sessions/${session._id}`,
+      url: sessionLink,
       timestamp: new Date().toISOString(),
       footer: { text: "Void Guild Session Tracker" }
     };

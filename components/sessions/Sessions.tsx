@@ -494,7 +494,8 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
     // Filter by tab
     let filtered = sessionsRaw;
     if (activeTab === 'upcoming') {
-        filtered = sessionsRaw.filter(s => !s.planning);
+        // Upcoming now includes everything not locked (scheduled AND planning)
+        filtered = sessionsRaw;
     } else if (activeTab === 'planning') {
         filtered = sessionsRaw.filter(s => !!s.planning);
     }
