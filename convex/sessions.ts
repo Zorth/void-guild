@@ -358,6 +358,12 @@ export const deleteSession = mutation({
       throw new Error('Only the session owner or an admin can delete this session')
     }
 
+    if (session.discordThreadId) {
+        await ctx.scheduler.runAfter(0, internal.discord.deleteSessionThread, {
+            threadId: session.discordThreadId
+        })
+    }
+
     await ctx.db.delete(args.sessionId)
   },
 })

@@ -45,11 +45,15 @@ export const syncSessionToDiscord = internalAction({
     const systemEmoji = session.system === 'PF' ? '<:Pathfinder:1322734594864320522>' : '<:DnD:1322734981524754473>';
     const systemName = session.system === 'PF' ? 'Pathfinder 2e' : 'D&D 5e';
     const locationInfo = session.location ? `[View on Google Maps](${session.location})` : 'TBD';
+    const worldLink = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'}/world/${encodeURIComponent(session.worldName)}`;
+    const arrivalTime = `<t:${unixTimestamp}:t>`;
+    const endTime = `<t:${unixTimestamp + 1800}:t>`; // 30 minutes later
     
-    const messageContent = `# ${systemEmoji} ${session.worldName}\n` +
+    const messageContent = `# ${systemEmoji} [${session.worldName}](${worldLink})\n` +
       `**System**: ${systemName}\n` +
       `**Location**: ${locationInfo}\n` +
-      `**Date**: ${discordTimestamp} (session starts 30 minutes after)`;
+      `**Date**: Arrive between ${arrivalTime} and ${endTime}\n\n` +
+      `*Voidmasters encourage you to use this thread to discuss your plans and prepare for this session!*`;
 
     // Format the list of signed-up characters for the embed
     const characterList = session.attendingCharacters.length > 0
@@ -173,5 +177,27 @@ export const updateSessionThreadId = internalMutation({
   args: { sessionId: v.id("sessions"), threadId: v.string() },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.sessionId, { discordThreadId: args.threadId });
+  },
+});
+
+/**
+ * Deletes a Discord thread.
+ */
+export const deleteSessionThread = internalAction({
+  args: { threadId: v.string() },
+  handler: async (ctx, args) => {
+    const botToken = process.env.DISCORD_BOT_TOKEN;
+    if (!botToken) return;
+
+    try {
+      await fetch(`${DISCORD_API_BASE}/channels/${args.threadId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bot ${botToken}`,
+        },
+      });
+    } catch (e) {
+      console.error("Failed to delete Discord thread:", e);
+    }
   },
 });
