@@ -339,6 +339,10 @@ export const updateSession = mutation({
       location: args.location,
       system: args.system,
     })
+
+    await ctx.scheduler.runAfter(0, internal.discord.syncSessionToDiscord, {
+        sessionId: args.sessionId
+    })
   },
 })
 
