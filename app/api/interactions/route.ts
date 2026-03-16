@@ -18,33 +18,34 @@ export async function POST(req: Request) {
   const publicKey = process.env.DISCORD_PUBLIC_KEY || process.env.NEXT_PUBLIC_DISCORD_PUBLIC_KEY;
   const signature = req.headers.get('x-signature-ed25519');
   const timestamp = req.headers.get('x-signature-timestamp');
-  const userAgent = req.headers.get('user-agent');
   
-  console.log(`[Discord] New request from ${userAgent}. Sig: ${!!signature}, PK: ${!!publicKey}`);
-  if (publicKey) {
-    console.log(`[Discord] PK Snippet: ${publicKey.substring(0, 4)}...${publicKey.substring(publicKey.length - 4)}`);
-  }
+  console.log(`[Discord] New request. PK: ${!!publicKey}, Sig: ${!!signature}, TS: ${!!timestamp}`);
 
   try {
     const body = await req.text();
-    console.log(`[Discord] Received body (${body.length} bytes)`);
+    console.log(`[Discord] Body received (${body.length} bytes)`);
 
     if (!signature || !timestamp || !publicKey) {
-      console.error("[Discord] Missing security data");
-      return new Response('Missing headers', { status: 401 });
+      console.error("[Discord] Missing Security Critical Data (Returning 401)");
+      return new Response('Missing security headers', { status: 401 });
     }
 
+    // VERIFY SIGNATURE
     const isValidRequest = verifyKey(body, signature, timestamp, publicKey);
+    console.log(`[Discord] Security Check: ${isValidRequest ? "PASS" : "FAIL"}`);
 
     if (!isValidRequest) {
-      console.warn("[Discord] SECURITY CHECK: INVALID SIGNATURE (Responding with 401)");
-      return new Response('Bad request signature', { status: 401 });
+      console.warn("[Discord] Signature check failed (Correctly returning 401)");
+      return new Response('Invalid request signature', { status: 401 });
     }
 
-    console.log("[Discord] SECURITY CHECK: VALID SIGNATURE");
+    console.log("[Discord] Security Check: VALID SIGNATURE");
+    
     const interaction = JSON.parse(body);
+    console.log(`[Discord] Interaction Type: ${interaction.type}`);
 
-    if (interaction.type === 1) { // InteractionType.PING
+    // Handle PING (Type 1)
+    if (interaction.type === 1) {
       console.log("[Discord] PING received -> Sending PONG");
       return new Response('{"type":1}', {
         status: 200,
@@ -52,28 +53,38 @@ export async function POST(req: Request) {
       });
     }
 
-    if (interaction.type === 2) { // APPLICATION_COMMAND
+    // Handle Commands (Type 2)
+    if (interaction.type === 2) {
       const { name } = interaction.data;
       if (name === 'sessions') {
-        const convex = getConvexClient();
-        const sessions = await convex.query(api.sessions.listSessions, { past: false });
+        try {
+          const convex = getConvexClient();
+          const sessions = await convex.query(api.sessions.listSessions, { past: false });
 
-        let content = "No upcoming sessions scheduled.";
-        if (sessions && sessions.length > 0) {
-          content = sessions.slice(0, 5).map(s => {
-            const date = new Date(s.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-            return `• **${s.worldName}** - ${date}`;
-          }).join('\n');
+          let content = "No upcoming sessions scheduled.";
+          if (sessions && sessions.length > 0) {
+            const sessionList = sessions.slice(0, 5).map(s => {
+              const date = new Date(s.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+              return `• **${s.worldName}** - ${date} (${s.characterNames.length}/${s.maxPlayers} players)`;
+            }).join('\n');
+            content = `### ⚔️ Upcoming Sessions\n${sessionList}\n\n[View Full Schedule](${process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'})`;
+          }
+
+          return new Response(JSON.stringify({
+            type: 4, // CHANNEL_MESSAGE_WITH_SOURCE
+            data: { content },
+          }), { headers: { 'Content-Type': 'application/json' } });
+        } catch (e) {
+          console.error("[Discord] Convex Error:", e);
+          return new Response(JSON.stringify({
+            type: 4,
+            data: { content: "Error fetching sessions." },
+          }), { headers: { 'Content-Type': 'application/json' } });
         }
-
-        return new Response(JSON.stringify({
-          type: 4, // CHANNEL_MESSAGE_WITH_SOURCE
-          data: { content: `### ⚔️ Upcoming Sessions\n${content}` },
-        }), { headers: { 'Content-Type': 'application/json' } });
       }
     }
 
-    return new Response('Unknown interaction type', { status: 400 });
+    return new Response('Interaction type not supported', { status: 400 });
 
   } catch (error) {
     console.error("[Discord] Internal Error:", error);

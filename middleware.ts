@@ -1,17 +1,13 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+import { clerkMiddleware } from '@clerk/nextjs/server';
 
-const isPublicRoute = createRouteMatcher(['/api/interactions']);
-
-export default clerkMiddleware(async (auth, request) => {
-  if (isPublicRoute(request)) {
-    console.log(`[Middleware] Skipping Clerk for: ${request.nextUrl.pathname}`);
-    return; 
-  }
-});
+export default clerkMiddleware();
 
 export const config = {
   matcher: [
-    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
-    '/(api|trpc)(.*)',
+    // 1. Exclude interactions and static files
+    '/((?!api/interactions|_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    // 2. Protect other API routes
+    '/api/(?!interactions)(.*)',
+    '/trpc/(.*)',
   ],
 };
