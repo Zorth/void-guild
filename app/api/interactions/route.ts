@@ -2,39 +2,56 @@ import { InteractionResponseType, InteractionType, verifyKey } from 'discord-int
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
 
-const client = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+// Lazy initialization to prevent module-level crashes if env vars are missing
+let client: ConvexHttpClient | null = null;
+function getConvexClient() {
+  if (!client) {
+    const url = process.env.NEXT_PUBLIC_CONVEX_URL;
+    if (!url) throw new Error("NEXT_PUBLIC_CONVEX_URL is not set");
+    client = new ConvexHttpClient(url);
+  }
+  return client;
+}
 
 export async function POST(req: Request) {
-  const signature = req.headers.get('x-signature-ed25519');
-  const timestamp = req.headers.get('x-signature-timestamp');
-  const body = await req.text();
+  try {
+    const signature = req.headers.get('x-signature-ed25519');
+    const timestamp = req.headers.get('x-signature-timestamp');
+    const body = await req.text();
 
-  const isValidRequest = signature && timestamp && verifyKey(
-    body,
-    signature,
-    timestamp,
-    process.env.DISCORD_PUBLIC_KEY! // Add this to your .env from Discord Portal
-  );
+    const publicKey = process.env.DISCORD_PUBLIC_KEY || process.env.NEXT_PUBLIC_DISCORD_PUBLIC_KEY;
 
-  if (!isValidRequest) {
-    return new Response('Bad request signature', { status: 401 });
-  }
+    if (!signature || !timestamp || !publicKey) {
+      console.error("[Discord] Missing signature, timestamp, or public key configuration");
+      return new Response('Missing headers or configuration', { status: 401 });
+    }
 
-  const interaction = JSON.parse(body);
+    const isValidRequest = verifyKey(
+      body,
+      signature,
+      timestamp,
+      publicKey
+    );
 
-  // Handle PING from Discord (mandatory)
-  if (interaction.type === InteractionType.PING) {
-    return Response.json({ type: InteractionResponseType.PONG });
-  }
+    if (!isValidRequest) {
+      console.error("[Discord] Bad request signature");
+      return new Response('Bad request signature', { status: 401 });
+    }
 
-  // Handle /sessions command
-  if (interaction.type === InteractionType.APPLICATION_COMMAND) {
-    const { name } = interaction.data;
+    const interaction = JSON.parse(body);
 
-    if (name === 'sessions') {
-      try {
-        // Fetch upcoming sessions from Convex
-        const sessions = await client.query(api.sessions.listSessions, { past: false });
+    // Handle PING from Discord (mandatory for endpoint verification)
+    if (interaction.type === InteractionType.PING) {
+      return Response.json({ type: InteractionResponseType.PONG });
+    }
+
+    // Handle /sessions command
+    if (interaction.type === InteractionType.APPLICATION_COMMAND) {
+      const { name } = interaction.data;
+
+      if (name === 'sessions') {
+        const convex = getConvexClient();
+        const sessions = await convex.query(api.sessions.listSessions, { past: false });
 
         if (!sessions || sessions.length === 0) {
           return Response.json({
@@ -54,15 +71,12 @@ export async function POST(req: Request) {
             content: `### ⚔️ Upcoming Sessions\n${sessionList}\n\n[View Full Schedule](${process.env.NEXT_PUBLIC_BASE_URL || 'https://void.tarragon.be'})`,
           },
         });
-      } catch (e) {
-        console.error("Convex fetch error:", e);
-        return Response.json({
-          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-          data: { content: "Failed to fetch sessions from the Void." },
-        });
       }
     }
-  }
 
-  return new Response('Unknown interaction', { status: 400 });
+    return new Response('Unknown interaction type', { status: 400 });
+  } catch (error) {
+    console.error("[Discord] Interaction error:", error);
+    return new Response('Internal Server Error', { status: 500 });
+  }
 }
