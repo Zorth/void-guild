@@ -243,6 +243,7 @@ function MonthOverview({
     }
 
     const sessionsByDay = sessions.reduce((acc, session) => {
+        if (!session.date) return acc;
         const sessionDate = new Date(session.date);
         if (sessionDate.getFullYear() === year && sessionDate.getMonth() === month) {
             const day = sessionDate.getDate();
@@ -424,6 +425,7 @@ function SevenDayOverview({ sessions, userCharacterIds }: { sessions: SessionWit
     });
 
     const sessionsByDay = sessions.reduce((acc, session) => {
+        if (session.planning || !session.date) return acc;
         const sessionDate = new Date(session.date);
         sessionDate.setHours(0, 0, 0, 0); // Normalize to start of day
         const dayString = sessionDate.toDateString();
@@ -479,17 +481,31 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
   const { width } = useWindowSize()
   const [activeTab, setActiveTab] = useState<'upcoming' | 'planning' | 'past'>('upcoming')
   const [viewDate, setViewDate] = useState(new Date())
-  const sessionsRaw = useQuery(api.sessions.listSessions, { past: activeTab === 'past' }) as SessionWithDetails[]
+  
+  // Use a query that returns planning sessions if in the planning tab
+  const sessionsRaw = useQuery(
+    api.sessions.listSessions, 
+    { past: activeTab === 'past' }
+  ) as SessionWithDetails[]
   
   const sessions = useMemo(() => {
     if (!sessionsRaw) return sessionsRaw;
-    if (!filters) return sessionsRaw;
-    return sessionsRaw.filter(session => {
+    
+    // Filter by tab
+    let filtered = sessionsRaw;
+    if (activeTab === 'upcoming') {
+        filtered = sessionsRaw.filter(s => !s.planning);
+    } else if (activeTab === 'planning') {
+        filtered = sessionsRaw.filter(s => !!s.planning);
+    }
+    
+    if (!filters) return filtered;
+    return filtered.filter(session => {
         if (session.system === 'PF' && !filters.pf) return false;
         if (session.system === 'DnD' && !filters.dnd) return false;
         return true;
     });
-  }, [sessionsRaw, filters]);
+  }, [sessionsRaw, filters, activeTab]);
 
   const isGM = useQuery(api.sessions.isGameMasterQuery)
   const userCharacters = useQuery(api.characters.listCharacters)
@@ -525,7 +541,7 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
           "flex items-center gap-4",
           width < 1015 && "flex-wrap justify-center w-full"
         )}>
-          {activeTab === 'upcoming' && isGM && <SessionDialog hasWorld={!!world} />}
+          {(activeTab === 'upcoming' || activeTab === 'planning') && isGM && <SessionDialog hasWorld={!!world} />}
           <div className="flex bg-muted p-1 rounded-md h-9 relative">
             {(['upcoming', 'planning', 'past'] as const).map((tab) => (
               <button
@@ -605,6 +621,7 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
                 <ul className={cn("space-y-4", activeTab === 'upcoming' && sessions.length > 0 && "mt-8")}>
                   {sessions.map((session, i) => {
                     const hasJoined = activeTab === 'upcoming' && session.characters.some(id => userCharacterIds.has(id))
+                    const isPlanning = session.planning || !session.date
                     
                     return (
                       <motion.li 
@@ -620,11 +637,13 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
                               "flex-grow p-2 rounded-md transition-colors relative flex justify-between items-start",
                               session.isOwner 
                                   ? "session-owner" 
-                                  : isGM && hasJoined 
-                                      ? "session-admin-joined" 
-                                      : hasJoined 
-                                          ? "session-joined" 
-                                          : "session-default"
+                                  : isPlanning
+                                      ? "session-planning"
+                                      : isGM && hasJoined 
+                                          ? "session-admin-joined" 
+                                          : hasJoined 
+                                              ? "session-joined" 
+                                              : "session-default"
                           )}
                         >
                           <div className="flex flex-col">
@@ -647,7 +666,8 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
                                   </div>
                                   <span className="truncate max-w-[200px] sm:max-w-none">{session.worldName}</span>
                               </div>
-                              {session.characters.length >= session.maxPlayers && (
+                              {isPlanning && <div className="text-[10px] bg-purple-600 text-white px-2 py-0.5 rounded-full uppercase tracking-widest font-black shadow-sm">Planning</div>}
+                              {!isPlanning && session.characters.length >= session.maxPlayers && (
                                 <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800 uppercase tracking-wider">
                                   Full
                                 </span>
@@ -655,13 +675,20 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
                               {session.locked && <Lock className="h-3 w-3 text-muted-foreground" />}
                             </div>
                             <div className="text-sm font-medium">
-                              {formatDate(session.date)} at {formatTime(session.date)}
+                              {session.date ? (
+                                <>{formatDate(session.date)} at {formatTime(session.date)}</>
+                              ) : (
+                                <span className="italic">Date TBD</span>
+                              )}
                             </div>
                             <div className="text-sm text-muted-foreground">
-                              {session.characters.length} / {session.maxPlayers} players
+                              {isPlanning 
+                                ? `${(session.interestedPlayers || []).length} interested players`
+                                : `${session.characters.length} / ${session.maxPlayers} players signed up`
+                              }
                             </div>
                           </div>
-                          {activeTab === 'past' && (
+                          {activeTab === 'past' && session.date && (
                               <Button 
                                   variant="outline" 
                                   size="sm" 
@@ -669,7 +696,7 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
                                   onClick={(e) => {
                                     e.stopPropagation(); // Prevent clicking the parent Link
                                     e.preventDefault(); // Prevent any default action of the button or parent that might cause navigation
-                                    window.open(`https://void.tarragon.be/Session-Reports/${new Date(session.date).toISOString().slice(0, 10)}-${session.worldName.replace(/\s+/g, '-')}`, '_blank');
+                                    window.open(`https://void.tarragon.be/Session-Reports/${new Date(session.date!).toISOString().slice(0, 10)}-${session.worldName.replace(/\s+/g, '-')}`, '_blank');
                                   }}
                               >
                                   <Book size={32} />

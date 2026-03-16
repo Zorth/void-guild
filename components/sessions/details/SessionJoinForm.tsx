@@ -6,6 +6,7 @@ import { Doc, Id } from '@/convex/_generated/dataModel'
 
 interface SessionJoinFormProps {
   sessionLocked: boolean
+  sessionPlanning?: boolean
   isFull: boolean
   availableCharacters: Doc<'characters'>[]
   userCharactersCount: number
@@ -18,6 +19,7 @@ interface SessionJoinFormProps {
 
 export default function SessionJoinForm({
   sessionLocked,
+  sessionPlanning,
   isFull,
   availableCharacters,
   userCharactersCount,
@@ -37,6 +39,11 @@ export default function SessionJoinForm({
           <div className="text-sm text-muted-foreground italic text-center p-4 bg-muted/30 rounded-md">
               This session has ended.
           </div>
+        ) : sessionPlanning ? (
+          <div className="text-sm text-purple-600 dark:text-purple-400 italic text-center p-4 bg-purple-500/10 rounded-md border border-purple-200 dark:border-purple-800">
+              This session is currently in the <b>planning phase</b> and cannot be joined yet. 
+              <p className="mt-2 not-italic text-xs text-muted-foreground font-medium">Express interest above to let the GM know you want to play!</p>
+          </div>
         ) : isFull ? (
           <div className="text-sm text-destructive italic text-center p-4 bg-destructive/5 rounded-md">
               This session is currently full.
@@ -46,7 +53,7 @@ export default function SessionJoinForm({
             {userCharactersCount === 0 
               ? (
                 <>
-                  <p>You don't have any characters yet.</p>
+                  <p>You don&apos;t have any characters yet.</p>
                   <a href="/" className="text-primary hover:underline font-semibold not-italic">Go to Home to create one!</a>
                 </>
               )

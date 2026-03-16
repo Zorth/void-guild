@@ -82,12 +82,13 @@ export default function SessionManagement({
                             onClick={() => onSendToDiscord('remind')} 
                             variant="outline"
                             className="w-full justify-start gap-2 border-amber-500/50 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+                            disabled={!session.date}
                         >
                             <Bell className="h-4 w-4" />
                             <span className="font-bold">Send Reminder</span>
                         </Button>
                         <p className="text-[11px] text-muted-foreground px-1">
-                            Remind players of available spots and time left before start.
+                            Remind players of available spots and time left before start. {!session.date && "(Requires a date)"}
                         </p>
                     </div>
 
@@ -96,12 +97,13 @@ export default function SessionManagement({
                             variant="destructive" 
                             onClick={() => onSendToDiscord('cancel')} 
                             className="w-full justify-start gap-2"
+                            disabled={!session.date}
                         >
                             <XCircle className="h-4 w-4" />
                             <span className="font-bold">Cancel Session</span>
                         </Button>
                         <p className="text-[11px] text-muted-foreground px-1">
-                            Notify everyone that the session is cancelled and will no longer happen.
+                            Notify everyone that the session is cancelled and will no longer happen. {!session.date && "(Requires a date)"}
                         </p>
                     </div>
                 </div>
@@ -121,7 +123,7 @@ export default function SessionManagement({
 
         <AlertDialog>
             <AlertDialogTrigger asChild>
-                <Button variant="default" className="w-full justify-start">
+                <Button variant="default" className="w-full justify-start" disabled={session.planning}>
                     <CheckCircle2 className="h-4 w-4 mr-2" />
                     End Session
                 </Button>

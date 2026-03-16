@@ -10,6 +10,7 @@ interface AttendingCharactersListProps {
   characters: Doc<'characters'>[]
   userCharacterIds: Set<Id<'characters'>>
   sessionLocked: boolean
+  sessionPlanning?: boolean
   isSessionOwner: boolean
   onLeave: (characterId: Id<'characters'>) => void
   userMetadata?: Record<string, UserMetadata>
@@ -20,6 +21,7 @@ export default function AttendingCharactersList({
   characters, 
   userCharacterIds, 
   sessionLocked, 
+  sessionPlanning,
   isSessionOwner, 
   onLeave,
   userMetadata,
@@ -33,7 +35,7 @@ export default function AttendingCharactersList({
     <ul className="grid grid-cols-1 gap-3">
       {characters.map((char) => {
         const isUserCharacter = userCharacterIds.has(char._id)
-        const canRemove = !sessionLocked && (isSessionOwner || isUserCharacter)
+        const canRemove = !sessionLocked && !sessionPlanning && (isSessionOwner || isUserCharacter)
         const metadata = userMetadata?.[char.userId]
         
         return (

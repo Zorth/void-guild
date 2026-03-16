@@ -51,8 +51,10 @@ export async function POST(req: Request) {
           let content = "No upcoming sessions scheduled in the Void Guild.";
           if (sessions && sessions.length > 0) {
             const sessionList = sessions.slice(0, 5).map(s => {
-              const date = new Date(s.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-              return `• **${s.worldName}** - ${date} (${s.characterNames.length}/${s.maxPlayers} players)`;
+              const dateStr = s.date 
+                ? new Date(s.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+                : "Date TBD";
+              return `• **${s.worldName}** - ${dateStr} (${s.characterNames.length}/${s.maxPlayers} players)`;
             }).join('\n');
             content = `### ⚔️ Upcoming Sessions\n${sessionList}\n\n[View Full Schedule](${process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'})`;
           }

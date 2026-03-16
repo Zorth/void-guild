@@ -14,11 +14,12 @@ export default defineSchema({
         system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
     }).index('by_userId', ['userId']),
     sessions: defineTable({
-        date: v.number(),
+        date: v.optional(v.number()),
         world: v.id("worlds"),
         level: v.optional(v.number()),
         maxPlayers: v.number(),
         locked: v.boolean(),
+        planning: v.optional(v.boolean()),
         characters: v.array(v.id("characters")),
         gmCharacter: v.optional(v.id("characters")),
         location: v.optional(v.string()), // Google Maps link

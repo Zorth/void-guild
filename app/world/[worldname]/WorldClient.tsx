@@ -1,6 +1,6 @@
 'use client'
 
-import { useParams, notFound } from 'next/navigation'
+import { useParams, notFound, useRouter } from 'next/navigation'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -205,7 +205,12 @@ function ReputationSystem({ worldId, worldName, userCharacterIds }: { worldId: I
 
   const unlockedSessions = useMemo(() => {
     if (!sessions) return []
-    return sessions.filter(s => !s.locked).sort((a, b) => a.date - b.date)
+    return sessions.filter(s => !s.locked).sort((a, b) => {
+        if (a.date && b.date) return a.date - b.date
+        if (a.date) return -1
+        if (b.date) return 1
+        return 0
+    })
   }, [sessions])
 
   const characterIds = useMemo(() => {
@@ -493,7 +498,7 @@ function ReputationSystem({ worldId, worldName, userCharacterIds }: { worldId: I
                     {sessionFilter === 'all' ? "All Participants" : 
                       (() => {
                         const s = unlockedSessions.find(x => x._id === sessionFilter);
-                        return s ? formatDate(s.date) : "Select Session";
+                        return s ? (s.date ? formatDate(s.date) : "Planning") : "Select Session";
                       })()
                     }
                   </span>
@@ -516,7 +521,7 @@ function ReputationSystem({ worldId, worldName, userCharacterIds }: { worldId: I
                       onClick={() => setSessionFilter(s._id)}
                     >
                       <Calendar className="h-3 w-3 mr-2 opacity-50" />
-                      {formatDate(s.date)} {formatTime(s.date)}
+                      {s.date ? `${formatDate(s.date)} ${formatTime(s.date)}` : `Planning: ${worldName}`}
                     </Button>
                   ))}
                 </div>
@@ -800,21 +805,42 @@ export default function WorldClient() {
   const params = useParams()
   const worldName = decodeURIComponent(params.worldname as string)
   const { userId } = useAuth()
+  const router = useRouter()
   
   const world = useQuery(api.worlds.getWorldByName, { name: worldName })
   const sessions = useQuery(api.worlds.getSessionsByWorld, world?._id ? { worldId: world._id } : 'skip')
   const isGM = useQuery(api.sessions.isGameMasterQuery)
   const userCharacters = useQuery(api.characters.listCharacters)
+  const renameWorld = useMutation(api.worlds.renameWorld)
   
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming')
   const [userMetadata, setUserMetadata] = useState<Record<string, UserMetadata>>({})
   const [sessionsLimit, setSessionsLimit] = useState(5)
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [newName, setNewName] = useState('')
 
   useEffect(() => {
     if (world) {
+      setNewName(world.name)
       getUsernames([world.owner]).then(setUserMetadata)
     }
   }, [world])
+
+  const handleRenameWorld = async () => {
+    if (!world || !newName.trim() || newName === world.name) {
+        setIsEditingName(false)
+        return
+    }
+    try {
+        const encodedNewName = encodeURIComponent(newName.trim())
+        await renameWorld({ worldId: world._id, newName: newName.trim() })
+        setIsEditingName(false)
+        // Redirect to the new world URL
+        router.push(`/world/${encodedNewName}`)
+    } catch (e) {
+        alert(e instanceof Error ? e.message : 'Failed to rename world')
+    }
+  }
 
   useEffect(() => {
     setSessionsLimit(5)
@@ -824,8 +850,17 @@ export default function WorldClient() {
 
   const allFilteredSessions = useMemo(() => {
     if (!sessions) return []
+    // Upcoming tab includes both scheduled and planning sessions
     const filtered = sessions.filter(s => activeTab === 'past' ? s.locked : !s.locked)
-    return filtered.sort((a, b) => activeTab === 'past' ? b.date - a.date : a.date - b.date)
+    return filtered.sort((a, b) => {
+        if (activeTab === 'past') return (b.date || 0) - (a.date || 0)
+        
+        // For upcoming: scheduled sessions first (by date), then planning sessions
+        if (a.date && b.date) return a.date - b.date
+        if (a.date) return -1
+        if (b.date) return 1
+        return 0
+    })
   }, [sessions, activeTab])
 
   if (world === undefined) {
@@ -879,18 +914,60 @@ export default function WorldClient() {
         {/* Left Column: Title and Sessions */}
         <div className="lg:col-span-4 space-y-8">
           <div>
-            <h1 className="text-4xl sm:text-5xl font-bold flex items-center gap-4">
-              {world.name}
-              <a 
-                href={`https://void.tarragon.be/World-Notes/${world.name.replace(/\s+/g, '-')}`} 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className="hover:text-primary transition-colors"
-                title="View Wiki"
-              >
-                <Book className="h-8 w-8" />
-              </a>
-            </h1>
+            <div className="flex items-center gap-4 group min-w-0">
+                {isEditingName ? (
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full">
+                        <Input 
+                            value={newName} 
+                            onChange={(e) => setNewName(e.target.value)}
+                            className="text-2xl font-bold h-12 flex-grow"
+                            autoFocus
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleRenameWorld()
+                                if (e.key === 'Escape') setIsEditingName(false)
+                            }}
+                        />
+                        <div className="flex gap-2 shrink-0">
+                            <Button size="sm" onClick={handleRenameWorld}>Save</Button>
+                            <Button size="sm" variant="ghost" onClick={() => setIsEditingName(false)}>Cancel</Button>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="min-w-0 w-full overflow-hidden">
+                        <h1 
+                            className="font-bold flex flex-wrap items-center gap-x-4 gap-y-2 transition-all duration-300"
+                            style={{ 
+                                fontSize: `clamp(1.25rem, ${(25 / (world.name.length || 1))}rem, 3.5rem)`,
+                                lineHeight: '1.1'
+                            }}
+                        >
+                            <span className="break-words max-w-full">{world.name}</span>
+                            <div className="flex items-center gap-2 shrink-0">
+                                <a 
+                                    href={`https://void.tarragon.be/World-Notes/${world.name.replace(/\s+/g, '-')}`} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    className="hover:text-primary transition-colors shrink-0"
+                                    title="View Wiki"
+                                >
+                                    <Book className="h-8 w-8" />
+                                </a>
+                                {userId === world.owner && (
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors"
+                                        onClick={() => setIsEditingName(true)}
+                                        title="Rename World"
+                                    >
+                                        <Pencil className="h-5 w-5" />
+                                    </Button>
+                                )}
+                            </div>
+                        </h1>
+                    </div>
+                )}
+            </div>
             <p className="text-xl text-muted-foreground mt-2 italic font-serif">
               Directed by <span className="font-semibold text-foreground not-italic">{ownerName}</span>.
             </p>
@@ -942,7 +1019,8 @@ export default function WorldClient() {
                     className="space-y-4"
                   >
                     {filteredSessions.map((session, i) => {
-                      const hasJoined = !session.locked && session.characters.some(id => userCharacterIds.has(id))
+                      const isPlanning = session.planning || !session.date
+                      const hasJoined = !session.locked && !isPlanning && session.characters.some(id => userCharacterIds.has(id))
                       const isOwner = userId === session.owner
                       
                       return (
@@ -959,11 +1037,13 @@ export default function WorldClient() {
                                 "block p-3 rounded-md transition-all relative",
                                 isOwner 
                                     ? "session-owner" 
-                                    : isGM && hasJoined 
-                                        ? "session-admin-joined" 
-                                        : hasJoined 
-                                            ? "session-joined" 
-                                            : "session-default"
+                                    : isPlanning
+                                        ? "session-planning"
+                                        : isGM && hasJoined 
+                                            ? "session-admin-joined" 
+                                            : hasJoined 
+                                                ? "session-joined" 
+                                                : "session-default"
                             )}
                           >
                             <div className="flex flex-col gap-2">
@@ -982,29 +1062,33 @@ export default function WorldClient() {
                                         className="h-5 w-5"
                                     />
                                   )}
+                                  {isPlanning && <div className="text-[8px] bg-purple-600 text-white px-1.5 py-0.5 rounded-full uppercase tracking-widest font-black shadow-sm">Planning</div>}
                                   {session.locked && <Lock className="h-3 w-3 text-muted-foreground" />}
-                                  {session.characters.length >= session.maxPlayers && (
+                                  {!isPlanning && session.characters.length >= session.maxPlayers && (
                                     <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800 uppercase tracking-wider">
                                       Full
                                     </span>
                                   )}
                                 </div>
                                 <div className="text-xs font-medium text-muted-foreground bg-muted/50 px-2 py-1 rounded">
-                                  {formatDate(session.date)}
+                                  {session.date ? formatDate(session.date) : "Date TBD"}
                                 </div>
                               </div>
                               
                               <div className="flex items-center justify-between mt-1">
                                 <div className="text-sm font-semibold flex items-center gap-1">
                                   <Calendar className="h-3 w-3" />
-                                  {formatTime(session.date)}
+                                  {session.date ? formatTime(session.date) : "Planning Phase"}
                                 </div>
                                 <div className="flex items-center gap-4">
                                   <div className="text-xs text-muted-foreground flex items-center gap-1">
                                     <Users className="h-3 w-3" />
-                                    {session.characters.length} / {session.maxPlayers}
+                                    {isPlanning 
+                                        ? `${(session.interestedPlayers || []).length} interested`
+                                        : `${session.characters.length} / ${session.maxPlayers}`
+                                    }
                                   </div>
-                                  {activeTab === 'past' && (
+                                  {activeTab === 'past' && session.date && (
                                     <Button 
                                       variant="outline" 
                                       size="sm" 
@@ -1012,7 +1096,7 @@ export default function WorldClient() {
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         e.preventDefault();
-                                        window.open(`https://void.tarragon.be/Session-Reports/${new Date(session.date).toISOString().slice(0, 10)}-${world.name.replace(/\s+/g, '-')}`, '_blank');
+                                        window.open(`https://void.tarragon.be/Session-Reports/${new Date(session.date!).toISOString().slice(0, 10)}-${world.name.replace(/\s+/g, '-')}`, '_blank');
                                       }}
                                     >
                                       <Book className="h-3 w-3" />

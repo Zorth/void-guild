@@ -23,6 +23,16 @@
   color: #7E22CE; /* text-purple-700 */
 }
 
+.session-planning {
+  background-color: rgba(147, 51, 234, 0.05); /* bg-purple-50/50 */
+  border: 1px dashed #D8B4FE; /* border-purple-300 dashed */
+}
+
+.session-planning:hover {
+    background-color: rgba(147, 51, 234, 0.1);
+    border-style: solid;
+}
+
 .session-admin-joined {
     background-color: rgba(147, 51, 234, 0.1); /* bg-purple-100/50 */
     border: 2px solid #D8B4FE; /* border-purple-300 */

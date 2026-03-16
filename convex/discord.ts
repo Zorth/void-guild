@@ -27,42 +27,56 @@ export const syncSessionToDiscord = internalAction({
 
     if (!session) return;
 
-    const sessionTime = new Date(session.date);
-    const day = String(sessionTime.getDate()).padStart(2, '0');
-    const month = String(sessionTime.getMonth() + 1).padStart(2, '0');
+    const sessionTime = session.date ? new Date(session.date) : null;
+    let dateStr = "TBD";
+    if (sessionTime) {
+      const day = String(sessionTime.getDate()).padStart(2, '0');
+      const month = String(sessionTime.getMonth() + 1).padStart(2, '0');
+      dateStr = `${day}/${month}`;
+    }
     
     // Format: (DD/MM) The Void: <WorldName> [<signupCharacters>/<MaxCharacters>]
-    const threadName = `(${day}/${month}) The Void: ${session.worldName} [${session.attendingCharacters.length}/${session.maxPlayers}]`;
+    // OR: (PLANNING) The Void: <WorldName> [<interestCount>]
+    const isPlanning = session.planning || !session.date;
+    const threadName = isPlanning 
+      ? `(PLANNING) The Void: ${session.worldName} [${(session.interestedPlayers || []).length} Interested]`
+      : `(${dateStr}) The Void: ${session.worldName} [${session.attendingCharacters.length}/${session.maxPlayers}]`;
 
-    const unixTimestamp = Math.floor(session.date / 1000);
-    const discordTimestamp = `<t:${unixTimestamp}:F> (<t:${unixTimestamp}:R>)`;
+    const unixTimestamp = session.date ? Math.floor(session.date / 1000) : null;
+    const arrivalTime = unixTimestamp ? `<t:${unixTimestamp}:t>` : null;
+    const endTime = unixTimestamp ? `<t:${unixTimestamp + 1800}:t>` : null; // 30 minutes later
     
-    // First message content following the user's specific format
-    // # :Pathfinder: (or :DnD:) <WorldName>  
-    // **System**: Pathfinder 2e/Dungeons & Dragons 
-    // **Location**: <insert location> 
-    // **Date**: <Insert date and time with "sessions starts 30 minutes after">
+    const dateInfo = isPlanning 
+      ? "TBD (Planning Phase)" 
+      : `Arrive between ${arrivalTime} and ${endTime}`;
+
     const systemEmoji = session.system === 'PF' ? '<:Pathfinder:1322734594864320522>' : '<:DnD:1322734981524754473>';
     const systemName = session.system === 'PF' ? 'Pathfinder 2e' : 'D&D 5e';
-    const locationInfo = session.location ? `[View on Google Maps](${session.location})` : 'TBD';
+    const locationInfo = session.location ? `[View on Google Maps](${session.location})` : (isPlanning ? 'TBD (Planning Phase)' : 'TBD');
     const worldLink = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'}/world/${encodeURIComponent(session.worldName)}`;
-    const arrivalTime = `<t:${unixTimestamp}:t>`;
-    const endTime = `<t:${unixTimestamp + 1800}:t>`; // 30 minutes later
+    const sessionLink = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'}/sessions/${session._id}`;
     
     const messageContent = `# ${systemEmoji} [${session.worldName}](${worldLink})\n` +
       `**System**: ${systemName}\n` +
       `**Location**: ${locationInfo}\n` +
-      `**Date**: Arrive between ${arrivalTime} and ${endTime}\n\n` +
-      `*Voidmasters encourage you to use this thread to discuss your plans and prepare for this session!*`;
+      `**Date**: ${dateInfo}\n\n` +
+      `[**⚔️ VIEW SESSION ON GUILD**]( ${sessionLink} )\n\n` +
+      (isPlanning 
+        ? `*This session is currently in the planning phase. Click the link above to **show your interest** and make it easier for everyone to pick a date by filling in the Planning tab!*`
+        : `*Click the link above to **sign up with your character**! Voidmasters encourage you to use this thread to discuss your plans and prepare for this session!*`);
 
     // Format the list of signed-up characters for the embed
     const characterList = session.attendingCharacters.length > 0
       ? session.attendingCharacters.map(c => `• **${c.name}** (Lvl ${c.lvl} ${c.class})`).join("\n")
-      : "_No characters signed up yet._";
+      : (isPlanning ? "_Session is in planning - signups not yet open._" : "_No characters signed up yet._");
 
     const embed = {
-      title: "Current Signups",
-      description: characterList,
+      title: isPlanning ? "Interested Players" : "Current Signups",
+      description: isPlanning 
+        ? (session.interestedPlayers && session.interestedPlayers.length > 0 
+            ? session.interestedPlayers.map(p => `• **${p.username}**`).join("\n")
+            : "_No interest expressed yet._")
+        : characterList,
       color: session.system === 'PF' ? 0xde2e2e : 0xe81123,
       url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'}/sessions/${session._id}`,
       timestamp: new Date().toISOString(),

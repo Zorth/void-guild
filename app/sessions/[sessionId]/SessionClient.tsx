@@ -288,9 +288,14 @@ export default function SessionClient() {
       alert('Discord Webhook URL is not configured.')
       return
     }
-    const sessionTime = new Date(session.date)
-    const unixTimestamp = Math.floor(session.date / 1000)
-    const discordTimestamp = `<t:${unixTimestamp}:F> (<t:${unixTimestamp}:R>)`
+
+    if (!session.date && (type === 'remind' || type === 'cancel')) {
+        alert('Cannot send reminder or cancellation for a session without a date.')
+        return
+    }
+
+    const unixTimestamp = session.date ? Math.floor(session.date / 1000) : null
+    const discordTimestamp = unixTimestamp ? `<t:${unixTimestamp}:F> (<t:${unixTimestamp}:R>)` : "TBD"
     const roleId = session.system === 'PF' 
         ? process.env.NEXT_PUBLIC_DISCORD_ROLE_ID_PF 
         : process.env.NEXT_PUBLIC_DISCORD_ROLE_ID_DND
@@ -302,14 +307,16 @@ export default function SessionClient() {
 
     if (type === 'new') {
         embedTitle = `New Session Alert: ${session.worldName}`
-        embedDescription = `A new session for "${session.worldName}" has been announced!`
-    } else if (type === 'remind') {
+        embedDescription = session.date 
+            ? `A new session for "${session.worldName}" has been announced for ${discordTimestamp}!`
+            : `A new session for "${session.worldName}" is now in the planning phase! Express interest on the website to help pick a date.`
+    } else if (type === 'remind' && session.date) {
         const spotsLeft = session.maxPlayers - session.attendingCharacters.length
         const daysLeft = Math.ceil((session.date - Date.now()) / (1000 * 60 * 60 * 24))
         embedTitle = `Reminder: ${session.worldName}`
         embedDescription = `There are still ${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} left! The session starts ${discordTimestamp}.`
         embedColor = 16776960 // Yellow
-    } else if (type === 'cancel') {
+    } else if (type === 'cancel' && session.date) {
         embedTitle = `SESSION CANCELLED: ${session.worldName}`
         embedDescription = `The session for "${session.worldName}" on ${discordTimestamp} has been cancelled and will no longer be happening.`
         embedColor = 15158332 // Red
@@ -353,10 +360,9 @@ export default function SessionClient() {
     !session.characters.includes(char._id) && char.system === session.system
   ) ?? []
   const isFull = session.characters.length >= session.maxPlayers
-  const sessionTime = new Date(session.date)
-  const arrivalEndTime = new Date(session.date + 30 * 60 * 1000)
 
   const getGoogleCalendarLink = () => {
+    if (!session.date) return null
     const start = new Date(session.date).toISOString().replace(/-|:|\.\d+/g, '')
     const end = new Date(session.date + 4 * 3600000).toISOString().replace(/-|:|\.\d+/g, '')
     const title = encodeURIComponent(`Void Guild: ${session.worldName}`)
@@ -364,6 +370,8 @@ export default function SessionClient() {
     const location = encodeURIComponent(session.location || '')
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${start}/${end}&details=${details}&location=${location}`
   }
+
+  const calendarLink = getGoogleCalendarLink()
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -375,12 +383,14 @@ export default function SessionClient() {
           </Link>
         </Button>
         <div className="flex gap-2">
-            <Button variant="outline" size="sm" asChild className="sm:px-3 sm:w-auto w-9 px-0">
-                <a href={getGoogleCalendarLink()} target="_blank" rel="noopener noreferrer">
-                    <Calendar className="h-4 w-4 sm:mr-2" />
-                    <span className="hidden sm:inline">Add to Calendar</span>
-                </a>
-            </Button>
+            {calendarLink && (
+                <Button variant="outline" size="sm" asChild className="sm:px-3 sm:w-auto w-9 px-0">
+                    <a href={calendarLink} target="_blank" rel="noopener noreferrer">
+                        <Calendar className="h-4 w-4 sm:mr-2" />
+                        <span className="hidden sm:inline">Add to Calendar</span>
+                    </a>
+                </Button>
+            )}
             {isAdmin && session.locked && (
                 <AlertDialog>
                     <AlertDialogTrigger asChild>
@@ -413,7 +423,7 @@ export default function SessionClient() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         <div className="md:col-span-2 space-y-8">
-          <Card className={session.locked ? "border-amber-200 bg-amber-50/10" : ""}>
+          <Card className={session.locked ? "border-amber-200 bg-amber-50/10" : session.planning ? "border-purple-200 bg-purple-50/10" : ""}>
             <CardHeader>
               <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                 <div className="space-y-4 flex-grow">
@@ -422,8 +432,9 @@ export default function SessionClient() {
                         <span>{session.worldName}</span>
                         <div className="flex items-center gap-2 shrink-0">
                             {session.locked && <LockIcon className="h-5 w-5 text-amber-500" />}
+                            {session.planning && <div className="text-[10px] bg-purple-600 text-white px-2 py-0.5 rounded-full uppercase tracking-widest font-black shadow-sm">Planning</div>}
                             <a 
-                                href={`https://void.tarragon.be/Session-Reports/${sessionTime.toISOString().slice(0, 10)}-${session.worldName.replace(/\s+/g, '-')}`} 
+                                href={`https://void.tarragon.be/Session-Reports/${session.date ? new Date(session.date).toISOString().slice(0, 10) : 'TBD'}-${session.worldName.replace(/\s+/g, '-')}`} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
                                 className="text-muted-foreground hover:text-purple-500"
@@ -441,15 +452,29 @@ export default function SessionClient() {
                         </div>
                     </CardTitle>
                     <div className="text-lg text-muted-foreground mt-1">
-                        {formatDate(sessionTime)} at {formatTimeUtil(sessionTime)}
+                        {session.date ? (
+                            <>{formatDate(new Date(session.date))} at {formatTimeUtil(new Date(session.date))}</>
+                        ) : (
+                            <span className="italic">Date and Time TBD</span>
+                        )}
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="h-4 w-4 shrink-0" />
-                        <span>Please arrive between {formatTimeUtil(sessionTime)} and {formatTimeUtil(arrivalEndTime)}</span>
-                    </div>
+                    {session.date ? (
+                        <div className="space-y-1">
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Clock className="h-4 w-4 shrink-0" />
+                                <span>Please arrive between {formatTimeUtil(new Date(session.date))} and {formatTimeUtil(new Date(session.date + 30 * 60 * 1000))}</span>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground ml-6 italic">Session starts 30 minutes after.</p>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Clock className="h-4 w-4 shrink-0" />
+                            <span>Arrival time will be announced once a date is set.</span>
+                        </div>
+                    )}
                     {session.location && (
                         <div className="flex items-center gap-2 text-sm text-primary hover:underline">
                             <MapPin className="h-4 w-4 shrink-0" />
@@ -548,6 +573,7 @@ export default function SessionClient() {
                 characters={session.attendingCharacters}
                 userCharacterIds={userCharacterIds}
                 sessionLocked={session.locked}
+                sessionPlanning={session.planning}
                 isSessionOwner={session.isOwner}
                 onLeave={handleLeave}
                 userMetadata={userMetadata}
@@ -585,9 +611,12 @@ export default function SessionClient() {
             <>
               <Authenticated>
                 {!hasUserCharacterInSession && (
-                    <Card>
+                    <Card className={session.planning ? "border-purple-200 bg-purple-50/20" : ""}>
                     <CardHeader>
-                        <CardTitle>Interested?</CardTitle>
+                        <CardTitle className="flex items-center gap-2">
+                            Interested?
+                            {session.planning && <div className="text-[8px] bg-purple-600 text-white px-1.5 py-0.5 rounded-full uppercase tracking-widest font-black">Planning</div>}
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
                         {session.locked ? (
@@ -596,17 +625,21 @@ export default function SessionClient() {
                         </div>
                         ) : (
                         <div className="space-y-4">
-                            {isFull && !currentInterestedPlayers?.some(p => p.userId === userId) && (
-                            <div className="text-sm text-destructive italic text-center p-4 bg-destructive/5 rounded-md">
-                                This session is currently full, but you can still express interest.
-                            </div>
+                            {session.planning ? (
+                                <div className="text-sm text-purple-700 dark:text-purple-300 italic text-center p-4 bg-purple-500/10 rounded-md">
+                                    This session is in <b>planning</b>. Let the Voidmaster know you&apos;re interested to help them pick a date!
+                                </div>
+                            ) : isFull && !currentInterestedPlayers?.some(p => p.userId === userId) && (
+                                <div className="text-sm text-destructive italic text-center p-4 bg-destructive/5 rounded-md">
+                                    This session is currently full, but you can still express interest.
+                                </div>
                             )}
                             {currentInterestedPlayers?.some(p => p.userId === userId) ? (
                             <Button className="w-full" variant="outline" onClick={handleWithdrawInterest} disabled={isExpressingInterest}>
                                 {isExpressingInterest ? 'Updating...' : 'Not anymore :('}
                             </Button>
                             ) : (
-                            <Button className="w-full" onClick={handleExpressInterest} disabled={isExpressingInterest}>
+                            <Button className="w-full" onClick={handleExpressInterest} disabled={isExpressingInterest} variant={session.planning ? "default" : "outline"}>
                                 {isExpressingInterest ? 'Updating...' : 'Yes! :)'}
                             </Button>
                             )}
@@ -617,6 +650,7 @@ export default function SessionClient() {
 
                             <SessionJoinForm 
                             sessionLocked={session.locked}
+                            sessionPlanning={session.planning}
                             isFull={isFull}
                             availableCharacters={availableCharacters}
                             userCharactersCount={userCharacters?.length ?? 0}

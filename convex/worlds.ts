@@ -78,7 +78,12 @@ export const getSessionsByWorld = query({
       .filter((q) => q.eq(q.field('world'), args.worldId))
       .collect()
 
-    return sessions.sort((a, b) => b.date - a.date)
+    return sessions.sort((a, b) => {
+        if (a.date && b.date) return b.date - a.date
+        if (a.date) return -1
+        if (b.date) return 1
+        return 0
+    })
   },
 })
 

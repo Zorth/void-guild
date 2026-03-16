@@ -38,6 +38,7 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
   const [gmCharacter, setGmCharacter] = useState<Id<'characters'> | ''>(session?.gmCharacter || '')
   const [location, setLocation] = useState(session?.location || '')
   const [system, setSystem] = useState<'PF' | 'DnD'>(session?.system || 'PF')
+  const [planning, setPlanning] = useState(session?.planning || false)
   const [isOpen, setIsOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -49,18 +50,23 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
     }
     if (open) {
       if (session) {
-        const d = new Date(session.date)
-        
-        // Format YYYY-MM-DD in local time
-        const year = d.getFullYear()
-        const month = (d.getMonth() + 1).toString().padStart(2, '0')
-        const day = d.getDate().toString().padStart(2, '0')
-        setDate(`${year}-${month}-${day}`)
+        if (session.date) {
+            const d = new Date(session.date)
+            
+            // Format YYYY-MM-DD in local time
+            const year = d.getFullYear()
+            const month = (d.getMonth() + 1).toString().padStart(2, '0')
+            const day = d.getDate().toString().padStart(2, '0')
+            setDate(`${year}-${month}-${day}`)
 
-        // Format HH:mm in local time
-        const hours = d.getHours().toString().padStart(2, '0')
-        const minutes = d.getMinutes().toString().padStart(2, '0')
-        setTime(`${hours}:${minutes}`)
+            // Format HH:mm in local time
+            const hours = d.getHours().toString().padStart(2, '0')
+            const minutes = d.getMinutes().toString().padStart(2, '0')
+            setTime(`${hours}:${minutes}`)
+        } else {
+            setDate('')
+            setTime('')
+        }
         
         // setWorld(session.world) // Removed: world is now derived
         setLevel(session.level?.toString() || '')
@@ -68,6 +74,7 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
         setGmCharacter(session.gmCharacter || '')
         setLocation(session.location || '')
         setSystem(session.system || 'PF')
+        setPlanning(session.planning || false)
       } else {
         setDate('')
         setTime('')
@@ -77,6 +84,7 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
         setGmCharacter('')
         setLocation('')
         setSystem('PF')
+        setPlanning(false)
       }
     }
   }
@@ -86,8 +94,10 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
     
     // Validation
     const newErrors: Record<string, string> = {}
-    if (!date) newErrors.date = "Date is required"
-    if (!time) newErrors.time = "Time is required"
+    if (!planning) {
+        if (!date) newErrors.date = "Date is required"
+        if (!time) newErrors.time = "Time is required"
+    }
     
     const maxPlayersNum = parseInt(maxPlayers)
     if (isNaN(maxPlayersNum) || maxPlayersNum < 1) {
@@ -107,8 +117,11 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
     }
 
     setErrors({})
-    const sessionDateTime = new Date(`${date}T${time}`).getTime()
-    if (isNaN(sessionDateTime)) return
+    let sessionDateTime: number | undefined = undefined;
+    if (date && time) {
+        sessionDateTime = new Date(`${date}T${time}`).getTime()
+        if (isNaN(sessionDateTime)) sessionDateTime = undefined
+    }
 
     let levelValue: number | undefined = parseInt(level)
     if (isNaN(levelValue) || levelValue === 0) {
@@ -131,8 +144,9 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
           gmCharacter: gmCharId,
           location: locationVal,
           system: system,
+          planning: planning,
         })
-        track('session_updated', { worldName: worldName?.name, system });
+        track('session_updated', { worldName: worldName?.name, system, planning });
       } else {
         // Trigger particle effect at the mouse position for new sessions
         if ('clientX' in event.nativeEvent) {
@@ -149,8 +163,9 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
           gmCharacter: gmCharId,
           location: locationVal,
           system: system,
+          planning: planning,
         })
-        track('session_created', { worldName: worldName?.name, system });
+        track('session_created', { worldName: worldName?.name, system, planning });
       }
       setIsOpen(false)
     } finally {
@@ -175,11 +190,32 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{session ? 'Edit Session' : 'Create a New Session'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex items-center space-x-2 bg-muted/30 p-3 rounded-lg border border-primary/20">
+            <input 
+              type="checkbox" 
+              id="planning-toggle" 
+              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+              checked={planning}
+              onChange={(e) => setPlanning(e.target.checked)}
+            />
+            <div className="grid gap-1.5 leading-none">
+                <label
+                    htmlFor="planning-toggle"
+                    className="text-sm font-bold leading-none cursor-pointer"
+                >
+                    Planning Phase
+                </label>
+                <p className="text-[10px] text-muted-foreground">
+                    Gauge interest before setting a firm date. Signups will be disabled.
+                </p>
+            </div>
+          </div>
+
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium">System</label>
             <select
@@ -254,7 +290,7 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
             />
           </div>
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium">Date</label>
+            <label className="text-sm font-medium">Date {planning && "(Optional)"}</label>
             <Input
               type="date"
               value={date}
@@ -262,13 +298,13 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
                 setDate(e.target.value)
                 if (errors.date) setErrors({ ...errors, date: '' })
               }}
-              required
+              required={!planning}
               className={errors.date ? "border-destructive focus-visible:ring-destructive" : ""}
             />
             {errors.date && <p className="text-[10px] text-destructive font-medium">{errors.date}</p>}
           </div>
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium">When can people arrive at the location? Session starts 30 min after.</label>
+            <label className="text-sm font-medium">Arrival Time {planning && "(Optional)"}</label>
             <Input
               type="time"
               value={time}
@@ -276,7 +312,7 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
                 setTime(e.target.value)
                 if (errors.time) setErrors({ ...errors, time: '' })
               }}
-              required
+              required={!planning}
               className={errors.time ? "border-destructive focus-visible:ring-destructive" : ""}
             />
             {errors.time && <p className="text-[10px] text-destructive font-medium">{errors.time}</p>}
@@ -291,7 +327,7 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
               <Button type="button" variant="ghost" onClick={() => setIsOpen(false)} className="flex-1" disabled={isSubmitting}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={!date || !time || !maxPlayers || isSubmitting}>
+              <Button type="submit" disabled={(!planning && (!date || !time)) || !maxPlayers || isSubmitting}>
                 {isSubmitting ? (session ? 'Updating...' : 'Creating...') : (session ? 'Update' : 'Create')}
               </Button>
             </div>

@@ -106,7 +106,17 @@ export const listSessions = query({
       })
     )
 
-    return sessionsWithDetails.sort((a, b) => (args.past ? b.date - a.date : a.date - b.date))
+    return sessionsWithDetails.sort((a, b) => {
+      if (args.past) {
+        return (b.date || 0) - (a.date || 0);
+      }
+      
+      // For upcoming: sessions with dates first, then planning sessions without dates
+      if (a.date && b.date) return a.date - b.date;
+      if (a.date) return -1;
+      if (b.date) return 1;
+      return 0;
+    })
   },
 })
 
@@ -133,7 +143,15 @@ export const publicListSessions = query({
       })
     )
 
-    return sessionsWithDetails.sort((a, b) => (args.past ? b.date - a.date : a.date - b.date))
+    return sessionsWithDetails.sort((a, b) => {
+        if (args.past) {
+          return (b.date || 0) - (a.date || 0);
+        }
+        if (a.date && b.date) return a.date - b.date;
+        if (a.date) return -1;
+        if (b.date) return 1;
+        return 0;
+    })
   },
 })
 
@@ -247,13 +265,14 @@ export const previewXPGains = query({
 
 export const createSession = mutation({
   args: {
-    date: v.number(),
+    date: v.optional(v.number()),
     level: v.optional(v.number()),
     maxPlayers: v.number(),
     characters: v.array(v.id('characters')),
     gmCharacter: v.optional(v.id('characters')),
     location: v.optional(v.string()),
     system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
+    planning: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const isGM = await isGameMaster(ctx)
@@ -286,6 +305,7 @@ export const createSession = mutation({
       location: args.location,
       owner: identity.subject,
       system: args.system,
+      planning: args.planning,
     })
 
     await ctx.scheduler.runAfter(0, internal.discord.syncSessionToDiscord, {
@@ -306,7 +326,7 @@ export const createSession = mutation({
 export const updateSession = mutation({
   args: {
     sessionId: v.id('sessions'),
-    date: v.number(),
+    date: v.optional(v.number()),
     world: v.id('worlds'),
     level: v.optional(v.number()),
     maxPlayers: v.number(),
@@ -314,6 +334,7 @@ export const updateSession = mutation({
     gmCharacter: v.optional(v.id('characters')),
     location: v.optional(v.string()),
     system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
+    planning: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
@@ -338,6 +359,7 @@ export const updateSession = mutation({
       gmCharacter: args.gmCharacter,
       location: args.location,
       system: args.system,
+      planning: args.planning,
     })
 
     await ctx.scheduler.runAfter(0, internal.discord.syncSessionToDiscord, {
@@ -382,6 +404,10 @@ export const joinSession = mutation({
 
     if (session.locked) {
       throw new Error('This session is locked. You cannot join or leave.')
+    }
+
+    if (session.planning) {
+        throw new Error('This session is in planning and cannot be joined yet.')
     }
 
     if (session.characters.length >= session.maxPlayers) {
@@ -440,6 +466,10 @@ export const adminAddCharacterToSession = mutation({
   
       if (session.locked) {
         throw new Error('This session is locked. You cannot add characters.')
+      }
+
+      if (session.planning) {
+          throw new Error('This session is in planning and cannot be joined yet.')
       }
 
       if (session.characters.length >= session.maxPlayers) {
@@ -536,6 +566,10 @@ export const expressInterest = mutation({
     const newInterestedPlayers = [...interestedPlayers, { userId: user.subject, username: displayName }]
 
     await ctx.db.patch(args.sessionId, { interestedPlayers: newInterestedPlayers })
+
+    await ctx.scheduler.runAfter(0, internal.discord.syncSessionToDiscord, {
+        sessionId: args.sessionId
+    })
   },
 })
 
@@ -552,6 +586,10 @@ export const withdrawInterest = mutation({
     const newInterestedPlayers = interestedPlayers.filter(p => p.userId !== user.subject)
 
     await ctx.db.patch(args.sessionId, { interestedPlayers: newInterestedPlayers })
+
+    await ctx.scheduler.runAfter(0, internal.discord.syncSessionToDiscord, {
+        sessionId: args.sessionId
+    })
   },
 })
 
