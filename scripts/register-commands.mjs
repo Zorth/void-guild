@@ -1,5 +1,5 @@
-const APP_ID = "YOUR_APPLICATION_ID_HERE"; // Get this from Discord Portal
-const GUILD_ID = "YOUR_SERVER_ID_HERE"; // Optional: Use for instant updates in one server
+const APP_ID = "1479506068185944226"; // Get this from Discord Portal
+const GUILD_ID = "878674783972261918"; // Optional: Use for instant updates in one server
 const BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 
 async function registerCommands() {

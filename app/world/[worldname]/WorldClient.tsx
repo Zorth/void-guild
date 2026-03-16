@@ -203,7 +203,10 @@ function ReputationSystem({ worldId, worldName, userCharacterIds }: { worldId: I
   const [editingGroup, setEditingGroup] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
 
-  const unlockedSessions = useMemo(() => sessions?.filter(s => !s.locked) ?? [], [sessions])
+  const unlockedSessions = useMemo(() => {
+    if (!sessions) return []
+    return sessions.filter(s => !s.locked).sort((a, b) => a.date - b.date)
+  }, [sessions])
 
   const characterIds = useMemo(() => {
     if (!sessions) return []
@@ -852,7 +855,11 @@ export default function WorldClient() {
   const ownerMetadata = userMetadata[world.owner]
   const ownerName = ownerMetadata?.name || `User ${world.owner.slice(-4)}`
 
-  const allFilteredSessions = sessions?.filter(s => activeTab === 'past' ? s.locked : !s.locked) || []
+  const allFilteredSessions = useMemo(() => {
+    if (!sessions) return []
+    const filtered = sessions.filter(s => activeTab === 'past' ? s.locked : !s.locked)
+    return filtered.sort((a, b) => activeTab === 'past' ? b.date - a.date : a.date - b.date)
+  }, [sessions, activeTab])
   const filteredSessions = activeTab === 'past' ? allFilteredSessions.slice(0, sessionsLimit) : allFilteredSessions
   const hasMoreSessions = activeTab === 'past' && allFilteredSessions.length > sessionsLimit
 
