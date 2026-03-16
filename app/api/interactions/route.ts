@@ -41,12 +41,16 @@ export async function POST(req: Request) {
     const interaction = JSON.parse(body);
 
     // Handle PING from Discord (mandatory for endpoint verification)
-    if (interaction.type === InteractionType.PING) {
-      return Response.json({ type: InteractionResponseType.PONG });
+    if (interaction.type === 1) { // InteractionType.PING
+      console.log("[Discord] Received PING, sending PONG");
+      return new Response(JSON.stringify({ type: 1 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
     // Handle /sessions command
-    if (interaction.type === InteractionType.APPLICATION_COMMAND) {
+    if (interaction.type === 2) { // InteractionType.APPLICATION_COMMAND
       const { name } = interaction.data;
 
       if (name === 'sessions') {
