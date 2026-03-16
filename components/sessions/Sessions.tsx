@@ -628,22 +628,24 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
                           )}
                         >
                           <div className="flex flex-col">
-                            <div className="flex items-center gap-2">
-                              <div className={cn("font-semibold", "session-world", "flex items-center")}>
-                                  <span 
-                                    className="inline-flex align-middle justify-center w-20 rounded-full px-2.5 py-0.5 text-xs font-semibold mr-2"
-                                    style={getLevelBadgeStyle(session.level)}
-                                  >
-                                      Lvl {session.level ?? 'TBD'}
-                                  </span>
-                                  {session.system && (
-                                    <img 
-                                        src={session.system === 'PF' ? '/PFVoid.svg' : '/DnDVoid.svg'} 
-                                        alt={session.system} 
-                                        className="h-5 w-5 mr-2"
-                                    />
-                                  )}
-                                  {session.worldName}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <div className={cn("font-semibold", "session-world", "flex items-center gap-2 flex-wrap")}>
+                                  <div className="flex items-center gap-2 whitespace-nowrap">
+                                      <span 
+                                        className="inline-flex align-middle justify-center w-20 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                                        style={getLevelBadgeStyle(session.level)}
+                                      >
+                                          Lvl {session.level ?? 'TBD'}
+                                      </span>
+                                      {session.system && (
+                                        <img 
+                                            src={session.system === 'PF' ? '/PFVoid.svg' : '/DnDVoid.svg'} 
+                                            alt={session.system} 
+                                            className="h-5 w-5"
+                                        />
+                                      )}
+                                  </div>
+                                  <span className="truncate max-w-[200px] sm:max-w-none">{session.worldName}</span>
                               </div>
                               {session.characters.length >= session.maxPlayers && (
                                 <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800 uppercase tracking-wider">

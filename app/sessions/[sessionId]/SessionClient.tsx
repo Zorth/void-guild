@@ -415,13 +415,13 @@ export default function SessionClient() {
         <div className="md:col-span-2 space-y-8">
           <Card className={session.locked ? "border-amber-200 bg-amber-50/10" : ""}>
             <CardHeader>
-              <div className="flex justify-between items-start">
-                <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                <div className="space-y-4 flex-grow">
                   <div>
-                    <CardTitle className="text-3xl font-bold flex items-center gap-3">
-                        {session.worldName}
-                        {session.locked && <LockIcon className="h-5 w-5 text-amber-500" />}
-                        <div className="flex items-center gap-2">
+                    <CardTitle className="text-3xl font-bold flex flex-wrap items-center gap-3">
+                        <span>{session.worldName}</span>
+                        <div className="flex items-center gap-2 shrink-0">
+                            {session.locked && <LockIcon className="h-5 w-5 text-amber-500" />}
                             <a 
                                 href={`https://void.tarragon.be/Session-Reports/${sessionTime.toISOString().slice(0, 10)}-${session.worldName.replace(/\s+/g, '-')}`} 
                                 target="_blank" 
@@ -447,12 +447,12 @@ export default function SessionClient() {
 
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="h-4 w-4" />
+                        <Clock className="h-4 w-4 shrink-0" />
                         <span>Please arrive between {formatTimeUtil(sessionTime)} and {formatTimeUtil(arrivalEndTime)}</span>
                     </div>
                     {session.location && (
                         <div className="flex items-center gap-2 text-sm text-primary hover:underline">
-                            <MapPin className="h-4 w-4" />
+                            <MapPin className="h-4 w-4 shrink-0" />
                             <a href={session.location} target="_blank" rel="noopener noreferrer">
                                 View session location on Google Maps
                             </a>
@@ -460,19 +460,21 @@ export default function SessionClient() {
                     )}
                   </div>
 
-                  <div className="mt-2 flex gap-2 flex-wrap">
-                    <span className="text-sm font-medium px-2 py-0.5 bg-secondary rounded-md">
-                        Session Level {session.level ?? 'TBD'}
-                    </span>
-                    {session.system && (
-                        <img 
-                            src={session.system === 'PF' ? '/PFVoid.svg' : '/DnDVoid.svg'} 
-                            alt={session.system} 
-                            className="h-5 w-5"
-                        />
-                    )}
+                  <div className="mt-2 flex gap-2 flex-wrap items-center">
+                    <div className="flex items-center gap-2 bg-secondary px-2 py-0.5 rounded-md whitespace-nowrap">
+                        <span className="text-sm font-medium">
+                            Session Level {session.level ?? 'TBD'}
+                        </span>
+                        {session.system && (
+                            <img 
+                                src={session.system === 'PF' ? '/PFVoid.svg' : '/DnDVoid.svg'} 
+                                alt={session.system} 
+                                className="h-4 w-4"
+                            />
+                        )}
+                    </div>
                     {session.isOwner && session.gmCharacterData && (
-                        <span className="text-sm font-medium px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded-md flex items-center gap-1">
+                        <span className="text-sm font-medium px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded-md flex items-center gap-1 whitespace-nowrap">
                             <Shield className="h-3 w-3" /> GM: {session.gmCharacterData.name}
                             {session.gmCharacterData.system && (
                                 <img 
@@ -485,7 +487,7 @@ export default function SessionClient() {
                     )}
                   </div>
                 </div>
-                <div className="bg-muted px-3 py-1 rounded-full text-sm font-semibold">
+                <div className="bg-muted px-3 py-1 rounded-full text-sm font-semibold whitespace-nowrap self-start">
                     {session.attendingCharacters.length} / {session.maxPlayers} Players
                 </div>
               </div>
