@@ -51,7 +51,7 @@ export async function POST(req: Request) {
     // Handle PING from Discord (mandatory for endpoint verification)
     if (interaction.type === 1) { // InteractionType.PING
       console.log("[Discord] Valid PING received, sending PONG");
-      return new Response(JSON.stringify({ type: 1 }), {
+      return new Response('{"type":1}', {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
