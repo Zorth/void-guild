@@ -307,6 +307,9 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
           </div>
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium">Arrival Time {planning && "(Optional)"}</label>
+            <p className="text-[10px] text-muted-foreground -mt-1 italic">
+                Session starts 30 minutes after.
+            </p>
             <Input
               type="time"
               value={time}
