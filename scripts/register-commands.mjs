@@ -17,6 +17,30 @@ async function registerCommands() {
       {
         name: 'sessions',
         description: 'Show upcoming gaming sessions',
+      },
+      {
+        name: 'character',
+        description: 'Search for a character by name',
+        options: [
+          {
+            name: 'name',
+            description: 'The name of the character to find',
+            type: 3, // STRING
+            required: true,
+          }
+        ]
+      },
+      {
+        name: 'world',
+        description: 'Search for a world by name',
+        options: [
+          {
+            name: 'name',
+            description: 'The name of the world to find',
+            type: 3, // STRING
+            required: true,
+          }
+        ]
       }
     ]),
   });

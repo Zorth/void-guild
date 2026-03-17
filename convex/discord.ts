@@ -1,4 +1,4 @@
-import { action, internalAction, internalMutation, internalQuery } from "./_generated/server";
+import { action, internalAction, internalMutation, internalQuery, query } from "./_generated/server";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
@@ -193,6 +193,63 @@ export const sendActivityToDiscord = internalAction({
     } catch (e) {
       console.error("Failed to send activity to Discord:", e);
     }
+  },
+});
+
+/**
+ * Searches for a character by name (case-insensitive fuzzy match).
+ */
+export const searchCharacter = query({
+  args: { name: v.string() },
+  handler: async (ctx, args) => {
+    const characters = await ctx.db.query("characters").collect();
+    const searchLower = args.name.toLowerCase();
+    
+    // Simple "fuzzy" match: contains search string, then pick shortest name to get "best" match
+    const matches = characters
+      .filter(c => c.name.toLowerCase().includes(searchLower))
+      .sort((a, b) => a.name.length - b.name.length);
+
+    return matches.length > 0 ? matches[0] : null;
+  },
+});
+
+/**
+ * Searches for a world by name (case-insensitive fuzzy match) and finds its next session.
+ */
+export const searchWorld = query({
+  args: { name: v.string() },
+  handler: async (ctx, args) => {
+    const worlds = await ctx.db.query("worlds").collect();
+    const searchLower = args.name.toLowerCase();
+
+    const matchedWorld = worlds
+      .filter(w => w.name.toLowerCase().includes(searchLower))
+      .sort((a, b) => a.name.length - b.name.length)[0];
+
+    if (!matchedWorld) return null;
+
+    // Find the next upcoming session (not locked, closest date, or planning)
+    const sessions = await ctx.db
+      .query("sessions")
+      .filter(q => q.and(
+        q.eq(q.field("world"), matchedWorld._id),
+        q.eq(q.field("locked"), false)
+      ))
+      .collect();
+
+    // Sort: 1. Dated sessions by date (soonest first), 2. Planning sessions
+    const nextSession = sessions.sort((a, b) => {
+      if (a.date && b.date) return a.date - b.date;
+      if (a.date) return -1;
+      if (b.date) return 1;
+      return 0;
+    })[0];
+
+    return {
+      world: matchedWorld,
+      nextSession: nextSession || null,
+    };
   },
 });
 

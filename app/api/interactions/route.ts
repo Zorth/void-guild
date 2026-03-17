@@ -42,10 +42,12 @@ export async function POST(req: Request) {
     }
 
     if (interaction.type === 2) { // APPLICATION_COMMAND
-      const { name } = interaction.data;
+      const { name, options } = interaction.data;
+      const convex = getConvexClient();
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be';
+
       if (name === 'sessions') {
         try {
-          const convex = getConvexClient();
           const sessions = await convex.query(api.sessions.publicListSessions, { past: false });
 
           let content = "No upcoming sessions scheduled in the Void Guild.";
@@ -56,7 +58,7 @@ export async function POST(req: Request) {
                 : "Date TBD";
               return `• **${s.worldName}** - ${dateStr} (${s.characterNames.length}/${s.maxPlayers} players)`;
             }).join('\n');
-            content = `### ⚔️ Upcoming Sessions\n${sessionList}\n\n[View Full Schedule](${process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'})`;
+            content = `### ⚔️ Upcoming Sessions\n${sessionList}\n\n[View Full Schedule](${baseUrl})`;
           }
 
           return new Response(JSON.stringify({
@@ -68,6 +70,96 @@ export async function POST(req: Request) {
           return new Response(JSON.stringify({
             type: 4,
             data: { content: "Error fetching sessions." },
+          }), { headers: { 'Content-Type': 'application/json' } });
+        }
+      }
+
+      if (name === 'character') {
+        const charName = options?.[0]?.value;
+        if (!charName) return new Response('Missing character name', { status: 400 });
+
+        try {
+          const character = await convex.query(api.discord.searchCharacter, { name: charName });
+          
+          if (!character) {
+            return new Response(JSON.stringify({
+              type: 4,
+              data: { content: `No character found matching "**${charName}**".` },
+            }), { headers: { 'Content-Type': 'application/json' } });
+          }
+
+          const systemEmoji = character.system === 'PF' ? '<:Pathfinder:1322734594864320522>' : '<:DnD:1322734981524754473>';
+          const embed = {
+            title: `${systemEmoji} ${character.name}`,
+            description: `${character.ancestry || 'Unknown Ancestry'} ${character.class || 'Unknown Class'}`,
+            fields: [
+              { name: 'Level', value: `Lvl ${character.lvl}`, inline: true },
+              { name: 'Experience', value: `${character.xp}/1000 XP`, inline: true },
+            ],
+            color: character.system === 'PF' ? 0xde2e2e : 0xe81123,
+            timestamp: new Date().toISOString(),
+          };
+
+          return new Response(JSON.stringify({
+            type: 4,
+            data: { embeds: [embed] },
+          }), { headers: { 'Content-Type': 'application/json' } });
+        } catch (e) {
+          console.error("[Discord] Convex Error:", e);
+          return new Response(JSON.stringify({
+            type: 4,
+            data: { content: "Error fetching character details." },
+          }), { headers: { 'Content-Type': 'application/json' } });
+        }
+      }
+
+      if (name === 'world') {
+        const worldNameArg = options?.[0]?.value;
+        if (!worldNameArg) return new Response('Missing world name', { status: 400 });
+
+        try {
+          const result = await convex.query(api.discord.searchWorld, { name: worldNameArg });
+          
+          if (!result) {
+            return new Response(JSON.stringify({
+              type: 4,
+              data: { content: `No world found matching "**${worldNameArg}**".` },
+            }), { headers: { 'Content-Type': 'application/json' } });
+          }
+
+          const { world, nextSession } = result;
+          const worldLink = `${baseUrl}/world/${encodeURIComponent(world.name)}`;
+          
+          let sessionInfo = "No upcoming sessions.";
+          if (nextSession) {
+            if (nextSession.date) {
+              const unixTimestamp = Math.floor(nextSession.date / 1000);
+              sessionInfo = `Next session: <t:${unixTimestamp}:F> (<t:${unixTimestamp}:R>)`;
+            } else if (nextSession.planning) {
+              sessionInfo = "Next session is currently in the planning phase.";
+            }
+          }
+
+          const embed = {
+            title: `🌍 ${world.name}`,
+            url: worldLink,
+            description: world.description || "_No description provided._",
+            fields: [
+              { name: 'Status', value: sessionInfo },
+            ],
+            color: 0x3b82f6, // Blue
+            timestamp: new Date().toISOString(),
+          };
+
+          return new Response(JSON.stringify({
+            type: 4,
+            data: { embeds: [embed] },
+          }), { headers: { 'Content-Type': 'application/json' } });
+        } catch (e) {
+          console.error("[Discord] Convex Error:", e);
+          return new Response(JSON.stringify({
+            type: 4,
+            data: { content: "Error fetching world details." },
           }), { headers: { 'Content-Type': 'application/json' } });
         }
       }
