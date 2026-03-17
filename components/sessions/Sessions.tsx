@@ -466,7 +466,7 @@ function SevenDayOverview({ sessions, userCharacterIds }: { sessions: SessionWit
                             )}
                         >
                             <div className="day-box-header px-2 py-1">
-                                {day.toLocaleDateString([], { weekday: 'short', day: 'numeric' })}
+                                {`${day.getDate().toString().padStart(2, '0')}/${(day.getMonth() + 1).toString().padStart(2, '0')}`}
                             </div>
                             <div className="day-box-content">
                                 {daySessions.map(session => (

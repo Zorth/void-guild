@@ -78,10 +78,38 @@ const sabon = localFont({
   preload: false,
 })
 
+const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'
+
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'),
-  title: 'Void Guild',
-  description: 'Character Manager for the Guild of The Void',
+  metadataBase: new URL(baseUrl),
+  title: {
+    default: 'Guild of The Void | Character & Session Manager',
+    template: '%s | Void Guild'
+  },
+  description: 'The central hub for The Void tabletop campaign. Manage your characters, join epic sessions, track XP, and explore new worlds with real-time Discord integration.',
+  keywords: ['Pathfinder 2e', 'D&D 5e', 'TTRPG', 'Character Manager', 'Session Tracker', 'The Void'],
+  openGraph: {
+    title: 'Guild of The Void',
+    description: 'The central hub for The Void tabletop campaign. Character management, session scheduling, and real-time XP tracking.',
+    url: baseUrl,
+    siteName: 'Void Guild',
+    images: [
+      {
+        url: `${baseUrl}/PFVoid.svg`, // Defaulting to the Pathfinder logo as it's the primary system
+        width: 800,
+        height: 800,
+        alt: 'Void Guild Logo',
+      },
+    ],
+    locale: 'en_GB',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Guild of The Void',
+    description: 'Manage your TTRPG characters and sessions in the Void.',
+    images: [`${baseUrl}/PFVoid.svg`],
+  },
 }
 
 export default function RootLayout({

@@ -30,8 +30,15 @@ export const syncSessionToDiscord = internalAction({
     const sessionTime = session.date ? new Date(session.date) : null;
     let dateStr = "TBD";
     if (sessionTime) {
-      const day = String(sessionTime.getDate()).padStart(2, '0');
-      const month = String(sessionTime.getMonth() + 1).padStart(2, '0');
+      // Use Europe/Brussels to ensure the thread name reflects the GM's intended day/month
+      const formatter = new Intl.DateTimeFormat('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        timeZone: 'Europe/Brussels'
+      });
+      const parts = formatter.formatToParts(sessionTime);
+      const day = parts.find(p => p.type === 'day')?.value || "01";
+      const month = parts.find(p => p.type === 'month')?.value || "01";
       dateStr = `${day}/${month}`;
     }
     
@@ -272,12 +279,20 @@ export const searchSessions = query({
     return sessions
       .map((s) => {
         const worldName = worldMap.get(s.world) || "Unknown World";
-        const dateStr = s.date
-          ? new Date(s.date).toLocaleDateString("en-GB", {
-              day: "numeric",
-              month: "short",
-            })
-          : "Planning";
+        let dateStr = "Planning";
+        if (s.date) {
+            const d = new Date(s.date);
+            // Use Brussels time for consistency
+            const formatter = new Intl.DateTimeFormat('en-GB', {
+                day: '2-digit',
+                month: '2-digit',
+                timeZone: 'Europe/Brussels'
+            });
+            const parts = formatter.formatToParts(d);
+            const day = parts.find(p => p.type === 'day')?.value || "01";
+            const month = parts.find(p => p.type === 'month')?.value || "01";
+            dateStr = `${day}/${month}`;
+        }
         return {
           name: `${worldName} (${dateStr})`,
           id: s._id,

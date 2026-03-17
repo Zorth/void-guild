@@ -188,6 +188,9 @@ export const getPublicSession = query({
     if (!session) return null;
 
     const world = await ctx.db.get(session.world);
+    const attendingCharacters = await Promise.all(
+      session.characters.map((id) => ctx.db.get(id))
+    );
     
     return {
       _id: session._id,
@@ -196,7 +199,9 @@ export const getPublicSession = query({
       system: session.system,
       level: session.level,
       maxPlayers: session.maxPlayers,
-      attendingCount: session.characters.length,
+      attendingCharacters: attendingCharacters
+        .filter((c): c is any => c !== null)
+        .map(c => ({ name: c.name, lvl: c.lvl })),
       interestedCount: (session.interestedPlayers || []).length,
       planning: session.planning,
       location: session.location,

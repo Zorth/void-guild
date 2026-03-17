@@ -87,8 +87,15 @@ export async function POST(req: Request) {
             fields: [
               { name: 'System', value: session.system === 'PF' ? 'Pathfinder 2e' : 'D&D 5e', inline: true },
               { name: 'Level', value: session.level ? `Level ${session.level}` : 'TBD', inline: true },
-              { name: 'Players', value: `${session.attendingCount}/${session.maxPlayers}`, inline: true },
+              { name: 'Players', value: `${session.attendingCharacters.length}/${session.maxPlayers}`, inline: true },
               { name: 'Date & Time', value: discordTimestamp, inline: false },
+              { 
+                name: session.planning ? 'Interested Players' : 'Current Signups', 
+                value: session.attendingCharacters.length > 0 
+                  ? session.attendingCharacters.map(c => `• **${c.name}** (Lvl ${c.lvl})`).join('\n')
+                  : (session.planning ? "_No interest expressed yet._" : "_No characters signed up yet._"),
+                inline: false 
+              },
             ],
             color: session.system === 'PF' ? 0xde2e2e : 0xe81123,
             timestamp: new Date().toISOString(),
@@ -119,7 +126,7 @@ export async function POST(req: Request) {
           if (sessions && sessions.length > 0) {
             const sessionList = sessions.slice(0, 5).map(s => {
               const dateStr = s.date 
-                ? new Date(s.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+                ? `<t:${Math.floor(s.date / 1000)}:d>`
                 : "Date TBD";
               return `• **${s.worldName}** - ${dateStr} (${s.characterNames.length}/${s.maxPlayers} players)`;
             }).join('\n');

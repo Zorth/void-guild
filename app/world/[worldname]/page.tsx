@@ -20,6 +20,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
     const title = `${world.name} | Void Guild World`
     const description = world.description || `Explore the world of ${world.name} in the Void Guild.`
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'
+    const imagePath = `${baseUrl}/globe.svg`
 
     return {
       title,
@@ -30,7 +32,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         type: 'website',
         images: [
           {
-            url: '/globe.svg',
+            url: imagePath,
             width: 400,
             height: 400,
             alt: world.name,
@@ -41,7 +43,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         card: 'summary',
         title,
         description,
-        images: ['/globe.svg'],
+        images: [imagePath],
       },
     }
   } catch (error) {
