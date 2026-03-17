@@ -64,8 +64,37 @@ export async function POST(req: Request) {
 
       if (name === 'session') {
         const sessionId = options?.[0]?.value;
-        if (!sessionId) return new Response('Missing session ID', { status: 400 });
+        
+        if (!sessionId) {
+          // List upcoming sessions (Equivalent to old /sessions)
+          try {
+            const sessions = await convex.query(api.sessions.publicListSessions, { past: false });
 
+            let content = "No upcoming sessions scheduled in the Void Guild.";
+            if (sessions && sessions.length > 0) {
+              const sessionList = sessions.slice(0, 5).map(s => {
+                const dateStr = s.date 
+                  ? `<t:${Math.floor(s.date / 1000)}:d>`
+                  : "Date TBD";
+                return `• **${s.worldName}** - ${dateStr} (${s.characterNames.length}/${s.maxPlayers} players)${s.planning ? " (Planning)" : ""}`;
+              }).join('\n');
+              content = `### ⚔️ Upcoming Sessions\n${sessionList}\n\n[View Full Schedule](${baseUrl})`;
+            }
+
+            return new Response(JSON.stringify({
+              type: 4, // CHANNEL_MESSAGE_WITH_SOURCE
+              data: { content },
+            }), { headers: { 'Content-Type': 'application/json' } });
+          } catch (e) {
+            console.error("[Discord] Convex Error:", e);
+            return new Response(JSON.stringify({
+              type: 4,
+              data: { content: "Error fetching sessions." },
+            }), { headers: { 'Content-Type': 'application/json' } });
+          }
+        }
+
+        // Show specific session details
         try {
           const session = await convex.query(api.sessions.getPublicSession, { sessionId });
           
@@ -122,30 +151,57 @@ export async function POST(req: Request) {
         }
       }
 
-      if (name === 'sessions') {
-        try {
-          const sessions = await convex.query(api.sessions.publicListSessions, { past: false });
 
-          let content = "No upcoming sessions scheduled in the Void Guild.";
-          if (sessions && sessions.length > 0) {
-            const sessionList = sessions.slice(0, 5).map(s => {
-              const dateStr = s.date 
-                ? `<t:${Math.floor(s.date / 1000)}:d>`
-                : "Date TBD";
-              return `• **${s.worldName}** - ${dateStr} (${s.characterNames.length}/${s.maxPlayers} players)`;
-            }).join('\n');
-            content = `### ⚔️ Upcoming Sessions\n${sessionList}\n\n[View Full Schedule](${baseUrl})`;
+      if (name === 'schedule') {
+        try {
+          const summary = await convex.query(api.planning.getPlanningSummary);
+          
+          if (!summary.nextAvailable && !summary.mostAvailable) {
+            return new Response(JSON.stringify({
+              type: 4,
+              data: { content: "No upcoming availability recorded for the next 2 weeks. Go to the Planning tab on the website to mark your availability!" },
+            }), { headers: { 'Content-Type': 'application/json' } });
           }
 
+          const fields = [];
+          if (summary.nextAvailable) {
+            const unixTs = Math.floor(summary.nextAvailable.date / 1000);
+            fields.push({
+              name: "📅 Next Session Opportunity",
+              value: `<t:${unixTs}:D> (<t:${unixTs}:R>)\n**Players:** ${summary.nextAvailable.count} (inc. ${summary.nextAvailable.gmCount} GMs)\n**Names:** ${summary.nextAvailable.users.join(", ")}`,
+              inline: false
+            });
+          }
+
+          if (summary.mostAvailable && (!summary.nextAvailable || summary.mostAvailable.date !== summary.nextAvailable.date)) {
+            const unixTs = Math.floor(summary.mostAvailable.date / 1000);
+            fields.push({
+              name: "🌟 Most Available Date",
+              value: `<t:${unixTs}:D> (<t:${unixTs}:R>)\n**Players:** ${summary.mostAvailable.count} (inc. ${summary.mostAvailable.gmCount} GMs)\n**Names:** ${summary.mostAvailable.users.join(", ")}`,
+              inline: false
+            });
+          }
+
+          const embed = {
+            title: "⚔️ Void Guild Planning Summary",
+            description: "Here are the best dates for potential sessions in the next 2 weeks based on member availability.",
+            fields: fields,
+            color: 0x3b82f6, // Blue
+            timestamp: new Date().toISOString(),
+          };
+
           return new Response(JSON.stringify({
-            type: 4, // CHANNEL_MESSAGE_WITH_SOURCE
-            data: { content },
+            type: 4,
+            data: { 
+              embeds: [embed],
+              content: `[View Full Planning Calendar](${baseUrl})`
+            },
           }), { headers: { 'Content-Type': 'application/json' } });
         } catch (e) {
           console.error("[Discord] Convex Error:", e);
           return new Response(JSON.stringify({
             type: 4,
-            data: { content: "Error fetching sessions." },
+            data: { content: "Error fetching planning summary." },
           }), { headers: { 'Content-Type': 'application/json' } });
         }
       }
@@ -191,7 +247,33 @@ export async function POST(req: Request) {
 
       if (name === 'world') {
         const worldNameArg = options?.[0]?.value;
-        if (!worldNameArg) return new Response('Missing world name', { status: 400 });
+        
+        if (!worldNameArg) {
+          // List all worlds
+          try {
+            const worlds = await convex.query(api.worlds.listAllWorlds);
+            
+            let content = "No worlds found in the Void Guild.";
+            if (worlds && worlds.length > 0) {
+              const worldList = worlds.map(w => {
+                const worldLink = `${baseUrl}/world/${encodeURIComponent(w.name)}`;
+                return `• **[${w.name}](${worldLink})**`;
+              }).join('\n');
+              content = `### 🌍 Discover Our Worlds\n${worldList}\n\n[Explore All](${baseUrl}/world)`;
+            }
+
+            return new Response(JSON.stringify({
+              type: 4,
+              data: { content },
+            }), { headers: { 'Content-Type': 'application/json' } });
+          } catch (e) {
+            console.error("[Discord] Convex Error:", e);
+            return new Response(JSON.stringify({
+              type: 4,
+              data: { content: "Error fetching worlds." },
+            }), { headers: { 'Content-Type': 'application/json' } });
+          }
+        }
 
         try {
           const result = await convex.query(api.discord.searchWorld, { name: worldNameArg });

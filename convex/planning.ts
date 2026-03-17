@@ -88,3 +88,62 @@ export const toggleAvailability = mutation({
     }
   }
 })
+
+/**
+ * Returns a summary of availability for the next 2 weeks, finding:
+ * 1. The next date with at least 4 players (inc. 1 GM).
+ * 2. The date with the most total availability.
+ */
+export const getPlanningSummary = query({
+    args: {},
+    handler: async (ctx) => {
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+        const startTime = now.getTime();
+        const twoWeeksLater = startTime + (14 * 24 * 60 * 60 * 1000);
+
+        const availability = await ctx.db
+            .query('availability')
+            .withIndex('by_date', (q) => q.gte('date', startTime).lte('date', twoWeeksLater))
+            .collect();
+
+        // Group by date
+        const byDate = new Map<number, { date: number, users: string[], gms: string[] }>();
+        for (const record of availability) {
+            const entry = byDate.get(record.date) || { date: record.date, users: [], gms: [] };
+            entry.users.push(record.username);
+            if (record.isGM) entry.gms.push(record.username);
+            byDate.set(record.date, entry);
+        }
+
+        const sortedDates = Array.from(byDate.values()).sort((a, b) => a.date - b.date);
+
+        // 1. Next Available: 4+ people, 1+ GM
+        const nextAvailable = sortedDates.find(d => d.users.length >= 4 && d.gms.length >= 1);
+
+        // 2. Most Available: Max total users
+        let mostAvailable = null;
+        let maxUsers = 0;
+        for (const d of sortedDates) {
+            if (d.users.length > maxUsers) {
+                maxUsers = d.users.length;
+                mostAvailable = d;
+            }
+        }
+
+        return {
+            nextAvailable: nextAvailable ? {
+                date: nextAvailable.date,
+                count: nextAvailable.users.length,
+                gmCount: nextAvailable.gms.length,
+                users: nextAvailable.users
+            } : null,
+            mostAvailable: mostAvailable ? {
+                date: mostAvailable.date,
+                count: mostAvailable.users.length,
+                gmCount: mostAvailable.gms.length,
+                users: mostAvailable.users
+            } : null
+        };
+    }
+})

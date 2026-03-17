@@ -111,10 +111,14 @@ export const listSessions = query({
         return (b.date || 0) - (a.date || 0);
       }
       
-      // For upcoming: sessions with dates first, then planning sessions without dates
+      // Planning sessions first
+      const aIsPlanning = a.planning || !a.date;
+      const bIsPlanning = b.planning || !b.date;
+      if (aIsPlanning && !bIsPlanning) return -1;
+      if (!aIsPlanning && bIsPlanning) return 1;
+
+      // Then by date
       if (a.date && b.date) return a.date - b.date;
-      if (a.date) return -1;
-      if (b.date) return 1;
       return 0;
     })
   },
@@ -147,9 +151,15 @@ export const publicListSessions = query({
         if (args.past) {
           return (b.date || 0) - (a.date || 0);
         }
+
+        // Planning sessions first
+        const aIsPlanning = a.planning || !a.date;
+        const bIsPlanning = b.planning || !b.date;
+        if (aIsPlanning && !bIsPlanning) return -1;
+        if (!aIsPlanning && bIsPlanning) return 1;
+
+        // Then by date
         if (a.date && b.date) return a.date - b.date;
-        if (a.date) return -1;
-        if (b.date) return 1;
         return 0;
     })
   },

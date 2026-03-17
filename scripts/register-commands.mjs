@@ -15,18 +15,14 @@ async function registerCommands() {
     },
     body: JSON.stringify([
       {
-        name: 'sessions',
-        description: 'Show upcoming gaming sessions',
-      },
-      {
         name: 'session',
-        description: 'View details of a specific session',
+        description: 'Show upcoming sessions or search for one',
         options: [
           {
             name: 'name',
             description: 'Search for a session by world or date',
             type: 3, // STRING
-            required: true,
+            required: false,
             autocomplete: true,
           }
         ]
@@ -45,15 +41,19 @@ async function registerCommands() {
       },
       {
         name: 'world',
-        description: 'Search for a world by name',
+        description: 'Search for a world by name or list all worlds',
         options: [
           {
             name: 'name',
             description: 'The name of the world to find',
             type: 3, // STRING
-            required: true,
+            required: false,
           }
         ]
+      },
+      {
+        name: 'schedule',
+        description: 'Show upcoming availability summary for the next 2 weeks',
       }
     ]),
   });
