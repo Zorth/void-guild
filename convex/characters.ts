@@ -111,6 +111,7 @@ export const createCharacter = mutation({
 export const updateCharacter = mutation({
   args: {
     characterId: v.id('characters'),
+    name: v.optional(v.string()),
     ancestry: v.optional(v.string()),
     class: v.optional(v.string()),
     websiteLink: v.optional(v.string()),
@@ -126,6 +127,7 @@ export const updateCharacter = mutation({
       throw new Error('Character not found or you do not have permission to edit it.')
     }
     await ctx.db.patch(args.characterId, {
+      name: args.name,
       ancestry: args.ancestry,
       class: args.class,
       websiteLink: args.websiteLink,

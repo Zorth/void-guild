@@ -53,7 +53,7 @@ export default function Characters({ filters }: { filters?: { pf: boolean, dnd: 
 
   const [selectedCharacter, setSelectedCharacter] = useState<Doc<'characters'> | null>(null)
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false)
-  const [editedCharacterData, setEditedCharacterData] = useState({ ancestry: '', class: '', websiteLink: '', system: 'PF' as 'PF' | 'DnD' })
+  const [editedCharacterData, setEditedCharacterData] = useState({ name: '', ancestry: '', class: '', websiteLink: '', system: 'PF' as 'PF' | 'DnD' })
 
   const [showCreateWorldDialog, setShowCreateWorldDialog] = useState(false)
   const [newWorldName, setNewWorldName] = useState('')
@@ -103,7 +103,7 @@ export default function Characters({ filters }: { filters?: { pf: boolean, dnd: 
         characterId: selectedCharacter._id,
         ...editedCharacterData,
       })
-      track('character_updated', { name: selectedCharacter.name })
+      track('character_updated', { name: editedCharacterData.name })
       setIsDetailsDialogOpen(false)
     } finally {
       setIsSubmitting(false)
@@ -121,6 +121,7 @@ export default function Characters({ filters }: { filters?: { pf: boolean, dnd: 
   function openDetailsDialog(character: Doc<'characters'>) {
     setSelectedCharacter(character)
     setEditedCharacterData({
+      name: character.name,
       ancestry: character.ancestry ?? '',
       class: character.class ?? '',
       websiteLink: character.websiteLink ?? '',
@@ -316,21 +317,39 @@ export default function Characters({ filters }: { filters?: { pf: boolean, dnd: 
                   <option value="DnD">Dungeons & Dragons</option>
                 </select>
               </div>
-              <Input
-                value={editedCharacterData.ancestry}
-                onChange={(e) => setEditedCharacterData({ ...editedCharacterData, ancestry: e.target.value })}
-                placeholder="Ancestry"
-              />
-              <Input
-                value={editedCharacterData.class}
-                onChange={(e) => setEditedCharacterData({ ...editedCharacterData, class: e.target.value })}
-                placeholder="Class"
-              />
-              <Input
-                value={editedCharacterData.websiteLink}
-                onChange={(e) => setEditedCharacterData({ ...editedCharacterData, websiteLink: e.target.value })}
-                placeholder="Website Link"
-              />
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium">Character Name</label>
+                <Input
+                  value={editedCharacterData.name}
+                  onChange={(e) => setEditedCharacterData({ ...editedCharacterData, name: e.target.value })}
+                  placeholder="Character Name"
+                  required
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium">Ancestry</label>
+                <Input
+                  value={editedCharacterData.ancestry}
+                  onChange={(e) => setEditedCharacterData({ ...editedCharacterData, ancestry: e.target.value })}
+                  placeholder="Ancestry"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium">Class</label>
+                <Input
+                  value={editedCharacterData.class}
+                  onChange={(e) => setEditedCharacterData({ ...editedCharacterData, class: e.target.value })}
+                  placeholder="Class"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium">Website Link</label>
+                <Input
+                  value={editedCharacterData.websiteLink}
+                  onChange={(e) => setEditedCharacterData({ ...editedCharacterData, websiteLink: e.target.value })}
+                  placeholder="Website Link"
+                />
+              </div>
               <DialogFooter className="mt-4">
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
