@@ -77,7 +77,11 @@ export async function POST(req: Request) {
           }
 
           const unixTimestamp = session.date ? Math.floor(session.date / 1000) : null;
-          const discordTimestamp = unixTimestamp ? `<t:${unixTimestamp}:F> (<t:${unixTimestamp}:R>)` : "TBD";
+          let dateInfo = "TBD";
+          if (unixTimestamp) {
+            dateInfo = `<t:${unixTimestamp}:F> (<t:${unixTimestamp}:R>)\n**Session starts at** <t:${unixTimestamp + 1800}:t>`;
+          }
+          
           const systemEmoji = session.system === 'PF' ? '<:Pathfinder:1322734594864320522>' : '<:DnD:1322734981524754473>';
           const sessionLink = `${baseUrl}/sessions/${session._id}`;
 
@@ -88,7 +92,7 @@ export async function POST(req: Request) {
               { name: 'System', value: session.system === 'PF' ? 'Pathfinder 2e' : 'D&D 5e', inline: true },
               { name: 'Level', value: session.level ? `Level ${session.level}` : 'TBD', inline: true },
               { name: 'Players', value: `${session.attendingCharacters.length}/${session.maxPlayers}`, inline: true },
-              { name: 'Date & Time', value: discordTimestamp, inline: false },
+              { name: 'Date & Time', value: dateInfo, inline: false },
               { 
                 name: session.planning ? 'Interested Players' : 'Current Signups', 
                 value: session.attendingCharacters.length > 0 

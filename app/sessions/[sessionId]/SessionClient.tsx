@@ -295,7 +295,11 @@ export default function SessionClient() {
     }
 
     const unixTimestamp = session.date ? Math.floor(session.date / 1000) : null
-    const discordTimestamp = unixTimestamp ? `<t:${unixTimestamp}:F> (<t:${unixTimestamp}:R>)` : "TBD"
+    let dateInfo = "TBD"
+    if (unixTimestamp) {
+        dateInfo = `<t:${unixTimestamp}:F> (<t:${unixTimestamp}:R>)\n**Session starts at** <t:${unixTimestamp + 1800}:t>`
+    }
+    
     const roleId = session.system === 'PF' 
         ? process.env.NEXT_PUBLIC_DISCORD_ROLE_ID_PF 
         : process.env.NEXT_PUBLIC_DISCORD_ROLE_ID_DND
@@ -308,17 +312,17 @@ export default function SessionClient() {
     if (type === 'new') {
         embedTitle = `New Session Alert: ${session.worldName}`
         embedDescription = session.date 
-            ? `A new session for "${session.worldName}" has been announced for ${discordTimestamp}!`
+            ? `A new session for "${session.worldName}" has been announced for ${dateInfo}!`
             : `A new session for "${session.worldName}" is now in the planning phase! Express interest on the website to help pick a date.`
     } else if (type === 'remind' && session.date) {
         const spotsLeft = session.maxPlayers - session.attendingCharacters.length
         const daysLeft = Math.ceil((session.date - Date.now()) / (1000 * 60 * 60 * 24))
         embedTitle = `Reminder: ${session.worldName}`
-        embedDescription = `There are still ${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} left! The session starts ${discordTimestamp}.`
+        embedDescription = `There are still ${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} left! The session starts on ${dateInfo}.`
         embedColor = 16776960 // Yellow
     } else if (type === 'cancel' && session.date) {
         embedTitle = `SESSION CANCELLED: ${session.worldName}`
-        embedDescription = `The session for "${session.worldName}" on ${discordTimestamp} has been cancelled and will no longer be happening.`
+        embedDescription = `The session for "${session.worldName}" on ${dateInfo} has been cancelled and will no longer be happening.`
         embedColor = 15158332 // Red
     }
 
@@ -330,7 +334,7 @@ export default function SessionClient() {
         { name: 'System', value: session.system === 'PF' ? '<:Pathfinder:1322734594864320522> Pathfinder 2e' : '<:DnD:1322734981524754473> D&D 5e', inline: true },
         { name: 'Level', value: session.level ? `Level ${session.level}` : 'TBD', inline: true },
         { name: 'Players', value: `${session.attendingCharacters.length}/${session.maxPlayers}`, inline: true },
-        { name: 'Date & Time', value: discordTimestamp, inline: false },
+        { name: 'Date & Time', value: dateInfo, inline: false },
       ],
       timestamp: new Date().toISOString(),
       url: `${window.location.origin}/sessions/${session._id}`,

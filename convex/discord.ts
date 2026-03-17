@@ -50,12 +50,9 @@ export const syncSessionToDiscord = internalAction({
       : `(${dateStr}) The Void: ${session.worldName} [${session.attendingCharacters.length}/${session.maxPlayers}]`;
 
     const unixTimestamp = session.date ? Math.floor(session.date / 1000) : null;
-    const arrivalTime = unixTimestamp ? `<t:${unixTimestamp}:t>` : null;
-    const endTime = unixTimestamp ? `<t:${unixTimestamp + 1800}:t>` : null; // 30 minutes later
-    
-    const dateInfo = isPlanning 
+    const dateInfo = (isPlanning || !unixTimestamp) 
       ? "TBD (Planning Phase)" 
-      : `Arrive between ${arrivalTime} and ${endTime}`;
+      : `<t:${unixTimestamp}:F> (<t:${unixTimestamp}:R>)\n**Session starts at** <t:${unixTimestamp + 1800}:t>`;
 
     const systemEmoji = session.system === 'PF' ? '<:Pathfinder:1322734594864320522>' : '<:DnD:1322734981524754473>';
     const systemName = session.system === 'PF' ? 'Pathfinder 2e' : 'D&D 5e';
