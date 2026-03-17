@@ -171,7 +171,7 @@ export const syncSessionToDiscord = internalAction({
 });
 
 /**
- * Sends a message to a Discord webhook with optional embeds.
+ * Sends a message to a Discord channel via the bot.
  */
 export const sendActivityToDiscord = internalAction({
   args: { 
@@ -179,16 +179,20 @@ export const sendActivityToDiscord = internalAction({
     embeds: v.optional(v.array(v.any()))
   },
   handler: async (ctx, args) => {
-    const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
-    if (!webhookUrl) {
-      console.warn("DISCORD_WEBHOOK_URL not configured in Convex.");
+    const botToken = process.env.DISCORD_BOT_TOKEN;
+    const channelId = process.env.DISCORD_CHANNEL_ID;
+    if (!botToken || !channelId) {
+      console.warn("Discord bot token or activity channel ID not configured.");
       return;
     }
 
     try {
-      await fetch(webhookUrl, {
+      await fetch(`${DISCORD_API_BASE}/channels/${channelId}/messages`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          Authorization: `Bot ${botToken}`,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({ 
           content: args.message,
           embeds: args.embeds 
@@ -197,6 +201,88 @@ export const sendActivityToDiscord = internalAction({
     } catch (e) {
       console.error("Failed to send activity to Discord:", e);
     }
+  },
+});
+
+/**
+ * Sends a session notification (New, Reminder, Cancellation) to the activity channel.
+ */
+export const sendSessionNotification = action({
+  args: {
+    sessionId: v.id("sessions"),
+    type: v.union(v.literal("new"), v.literal("remind"), v.literal("cancel")),
+  },
+  handler: async (ctx, args) => {
+    const botToken = process.env.DISCORD_BOT_TOKEN;
+    const channelId = process.env.DISCORD_CHANNEL_ID;
+    if (!botToken || !channelId) {
+      throw new Error("Discord bot token or activity channel ID not configured.");
+    }
+
+    const session = await ctx.runQuery(internal.discord.getInternalSessionDetails, { 
+      sessionId: args.sessionId 
+    });
+    if (!session) throw new Error("Session not found");
+
+    const unixTimestamp = session.date ? Math.floor(session.date / 1000) : null;
+    let dateInfo = "TBD";
+    if (unixTimestamp) {
+      dateInfo = `<t:${unixTimestamp}:F> (<t:${unixTimestamp}:R>)\n**Session starts at** <t:${unixTimestamp + 1800}:t>`;
+    }
+
+    const roleId = session.system === 'PF' 
+      ? process.env.DISCORD_ROLE_ID_PF 
+      : process.env.DISCORD_ROLE_ID_DND;
+
+    let content = (roleId && args.type !== 'cancel') ? `<@&${roleId}>` : undefined;
+    let embedTitle = "";
+    let embedDescription = "";
+    let embedColor = 5814783; // Blueish
+
+    if (args.type === 'new') {
+      embedTitle = `New Session Alert: ${session.worldName}`;
+      embedDescription = session.date 
+        ? `A new session for "${session.worldName}" has been announced for ${dateInfo}!`
+        : `A new session for "${session.worldName}" is now in the planning phase! Express interest on the website to help pick a date.`;
+    } else if (args.type === 'remind' && session.date) {
+      const spotsLeft = session.maxPlayers - session.attendingCharacters.length;
+      embedTitle = `Reminder: ${session.worldName}`;
+      embedDescription = `There are still ${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} left! The session starts on ${dateInfo}.`;
+      embedColor = 16776960; // Yellow
+    } else if (args.type === 'cancel' && session.date) {
+      embedTitle = `SESSION CANCELLED: ${session.worldName}`;
+      embedDescription = `The session for "${session.worldName}" on ${dateInfo} has been cancelled and will no longer be happening.`;
+      embedColor = 15158332; // Red
+    }
+
+    const sessionLink = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'}/sessions/${session._id}`;
+
+    const embed: any = {
+      title: embedTitle,
+      description: embedDescription,
+      color: embedColor,
+      fields: [
+        { name: 'System', value: session.system === 'PF' ? '<:Pathfinder:1322734594864320522> Pathfinder 2e' : '<:DnD:1322734981524754473> D&D 5e', inline: true },
+        { name: 'Level', value: session.level ? `Level ${session.level}` : 'TBD', inline: true },
+        { name: 'Players', value: `${session.attendingCharacters.length}/${session.maxPlayers}`, inline: true },
+        { name: 'Date & Time', value: dateInfo, inline: false },
+      ],
+      timestamp: new Date().toISOString(),
+      url: sessionLink,
+    };
+
+    if (session.location && args.type !== 'cancel') {
+      embed.fields.push({ name: 'Location', value: `[View on Google Maps](${session.location})`, inline: false });
+    }
+
+    await fetch(`${DISCORD_API_BASE}/channels/${channelId}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bot ${botToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ content, embeds: [embed] }),
+    });
   },
 });
 

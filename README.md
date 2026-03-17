@@ -72,11 +72,13 @@ Follow these instructions to set up and run the project locally.
     *   Ensure your Convex authentication is configured with Clerk as per Convex documentation.
 
 5.  **Discord Setup (Optional):**
-    *   To enable Discord notifications, add the following environment variables:
+    *   To enable Discord notifications, add the following environment variables to your Convex dashboard:
         ```
         DISCORD_BOT_TOKEN=your_bot_token
         DISCORD_FORUM_CHANNEL_ID=your_forum_channel_id
-        DISCORD_WEBHOOK_URL=your_webhook_url
+        DISCORD_CHANNEL_ID=your_activity_channel_id
+        DISCORD_ROLE_ID_PF=role_id_to_ping_for_pathfinder
+        DISCORD_ROLE_ID_DND=role_id_to_ping_for_dnd
         DISCORD_PUBLIC_KEY=your_public_key
         ```
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useParams, useRouter, notFound } from 'next/navigation'
-import { useQuery, useMutation, Authenticated, Unauthenticated } from 'convex/react'
+import { useQuery, useMutation, useAction, Authenticated, Unauthenticated } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -68,6 +68,7 @@ export default function SessionClient() {
   const adminAddCharacterToSession = useMutation(api.sessions.adminAddCharacterToSession)
   const expressInterest = useMutation(api.sessions.expressInterest)
   const withdrawInterest = useMutation(api.sessions.withdrawInterest)
+  const sendNotification = useAction(api.discord.sendSessionNotification)
 
   const isAdmin = useQuery(api.sessions.isAdminQuery)
   const allCharacters = useQuery(api.characters.listAllCharacters, isAdmin ? undefined : "skip")
@@ -283,73 +284,8 @@ export default function SessionClient() {
   }
 
   const handleSendToDiscord = async (type: 'new' | 'remind' | 'cancel') => {
-    const webhookUrl = process.env.NEXT_PUBLIC_DISCORD_WEBHOOK_URL
-    if (!webhookUrl) {
-      alert('Discord Webhook URL is not configured.')
-      return
-    }
-
-    if (!session.date && (type === 'remind' || type === 'cancel')) {
-        alert('Cannot send reminder or cancellation for a session without a date.')
-        return
-    }
-
-    const unixTimestamp = session.date ? Math.floor(session.date / 1000) : null
-    let dateInfo = "TBD"
-    if (unixTimestamp) {
-        dateInfo = `<t:${unixTimestamp}:F> (<t:${unixTimestamp}:R>)\n**Session starts at** <t:${unixTimestamp + 1800}:t>`
-    }
-    
-    const roleId = session.system === 'PF' 
-        ? process.env.NEXT_PUBLIC_DISCORD_ROLE_ID_PF 
-        : process.env.NEXT_PUBLIC_DISCORD_ROLE_ID_DND
-
-    let content = (roleId && type !== 'cancel') ? `<@&${roleId}>` : undefined
-    let embedTitle = ""
-    let embedDescription = ""
-    let embedColor = 5814783 // Blueish
-
-    if (type === 'new') {
-        embedTitle = `New Session Alert: ${session.worldName}`
-        embedDescription = session.date 
-            ? `A new session for "${session.worldName}" has been announced for ${dateInfo}!`
-            : `A new session for "${session.worldName}" is now in the planning phase! Express interest on the website to help pick a date.`
-    } else if (type === 'remind' && session.date) {
-        const spotsLeft = session.maxPlayers - session.attendingCharacters.length
-        const daysLeft = Math.ceil((session.date - Date.now()) / (1000 * 60 * 60 * 24))
-        embedTitle = `Reminder: ${session.worldName}`
-        embedDescription = `There are still ${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} left! The session starts on ${dateInfo}.`
-        embedColor = 16776960 // Yellow
-    } else if (type === 'cancel' && session.date) {
-        embedTitle = `SESSION CANCELLED: ${session.worldName}`
-        embedDescription = `The session for "${session.worldName}" on ${dateInfo} has been cancelled and will no longer be happening.`
-        embedColor = 15158332 // Red
-    }
-
-    const embed = {
-      title: embedTitle,
-      description: embedDescription,
-      color: embedColor,
-      fields: [
-        { name: 'System', value: session.system === 'PF' ? '<:Pathfinder:1322734594864320522> Pathfinder 2e' : '<:DnD:1322734981524754473> D&D 5e', inline: true },
-        { name: 'Level', value: session.level ? `Level ${session.level}` : 'TBD', inline: true },
-        { name: 'Players', value: `${session.attendingCharacters.length}/${session.maxPlayers}`, inline: true },
-        { name: 'Date & Time', value: dateInfo, inline: false },
-      ],
-      timestamp: new Date().toISOString(),
-      url: `${window.location.origin}/sessions/${session._id}`,
-    }
-
-    if (session.location && type !== 'cancel') {
-        embed.fields.push({ name: 'Location', value: `[View on Google Maps](${session.location})`, inline: false })
-    }
-
     try {
-      await fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content, embeds: [embed] }),
-      })
+      await sendNotification({ sessionId: session._id, type })
       toast.success(`Discord ${type} notification sent!`)
     } catch (error) {
       console.error('Failed to send to Discord:', error)
