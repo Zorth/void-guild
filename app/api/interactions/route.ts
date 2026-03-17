@@ -86,7 +86,7 @@ export async function POST(req: Request) {
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be';
 
       if (name === 'session') {
-        const sessionId = options?.find(opt => opt.name === 'world-date')?.value;
+        const sessionId = options?.find((opt: any) => opt.name === 'world-date')?.value;
         
         if (!sessionId) {
           // List upcoming sessions (Equivalent to old /sessions)
