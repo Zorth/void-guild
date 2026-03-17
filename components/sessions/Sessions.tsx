@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useState, useEffect, useMemo } from 'react'
 import SessionDialog from './SessionDialog'
 import Link from 'next/link'
-import { Book, Lock, ChevronLeft, ChevronRight, User, Shield } from 'lucide-react'
+import { Book, Lock, ChevronLeft, ChevronRight, User, Shield, Filter } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn, getLevelBadgeStyle, formatDate, formatTime, CharacterRankIcon } from '@/lib/utils'
 import './sessions.css'
@@ -20,6 +20,12 @@ import {
     DialogTrigger,
     DialogFooter,
 } from '@/components/ui/dialog'
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover'
+import { Checkbox } from '@/components/ui/checkbox'
 import { useAuth } from '@clerk/nextjs'
 import { getUsernames, UserMetadata } from '@/app/stats/actions'
 import {
@@ -479,14 +485,29 @@ function SevenDayOverview({ sessions, userCharacterIds }: { sessions: SessionWit
 
 export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: boolean } }) {
   const { width } = useWindowSize()
+  const { userId } = useAuth()
   const [activeTab, setActiveTab] = useState<'upcoming' | 'planning' | 'past'>('upcoming')
   const [viewDate, setViewDate] = useState(new Date())
+  const [activeFilters, setActiveFilters] = useState({
+    owned: false,
+    signedUp: false,
+    notFull: false,
+    planning: false,
+    scheduled: false,
+    interested: false,
+  })
   
   // Use a query that returns planning sessions if in the planning tab
   const sessionsRaw = useQuery(
     api.sessions.listSessions, 
     { past: activeTab === 'past' }
   ) as SessionWithDetails[]
+
+  const isGM = useQuery(api.sessions.isGameMasterQuery)
+  const userCharacters = useQuery(api.characters.listCharacters)
+  const world = useQuery(api.worlds.getWorldByOwner) // Query for the user's world
+
+  const userCharacterIds = useMemo(() => new Set(userCharacters?.map(c => c._id) ?? []), [userCharacters])
   
   const sessions = useMemo(() => {
     if (!sessionsRaw) return sessionsRaw;
@@ -500,19 +521,23 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
         filtered = sessionsRaw.filter(s => !!s.planning);
     }
     
-    if (!filters) return filtered;
-    return filtered.filter(session => {
-        if (session.system === 'PF' && !filters.pf) return false;
-        if (session.system === 'DnD' && !filters.dnd) return false;
-        return true;
-    });
-  }, [sessionsRaw, filters, activeTab]);
+    if (filters) {
+        filtered = filtered.filter(session => {
+            if (session.system === 'PF' && !filters.pf) return false;
+            if (session.system === 'DnD' && !filters.dnd) return false;
+            return true;
+        });
+    }
 
-  const isGM = useQuery(api.sessions.isGameMasterQuery)
-  const userCharacters = useQuery(api.characters.listCharacters)
-  const world = useQuery(api.worlds.getWorldByOwner) // Query for the user's world
+    if (activeFilters.owned) filtered = filtered.filter(s => s.isOwner);
+    if (activeFilters.signedUp) filtered = filtered.filter(s => s.characters.some(id => userCharacterIds.has(id)));
+    if (activeFilters.notFull) filtered = filtered.filter(s => s.characters.length < s.maxPlayers);
+    if (activeFilters.planning) filtered = filtered.filter(s => !!s.planning);
+    if (activeFilters.scheduled) filtered = filtered.filter(s => !s.planning);
+    if (activeFilters.interested) filtered = filtered.filter(s => s.interestedPlayers?.some(p => p.userId === userId));
 
-  const userCharacterIds = new Set(userCharacters?.map(c => c._id) ?? [])
+    return filtered;
+  }, [sessionsRaw, filters, activeTab, activeFilters, userCharacterIds, userId]);
 
   const handlePrevMonth = () => {
     track('month_nav_prev');
@@ -537,7 +562,112 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
         "flex flex-row flex-wrap items-center justify-between gap-4",
         width < 1015 && "flex-col items-center justify-center text-center"
       )}>
-        <CardTitle>Sessions</CardTitle>
+        <div className="flex items-center gap-2">
+            <CardTitle>Sessions</CardTitle>
+            <Popover>
+                <PopoverTrigger asChild>
+                    <Button variant="ghost" size="sm" className={cn("h-8 w-8 p-0", Object.values(activeFilters).some(Boolean) && "text-primary bg-primary/10")}>
+                        <Filter className="h-4 w-4" />
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-4" align="start">
+                    <div className="space-y-4">
+                        <h4 className="font-bold leading-none">Filter Sessions</h4>
+                        <div className="grid gap-2">
+                            {isGM && (
+                                <div className="flex items-center space-x-2">
+                                    <Checkbox 
+                                        id="filter-owned" 
+                                        checked={activeFilters.owned} 
+                                        onCheckedChange={(checked) => {
+                                            setActiveFilters(prev => ({ ...prev, owned: !!checked }));
+                                            track('filter_applied', { filter: 'owned', value: checked });
+                                        }}
+                                    />
+                                    <label htmlFor="filter-owned" className="text-sm font-medium leading-none cursor-pointer">Owned Sessions</label>
+                                </div>
+                            )}
+                            <div className="flex items-center space-x-2">
+                                <Checkbox 
+                                    id="filter-signed" 
+                                    checked={activeFilters.signedUp} 
+                                    onCheckedChange={(checked) => {
+                                        setActiveFilters(prev => ({ ...prev, signedUp: !!checked }));
+                                        track('filter_applied', { filter: 'signedUp', value: checked });
+                                    }}
+                                />
+                                <label htmlFor="filter-signed" className="text-sm font-medium leading-none cursor-pointer">Signed Up</label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <Checkbox 
+                                    id="filter-notfull" 
+                                    checked={activeFilters.notFull} 
+                                    onCheckedChange={(checked) => {
+                                        setActiveFilters(prev => ({ ...prev, notFull: !!checked }));
+                                        track('filter_applied', { filter: 'notFull', value: checked });
+                                    }}
+                                />
+                                <label htmlFor="filter-notfull" className="text-sm font-medium leading-none cursor-pointer">Not FULL</label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <Checkbox 
+                                    id="filter-interested" 
+                                    checked={activeFilters.interested} 
+                                    onCheckedChange={(checked) => {
+                                        setActiveFilters(prev => ({ ...prev, interested: !!checked }));
+                                        track('filter_applied', { filter: 'interested', value: checked });
+                                    }}
+                                />
+                                <label htmlFor="filter-interested" className="text-sm font-medium leading-none cursor-pointer">Interested</label>
+                            </div>
+                            <div className="border-t my-1" />
+                            <div className="flex items-center space-x-2">
+                                <Checkbox 
+                                    id="filter-planning" 
+                                    checked={activeFilters.planning} 
+                                    onCheckedChange={(checked) => {
+                                        setActiveFilters(prev => ({ ...prev, planning: !!checked }));
+                                        track('filter_applied', { filter: 'planning', value: checked });
+                                    }}
+                                />
+                                <label htmlFor="filter-planning" className="text-sm font-medium leading-none cursor-pointer">Planning Phase</label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <Checkbox 
+                                    id="filter-scheduled" 
+                                    checked={activeFilters.scheduled} 
+                                    onCheckedChange={(checked) => {
+                                        setActiveFilters(prev => ({ ...prev, scheduled: !!checked }));
+                                        track('filter_applied', { filter: 'scheduled', value: checked });
+                                    }}
+                                />
+                                <label htmlFor="filter-scheduled" className="text-sm font-medium leading-none cursor-pointer">Scheduled Games</label>
+                            </div>
+                        </div>
+                        {Object.values(activeFilters).some(Boolean) && (
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="w-full mt-2 h-7 text-xs" 
+                                onClick={() => {
+                                    setActiveFilters({
+                                        owned: false,
+                                        signedUp: false,
+                                        notFull: false,
+                                        planning: false,
+                                        scheduled: false,
+                                        interested: false,
+                                    });
+                                    track('filter_cleared');
+                                }}
+                            >
+                                Clear Filters
+                            </Button>
+                        )}
+                    </div>
+                </PopoverContent>
+            </Popover>
+        </div>
         <div className={cn(
           "flex items-center gap-4",
           width < 1015 && "flex-wrap justify-center w-full"
