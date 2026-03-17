@@ -181,6 +181,29 @@ export const listUserJoinedSessions = query({
   }
 })
 
+export const getPublicSession = query({
+  args: { sessionId: v.id("sessions") },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) return null;
+
+    const world = await ctx.db.get(session.world);
+    
+    return {
+      _id: session._id,
+      date: session.date,
+      worldName: world?.name || "Unknown World",
+      system: session.system,
+      level: session.level,
+      maxPlayers: session.maxPlayers,
+      attendingCount: session.characters.length,
+      interestedCount: (session.interestedPlayers || []).length,
+      planning: session.planning,
+      location: session.location,
+    };
+  },
+});
+
 export const getSession = query({
   args: { sessionId: v.string() },
   handler: async (ctx, args) => {

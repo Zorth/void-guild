@@ -19,6 +19,19 @@ async function registerCommands() {
         description: 'Show upcoming gaming sessions',
       },
       {
+        name: 'session',
+        description: 'View details of a specific session',
+        options: [
+          {
+            name: 'name',
+            description: 'Search for a session by world or date',
+            type: 3, // STRING
+            required: true,
+            autocomplete: true,
+          }
+        ]
+      },
+      {
         name: 'character',
         description: 'Search for a character by name',
         options: [

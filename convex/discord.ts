@@ -253,6 +253,41 @@ export const searchWorld = query({
   },
 });
 
+/**
+ * Lists upcoming and planning sessions for Discord autocomplete.
+ */
+export const searchSessions = query({
+  args: { query: v.string() },
+  handler: async (ctx, args) => {
+    const sessions = await ctx.db
+      .query("sessions")
+      .filter((q) => q.eq(q.field("locked"), false))
+      .collect();
+
+    const worlds = await ctx.db.query("worlds").collect();
+    const worldMap = new Map(worlds.map((w) => [w._id, w.name]));
+
+    const searchLower = args.query.toLowerCase();
+
+    return sessions
+      .map((s) => {
+        const worldName = worldMap.get(s.world) || "Unknown World";
+        const dateStr = s.date
+          ? new Date(s.date).toLocaleDateString("en-GB", {
+              day: "numeric",
+              month: "short",
+            })
+          : "Planning";
+        return {
+          name: `${worldName} (${dateStr})`,
+          id: s._id,
+        };
+      })
+      .filter((s) => s.name.toLowerCase().includes(searchLower))
+      .slice(0, 25);
+  },
+});
+
 /** Internal helpers **/
 
 export const getInternalSessionDetails = internalQuery({

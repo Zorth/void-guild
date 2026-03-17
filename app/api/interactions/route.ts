@@ -41,10 +41,75 @@ export async function POST(req: Request) {
       });
     }
 
+    if (interaction.type === 4) { // APPLICATION_COMMAND_AUTOCOMPLETE
+      const { name, options } = interaction.data;
+      if (name === 'session') {
+        const queryArg = options?.[0]?.value || "";
+        const convex = getConvexClient();
+        const results = await convex.query(api.discord.searchSessions, { query: queryArg });
+        
+        return new Response(JSON.stringify({
+          type: 8, // APPLICATION_COMMAND_AUTOCOMPLETE_RESULT
+          data: {
+            choices: results.map(r => ({ name: r.name, value: r.id }))
+          },
+        }), { headers: { 'Content-Type': 'application/json' } });
+      }
+    }
+
     if (interaction.type === 2) { // APPLICATION_COMMAND
       const { name, options } = interaction.data;
       const convex = getConvexClient();
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be';
+
+      if (name === 'session') {
+        const sessionId = options?.[0]?.value;
+        if (!sessionId) return new Response('Missing session ID', { status: 400 });
+
+        try {
+          const session = await convex.query(api.sessions.getPublicSession, { sessionId });
+          
+          if (!session) {
+            return new Response(JSON.stringify({
+              type: 4,
+              data: { content: `Session not found.` },
+            }), { headers: { 'Content-Type': 'application/json' } });
+          }
+
+          const unixTimestamp = session.date ? Math.floor(session.date / 1000) : null;
+          const discordTimestamp = unixTimestamp ? `<t:${unixTimestamp}:F> (<t:${unixTimestamp}:R>)` : "TBD";
+          const systemEmoji = session.system === 'PF' ? '<:Pathfinder:1322734594864320522>' : '<:DnD:1322734981524754473>';
+          const sessionLink = `${baseUrl}/sessions/${session._id}`;
+
+          const embed = {
+            title: `${systemEmoji} ${session.worldName}`,
+            url: sessionLink,
+            fields: [
+              { name: 'System', value: session.system === 'PF' ? 'Pathfinder 2e' : 'D&D 5e', inline: true },
+              { name: 'Level', value: session.level ? `Level ${session.level}` : 'TBD', inline: true },
+              { name: 'Players', value: `${session.attendingCount}/${session.maxPlayers}`, inline: true },
+              { name: 'Date & Time', value: discordTimestamp, inline: false },
+            ],
+            color: session.system === 'PF' ? 0xde2e2e : 0xe81123,
+            timestamp: new Date().toISOString(),
+          };
+
+          if (session.planning) {
+            embed.fields.push({ name: 'Status', value: `*This session is in the planning phase. Click the link above to show your interest!*`, inline: false });
+          }
+
+          return new Response(JSON.stringify({
+            type: 4,
+            data: { embeds: [embed] },
+          }), { headers: { 'Content-Type': 'application/json' } });
+        } catch (e) {
+          console.error("[Discord] Convex Error:", e);
+          return new Response(JSON.stringify({
+            type: 4,
+            data: { content: "Error fetching session details." },
+          }), { headers: { 'Content-Type': 'application/json' } });
+        }
+      }
 
       if (name === 'sessions') {
         try {
