@@ -407,7 +407,7 @@ export default function SessionClient() {
                                 <Clock className="h-4 w-4 shrink-0" />
                                 <span>Please arrive between {formatTimeUtil(new Date(session.date))} and {formatTimeUtil(new Date(session.date + 30 * 60 * 1000))}</span>
                             </div>
-                            <p className="text-[10px] text-muted-foreground ml-6 italic">Session starts 30 minutes after.</p>
+                            <p className="text-[10px] text-muted-foreground ml-6 italic">Session starts at second listed time.</p>
                         </div>
                     ) : (
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
