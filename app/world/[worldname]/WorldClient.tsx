@@ -72,7 +72,7 @@ function WorldDescription({ worldId, initialDescription, isOwner }: { worldId: I
             </div>
           </div>
         ) : (
-          <div className="text-sm leading-relaxed [&_>_*:first-child]:mt-0 [&>h1]:text-2xl [&>h1]:font-bold [&>h1]:mt-6 [&>h2]:text-xl [&>h2]:font-bold [&>h2]:mt-5 [&>h3]:text-lg [&>h3]:font-bold [&>h3]:mt-4 [&>p]:mt-3 [&>ul]:list-disc [&>ul]:pl-6 [&>ul]:mt-3 [&>ol]:list-decimal [&>ol]:pl-6 [&>ol]:mt-3 [&>blockquote]:border-l-4 [&>blockquote]:pl-4 [&>blockquote]:italic [&>blockquote]:mt-3">
+          <div className="text-sm leading-relaxed [&_>_*:first-child]:mt-0 [&>h1]:text-2xl [&>h1]:font-bold [&>h1]:mt-6 [&>h2]:text-xl [&>h2]:font-bold [&>h2]:mt-5 [&>h3]:text-lg [&>h3]:font-bold [&>h3]:mt-4 [&>p]:mt-3 [&>ul]:list-disc [&>ul]:pl-6 [&>ul]:mt-3 [&>ol]:list-decimal [&>ol]:pl-6 [&>ol]:mt-3 [&>blockquote]:border-l-4 [&>blockquote]:pl-4 [&>blockquote]:italic [&>blockquote]:mt-3 [&_a]:text-purple-600 dark:[&_a]:text-purple-400 [&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-purple-600/30 dark:[&_a]:decoration-purple-400/30 hover:[&_a]:text-purple-500 dark:hover:[&_a]:text-purple-300">
             {description ? (
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {description}
