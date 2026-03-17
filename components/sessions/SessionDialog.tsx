@@ -107,7 +107,7 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
     }
 
     const levelNum = parseInt(level)
-    if (level && (isNaN(levelNum) || levelNum < 1 || levelNum > 20)) {
+    if (level && levelNum !== 0 && (isNaN(levelNum) || levelNum < 1 || levelNum > 20)) {
       newErrors.level = "Level must be 1-20"
     }
 
@@ -239,7 +239,9 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
                 <label className="text-sm font-medium">Level</label>
                 <Input
                 type="number"
+                min="0"
                 max="20"
+                placeholder="TBD"
                 value={level}
                 onChange={(e) => {
                   setLevel(e.target.value)
