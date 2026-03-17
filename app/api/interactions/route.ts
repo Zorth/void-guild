@@ -43,15 +43,38 @@ export async function POST(req: Request) {
 
     if (interaction.type === 4) { // APPLICATION_COMMAND_AUTOCOMPLETE
       const { name, options } = interaction.data;
+      const queryArg = options?.[0]?.value || "";
+      const convex = getConvexClient();
+
       if (name === 'session') {
-        const queryArg = options?.[0]?.value || "";
-        const convex = getConvexClient();
         const results = await convex.query(api.discord.searchSessions, { query: queryArg });
         
         return new Response(JSON.stringify({
           type: 8, // APPLICATION_COMMAND_AUTOCOMPLETE_RESULT
           data: {
             choices: results.map(r => ({ name: r.name, value: r.id }))
+          },
+        }), { headers: { 'Content-Type': 'application/json' } });
+      }
+
+      if (name === 'character') {
+        const results = await convex.query(api.discord.searchCharacters, { query: queryArg });
+        
+        return new Response(JSON.stringify({
+          type: 8,
+          data: {
+            choices: results.map(r => ({ name: r.name, value: r.value }))
+          },
+        }), { headers: { 'Content-Type': 'application/json' } });
+      }
+
+      if (name === 'world') {
+        const results = await convex.query(api.discord.searchWorlds, { query: queryArg });
+        
+        return new Response(JSON.stringify({
+          type: 8,
+          data: {
+            choices: results.map(r => ({ name: r.name, value: r.value }))
           },
         }), { headers: { 'Content-Type': 'application/json' } });
       }
@@ -63,7 +86,7 @@ export async function POST(req: Request) {
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be';
 
       if (name === 'session') {
-        const sessionId = options?.[0]?.value;
+        const sessionId = options?.find(opt => opt.name === 'world-date')?.value;
         
         if (!sessionId) {
           // List upcoming sessions (Equivalent to old /sessions)

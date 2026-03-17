@@ -19,7 +19,7 @@ async function registerCommands() {
         description: 'Show upcoming sessions or search for one',
         options: [
           {
-            name: 'name',
+            name: 'world-date',
             description: 'Search for a session by world or date',
             type: 3, // STRING
             required: false,
@@ -36,6 +36,7 @@ async function registerCommands() {
             description: 'The name of the character to find',
             type: 3, // STRING
             required: true,
+            autocomplete: true,
           }
         ]
       },
@@ -48,6 +49,7 @@ async function registerCommands() {
             description: 'The name of the world to find',
             type: 3, // STRING
             required: false,
+            autocomplete: true,
           }
         ]
       },

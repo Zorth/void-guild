@@ -411,6 +411,46 @@ export const searchSessions = query({
   },
 });
 
+/**
+ * Lists characters for Discord autocomplete.
+ */
+export const searchCharacters = query({
+  args: { query: v.string() },
+  handler: async (ctx, args) => {
+    const characters = await ctx.db.query("characters").collect();
+    const searchLower = args.query.toLowerCase();
+
+    return characters
+      .filter((c) => c.name.toLowerCase().includes(searchLower))
+      .sort((a, b) => a.name.length - b.name.length)
+      .slice(0, 25)
+      .map((c) => ({
+        name: `${c.name} (Lvl ${c.lvl} ${c.class || ''})`,
+        value: c.name, // The /character command expects the name string
+      }));
+  },
+});
+
+/**
+ * Lists worlds for Discord autocomplete.
+ */
+export const searchWorlds = query({
+  args: { query: v.string() },
+  handler: async (ctx, args) => {
+    const worlds = await ctx.db.query("worlds").collect();
+    const searchLower = args.query.toLowerCase();
+
+    return worlds
+      .filter((w) => w.name.toLowerCase().includes(searchLower))
+      .sort((a, b) => a.name.length - b.name.length)
+      .slice(0, 25)
+      .map((w) => ({
+        name: w.name,
+        value: w.name,
+      }));
+  },
+});
+
 /** Internal helpers **/
 
 export const getInternalSessionDetails = internalQuery({
