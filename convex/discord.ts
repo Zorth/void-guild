@@ -298,20 +298,34 @@ export const sendSessionNotification = action({
 });
 
 /**
- * Searches for a character by name (case-insensitive fuzzy match).
+ * Fetches a character's full profile including session stats for Discord.
  */
-export const searchCharacter = query({
+export const getCharacterProfile = query({
   args: { name: v.string() },
   handler: async (ctx, args) => {
     const characters = await ctx.db.query("characters").collect();
     const searchLower = args.name.toLowerCase();
     
-    // Simple "fuzzy" match: contains search string, then pick shortest name to get "best" match
-    const matches = characters
+    const character = characters
       .filter(c => c.name.toLowerCase().includes(searchLower))
-      .sort((a, b) => a.name.length - b.name.length);
+      .sort((a, b) => a.name.length - b.name.length)[0];
 
-    return matches.length > 0 ? matches[0] : null;
+    if (!character) return null;
+
+    // Count how many locked (completed) sessions this character participated in
+    const sessions = await ctx.db
+      .query("sessions")
+      .filter(q => q.and(
+        q.eq(q.field("locked"), true),
+      ))
+      .collect();
+
+    const sessionCount = sessions.filter(s => s.characters.includes(character._id)).length;
+
+    return {
+      ...character,
+      sessionCount,
+    };
   },
 });
 

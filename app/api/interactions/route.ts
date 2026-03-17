@@ -211,7 +211,7 @@ export async function POST(req: Request) {
         if (!charName) return new Response('Missing character name', { status: 400 });
 
         try {
-          const character = await convex.query(api.discord.searchCharacter, { name: charName });
+          const character = await convex.query(api.discord.getCharacterProfile, { name: charName });
           
           if (!character) {
             return new Response(JSON.stringify({
@@ -221,16 +221,49 @@ export async function POST(req: Request) {
           }
 
           const systemEmoji = character.system === 'PF' ? '<:Pathfinder:1322734594864320522>' : '<:DnD:1322734981524754473>';
+          const systemName = character.system === 'PF' ? 'Pathfinder 2e' : 'D&D 5e';
+          const systemLogo = character.system === 'PF' 
+            ? `${baseUrl}/PFVoid.svg`
+            : `${baseUrl}/DnDVoid.svg`;
+          
+          // XP Math
+          const totalBars = 20;
+          const filledBars = Math.floor((character.xp / 1000) * totalBars);
+          const xpBar = "▰".repeat(filledBars) + "▱".repeat(totalBars - filledBars);
+          const xpNeeded = 1000 - character.xp;
+          
+          const rankInfo = character.rank && character.rank !== 'none' 
+            ? `\n**Rank:** ${character.rank.charAt(0).toUpperCase() + character.rank.slice(1)}` 
+            : '';
+
+          // Discord Interaction User Metadata
+          const user = interaction.member?.user || interaction.user;
+          const avatarUrl = user?.avatar 
+            ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`
+            : `https://cdn.discordapp.com/embed/avatars/0.png`;
+
           const embed = {
-            title: `${systemEmoji} ${character.name}`,
-            description: `${character.ancestry || 'Unknown Ancestry'} ${character.class || 'Unknown Class'}`,
+            author: {
+              name: `${character.name}`,
+              icon_url: avatarUrl,
+              url: character.websiteLink || undefined
+            },
+            title: `${systemEmoji} ${character.ancestry || 'Unknown'} ${character.class || 'Character'}`,
+            description: `**Current Progress** \n\`${xpBar}\` \n**${character.xp}** / 1000 XP (*${xpNeeded} XP to level ${character.lvl + 1}*)${rankInfo}`,
+            thumbnail: { url: systemLogo },
             fields: [
-              { name: 'Level', value: `Lvl ${character.lvl}`, inline: true },
-              { name: 'Experience', value: `${character.xp}/1000 XP`, inline: true },
+              { name: 'Level', value: `\` ${character.lvl} \``, inline: true },
+              { name: 'System', value: `\` ${systemName} \``, inline: true },
+              { name: 'Sessions Played', value: `\` ${character.sessionCount} \``, inline: true },
             ],
             color: character.system === 'PF' ? 0xde2e2e : 0xe81123,
             timestamp: new Date().toISOString(),
+            footer: { text: "Void Guild Chronicles", icon_url: `${baseUrl}/favicon.ico` }
           };
+
+          if (character.websiteLink) {
+            embed.fields.push({ name: 'External Sheet', value: `[Link](${character.websiteLink})`, inline: true });
+          }
 
           return new Response(JSON.stringify({
             type: 4,
