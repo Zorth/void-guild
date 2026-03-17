@@ -166,10 +166,21 @@ export const adminUpdateCharacter = mutation({
     })
 
     if (args.rank && args.rank !== 'none' && args.rank !== oldCharacter?.rank) {
+        const rankName = args.rank.charAt(0).toUpperCase() + args.rank.slice(1);
         await ctx.scheduler.runAfter(0, internal.activity.logActivity, {
             type: 'rank_promotion',
-            message: `${args.name} was promoted to ${args.rank.charAt(0).toUpperCase() + args.rank.slice(1)}!`,
+            message: `${args.name} was promoted to ${rankName}!`,
             metadata: { characterId: args.characterId, rank: args.rank }
+        })
+
+        const isGuildmaster = args.rank === 'guildmaster';
+        await ctx.scheduler.runAfter(0, internal.discord.sendActivityToDiscord, {
+            embeds: [{
+                title: isGuildmaster ? "👑 New Guildmaster!" : "🏅 New Journeyman!",
+                description: `**${args.name}** has been promoted to the rank of **${rankName}**!`,
+                color: isGuildmaster ? 0xf59e0b : 0xa855f7, // Amber vs Purple
+                timestamp: new Date().toISOString(),
+            }]
         })
     }
 
@@ -178,6 +189,9 @@ export const adminUpdateCharacter = mutation({
             type: 'level_up',
             message: `${args.name} reached Level ${args.lvl}!`,
             metadata: { characterId: args.characterId, newLvl: args.lvl }
+        })
+        await ctx.scheduler.runAfter(0, internal.discord.sendActivityToDiscord, {
+            message: `**${args.name}** just reached level **${args.lvl}**!`
         })
     }
   },

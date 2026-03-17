@@ -166,6 +166,36 @@ export const syncSessionToDiscord = internalAction({
   },
 });
 
+/**
+ * Sends a message to a Discord webhook with optional embeds.
+ */
+export const sendActivityToDiscord = internalAction({
+  args: { 
+    message: v.optional(v.string()),
+    embeds: v.optional(v.array(v.any()))
+  },
+  handler: async (ctx, args) => {
+    const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
+    if (!webhookUrl) {
+      console.warn("DISCORD_WEBHOOK_URL not configured in Convex.");
+      return;
+    }
+
+    try {
+      await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          content: args.message,
+          embeds: args.embeds 
+        }),
+      });
+    } catch (e) {
+      console.error("Failed to send activity to Discord:", e);
+    }
+  },
+});
+
 /** Internal helpers **/
 
 export const getInternalSessionDetails = internalQuery({

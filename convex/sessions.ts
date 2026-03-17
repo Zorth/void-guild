@@ -642,6 +642,9 @@ export const lockSession = mutation({
                 message: `${character.name} reached Level ${newLvl}!`,
                 metadata: { characterId, newLvl }
             })
+            await ctx.scheduler.runAfter(0, internal.discord.sendActivityToDiscord, {
+                message: `**${character.name}** just reached level **${newLvl}**!`
+            })
           }
 
           if (character.rank !== undefined && character.rank !== 'none') {

@@ -71,6 +71,15 @@ Follow these instructions to set up and run the project locally.
         ```
     *   Ensure your Convex authentication is configured with Clerk as per Convex documentation.
 
+5.  **Discord Setup (Optional):**
+    *   To enable Discord notifications, add the following environment variables:
+        ```
+        DISCORD_BOT_TOKEN=your_bot_token
+        DISCORD_FORUM_CHANNEL_ID=your_forum_channel_id
+        DISCORD_WEBHOOK_URL=your_webhook_url
+        DISCORD_PUBLIC_KEY=your_public_key
+        ```
+
 ### Running the Development Server
 
 Once everything is set up, run the development server:
