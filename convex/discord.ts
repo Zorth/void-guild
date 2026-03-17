@@ -187,7 +187,7 @@ export const sendActivityToDiscord = internalAction({
     }
 
     try {
-      await fetch(`${DISCORD_API_BASE}/channels/${channelId}/messages`, {
+      const response = await fetch(`${DISCORD_API_BASE}/channels/${channelId}/messages`, {
         method: "POST",
         headers: {
           Authorization: `Bot ${botToken}`,
@@ -198,6 +198,11 @@ export const sendActivityToDiscord = internalAction({
           embeds: args.embeds 
         }),
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Discord API error (${response.status}):`, errorText);
+      }
     } catch (e) {
       console.error("Failed to send activity to Discord:", e);
     }
@@ -275,7 +280,7 @@ export const sendSessionNotification = action({
       embed.fields.push({ name: 'Location', value: `[View on Google Maps](${session.location})`, inline: false });
     }
 
-    await fetch(`${DISCORD_API_BASE}/channels/${channelId}/messages`, {
+    const response = await fetch(`${DISCORD_API_BASE}/channels/${channelId}/messages`, {
       method: "POST",
       headers: {
         Authorization: `Bot ${botToken}`,
@@ -283,6 +288,12 @@ export const sendSessionNotification = action({
       },
       body: JSON.stringify({ content, embeds: [embed] }),
     });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Discord API error (${response.status}):`, errorText);
+        throw new Error(`Discord API error: ${errorText}`);
+    }
   },
 });
 
