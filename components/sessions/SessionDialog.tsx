@@ -237,6 +237,9 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
           <div className="flex gap-4">
             <div className="flex-1 flex flex-col gap-2">
                 <label className="text-sm font-medium">Level</label>
+                <p className="text-[10px] text-muted-foreground -mt-1 italic">
+                  Level can be 0 or empty to set TBD
+                </p>
                 <Input
                 type="number"
                 min="0"
