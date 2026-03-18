@@ -419,7 +419,7 @@ export const deleteSession = mutation({
     }
 
     if (session.discordThreadId) {
-        await ctx.scheduler.runAfter(0, internal.discord.deleteSessionThread, {
+        await ctx.scheduler.runAfter(0, internal.discord.closeSessionThread, {
             threadId: session.discordThreadId
         })
     }

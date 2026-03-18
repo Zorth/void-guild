@@ -261,6 +261,10 @@ export const sendSessionNotification = action({
     }
 
     const sessionLink = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'}/sessions/${session._id}`;
+    const guildId = process.env.DISCORD_GUILD_ID;
+    const threadLink = (guildId && session.discordThreadId) 
+      ? `https://discord.com/channels/${guildId}/${session.discordThreadId}` 
+      : null;
 
     const embed: any = {
       title: embedTitle,
@@ -273,11 +277,29 @@ export const sendSessionNotification = action({
         { name: 'Date & Time', value: dateInfo, inline: false },
       ],
       timestamp: new Date().toISOString(),
-      url: sessionLink,
+      url: (args.type !== 'cancel' && threadLink) ? threadLink : sessionLink,
     };
 
     if (session.location && args.type !== 'cancel') {
       embed.fields.push({ name: 'Location', value: `[View on Google Maps](${session.location})`, inline: false });
+    }
+
+    // Post cancellation message in the thread if it exists
+    if (args.type === 'cancel' && session.discordThreadId) {
+      try {
+        await fetch(`${DISCORD_API_BASE}/channels/${session.discordThreadId}/messages`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bot ${botToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ 
+            content: `🛑 **SESSION CANCELLED**\nThe session for "${session.worldName}" scheduled for ${dateInfo} has been cancelled.` 
+          }),
+        });
+      } catch (e) {
+        console.error("Failed to post cancellation to Discord thread:", e);
+      }
     }
 
     const response = await fetch(`${DISCORD_API_BASE}/channels/${channelId}/messages`, {
@@ -480,9 +502,9 @@ export const updateSessionThreadId = internalMutation({
 });
 
 /**
- * Deletes a Discord thread.
+ * Locks and archives a Discord thread.
  */
-export const deleteSessionThread = internalAction({
+export const closeSessionThread = internalAction({
   args: { threadId: v.string() },
   handler: async (ctx, args) => {
     const botToken = process.env.DISCORD_BOT_TOKEN;
@@ -490,13 +512,18 @@ export const deleteSessionThread = internalAction({
 
     try {
       await fetch(`${DISCORD_API_BASE}/channels/${args.threadId}`, {
-        method: "DELETE",
+        method: "PATCH",
         headers: {
           Authorization: `Bot ${botToken}`,
+          "Content-Type": "application/json",
         },
+        body: JSON.stringify({
+          archived: true,
+          locked: true
+        }),
       });
     } catch (e) {
-      console.error("Failed to delete Discord thread:", e);
+      console.error("Failed to close Discord thread:", e);
     }
   },
 });
