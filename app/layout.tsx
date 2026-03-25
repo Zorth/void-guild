@@ -110,6 +110,15 @@ export const metadata: Metadata = {
     description: 'Manage your TTRPG characters and sessions in the Void.',
     images: [`${baseUrl}/PFVoid.svg`],
   },
+  robots: {
+    index: true,
+    follow: true,
+    noai: true, // Custom property for clarity, though not standard in all parsers
+  },
+  other: {
+    'robots': 'noai, noimageai',
+    'ai-content': 'no',
+  },
 }
 
 export default function RootLayout({
