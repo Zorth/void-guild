@@ -147,3 +147,16 @@ export const getPlanningSummary = query({
         };
     }
 })
+
+export const getUserAvailability = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) return []
+
+    return await ctx.db
+      .query('availability')
+      .withIndex('by_user_date', (q) => q.eq('userId', identity.subject))
+      .collect()
+  }
+})

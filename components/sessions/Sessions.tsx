@@ -227,6 +227,9 @@ function MonthOverview({
     })
     const toggleAvailability = useMutation(api.planning.toggleAvailability)
 
+    // Optimistic UI for availability
+    const [optimisticAvailability, setOptimisticAvailability] = useState<Record<number, boolean>>({});
+
     const [userMetadata, setUserMetadata] = useState<Record<string, UserMetadata>>({});
 
     useEffect(() => {
@@ -261,14 +264,31 @@ function MonthOverview({
 
     const availabilityByDay = useMemo(() => {
         if (!availability) return {};
-        return availability.reduce((acc, a) => {
+        const baseAvailability = availability.reduce((acc, a) => {
             const date = new Date(a.date);
             const day = date.getDate();
             if (!acc[day]) acc[day] = [];
             acc[day].push(a);
             return acc;
         }, {} as Record<number, Doc<'availability'>[]>);
-    }, [availability]);
+
+        // Apply optimistic updates
+        Object.entries(optimisticAvailability).forEach(([dayStr, isAvailable]) => {
+            const day = parseInt(dayStr);
+            const current = baseAvailability[day] || [];
+            const userAlreadyInList = current.some(a => a.userId === userId);
+
+            if (isAvailable && !userAlreadyInList) {
+                // Add optimistic entry (minimal mock)
+                baseAvailability[day] = [...current, { userId, isGM: false, date: new Date(year, month, day).getTime() } as Doc<'availability'>];
+            } else if (!isAvailable && userAlreadyInList) {
+                // Remove entry
+                baseAvailability[day] = current.filter(a => a.userId !== userId);
+            }
+        });
+
+        return baseAvailability;
+    }, [availability, optimisticAvailability, userId, year, month]);
 
     const monthName = viewDate.toLocaleString('default', { month: 'long' });
 
@@ -296,59 +316,73 @@ function MonthOverview({
                     </Button>
                 </div>
             </div>
-            <div className="grid grid-cols-7 gap-1 sm:gap-2">
-                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
-                    <div key={day} className="text-center text-[10px] sm:text-xs font-bold text-muted-foreground py-1">
-                        {day}
-                    </div>
-                ))}
-                {calendarDays.map((day, idx) => {
-                    if (!day) return <motion.div 
-                        key={`empty-${idx}`} 
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: Math.min(idx * 0.01, 0.2) }}
-                        className="bg-muted/5 rounded-md aspect-square" 
-                    />;
-                    
-                    const dayNum = day.getDate();
-                    const daySessions = sessionsByDay[dayNum] || [];
-                    const dayAvailability = availabilityByDay[dayNum] || [];
+            <div className="overflow-x-auto pb-2 -mx-2 px-2 scrollbar-hide">
+                <div className="grid grid-cols-7 gap-1 sm:gap-2 min-w-[350px]">
+                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
+                        <div key={day} className="text-center text-[10px] sm:text-xs font-bold text-muted-foreground py-1">
+                            {day}
+                        </div>
+                    ))}
+                    {calendarDays.map((day, idx) => {
+                        if (!day) return <motion.div 
+                            key={`empty-${idx}`} 
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: Math.min(idx * 0.01, 0.2) }}
+                            className="bg-muted/5 rounded-md aspect-square" 
+                        />;
+                        
+                        const dayNum = day.getDate();
+                        const daySessions = sessionsByDay[dayNum] || [];
+                        const dayAvailability = availabilityByDay[dayNum] || [];
 
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-                    const isPast = day < today;
-                    
-                    let dayBoxClass = "";
-                    if (daySessions.some(s => s.isOwner)) {
-                        dayBoxClass = "day-box-owner";
-                    } else if (daySessions.some(s => s.characters.some(id => userCharacterIds.has(id)))) {
-                        dayBoxClass = "day-box-joined";
-                    }
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const isPast = day < today;
+                        
+                        let dayBoxClass = "";
+                        if (daySessions.some(s => s.isOwner)) {
+                            dayBoxClass = "day-box-owner";
+                        } else if (daySessions.some(s => s.characters.some(id => userCharacterIds.has(id)))) {
+                            dayBoxClass = "day-box-joined";
+                        }
 
-                    const isUserAvailable = dayAvailability.some(a => a.userId === userId);
-                    const gmCount = dayAvailability.filter(a => a.isGM).length;
-                    const playerCount = dayAvailability.length - gmCount;
-                    const isOptimal = dayAvailability.length >= 4 && gmCount >= 1;
+                        const isUserAvailable = dayAvailability.some(a => a.userId === userId);
+                        const gmCount = dayAvailability.filter(a => a.isGM).length;
+                        const playerCount = dayAvailability.length - gmCount;
+                        const isOptimal = dayAvailability.length >= 4 && gmCount >= 1;
 
-                    return (
-                        <Dialog key={dayNum}>
-                            <DialogTrigger asChild disabled={isPast}>
-                                <motion.div
-                                    initial={{ opacity: 0, scale: 0.9 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    transition={{ delay: Math.min(idx * 0.01, 0.2) }}
-                                    className={cn(
-                                        "day-box border border-border/50 overflow-hidden aspect-square flex flex-col relative transition-colors p-0",
-                                        isPast ? "bg-muted/10 opacity-50 grayscale cursor-not-allowed pointer-events-none" : "hover:bg-muted/20 cursor-pointer",
-                                        !isPast && isOptimal && !dayBoxClass && "ring-2 ring-inset ring-green-500/30 bg-green-500/5",
-                                        dayBoxClass
-                                    )}
-                                >
+                        // Check if available but not signed up for a planned session
+                        const availableButNotSignedUp = !isPast && isUserAvailable && daySessions.length > 0 && !daySessions.some(s => s.characters.some(id => userCharacterIds.has(id)));
+
+                        return (
+                            <Dialog key={dayNum}>
+                                <DialogTrigger asChild disabled={isPast}>
+                                    <motion.div
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        transition={{ delay: Math.min(idx * 0.01, 0.2) }}
+                                        className={cn(
+                                            "day-box overflow-hidden min-h-[50px] sm:aspect-square flex flex-col relative transition-all duration-200 p-0",
+                                            !dayBoxClass && "border border-border/50",
+                                            isPast ? "bg-muted/10 opacity-50 grayscale cursor-not-allowed pointer-events-none" : "hover:bg-muted/20 cursor-pointer",
+                                            !isPast && isOptimal && !dayBoxClass && "ring-2 ring-inset ring-green-500/30 bg-green-500/5",
+                                            availableButNotSignedUp && !dayBoxClass && "ring-2 ring-inset ring-blue-500/40 bg-blue-500/5",
+                                            dayBoxClass === "day-box-joined" && "ring-2 ring-inset ring-purple-500/50",
+                                            dayBoxClass
+                                        )}
+                                    >
                                     <div className="day-box-header py-0.5 px-1 text-[9px] sm:text-[10px] bg-muted/30 flex justify-between items-center">
                                         {dayNum}
-                                        {!isPast && isOptimal && (
-                                            <div className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" title="Optimal for a session!" />
+                                        {!isPast && (
+                                            <div className="flex gap-0.5">
+                                                {availableButNotSignedUp && (
+                                                    <div className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" title="Available but not signed up!" />
+                                                )}
+                                                {isOptimal && (
+                                                    <div className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" title="Optimal for a session!" />
+                                                )}
+                                            </div>
                                         )}
                                     </div>
                                     <div className="flex-grow flex items-center justify-center p-1">
@@ -379,10 +413,24 @@ function MonthOverview({
                                 <AvailabilityDialog 
                                     date={day} 
                                     availability={dayAvailability}
-                                    onToggle={() => {
-                                        toggleAvailability({ date: day.getTime() });
+                                    onToggle={async () => {
                                         const isCurrentlyAvailable = dayAvailability.some(a => a.userId === userId);
-                                        track('availability_toggled', { action: isCurrentlyAvailable ? 'removed' : 'added' });
+                                        // Update optimistic state
+                                        setOptimisticAvailability(prev => ({
+                                            ...prev,
+                                            [dayNum]: !isCurrentlyAvailable
+                                        }));
+
+                                        try {
+                                            await toggleAvailability({ date: day.getTime() });
+                                            track('availability_toggled', { action: isCurrentlyAvailable ? 'removed' : 'added' });
+                                        } catch (error) {
+                                            // Rollback on error
+                                            setOptimisticAvailability(prev => ({
+                                                ...prev,
+                                                [dayNum]: isCurrentlyAvailable
+                                            }));
+                                        }
                                     }}
                                     userMetadata={userMetadata}
                                 />                            )}
@@ -461,7 +509,9 @@ function SevenDayOverview({ sessions, userCharacterIds }: { sessions: SessionWit
                         <div
                             key={dayString}
                             className={cn(
-                                "day-box border border-gray-300 overflow-hidden min-h-[8rem]",
+                                "day-box overflow-hidden min-h-[8rem]",
+                                !dayBoxClass && "border border-gray-300",
+                                dayBoxClass === "day-box-joined" && "ring-2 ring-inset ring-purple-500/50",
                                 dayBoxClass
                             )}
                         >
@@ -506,9 +556,19 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
   const isGM = useQuery(api.sessions.isGameMasterQuery)
   const userCharacters = useQuery(api.characters.listCharacters)
   const world = useQuery(api.worlds.getWorldByOwner) // Query for the user's world
+  const userAvailability = useQuery(api.planning.getUserAvailability)
 
   const userCharacterIds = useMemo(() => new Set(userCharacters?.map(c => c._id) ?? []), [userCharacters])
   
+  const userAvailabilityDates = useMemo(() => {
+    if (!userAvailability) return new Set<number>();
+    return new Set(userAvailability.map(a => {
+      const d = new Date(a.date);
+      d.setHours(0, 0, 0, 0);
+      return d.getTime();
+    }));
+  }, [userAvailability]);
+
   const sessions = useMemo(() => {
     if (!sessionsRaw) return sessionsRaw;
     
@@ -754,6 +814,10 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
                     const hasJoined = activeTab === 'upcoming' && session.characters.some(id => userCharacterIds.has(id))
                     const isPlanning = session.planning || !session.date
                     
+                    const sessionDateRaw = session.date ? new Date(session.date) : null;
+                    if (sessionDateRaw) sessionDateRaw.setHours(0, 0, 0, 0);
+                    const isAvailable = sessionDateRaw && userAvailabilityDates.has(sessionDateRaw.getTime());
+
                     return (
                       <motion.li 
                         key={session._id}
@@ -796,6 +860,16 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
                                       )}
                                   </div>
                                   <span className="truncate max-w-[200px] sm:max-w-none">{session.worldName}</span>
+                                  {isAvailable && !hasJoined && (
+                                    <Tooltip delayDuration={0}>
+                                        <TooltipTrigger asChild>
+                                            <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse shrink-0 ml-1" />
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            You are available this day!
+                                        </TooltipContent>
+                                    </Tooltip>
+                                  )}
                               </div>
                               {isPlanning && <div className="text-[10px] bg-purple-600 text-white px-2 py-0.5 rounded-full uppercase tracking-widest font-black shadow-sm">Planning</div>}
                               {!isPlanning && session.characters.length >= session.maxPlayers && (
