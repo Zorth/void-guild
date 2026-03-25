@@ -36,19 +36,22 @@ const oxProto = localFont({
     },
   ],
   variable: '--font-ox-proto',
-  preload: false,
+  preload: true,
+  display: 'swap',
 })
 
 const taroca = localFont({
   src: '../public/fonts/taroca-regular/Taroca-Regular.ttf',
   variable: '--font-taroca',
-  preload: false,
+  preload: true,
+  display: 'swap',
 })
 
 const gin = localFont({
   src: '../public/fonts/gin-test/GinTest-Regular.otf',
   variable: '--font-gin',
-  preload: false,
+  preload: true,
+  display: 'swap',
 })
 
 const sabon = localFont({
@@ -75,7 +78,8 @@ const sabon = localFont({
     },
   ],
   variable: '--font-sabon',
-  preload: false,
+  preload: true,
+  display: 'swap',
 })
 
 const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'
