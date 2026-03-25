@@ -199,6 +199,7 @@ function AvailabilityDialog({
 
 function MonthOverview({ 
   sessions, 
+  allSessions,
   userCharacterIds, 
   viewDate, 
   onPrevMonth, 
@@ -206,6 +207,7 @@ function MonthOverview({
   canPrevMonth 
 }: { 
   sessions: SessionWithDetails[], 
+  allSessions: SessionWithDetails[],
   userCharacterIds: Set<string>,
   viewDate: Date,
   onPrevMonth: () => void,
@@ -252,6 +254,17 @@ function MonthOverview({
     }
 
     const sessionsByDay = sessions.reduce((acc, session) => {
+        if (!session.date) return acc;
+        const sessionDate = new Date(session.date);
+        if (sessionDate.getFullYear() === year && sessionDate.getMonth() === month) {
+            const day = sessionDate.getDate();
+            if (!acc[day]) acc[day] = [];
+            acc[day].push(session);
+        }
+        return acc;
+    }, {} as Record<number, SessionWithDetails[]>);
+
+    const highlightSessionsByDay = allSessions.reduce((acc, session) => {
         if (!session.date) return acc;
         const sessionDate = new Date(session.date);
         if (sessionDate.getFullYear() === year && sessionDate.getMonth() === month) {
@@ -334,6 +347,7 @@ function MonthOverview({
                         
                         const dayNum = day.getDate();
                         const daySessions = sessionsByDay[dayNum] || [];
+                        const highlightSessions = highlightSessionsByDay[dayNum] || [];
                         const dayAvailability = availabilityByDay[dayNum] || [];
 
                         const today = new Date();
@@ -341,9 +355,9 @@ function MonthOverview({
                         const isPast = day < today;
                         
                         let dayBoxClass = "";
-                        if (daySessions.some(s => s.isOwner)) {
+                        if (highlightSessions.some(s => s.isOwner)) {
                             dayBoxClass = "day-box-owner";
-                        } else if (daySessions.some(s => s.characters.some(id => userCharacterIds.has(id)))) {
+                        } else if (highlightSessions.some(s => s.characters.some(id => userCharacterIds.has(id)))) {
                             dayBoxClass = "day-box-joined";
                         }
 
@@ -372,7 +386,7 @@ function MonthOverview({
                                             dayBoxClass
                                         )}
                                     >
-                                    <div className="day-box-header py-0.5 px-1 text-[9px] sm:text-[10px] bg-muted/30 flex justify-between items-center">
+                                    <div className="day-box-header py-0.5 px-1 text-[9px] sm:text-[10px] flex justify-between items-center">
                                         {dayNum}
                                         {!isPast && (
                                             <div className="flex gap-0.5">
@@ -481,7 +495,7 @@ function SevenDayOverview({ sessions, userCharacterIds }: { sessions: SessionWit
     });
 
     const sessionsByDay = sessions.reduce((acc, session) => {
-        if (session.planning || !session.date) return acc;
+        if (!session.date) return acc;
         const sessionDate = new Date(session.date);
         sessionDate.setHours(0, 0, 0, 0); // Normalize to start of day
         const dayString = sessionDate.toDateString();
@@ -785,6 +799,7 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
               ) : (
                 <MonthOverview 
                   sessions={sessions} 
+                  allSessions={sessionsRaw || []}
                   userCharacterIds={userCharacterIds} 
                   viewDate={viewDate}
                   onPrevMonth={handlePrevMonth}

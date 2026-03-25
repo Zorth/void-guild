@@ -56,21 +56,27 @@
 }
 
 .day-box.day-box-owner {
-    border: 2px solid transparent;
+    border: 2px solid transparent !important;
     background: linear-gradient(var(--card), var(--card)) padding-box,
-                linear-gradient(to bottom right, #BF953F, #FCF6BA, #AA771C) border-box;
+                linear-gradient(to bottom right, #BF953F, #FCF6BA, #AA771C) border-box !important;
 }
 
 .day-box.day-box-joined {
-    border: 2px solid #D8B4FE; /* border-purple-300 */
-    background-color: rgba(147, 51, 234, 0.1); /* bg-purple-100/50 */
+    border: 2px solid #D8B4FE !important; /* border-purple-300 */
+    background-color: rgba(147, 51, 234, 0.1) !important; /* bg-purple-100/50 */
+}
+
+.day-box.day-box-owner .day-box-header,
+.day-box.day-box-joined .day-box-header {
+    background-color: transparent;
+    border-bottom-color: rgba(0,0,0,0.1);
 }
 
 .day-box-header {
     padding: 0.5rem;
     font-weight: 600;
     border-bottom: 1px solid hsl(var(--border));
-    background-color: var(--muted); /* 1 tone lighter than --muted */
+    background-color: var(--muted);
 }
 
 .day-box-content {
