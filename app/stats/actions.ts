@@ -27,7 +27,10 @@ export async function getUsernames(userIds: string[]): Promise<Record<string, Us
 
   try {
     const clerk = createClerkClient({ secretKey }); 
-    const users = await clerk.users.getUserList({ userId: userIds });
+    const users = await clerk.users.getUserList({ 
+      userId: userIds,
+      limit: 500 // Increased from default 10 to fetch all requested users
+    });
     
     const usernameMap: Record<string, UserMetadata> = {};
     users.data.forEach(user => {
