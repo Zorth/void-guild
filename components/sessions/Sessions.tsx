@@ -433,12 +433,14 @@ function MonthOverview({
                                         }
                                     }}
                                     userMetadata={userMetadata}
-                                />                            )}
+                                />
+                            )}
                         </Dialog>
                     );
                 })}
             </div>
         </div>
+    </div>
     );
 }
 

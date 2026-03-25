@@ -113,7 +113,6 @@ export const metadata: Metadata = {
   robots: {
     index: true,
     follow: true,
-    noai: true, // Custom property for clarity, though not standard in all parsers
   },
   other: {
     'robots': 'noai, noimageai',
