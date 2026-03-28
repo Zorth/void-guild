@@ -350,13 +350,6 @@ export const createSession = mutation({
         sessionId
     })
 
-    await ctx.scheduler.runAfter(0, internal.activity.logActivity, {
-        type: 'session_created',
-        message: `{user} posted a new session for ${gmWorld.name}!`,
-        userId: identity.subject,
-        metadata: { sessionId, worldName: gmWorld.name }
-    })
-
     return sessionId
   },
 })

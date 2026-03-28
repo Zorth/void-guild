@@ -4,7 +4,7 @@ import { useQuery } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn, formatDate, formatTime } from '@/lib/utils'
-import { Sparkles, Trophy, Calendar, User } from 'lucide-react'
+import { Sparkles, Trophy, User } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { getUsernames, UserMetadata } from '@/app/stats/actions'
 
@@ -55,7 +55,6 @@ export default function ActivityFeed() {
                 style={{ opacity }}
               >
                 <div className="mt-1">
-                  {activity.type === 'session_created' && <Calendar className="h-5 w-5 text-blue-500" />}
                   {activity.type === 'level_up' && <Sparkles className="h-5 w-5 text-purple-500" />}
                   {activity.type === 'rank_promotion' && <Trophy className="h-5 w-5 text-amber-500" />}
                   {activity.type === 'character_created' && <User className="h-5 w-5 text-green-500" />}

@@ -6,6 +6,7 @@ export const listActivity = query({
   handler: async (ctx) => {
     return await ctx.db
       .query('activity')
+      .filter((q) => q.neq(q.field('type'), 'session_created'))
       .order('desc')
       .take(7)
   }

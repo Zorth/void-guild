@@ -80,6 +80,7 @@ export default function SessionClient() {
   const [isExpressingInterest, setIsExpressingInterest] = useState(false)
   const [leavingCharacterId, setLeavingCharacterId] = useState<string | null>(null)
   const [optimisticInterestedPlayers, setOptimisticInterestedPlayers] = useState<{ userId: string; username: string }[] | null>(null)
+  const [isJoinSuccessDialogOpen, setIsJoinSuccessDialogOpen] = useState(false)
 
   useEffect(() => {
     if (session?.interestedPlayers) {
@@ -182,6 +183,7 @@ export default function SessionClient() {
         })
         track('session_joined', { worldName: session.worldName })
         setSelectedCharacterId('')
+        setIsJoinSuccessDialogOpen(true)
     } catch (e) {
         alert(e instanceof Error ? e.message : 'Failed to join session')
     } finally {
@@ -624,6 +626,29 @@ export default function SessionClient() {
         Thank you for playing with us!<br/>
         We encourage tipping your <b className="text-primary">Voidmaster</b> for their hard work.
       </div>
+
+      <AlertDialog open={isJoinSuccessDialogOpen} onOpenChange={setIsJoinSuccessDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Successfully Joined!</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have successfully joined the session for <strong>{session.worldName}</strong>. 
+              Would you like to add this session to your Google Calendar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Maybe Later</AlertDialogCancel>
+            {calendarLink && (
+              <AlertDialogAction asChild>
+                <a href={calendarLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Add to Calendar
+                </a>
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
