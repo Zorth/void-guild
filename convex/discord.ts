@@ -57,11 +57,15 @@ export const syncSessionToDiscord = internalAction({
     const systemEmoji = session.system === 'PF' ? '<:Pathfinder:1322734594864320522>' : '<:DnD:1322734981524754473>';
     const systemName = session.system === 'PF' ? 'Pathfinder 2e' : 'D&D 5e';
     const locationInfo = session.location ? `[View on Google Maps](${session.location})` : (isPlanning ? 'TBD (Planning Phase)' : 'TBD');
+    const levelInfo = (session.level && session.level > 0) 
+      ? `Level ${session.level}` 
+      : "Discuss what you're going to do to decide the mission's level";
     const worldLink = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'}/world/${encodeURIComponent(session.worldName)}`;
     const sessionLink = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'}/sessions/${session._id}`;
     
     const messageContent = `# ${systemEmoji} [${session.worldName}](${worldLink})\n` +
       `**System**: ${systemName}\n` +
+      `**Level**: ${levelInfo}\n` +
       `**Location**: ${locationInfo}\n` +
       `**Date**: ${dateInfo}\n\n` +
       `[**VIEW SESSION ON GUILD**]( ${sessionLink} )\n\n` +
@@ -239,6 +243,10 @@ export const sendSessionNotification = action({
       ? process.env.DISCORD_ROLE_ID_PF 
       : process.env.DISCORD_ROLE_ID_DND;
 
+    const levelInfo = (session.level && session.level > 0) 
+      ? `Level ${session.level}` 
+      : "Discuss what you're going to do to decide the mission's level";
+
     let content = (roleId && args.type !== 'cancel') ? `<@&${roleId}>` : undefined;
     let embedTitle = "";
     let embedDescription = "";
@@ -272,7 +280,7 @@ export const sendSessionNotification = action({
       color: embedColor,
       fields: [
         { name: 'System', value: session.system === 'PF' ? '<:Pathfinder:1322734594864320522> Pathfinder 2e' : '<:DnD:1322734981524754473> D&D 5e', inline: true },
-        { name: 'Level', value: session.level ? `Level ${session.level}` : 'TBD', inline: true },
+        { name: 'Level', value: levelInfo, inline: true },
         { name: 'Players', value: `${session.attendingCharacters.length}/${session.maxPlayers}`, inline: true },
         { name: 'Date & Time', value: dateInfo, inline: false },
       ],
