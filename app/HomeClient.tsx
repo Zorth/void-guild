@@ -23,7 +23,7 @@ export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
         <div className="flex flex-col gap-1 w-full sm:w-auto">
           <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Guild of The Void</h1>
           <p className="text-sm text-muted-foreground max-w-[300px] sm:max-w-none">
-            Management tool for The Void Campaign, currently in Open Beta.
+            Management tool for The Void Campaign.
           </p>
         </div>
         <Authenticated>
