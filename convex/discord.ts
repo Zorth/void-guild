@@ -42,12 +42,13 @@ export const syncSessionToDiscord = internalAction({
       dateStr = `${day}/${month}`;
     }
     
-    // Format: (DD/MM) The Void: <WorldName> [<signupCharacters>/<MaxCharacters>]
-    // OR: (PLANNING) The Void: <WorldName> [<interestCount>]
+    // Format: (DD/MM) The Void: <WorldName> [Lvl X] [<signupCharacters>/<MaxCharacters>]
+    // OR: (PLANNING) The Void: <WorldName> [Lvl X] [<interestCount> Interested]
     const isPlanning = session.planning || !session.date;
+    const levelStr = (session.level && session.level > 0) ? `[Lvl ${session.level}]` : "[Lvl ?]";
     const threadName = isPlanning 
-      ? `(PLANNING) The Void: ${session.worldName} [${(session.interestedPlayers || []).length} Interested]`
-      : `(${dateStr}) The Void: ${session.worldName} [${session.attendingCharacters.length}/${session.maxPlayers}]`;
+      ? `(PLANNING) The Void: ${session.worldName} ${levelStr} [${(session.interestedPlayers || []).length} Interested]`
+      : `(${dateStr}) The Void: ${session.worldName} ${levelStr} [${session.attendingCharacters.length}/${session.maxPlayers}]`;
 
     const unixTimestamp = session.date ? Math.floor(session.date / 1000) : null;
     const dateInfo = (isPlanning || !unixTimestamp) 
@@ -73,18 +74,21 @@ export const syncSessionToDiscord = internalAction({
         ? `*This session is currently in the planning phase. Click the link above to **show your interest** and make it easier for everyone to pick a date by filling in the Planning tab!*`
         : `*Click the link above to **sign up with your character**! Voidmasters encourage you to use this thread to discuss your plans and prepare for this session!*`);
 
-    // Format the list of signed-up characters for the embed
-    const characterList = session.attendingCharacters.length > 0
+    // Format the list of signed-up characters and interested players for the embed fields
+    const signupList = session.attendingCharacters.length > 0
       ? session.attendingCharacters.map(c => `• **${c.name}** (Lvl ${c.lvl} ${c.class})`).join("\n")
-      : (isPlanning ? "_Session is in planning - signups not yet open._" : "_No characters signed up yet._");
+      : (isPlanning ? "_Signups not yet open._" : "_No characters signed up yet._");
+    
+    const interestList = (session.interestedPlayers && session.interestedPlayers.length > 0)
+      ? session.interestedPlayers.map(p => `• **${p.username}**`).join("\n")
+      : "_No interest expressed yet._";
 
     const embed = {
-      title: isPlanning ? "Interested Players" : "Current Signups",
-      description: isPlanning 
-        ? (session.interestedPlayers && session.interestedPlayers.length > 0 
-            ? session.interestedPlayers.map(p => `• **${p.username}**`).join("\n")
-            : "_No interest expressed yet._")
-        : characterList,
+      title: "Session Participants",
+      fields: [
+        { name: "Current Signups", value: signupList, inline: false },
+        { name: "Interested Players", value: interestList, inline: false },
+      ],
       color: session.system === 'PF' ? 0xde2e2e : 0xe81123,
       url: sessionLink,
       timestamp: new Date().toISOString(),
@@ -274,6 +278,9 @@ export const sendSessionNotification = action({
       ? `https://discord.com/channels/${guildId}/${session.discordThreadId}` 
       : null;
 
+    const interestCount = (session.interestedPlayers || []).length;
+    const playersValue = `${session.attendingCharacters.length}/${session.maxPlayers}` + (interestCount > 0 ? ` (+${interestCount} interested)` : "");
+
     const embed: any = {
       title: embedTitle,
       description: embedDescription,
@@ -281,7 +288,7 @@ export const sendSessionNotification = action({
       fields: [
         { name: 'System', value: session.system === 'PF' ? '<:Pathfinder:1322734594864320522> Pathfinder 2e' : '<:DnD:1322734981524754473> D&D 5e', inline: true },
         { name: 'Level', value: levelInfo, inline: true },
-        { name: 'Players', value: `${session.attendingCharacters.length}/${session.maxPlayers}`, inline: true },
+        { name: 'Players', value: playersValue, inline: true },
         { name: 'Date & Time', value: dateInfo, inline: false },
       ],
       timestamp: new Date().toISOString(),
@@ -494,10 +501,13 @@ export const getInternalSessionDetails = internalQuery({
       session.characters.map((id) => ctx.db.get(id))
     );
 
+    const gmCharacter = session.gmCharacter ? await ctx.db.get(session.gmCharacter) : null;
+
     return {
       ...session,
       worldName: world?.name || "Unknown World",
       attendingCharacters: attendingCharacters.filter((c): c is any => c !== null),
+      gmCharacterName: gmCharacter?.name || null,
     };
   },
 });
