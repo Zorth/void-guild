@@ -112,12 +112,16 @@ function AvailabilityDialog({
     date, 
     availability, 
     onToggle,
-    userMetadata
+    userMetadata,
+    userCharacterIds,
+    daySessions
 }: { 
     date: Date, 
     availability: Doc<'availability'>[], 
     onToggle: () => void,
-    userMetadata: Record<string, UserMetadata>
+    userMetadata: Record<string, UserMetadata>,
+    userCharacterIds: Set<string>,
+    daySessions: SessionWithDetails[]
 }) {
     const { userId } = useAuth()
     const isAvailable = availability.some(a => a.userId === userId)
@@ -129,6 +133,9 @@ function AvailabilityDialog({
     const getDisplayName = (a: Doc<'availability'>) => {
         return userMetadata[a.userId]?.name || a.username || `User ${a.userId.slice(-4)}`;
     }
+
+    const sessionsRunning = daySessions.filter(s => s.isOwner);
+    const sessionsJoined = daySessions.filter(s => !s.isOwner && s.characters.some(id => userCharacterIds.has(id)));
 
     const UserItem = ({ a }: { a: Doc<'availability'> }) => (
         <Tooltip delayDuration={0}>
@@ -149,6 +156,23 @@ function AvailabilityDialog({
                 <DialogTitle>Availability for {formatDate(date)}</DialogTitle>
             </DialogHeader>
             <div className="py-4 space-y-6">
+                {(sessionsRunning.length > 0 || sessionsJoined.length > 0) && (
+                    <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-3 space-y-2 animate-in fade-in zoom-in duration-300">
+                        {sessionsRunning.map(s => (
+                            <div key={s._id} className="flex items-center gap-2 text-xs font-medium text-purple-700 dark:text-purple-400">
+                                <Shield className="h-3 w-3" />
+                                <span>You are <span className="font-bold underline decoration-purple-500/30">running</span> &quot;{s.worldName}&quot; on this day.</span>
+                            </div>
+                        ))}
+                        {sessionsJoined.map(s => (
+                            <div key={s._id} className="flex items-center gap-2 text-xs font-medium text-purple-700 dark:text-purple-400">
+                                <Book className="h-3 w-3" />
+                                <span>You have <span className="font-bold underline decoration-purple-500/30">joined</span> &quot;{s.worldName}&quot; on this day.</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
                 {isOptimal && (
                     <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 flex items-center gap-3 animate-in fade-in zoom-in duration-300">
                         <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse shrink-0" />
@@ -427,6 +451,8 @@ function MonthOverview({
                                 <AvailabilityDialog 
                                     date={day} 
                                     availability={dayAvailability}
+                                    userCharacterIds={userCharacterIds}
+                                    daySessions={highlightSessions}
                                     onToggle={async () => {
                                         const isCurrentlyAvailable = dayAvailability.some(a => a.userId === userId);
                                         // Update optimistic state
