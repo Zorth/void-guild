@@ -88,6 +88,78 @@ function WorldDescription({ worldId, initialDescription, isOwner }: { worldId: I
   )
 }
 
+function WorldMap({ worldId, initialMapUrl, isOwner }: { worldId: Id<'worlds'>, initialMapUrl?: string, isOwner: boolean }) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [mapUrl, setMapUrl] = useState(initialMapUrl || '')
+  const updateMap = useMutation(api.worlds.updateWorldMap)
+
+  const handleSave = async () => {
+    await updateMap({ worldId, mapEmbed: mapUrl })
+    setIsEditing(false)
+  }
+
+  return (
+    <Card className="md:col-span-2 flex flex-col bg-card/50 relative group border-border/40 gap-0 py-0 overflow-hidden">
+      <CardHeader className="flex flex-row items-center justify-between px-6 py-2 border-b border-border/50 pb-2">
+        <CardTitle className="text-lg font-bold flex items-center gap-2">
+          <Map className="h-4 w-4 text-primary" />
+          World Map
+        </CardTitle>
+        {isOwner && (
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="gap-2 transition-opacity h-7 px-2"
+            onClick={() => setIsEditing(!isEditing)}
+          >
+            <Settings className="h-3.5 w-3.5" />
+            {isEditing ? "Cancel" : "Edit URL"}
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent className="px-0 pt-0 pb-0 min-h-[500px] flex flex-col">
+        {isEditing ? (
+          <div className="p-6 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Map Embed URL</span>
+            </div>
+            <Input 
+              value={mapUrl}
+              onChange={(e) => setMapUrl(e.target.value)}
+              placeholder="https://www.worldanvil.com/w/.../map/..."
+              className="bg-muted/30"
+            />
+            <p className="text-[10px] text-muted-foreground italic">Paste the URL of the map you want to embed. Some sites might require a specific embed URL.</p>
+            <div className="flex justify-end gap-2">
+              <Button size="sm" onClick={handleSave}>Save Map</Button>
+            </div>
+          </div>
+        ) : (
+          mapUrl ? (
+            <iframe 
+              src={mapUrl} 
+              className="w-full flex-grow min-h-[600px] border-0"
+              allow="fullscreen"
+            />
+          ) : (
+            <div className="flex-grow flex items-center justify-center p-12 text-center">
+              <div>
+                <Map className="h-12 w-12 text-muted-foreground/20 mx-auto mb-4" />
+                <p className="text-muted-foreground italic">No world map has been shared yet.</p>
+                {isOwner && (
+                    <Button variant="outline" size="sm" className="mt-4" onClick={() => setIsEditing(true)}>
+                        Add a Map URL
+                    </Button>
+                )}
+              </div>
+            </div>
+          )
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 function ReputationCell({ 
   worldId, 
   charId, 
