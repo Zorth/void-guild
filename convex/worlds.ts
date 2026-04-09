@@ -391,3 +391,18 @@ export const updateWorldDescription = mutation({
     })
   },
 })
+
+export const updateWorldMap = mutation({
+  args: { worldId: v.id('worlds'), mapEmbed: v.string() },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    const world = await ctx.db.get(args.worldId)
+    if (!world || world.owner !== user?.subject) {
+      throw new Error('Unauthorized')
+    }
+
+    await ctx.db.patch(args.worldId, {
+      mapEmbed: args.mapEmbed,
+    })
+  },
+})

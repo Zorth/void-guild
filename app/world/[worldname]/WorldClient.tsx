@@ -9,7 +9,7 @@ import Link from 'next/link'
 import { 
   ChevronLeft, Globe, Calendar, Book, Lock, Shield, User, MapPin, Users, 
   Plus, Minus, Eye, EyeOff, Settings, Trash2, ChevronDown, Check, Info, 
-  Layers, ChevronRight, LayoutGrid, Handshake, Scroll, Pencil, X, Filter
+  Layers, ChevronRight, LayoutGrid, Handshake, Scroll, Pencil, X, Filter, Map
 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn, formatDate, formatTime, getLevelBadgeStyle } from '@/lib/utils'
@@ -1134,6 +1134,11 @@ export default function WorldClient() {
           <WorldDescription 
             worldId={world._id} 
             initialDescription={world.description || ''} 
+            isOwner={userId === world.owner} 
+          />
+          <WorldMap 
+            worldId={world._id} 
+            initialMapUrl={world.mapEmbed} 
             isOwner={userId === world.owner} 
           />
           <ReputationSystem 

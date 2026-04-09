@@ -48,6 +48,7 @@ export default defineSchema({
         }))),
         reputationVisible: v.optional(v.boolean()),
         description: v.optional(v.string()),
+        mapEmbed: v.optional(v.string()),
     }).index('by_owner', ['owner']),
     reputations: defineTable({
         worldId: v.id('worlds'),
