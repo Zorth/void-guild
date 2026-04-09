@@ -13,7 +13,7 @@ import {
 import { useAuth } from '@clerk/nextjs'
 import QuestDialog from './QuestDialog'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
+import { cn, getLevelBadgeStyle } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 
 interface QuestListProps {
@@ -98,10 +98,13 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false }: Qu
                   onClick={() => setExpandedQuestId(isExpanded ? null : quest._id)}
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className={cn(
-                        "flex items-center justify-center rounded-full bg-primary/10 text-primary font-bold shrink-0",
-                        isSidebar ? "h-6 w-6 text-[10px]" : "h-8 w-8 text-xs"
-                    )}>
+                    <div 
+                        className={cn(
+                            "flex items-center justify-center rounded-full font-bold shrink-0",
+                            isSidebar ? "h-6 w-6 text-[10px]" : "h-8 w-8 text-xs"
+                        )}
+                        style={getLevelBadgeStyle(quest.level)}
+                    >
                       {quest.level > 0 ? quest.level : '?'}
                     </div>
                     <div className="min-w-0">

@@ -124,7 +124,11 @@ export const getQuestsByWorld = query({
         .withIndex('by_worldId', (q) => q.eq('worldId', undefined))
         .collect()
 
-    return [...worldQuests, ...worldlessQuests]
+    return [...worldQuests, ...worldlessQuests].sort((a, b) => {
+        if (a.level === 0 && b.level !== 0) return -1
+        if (a.level !== 0 && b.level === 0) return 1
+        return a.level - b.level
+    })
   },
 })
 
