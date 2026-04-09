@@ -285,6 +285,10 @@ export const selectQuest = mutation({
     }
 
     await ctx.db.patch(args.sessionId, { questId: args.questId })
+
+    await ctx.scheduler.runAfter(0, internal.discord.syncSessionToDiscord, {
+      sessionId: args.sessionId
+    })
   },
 })
 
@@ -339,6 +343,7 @@ export const createSession = mutation({
     location: v.optional(v.string()),
     system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
     planning: v.optional(v.boolean()),
+    questId: v.optional(v.id('quests')),
   },
   handler: async (ctx, args) => {
     const isGM = await isGameMaster(ctx)
@@ -372,6 +377,7 @@ export const createSession = mutation({
       owner: identity.subject,
       system: args.system,
       planning: args.planning,
+      questId: args.questId,
     })
 
     await ctx.scheduler.runAfter(0, internal.discord.syncSessionToDiscord, {
@@ -394,6 +400,7 @@ export const updateSession = mutation({
     location: v.optional(v.string()),
     system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
     planning: v.optional(v.boolean()),
+    questId: v.optional(v.id('quests')),
   },
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
@@ -419,6 +426,7 @@ export const updateSession = mutation({
       location: args.location,
       system: args.system,
       planning: args.planning,
+      questId: args.questId,
     })
 
     await ctx.scheduler.runAfter(0, internal.discord.syncSessionToDiscord, {

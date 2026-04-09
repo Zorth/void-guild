@@ -46,9 +46,13 @@ export const syncSessionToDiscord = internalAction({
     // OR: (PLANNING) The Void: <WorldName> [Lvl X] [<interestCount> Interested]
     const isPlanning = session.planning || !session.date;
     const levelStr = (session.level && session.level > 0) ? `[Lvl ${session.level}]` : "[Lvl ?]";
+    
+    const interestCount = (session.interestedPlayers || []).length;
+    const interestStr = interestCount > 0 ? ` (+${interestCount})` : "";
+
     const threadName = isPlanning 
-      ? `(PLANNING) The Void: ${session.worldName} ${levelStr} [${(session.interestedPlayers || []).length} Interested]`
-      : `(${dateStr}) The Void: ${session.worldName} ${levelStr} [${session.attendingCharacters.length}/${session.maxPlayers}]`;
+      ? `(PLANNING) The Void: ${session.worldName} ${levelStr} [${interestCount} Interested]`
+      : `(${dateStr}) The Void: ${session.worldName} ${levelStr} [${session.attendingCharacters.length}/${session.maxPlayers}${interestStr}]`;
 
     const unixTimestamp = session.date ? Math.floor(session.date / 1000) : null;
     const dateInfo = (isPlanning || !unixTimestamp) 
@@ -69,18 +73,32 @@ export const syncSessionToDiscord = internalAction({
         const levelStr = session.selectedQuest.level > 0 ? `(lvl ${session.selectedQuest.level})` : "(lvl ?)";
         questContent = `\n## Quest\n**${session.selectedQuest.name}** ${levelStr}`;
         if (session.selectedQuest.description) {
-            questContent += `\n> *${session.selectedQuest.description}*`;
+            // Truncate description if very long
+            const desc = session.selectedQuest.description.length > 500 
+                ? session.selectedQuest.description.substring(0, 497) + "..." 
+                : session.selectedQuest.description;
+            questContent += `\n> *${desc}*`;
         }
         questContent += "\n";
     } else if (session.quests && session.quests.length > 0) {
-        questContent = "\n## Quests\n" + session.quests.map((q: any) => {
+        // Show only up to 5 quests to avoid exceeding 2000 char limit
+        const displayedQuests = session.quests.slice(0, 5);
+        questContent = "\n## Quests\n" + displayedQuests.map((q: any) => {
           const levelStr = q.level > 0 ? `(lvl ${q.level})` : "(lvl ?)";
           let str = `**${q.name}** ${levelStr}`;
           if (q.description) {
-            str += `\n> *${q.description}*`;
+            // Truncate description for list view
+            const desc = q.description.length > 200 
+                ? q.description.substring(0, 197) + "..." 
+                : q.description;
+            str += `\n> *${desc}*`;
           }
           return str;
         }).join("\n") + "\n";
+        
+        if (session.quests.length > 5) {
+            questContent += `*...and ${session.quests.length - 5} more on the website!*\n`;
+        }
     }
 
     const messageContent = `# ${systemEmoji} [${session.worldName}](${worldLink})\n` +
@@ -93,6 +111,11 @@ export const syncSessionToDiscord = internalAction({
       (isPlanning 
         ? `*This session is currently in the planning phase. Click the link above to **show your interest** and make it easier for everyone to pick a date by filling in the Planning tab!*`
         : `*Click the link above to **sign up with your character**! Voidmasters encourage you to use this thread to discuss your plans and prepare for this session!*`);
+
+    // Truncate messageContent if it somehow still exceeds 2000 chars (Discord limit)
+    const finalMessageContent = messageContent.length > 2000 
+        ? messageContent.substring(0, 1990) + "\n(Truncated...)" 
+        : messageContent;
 
     // Format the list of signed-up characters and interested players for the embed fields
     const signupList = session.attendingCharacters.length > 0
@@ -119,13 +142,15 @@ export const syncSessionToDiscord = internalAction({
     if (session.discordThreadId) {
       try {
         // Update thread name
+        // NOTE: Discord heavily rate limits thread renaming (2 changes per 10 minutes).
+        // We'll attempt it, but the message update is more important.
         await fetch(`${DISCORD_API_BASE}/channels/${session.discordThreadId}`, {
           method: "PATCH",
           headers: {
             Authorization: `Bot ${botToken}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ name: threadName }),
+          body: JSON.stringify({ name: threadName.substring(0, 100) }), // Ensure < 100 chars
         });
 
         // In forums, the first message has the same ID as the thread
@@ -136,7 +161,7 @@ export const syncSessionToDiscord = internalAction({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ 
-            content: messageContent,
+            content: finalMessageContent,
             embeds: [embed] 
           }),
         });
