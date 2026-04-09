@@ -1229,7 +1229,9 @@ export default function WorldClient() {
             </CardContent>
           </Card>
 
-          <QuestList worldId={world._id} worldOwner={world.owner} />
+          <div className="hidden lg:block">
+            <QuestList worldId={world._id} worldOwner={world.owner} />
+          </div>
         </div>
 
         {/* Right Column: Bento Grid */}
@@ -1253,6 +1255,11 @@ export default function WorldClient() {
             worldName={world.name} 
             userCharacterIds={userCharacterIds} 
           />
+        </div>
+
+        {/* Bottom on mobile, hidden on desktop */}
+        <div className="lg:hidden">
+          <QuestList worldId={world._id} worldOwner={world.owner} />
         </div>
       </div>
     </div>
