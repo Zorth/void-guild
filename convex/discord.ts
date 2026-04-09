@@ -77,7 +77,12 @@ export const syncSessionToDiscord = internalAction({
             const desc = session.selectedQuest.description.length > 500 
                 ? session.selectedQuest.description.substring(0, 497) + "..." 
                 : session.selectedQuest.description;
-            questContent += `\n> *${desc}*`;
+            
+            // Format each line with blockquote and italics
+            const formattedDesc = desc.split("\n")
+              .map((line: string) => line.trim() ? `> *${line}*` : ">")
+              .join("\n");
+            questContent += `\n${formattedDesc}`;
         }
         questContent += "\n";
     } else if (session.quests && session.quests.length > 0) {
@@ -91,7 +96,12 @@ export const syncSessionToDiscord = internalAction({
             const desc = q.description.length > 200 
                 ? q.description.substring(0, 197) + "..." 
                 : q.description;
-            str += `\n> *${desc}*`;
+            
+            // Format each line with blockquote and italics
+            const formattedDesc = desc.split("\n")
+              .map((line: string) => line.trim() ? `> *${line}*` : ">")
+              .join("\n");
+            str += `\n${formattedDesc}`;
           }
           return str;
         }).join("\n") + "\n";
