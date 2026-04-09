@@ -65,7 +65,14 @@ export const syncSessionToDiscord = internalAction({
     const sessionLink = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'}/sessions/${session._id}`;
     
     const questContent = (session.quests && session.quests.length > 0)
-      ? "\n" + session.quests.map((q: any) => `## ${q.name}`).join("\n") + "\n"
+      ? "\n## Quests\n" + session.quests.map((q: any) => {
+          const levelStr = q.level > 0 ? `(lvl ${q.level})` : "(lvl ?)";
+          let str = `**${q.name}** ${levelStr}`;
+          if (q.description) {
+            str += `\n> *${q.description}*`;
+          }
+          return str;
+        }).join("\n") + "\n"
       : "";
 
     const messageContent = `# ${systemEmoji} [${session.worldName}](${worldLink})\n` +
