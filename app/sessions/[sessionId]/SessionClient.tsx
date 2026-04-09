@@ -41,6 +41,7 @@ import AttendingCharactersList from '@/components/sessions/details/AttendingChar
 import InterestedPlayersList from '@/components/sessions/details/InterestedPlayersList'
 import SessionManagement from '@/components/sessions/details/SessionManagement'
 import SessionJoinForm from '@/components/sessions/details/SessionJoinForm'
+import QuestList from '@/components/quests/QuestList'
 
 interface SessionWithGM extends Doc<'sessions'> {
     attendingCharacters: Doc<'characters'>[];
@@ -57,6 +58,7 @@ export default function SessionClient() {
 
   const { userId } = useAuth()
   const session = useQuery(api.sessions.getSession, { sessionId }) as SessionWithGM | undefined | null
+  const world = useQuery(api.worlds.getWorldByName, session?.worldName ? { name: session.worldName } : "skip")
   const xpGainsPreview = useQuery(api.sessions.previewXPGains, session?._id ? { sessionId: session._id } : "skip")
   const userCharacters = useQuery(api.characters.listCharacters)
   const joinSession = useMutation(api.sessions.joinSession)
@@ -620,6 +622,8 @@ export default function SessionClient() {
               </Unauthenticated>
             </>
           ) : null}
+
+          <QuestList worldId={session?.world} worldOwner={world?.owner} isSidebar={true} />
         </div>
       </div>
       <div className="text-center mt-8 text-sm text-muted-foreground">

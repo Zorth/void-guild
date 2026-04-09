@@ -25,6 +25,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import '@/components/sessions/sessions.css'
 import { Id } from '@/convex/_generated/dataModel'
+import QuestList from '@/components/quests/QuestList'
 
 function WorldDescription({ worldId, initialDescription, isOwner }: { worldId: Id<'worlds'>, initialDescription: string, isOwner: boolean }) {
   const [isEditing, setIsEditing] = useState(false)
@@ -1124,6 +1125,8 @@ export default function WorldClient() {
               )}
             </CardContent>
           </Card>
+
+          <QuestList worldId={world._id} worldOwner={world.owner} />
         </div>
 
         {/* Right Column: Bento Grid */}

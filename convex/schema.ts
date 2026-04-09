@@ -67,4 +67,14 @@ export default defineSchema({
         userId: v.optional(v.string()), // The user who triggered the activity
         metadata: v.any(),
     }),
+    quests: defineTable({
+        name: v.string(),
+        level: v.number(), // 1-20 or 0 for unknown
+        worldId: v.optional(v.id("worlds")), // Optional for worldless quests (The Void)
+        description: v.optional(v.string()),
+        questgiver: v.optional(v.string()),
+        reward: v.optional(v.string()),
+        tags: v.optional(v.array(v.string())),
+        owner: v.string(), // Clerk userId of the creator
+    }).index('by_worldId', ['worldId']),
 })
