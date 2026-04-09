@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { Pencil, CheckCircle2, Shield, Send, Bell, XCircle } from 'lucide-react'
+import { Pencil, CheckCircle2, Shield, Send, Bell, XCircle, Scroll } from 'lucide-react'
 import SessionDialog from '@/components/sessions/SessionDialog'
 import {
     AlertDialog,
@@ -23,12 +23,15 @@ import {
     DialogTrigger,
     DialogDescription,
 } from '@/components/ui/dialog'
-import { getLevelBadgeStyle, CharacterRankIcon } from '@/lib/utils'
-import { Doc } from '@/convex/_generated/dataModel'
+import { getLevelBadgeStyle, CharacterRankIcon, cn } from '@/lib/utils'
+import { Doc, Id } from '@/convex/_generated/dataModel'
+import { useState } from 'react'
 
 interface SessionManagementProps {
   session: any // Using any for simplicity as it includes combined GM data
   isAdmin: boolean
+  quests?: Doc<'quests'>[]
+  onSelectQuest: (questId?: Id<'quests'>) => void
   onSendToDiscord: (type: 'new' | 'remind' | 'cancel') => void
   onLock: () => void
   onForceLock: () => void
@@ -38,18 +41,95 @@ interface SessionManagementProps {
 export default function SessionManagement({
   session,
   isAdmin,
+  quests,
+  onSelectQuest,
   onSendToDiscord,
   onLock,
   onForceLock,
   xpGainsPreview
 }: SessionManagementProps) {
+  const [isQuestDialogOpen, setIsQuestDialogOpen] = useState(false)
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Session Management</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
-        <Dialog>
+      <CardContent className="space-y-6">
+        <div className="space-y-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <Scroll className="h-3 w-3" />
+                Active Quest
+            </h4>
+            <div className="flex items-center justify-between p-2 bg-muted/30 rounded-md border border-border/40">
+                <div className="text-sm truncate mr-2">
+                    {session.quest ? (
+                        <span className="font-medium text-primary">{session.quest.name}</span>
+                    ) : (
+                        <span className="italic text-muted-foreground">No quest selected</span>
+                    )}
+                </div>
+                <Dialog open={isQuestDialogOpen} onOpenChange={setIsQuestDialogOpen}>
+                    <DialogTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-7 text-[10px] uppercase font-bold tracking-tight">
+                            {session.quest ? "Change" : "Select"}
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                            <DialogTitle>Select Quest</DialogTitle>
+                            <DialogDescription>
+                                Choose a specific quest for this session to display it on Discord and the session page.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-2 py-4 max-h-[300px] overflow-y-auto pr-2">
+                            <Button 
+                                variant={!session.questId ? "secondary" : "ghost"}
+                                className="justify-start font-normal"
+                                onClick={() => {
+                                    onSelectQuest(undefined)
+                                    setIsQuestDialogOpen(false)
+                                }}
+                            >
+                                <XCircle className="h-4 w-4 mr-2" />
+                                No Active Quest
+                            </Button>
+                            {quests?.map((quest) => (
+                                <Button 
+                                    key={quest._id}
+                                    variant={session.questId === quest._id ? "secondary" : "ghost"}
+                                    className="justify-start font-normal h-auto py-2 px-3 text-left"
+                                    onClick={() => {
+                                        onSelectQuest(quest._id)
+                                        setIsQuestDialogOpen(false)
+                                    }}
+                                >
+                                    <div className="flex flex-col items-start gap-1">
+                                        <div className="flex items-center gap-2 font-bold text-sm">
+                                            <div 
+                                                className="flex items-center justify-center rounded-full h-5 w-5 text-[8px]"
+                                                style={getLevelBadgeStyle(quest.level)}
+                                            >
+                                                {quest.level > 0 ? quest.level : '?'}
+                                            </div>
+                                            {quest.name}
+                                        </div>
+                                        {quest.description && (
+                                            <div className="text-[10px] text-muted-foreground italic line-clamp-1">
+                                                {quest.description}
+                                            </div>
+                                        )}
+                                    </div>
+                                </Button>
+                            ))}
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            </div>
+        </div>
+
+        <div className="space-y-2">
+
             <DialogTrigger asChild>
                 <Button variant="outline" className="w-full justify-start">
                     <img src="/discord-icon.svg" alt="Discord" className="mr-2 h-4 w-4" />

@@ -64,16 +64,24 @@ export const syncSessionToDiscord = internalAction({
     const worldLink = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'}/world/${encodeURIComponent(session.worldName)}`;
     const sessionLink = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'}/sessions/${session._id}`;
     
-    const questContent = (session.quests && session.quests.length > 0)
-      ? "\n## Quests\n" + session.quests.map((q: any) => {
+    let questContent = "";
+    if (session.selectedQuest) {
+        const levelStr = session.selectedQuest.level > 0 ? `(lvl ${session.selectedQuest.level})` : "(lvl ?)";
+        questContent = `\n## Quest\n**${session.selectedQuest.name}** ${levelStr}`;
+        if (session.selectedQuest.description) {
+            questContent += `\n> *${session.selectedQuest.description}*`;
+        }
+        questContent += "\n";
+    } else if (session.quests && session.quests.length > 0) {
+        questContent = "\n## Quests\n" + session.quests.map((q: any) => {
           const levelStr = q.level > 0 ? `(lvl ${q.level})` : "(lvl ?)";
           let str = `**${q.name}** ${levelStr}`;
           if (q.description) {
             str += `\n> *${q.description}*`;
           }
           return str;
-        }).join("\n") + "\n"
-      : "";
+        }).join("\n") + "\n";
+    }
 
     const messageContent = `# ${systemEmoji} [${session.worldName}](${worldLink})\n` +
       `**System**: ${systemName}\n` +
@@ -525,12 +533,18 @@ export const getInternalSessionDetails = internalQuery({
       .withIndex('by_worldId', (q) => q.eq('worldId', undefined))
       .collect();
 
+    let selectedQuest = null;
+    if (session.questId) {
+        selectedQuest = await ctx.db.get(session.questId);
+    }
+
     return {
       ...session,
       worldName: world?.name || "Unknown World",
       attendingCharacters: attendingCharacters.filter((c): c is any => c !== null),
       gmCharacterName: gmCharacter?.name || null,
       quests: [...quests, ...worldlessQuests],
+      selectedQuest,
     };
   },
 });

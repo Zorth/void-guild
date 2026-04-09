@@ -34,6 +34,7 @@ export default defineSchema({
             userId: v.string(),
             username: v.string(),
         }))),
+        questId: v.optional(v.id("quests")),
         system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
         discordThreadId: v.optional(v.string()),
   }),

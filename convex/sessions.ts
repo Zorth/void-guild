@@ -246,6 +246,11 @@ export const getSession = query({
     }
 
     const worldDoc = await ctx.db.get(session.world as Id<'worlds'>) // Explicitly cast to Id<'worlds'>
+    
+    let quest = null
+    if (session.questId) {
+        quest = await ctx.db.get(session.questId)
+    }
 
     return {
       ...session,
@@ -256,7 +261,30 @@ export const getSession = query({
       attendingCharacters: characterDocs.filter((c): c is Doc<'characters'> => c !== null),
       isOwner,
       interestedPlayers: session.interestedPlayers || [], // Include interested players
+      quest: quest,
     }
+  },
+})
+
+export const selectQuest = mutation({
+  args: { sessionId: v.id('sessions'), questId: v.optional(v.id('quests')) },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) {
+      throw new Error('Not authenticated')
+    }
+
+    const session = await ctx.db.get(args.sessionId)
+    if (!session) {
+      throw new Error('Session not found')
+    }
+
+    const isAdminUser = await isAdmin(ctx)
+    if (session.owner !== user.subject && !isAdminUser) {
+      throw new Error('Only the session owner or an admin can select a quest.')
+    }
+
+    await ctx.db.patch(args.sessionId, { questId: args.questId })
   },
 })
 

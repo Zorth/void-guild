@@ -8,10 +8,10 @@ import { Button } from '@/components/ui/button'
 import { useState, useEffect } from 'react'
 import { Id, Doc } from '@/convex/_generated/dataModel'
 import Link from 'next/link'
-import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, Unlock, Globe } from 'lucide-react'
+import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, Unlock, Globe, Scroll, Trophy } from 'lucide-react'
 import { useAuth, SignInButton } from '@clerk/nextjs'
 import { Skeleton } from '@/components/ui/skeleton'
-import { cn, formatDate, formatTime as formatTimeUtil } from '@/lib/utils'
+import { cn, formatDate, formatTime as formatTimeUtil, getLevelBadgeStyle } from '@/lib/utils'
 import { fireJoinParticles, fireGoldParticles } from '@/lib/particles'
 import { toast } from 'sonner'
 import { track } from '@vercel/analytics'
@@ -49,6 +49,7 @@ interface SessionWithGM extends Doc<'sessions'> {
     gmCharacterData?: Doc<'characters'> | null;
     worldName: string;
     interestedPlayers?: { userId: string; username: string }[];
+    quest?: Doc<'quests'> | null;
 }
 
 export default function SessionClient() {
@@ -68,12 +69,14 @@ export default function SessionClient() {
   const forceLockSession = useMutation(api.sessions.forceLockSession)
   const forceUnlockSession = useMutation(api.sessions.forceUnlockSession)
   const adminAddCharacterToSession = useMutation(api.sessions.adminAddCharacterToSession)
+  const selectQuest = useMutation(api.sessions.selectQuest)
   const expressInterest = useMutation(api.sessions.expressInterest)
   const withdrawInterest = useMutation(api.sessions.withdrawInterest)
   const sendNotification = useAction(api.discord.sendSessionNotification)
 
   const isAdmin = useQuery(api.sessions.isAdminQuery)
   const allCharacters = useQuery(api.characters.listAllCharacters, isAdmin ? undefined : "skip")
+  const worldQuests = useQuery(api.quests.getQuestsByWorld, session?.world ? { worldId: session.world } : "skip")
 
   const [selectedCharacterId, setSelectedCharacterId] = useState<Id<'characters'> | ''>('')
   const [selectedAdminCharacterId, setSelectedAdminCharacterId] = useState<Id<'characters'> | ''>('')
@@ -467,6 +470,40 @@ export default function SessionClient() {
                 </div>
               )}
             </CardHeader>
+
+            {session.quest && (
+                <div className="px-6 pb-6">
+                    <div className="bg-primary/5 border border-primary/20 rounded-lg overflow-hidden">
+                        <div className="bg-primary/10 px-4 py-2 border-b border-primary/20 flex items-center justify-between">
+                            <div className="flex items-center gap-2 font-bold text-sm">
+                                <Scroll className="h-4 w-4 text-primary" />
+                                Active Quest
+                            </div>
+                            <div 
+                                className="flex items-center justify-center rounded-full font-bold h-6 w-6 text-[10px]"
+                                style={getLevelBadgeStyle(session.quest.level)}
+                            >
+                                {session.quest.level > 0 ? session.quest.level : '?'}
+                            </div>
+                        </div>
+                        <div className="p-4 space-y-3">
+                            <h4 className="font-bold text-lg">{session.quest.name}</h4>
+                            {session.quest.description && (
+                                <p className="text-sm text-muted-foreground italic leading-relaxed whitespace-pre-wrap">
+                                    &quot;{session.quest.description}&quot;
+                                </p>
+                            )}
+                            {session.quest.reward && (
+                                <div className="flex items-start gap-2 text-xs pt-1">
+                                    <Trophy className="h-3.5 w-3.5 text-yellow-500 shrink-0" />
+                                    <span><span className="font-bold text-muted-foreground uppercase mr-1">Reward:</span> {session.quest.reward}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <CardContent>
               <h3 className="text-xl font-semibold mb-4 flex items-center justify-between">
                 Attending Characters
@@ -544,6 +581,13 @@ export default function SessionClient() {
             <SessionManagement 
                 session={session}
                 isAdmin={isAdmin}
+                quests={worldQuests}
+                onSelectQuest={async (questId) => {
+                  if (session?._id) {
+                    await selectQuest({ sessionId: session._id, questId });
+                    toast.success(questId ? "Quest selected" : "Quest removed");
+                  }
+                }}
                 onSendToDiscord={handleSendToDiscord}
                 onLock={handleLock}
                 onForceLock={handleForceLock}
