@@ -189,6 +189,7 @@ export default function SessionManagement({
                 </div>
             </DialogContent>
         </Dialog>
+    </div>
         
         <SessionDialog 
             session={session} 
