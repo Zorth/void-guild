@@ -64,11 +64,16 @@ export const syncSessionToDiscord = internalAction({
     const worldLink = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'}/world/${encodeURIComponent(session.worldName)}`;
     const sessionLink = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'}/sessions/${session._id}`;
     
+    const questContent = (session.quests && session.quests.length > 0)
+      ? "\n" + session.quests.map((q: any) => `## ${q.name}`).join("\n") + "\n"
+      : "";
+
     const messageContent = `# ${systemEmoji} [${session.worldName}](${worldLink})\n` +
       `**System**: ${systemName}\n` +
       `**Level**: ${levelInfo}\n` +
       `**Location**: ${locationInfo}\n` +
-      `**Date**: ${dateInfo}\n\n` +
+      `**Date**: ${dateInfo}\n` +
+      questContent + "\n" +
       `[**VIEW SESSION ON GUILD**]( ${sessionLink} )\n\n` +
       (isPlanning 
         ? `*This session is currently in the planning phase. Click the link above to **show your interest** and make it easier for everyone to pick a date by filling in the Planning tab!*`
@@ -503,11 +508,22 @@ export const getInternalSessionDetails = internalQuery({
 
     const gmCharacter = session.gmCharacter ? await ctx.db.get(session.gmCharacter) : null;
 
+    const quests = await ctx.db
+      .query('quests')
+      .withIndex('by_worldId', (q) => q.eq('worldId', session.world))
+      .collect();
+    
+    const worldlessQuests = await ctx.db
+      .query('quests')
+      .withIndex('by_worldId', (q) => q.eq('worldId', undefined))
+      .collect();
+
     return {
       ...session,
       worldName: world?.name || "Unknown World",
       attendingCharacters: attendingCharacters.filter((c): c is any => c !== null),
       gmCharacterName: gmCharacter?.name || null,
+      quests: [...quests, ...worldlessQuests],
     };
   },
 });
