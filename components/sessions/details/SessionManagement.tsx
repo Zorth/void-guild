@@ -129,20 +129,20 @@ export default function SessionManagement({
         </div>
 
         <div className="space-y-2">
-
-            <DialogTrigger asChild>
-                <Button variant="outline" className="w-full justify-start">
-                    <img src="/discord-icon.svg" alt="Discord" className="mr-2 h-4 w-4" />
-                    Post Message
-                </Button>
-            </DialogTrigger>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Discord Notification</DialogTitle>
-                    <DialogDescription>
-                        Choose the type of notification you want to send to the community.
-                    </DialogDescription>
-                </DialogHeader>
+            <Dialog>
+                <DialogTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start">
+                        <img src="/discord-icon.svg" alt="Discord" className="mr-2 h-4 w-4" />
+                        Post Message
+                    </Button>
+                </DialogTrigger>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Discord Notification</DialogTitle>
+                        <DialogDescription>
+                            Choose the type of notification you want to send to the community.
+                        </DialogDescription>
+                    </DialogHeader>
                 <div className="grid grid-cols-1 gap-6 py-4">
                     <div className="space-y-2">
                         <Button 
