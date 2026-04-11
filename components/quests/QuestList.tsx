@@ -15,6 +15,8 @@ import QuestDialog from './QuestDialog'
 import { toast } from 'sonner'
 import { cn, getLevelBadgeStyle } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 interface QuestListProps {
   worldId?: Id<'worlds'>
@@ -141,8 +143,13 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false }: Qu
                     >
                       <div className="px-3 pb-4 pt-0 text-sm border-t border-border/20 space-y-3">
                         {quest.description && (
-                            <div className="mt-3 text-muted-foreground text-xs leading-relaxed">
-                                {quest.description}
+                            <div className={cn(
+                                "mt-3 text-muted-foreground leading-relaxed [&_>_*:first-child]:mt-0 [&>p]:mt-2 [&>ul]:list-disc [&>ul]:pl-4 [&>ul]:mt-2 [&>ol]:list-decimal [&>ol]:pl-4 [&>ol]:mt-2 [&>blockquote]:border-l-2 [&>blockquote]:pl-3 [&>blockquote]:italic [&>blockquote]:mt-2 [&_a]:text-primary [&_a]:underline",
+                                isSidebar ? "text-[11px]" : "text-xs"
+                            )}>
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                    {quest.description}
+                                </ReactMarkdown>
                             </div>
                         )}
                         

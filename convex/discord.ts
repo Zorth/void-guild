@@ -78,9 +78,9 @@ export const syncSessionToDiscord = internalAction({
                 ? session.selectedQuest.description.substring(0, 497) + "..." 
                 : session.selectedQuest.description;
             
-            // Format each line with blockquote and italics
+            // Format each line with blockquote
             const formattedDesc = desc.split("\n")
-              .map((line: string) => line.trim() ? `> *${line}*` : ">")
+              .map((line: string) => line.trim() ? `> ${line}` : ">")
               .join("\n");
             questContent += `\n${formattedDesc}`;
         }
@@ -97,9 +97,9 @@ export const syncSessionToDiscord = internalAction({
                 ? q.description.substring(0, 197) + "..." 
                 : q.description;
             
-            // Format each line with blockquote and italics
+            // Format each line with blockquote
             const formattedDesc = desc.split("\n")
-              .map((line: string) => line.trim() ? `> *${line}*` : ">")
+              .map((line: string) => line.trim() ? `> ${line}` : ">")
               .join("\n");
             str += `\n${formattedDesc}`;
           }

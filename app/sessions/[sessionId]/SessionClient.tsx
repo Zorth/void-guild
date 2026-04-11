@@ -35,6 +35,8 @@ import {
     DialogTitle,
     DialogDescription,
 } from '@/components/ui/dialog'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 // Sub-components
 import AttendingCharactersList from '@/components/sessions/details/AttendingCharactersList'
@@ -489,9 +491,11 @@ export default function SessionClient() {
                         <div className="p-4 space-y-3">
                             <h4 className="font-bold text-lg">{session.quest.name}</h4>
                             {session.quest.description && (
-                                <p className="text-sm text-muted-foreground italic leading-relaxed whitespace-pre-wrap">
-                                    &quot;{session.quest.description}&quot;
-                                </p>
+                                <div className="text-sm text-muted-foreground leading-relaxed [&_>_*:first-child]:mt-0 [&>p]:mt-2 [&>ul]:list-disc [&>ul]:pl-4 [&>ul]:mt-2 [&>ol]:list-decimal [&>ol]:pl-4 [&>ol]:mt-2 [&>blockquote]:border-l-4 [&>blockquote]:pl-4 [&>blockquote]:italic [&>blockquote]:mt-2 [&_a]:text-primary [&_a]:underline">
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                        {session.quest.description}
+                                    </ReactMarkdown>
+                                </div>
                             )}
                             {session.quest.reward && (
                                 <div className="flex items-start gap-2 text-xs pt-1">
