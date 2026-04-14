@@ -110,7 +110,7 @@ export default function SessionManagement({
                                                 className="flex items-center justify-center rounded-full h-5 w-5 text-[8px]"
                                                 style={getLevelBadgeStyle(quest.level)}
                                             >
-                                                {quest.level > 0 ? quest.level : '?'}
+                                                {(quest.level ?? 0) > 0 ? quest.level : '?'}
                                             </div>
                                             {quest.name}
                                         </div>
