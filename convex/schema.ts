@@ -71,7 +71,9 @@ export default defineSchema({
     }),
     quests: defineTable({
         name: v.string(),
-        level: v.number(), // 1-20 or 0 for unknown
+        level: v.optional(v.number()), // 1-20 or 0 for unknown (DEPRECATED: Use levelPF)
+        levelPF: v.optional(v.number()),
+        levelDnD: v.optional(v.number()),
         worldId: v.optional(v.id("worlds")), // Optional for worldless quests (The Void)
         description: v.optional(v.string()),
         questgiver: v.optional(v.string()),

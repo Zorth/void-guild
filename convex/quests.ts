@@ -19,7 +19,8 @@ async function isAdmin(ctx: QueryCtx) {
 export const createQuest = mutation({
   args: {
     name: v.string(),
-    level: v.number(),
+    levelPF: v.optional(v.union(v.number(), v.null())),
+    levelDnD: v.optional(v.union(v.number(), v.null())),
     worldId: v.optional(v.id('worlds')),
     description: v.optional(v.string()),
     questgiver: v.optional(v.string()),
@@ -32,8 +33,12 @@ export const createQuest = mutation({
       throw new Error('Not authenticated')
     }
 
+    const { levelPF, levelDnD, ...otherFields } = args
+
     const questId = await ctx.db.insert('quests', {
-      ...args,
+      ...otherFields,
+      levelPF: levelPF === null ? undefined : levelPF,
+      levelDnD: levelDnD === null ? undefined : levelDnD,
       owner: user.subject,
     })
 
@@ -45,7 +50,8 @@ export const updateQuest = mutation({
   args: {
     questId: v.id('quests'),
     name: v.string(),
-    level: v.number(),
+    levelPF: v.union(v.number(), v.null()),
+    levelDnD: v.union(v.number(), v.null()),
     worldId: v.optional(v.id('worlds')),
     description: v.optional(v.string()),
     questgiver: v.optional(v.string()),
@@ -74,8 +80,16 @@ export const updateQuest = mutation({
       throw new Error('You do not have permission to update this quest.')
     }
 
-    const { questId, ...updateFields } = args
-    await ctx.db.patch(questId, updateFields)
+    const { questId, levelPF, levelDnD, ...otherFields } = args
+    
+    await ctx.db.replace(questId, {
+        ...quest,
+        ...otherFields,
+        levelPF: levelPF === null ? undefined : levelPF,
+        levelDnD: levelDnD === null ? undefined : levelDnD,
+        // Clear deprecated level if PF level is explicitly unset
+        level: levelPF === null ? undefined : quest.level,
+    })
   },
 })
 
@@ -124,10 +138,15 @@ export const getQuestsByWorld = query({
         .withIndex('by_worldId', (q) => q.eq('worldId', undefined))
         .collect()
 
-    return [...worldQuests, ...worldlessQuests].sort((a, b) => {
-        if (a.level === 0 && b.level !== 0) return -1
-        if (a.level !== 0 && b.level === 0) return 1
-        return a.level - b.level
+    const all = [...worldQuests, ...worldlessQuests];
+    
+    return all.sort((a, b) => {
+        const aLvl = a.levelPF ?? a.levelDnD ?? a.level ?? 0;
+        const bLvl = b.levelPF ?? b.levelDnD ?? b.level ?? 0;
+
+        if (aLvl === 0 && bLvl !== 0) return -1
+        if (aLvl !== 0 && bLvl === 0) return 1
+        return aLvl - bLvl
     })
   },
 })

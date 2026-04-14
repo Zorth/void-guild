@@ -11,7 +11,7 @@ import Link from 'next/link'
 import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, Unlock, Globe, Scroll, Trophy } from 'lucide-react'
 import { useAuth, SignInButton } from '@clerk/nextjs'
 import { Skeleton } from '@/components/ui/skeleton'
-import { cn, formatDate, formatTime as formatTimeUtil, getLevelBadgeStyle } from '@/lib/utils'
+import { cn, formatDate, formatTime as formatTimeUtil, getLevelBadgeStyle, getDualLevelBadgeStyle } from '@/lib/utils'
 import { fireJoinParticles, fireGoldParticles } from '@/lib/particles'
 import { toast } from 'sonner'
 import { track } from '@vercel/analytics'
@@ -473,40 +473,67 @@ export default function SessionClient() {
               )}
             </CardHeader>
 
-            {session.quest && (
-                <div className="px-6 pb-6">
-                    <div className="bg-primary/5 border border-primary/20 rounded-lg overflow-hidden">
-                        <div className="bg-primary/10 px-4 py-2 border-b border-primary/20 flex items-center justify-between">
-                            <div className="flex items-center gap-2 font-bold text-sm">
-                                <Scroll className="h-4 w-4 text-primary" />
-                                Active Quest
-                            </div>
-                            <div 
-                                className="flex items-center justify-center rounded-full font-bold h-6 w-6 text-[10px]"
-                                style={getLevelBadgeStyle(session.quest.level)}
-                            >
-                                {session.quest.level > 0 ? session.quest.level : '?'}
-                            </div>
-                        </div>
-                        <div className="p-4 space-y-3">
-                            <h4 className="font-bold text-lg">{session.quest.name}</h4>
-                            {session.quest.description && (
-                                <div className="text-sm text-muted-foreground leading-relaxed [&_>_*:first-child]:mt-0 [&>p]:mt-2 [&>ul]:list-disc [&>ul]:pl-4 [&>ul]:mt-2 [&>ol]:list-decimal [&>ol]:pl-4 [&>ol]:mt-2 [&>blockquote]:border-l-4 [&>blockquote]:pl-4 [&>blockquote]:italic [&>blockquote]:mt-2 [&_a]:text-primary [&_a]:underline">
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                        {session.quest.description}
-                                    </ReactMarkdown>
+            {session.quest && (() => {
+                const q = session.quest;
+                const levelPF = q.levelPF ?? (q.levelDnD === undefined ? q.level : undefined);
+                const levelDnD = q.levelDnD;
+                const isDual = levelPF !== undefined && levelDnD !== undefined;
+
+                return (
+                    <div className="px-6 pb-6">
+                        <div className="bg-primary/5 border border-primary/20 rounded-lg overflow-hidden">
+                            <div className="bg-primary/10 px-4 py-2 border-b border-primary/20 flex items-center justify-between">
+                                <div className="flex items-center gap-2 font-bold text-sm">
+                                    <Scroll className="h-4 w-4 text-primary" />
+                                    Active Quest
                                 </div>
-                            )}
-                            {session.quest.reward && (
-                                <div className="flex items-start gap-2 text-xs pt-1">
-                                    <Trophy className="h-3.5 w-3.5 text-yellow-500 shrink-0" />
-                                    <span><span className="font-bold text-muted-foreground uppercase mr-1">Reward:</span> {session.quest.reward}</span>
+                                <div 
+                                    className="flex items-center justify-center rounded-full font-bold h-6 w-6 text-[10px]"
+                                    style={getDualLevelBadgeStyle(levelPF, levelDnD)}
+                                >
+                                    {isDual ? 'V' : (levelPF ?? levelDnD ?? 0) > 0 ? (levelPF ?? levelDnD) : '?'}
                                 </div>
-                            )}
+                            </div>
+                            <div className="p-4 space-y-3">
+                                <h4 className="font-bold text-lg">{q.name}</h4>
+                                {q.description && (
+                                    <div className="text-sm text-muted-foreground leading-relaxed [&_>_*:first-child]:mt-0 [&>p]:mt-2 [&>ul]:list-disc [&>ul]:pl-4 [&>ul]:mt-2 [&>ol]:list-decimal [&>ol]:pl-4 [&>ol]:mt-2 [&>blockquote]:border-l-4 [&>blockquote]:pl-4 [&>blockquote]:italic [&>blockquote]:mt-2 [&_a]:text-primary [&_a]:underline">
+                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                            {q.description}
+                                        </ReactMarkdown>
+                                    </div>
+                                )}
+                                <div className="flex flex-wrap gap-4 pt-1">
+                                    {q.reward && (
+                                        <div className="flex items-start gap-2 text-xs">
+                                            <Trophy className="h-3.5 w-3.5 text-yellow-500 shrink-0" />
+                                            <span><span className="font-bold text-muted-foreground uppercase mr-1">Reward:</span> {q.reward}</span>
+                                        </div>
+                                    )}
+                                    {isDual && (
+                                        <div className="flex items-center gap-1 bg-muted/50 px-2 py-0.5 rounded text-[10px] font-bold border border-border/20">
+                                            <img src="/PFVoid.svg" alt="PF" className="h-3 w-3 mr-0.5" />
+                                            <span 
+                                                className="inline-flex items-center justify-center rounded-full w-4 h-4 text-[8px]"
+                                                style={getLevelBadgeStyle(levelPF)}
+                                            >
+                                                {levelPF}
+                                            </span>
+                                            <img src="/DnDVoid.svg" alt="DnD" className="h-3 w-3 ml-1.5 mr-0.5" />
+                                            <span 
+                                                className="inline-flex items-center justify-center rounded-full w-4 h-4 text-[8px]"
+                                                style={getLevelBadgeStyle(levelDnD)}
+                                            >
+                                                {levelDnD}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                );
+            })()}
 
             <CardContent>
               <h3 className="text-xl font-semibold mb-4 flex items-center justify-between">
@@ -671,7 +698,12 @@ export default function SessionClient() {
             </>
           ) : null}
 
-          <QuestList worldId={session?.world} worldOwner={world?.owner} isSidebar={true} />
+          <QuestList 
+            worldId={session?.world} 
+            worldOwner={world?.owner} 
+            isSidebar={true} 
+            filters={{ pf: session?.system === 'PF', dnd: session?.system === 'DnD' }} 
+          />
         </div>
       </div>
       <div className="text-center mt-8 text-sm text-muted-foreground">

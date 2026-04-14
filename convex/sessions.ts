@@ -97,11 +97,13 @@ export const listSessions = query({
           session.characters.map((id) => ctx.db.get(id))
         )
         const worldDoc = await ctx.db.get(session.world as Id<'worlds'>)
+        const questDoc = session.questId ? await ctx.db.get(session.questId) : null
         return {
           ...session,
           worldName: worldDoc ? (worldDoc as Doc<'worlds'>).name : 'Unknown World',
           characterNames: characterDocs.filter((c): c is Doc<'characters'> => c !== null).map((c) => c.name),
           isOwner: user.subject === session.owner,
+          quest: questDoc,
         }
       })
     )
@@ -138,11 +140,13 @@ export const publicListSessions = query({
           session.characters.map((id) => ctx.db.get(id))
         )
         const worldDoc = await ctx.db.get(session.world as Id<'worlds'>)
+        const questDoc = session.questId ? await ctx.db.get(session.questId) : null
         return {
           ...session,
           worldName: worldDoc ? (worldDoc as Doc<'worlds'>).name : 'Unknown World',
           characterNames: characterDocs.filter((c): c is Doc<'characters'> => c !== null).map((c) => c.name),
           isOwner: false,
+          quest: questDoc,
         }
       })
     )

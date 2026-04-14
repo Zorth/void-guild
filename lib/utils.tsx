@@ -85,6 +85,21 @@ export function getLevelBadgeStyle(level: number | undefined) {
   };
 }
 
+export function getDualLevelBadgeStyle(levelPF: number | undefined, levelDnD: number | undefined) {
+    const pfStyle = getLevelBadgeStyle(levelPF);
+    const dndStyle = getLevelBadgeStyle(levelDnD);
+
+    if (levelPF !== undefined && levelDnD !== undefined) {
+        return {
+            background: `linear-gradient(135deg, ${pfStyle.backgroundColor}, ${dndStyle.backgroundColor})`,
+            color: '#ffffff', // Usually white works best for these deep gradients
+            textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+        };
+    }
+
+    return levelPF !== undefined ? pfStyle : dndStyle;
+}
+
 export function getXPBarStyles(level: number, xp: number) {
     const currentStyle = getLevelBadgeStyle(level);
     const nextStyle = getLevelBadgeStyle(level + 1);

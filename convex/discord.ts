@@ -42,10 +42,24 @@ export const syncSessionToDiscord = internalAction({
       dateStr = `${day}/${month}`;
     }
     
+    // Level formatting logic
+    const getQuestLevelStr = (q: any) => {
+        const pf = q.levelPF ?? (q.levelDnD === undefined ? q.level : undefined);
+        const dnd = q.levelDnD;
+        if (pf !== undefined && dnd !== undefined) return `Lvl PF:${pf}/DnD:${dnd}`;
+        if (pf !== undefined) return `Lvl PF:${pf}`;
+        if (dnd !== undefined) return `Lvl DnD:${dnd}`;
+        return "Lvl ?";
+    };
+
     // Format: (DD/MM) The Void: <WorldName> [Lvl X] [<signupCharacters>/<MaxCharacters>]
     // OR: (PLANNING) The Void: <WorldName> [Lvl X] [<interestCount> Interested]
     const isPlanning = session.planning || !session.date;
-    const levelStr = (session.level && session.level > 0) ? `[Lvl ${session.level}]` : "[Lvl ?]";
+    
+    let levelStr = (session.level && session.level > 0) ? `[Lvl ${session.level}]` : "[Lvl ?]";
+    if (session.selectedQuest) {
+        levelStr = `[${getQuestLevelStr(session.selectedQuest)}]`;
+    }
     
     const interestCount = (session.interestedPlayers || []).length;
     const interestStr = interestCount > 0 ? ` (+${interestCount})` : "";
@@ -62,16 +76,22 @@ export const syncSessionToDiscord = internalAction({
     const systemEmoji = session.system === 'PF' ? '<:Pathfinder:1322734594864320522>' : '<:DnD:1322734981524754473>';
     const systemName = session.system === 'PF' ? 'Pathfinder 2e' : 'D&D 5e';
     const locationInfo = session.location ? `[View on Google Maps](${session.location})` : (isPlanning ? 'TBD (Planning Phase)' : 'TBD');
-    const levelInfo = (session.level && session.level > 0) 
+    
+    let levelInfo = (session.level && session.level > 0) 
       ? `Level ${session.level}` 
       : "Discuss what you're going to do to decide the mission's level";
+    
+    if (session.selectedQuest) {
+        levelInfo = getQuestLevelStr(session.selectedQuest);
+    }
+
     const worldLink = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'}/world/${encodeURIComponent(session.worldName)}`;
     const sessionLink = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'}/sessions/${session._id}`;
     
     let questContent = "";
     if (session.selectedQuest) {
-        const levelStr = session.selectedQuest.level > 0 ? `(lvl ${session.selectedQuest.level})` : "(lvl ?)";
-        questContent = `\n## Quest\n**${session.selectedQuest.name}** ${levelStr}`;
+        const qLevel = getQuestLevelStr(session.selectedQuest);
+        questContent = `\n## Quest\n**${session.selectedQuest.name}** (${qLevel})`;
         if (session.selectedQuest.description) {
             // Truncate description if very long
             const desc = session.selectedQuest.description.length > 500 
@@ -89,8 +109,8 @@ export const syncSessionToDiscord = internalAction({
         // Show only up to 5 quests to avoid exceeding 2000 char limit
         const displayedQuests = session.quests.slice(0, 5);
         questContent = "\n## Quests\n" + displayedQuests.map((q: any) => {
-          const levelStr = q.level > 0 ? `(lvl ${q.level})` : "(lvl ?)";
-          let str = `**${q.name}** ${levelStr}`;
+          const qLevel = getQuestLevelStr(q);
+          let str = `**${q.name}** (${qLevel})`;
           if (q.description) {
             // Truncate description for list view
             const desc = q.description.length > 200 
@@ -302,11 +322,25 @@ export const sendSessionNotification = action({
       ? process.env.DISCORD_ROLE_ID_PF 
       : process.env.DISCORD_ROLE_ID_DND;
 
-    const levelInfo = (session.level && session.level > 0) 
+    // Level formatting logic
+    const getQuestLevelStr = (q: any) => {
+        const pf = q.levelPF ?? (q.levelDnD === undefined ? q.level : undefined);
+        const dnd = q.levelDnD;
+        if (pf !== undefined && dnd !== undefined) return `PF:${pf}/DnD:${dnd}`;
+        if (pf !== undefined) return `PF:${pf}`;
+        if (dnd !== undefined) return `DnD:${dnd}`;
+        return "?";
+    };
+
+    let levelInfo = (session.level && session.level > 0) 
       ? `Level ${session.level}` 
       : "Discuss what you're going to do to decide the mission's level";
+    
+    if (session.selectedQuest) {
+        levelInfo = `Level ${getQuestLevelStr(session.selectedQuest)}`;
+    }
 
-    let content = (roleId && args.type !== 'cancel') ? `<@&${roleId}>` : undefined;
+    const content = (roleId && args.type !== 'cancel') ? `<@&${roleId}>` : undefined;
     let embedTitle = "";
     let embedDescription = "";
     let embedColor = 5814783; // Blueish

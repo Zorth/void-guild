@@ -9,7 +9,7 @@ import SessionDialog from './SessionDialog'
 import Link from 'next/link'
 import { Book, Lock, ChevronLeft, ChevronRight, User, Shield, Filter } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
-import { cn, getLevelBadgeStyle, formatDate, formatTime, CharacterRankIcon } from '@/lib/utils'
+import { cn, getLevelBadgeStyle, getDualLevelBadgeStyle, formatDate, formatTime, CharacterRankIcon } from '@/lib/utils'
 import './sessions.css'
 import type { Doc } from '@/convex/_generated/dataModel'
 import {
@@ -888,12 +888,21 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
                             <div className="flex items-center gap-2 flex-wrap">
                               <div className={cn("font-semibold", "session-world", "flex items-center gap-2 flex-wrap")}>
                                   <div className="flex items-center gap-2 whitespace-nowrap">
-                                      <span 
-                                        className="inline-flex align-middle justify-center w-20 rounded-full px-2.5 py-0.5 text-xs font-semibold"
-                                        style={getLevelBadgeStyle(session.level)}
-                                      >
-                                          Lvl {session.level ?? 'TBD'}
-                                      </span>
+                                      {(() => {
+                                          const q = session.quest as any;
+                                          const levelPF = q?.levelPF ?? (q?.levelDnD === undefined ? q?.level : undefined) ?? session.level;
+                                          const levelDnD = q?.levelDnD;
+                                          const isDual = levelPF !== undefined && levelDnD !== undefined;
+
+                                          return (
+                                              <span 
+                                                className="inline-flex align-middle justify-center w-20 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                                                style={getDualLevelBadgeStyle(levelPF, levelDnD)}
+                                              >
+                                                  Lvl {isDual ? 'V' : (levelPF ?? levelDnD ?? 'TBD')}
+                                              </span>
+                                          );
+                                      })()}
                                       {session.system && (
                                         <img 
                                             src={session.system === 'PF' ? '/PFVoid.svg' : '/DnDVoid.svg'} 
@@ -935,6 +944,32 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
                                 : `${session.characters.length} / ${session.maxPlayers} players signed up`
                               }
                             </div>
+                            {(() => {
+                                const q = session.quest as any;
+                                const levelPF = q?.levelPF ?? (q?.levelDnD === undefined ? q?.level : undefined);
+                                const levelDnD = q?.levelDnD;
+                                if (levelPF !== undefined && levelDnD !== undefined) {
+                                    return (
+                                        <div className="flex items-center gap-1 mt-1 bg-muted/30 px-1.5 py-0.5 rounded text-[9px] font-bold w-fit border border-border/10">
+                                            <img src="/PFVoid.svg" alt="PF" className="h-2.5 w-2.5" />
+                                            <span 
+                                                className="inline-flex items-center justify-center rounded-full w-3 h-3 text-[6px]"
+                                                style={getLevelBadgeStyle(levelPF)}
+                                            >
+                                                {levelPF}
+                                            </span>
+                                            <img src="/DnDVoid.svg" alt="DnD" className="h-2.5 w-2.5 ml-1" />
+                                            <span 
+                                                className="inline-flex items-center justify-center rounded-full w-3 h-3 text-[6px]"
+                                                style={getLevelBadgeStyle(levelDnD)}
+                                            >
+                                                {levelDnD}
+                                            </span>
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })()}
                           </div>
                           {activeTab === 'past' && session.date && (
                               <Button 

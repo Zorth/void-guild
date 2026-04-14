@@ -15,7 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn, formatDate, formatTime, getLevelBadgeStyle } from '@/lib/utils'
 import { useState, useEffect, useMemo } from 'react'
 import { getUsernames, UserMetadata } from '@/app/stats/actions'
-import { useAuth } from '@clerk/nextjs'
+import { useAuth, UserButton } from '@clerk/nextjs'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Input } from '@/components/ui/input'
@@ -23,6 +23,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Textarea } from '@/components/ui/textarea'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { ThemeToggle } from '@/components/ThemeToggle'
 import '@/components/sessions/sessions.css'
 import { Id } from '@/convex/_generated/dataModel'
 import QuestList from '@/components/quests/QuestList'
@@ -917,6 +918,8 @@ export default function WorldClient() {
   const renameWorld = useMutation(api.worlds.renameWorld)
   
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming')
+  const [pfFilter, setPfFilter] = useState(true)
+  const [dndFilter, setDndFilter] = useState(true)
   const [userMetadata, setUserMetadata] = useState<Record<string, UserMetadata>>({})
   const [sessionsLimit, setSessionsLimit] = useState(5)
   const [isEditingName, setIsEditingName] = useState(false)
@@ -955,7 +958,15 @@ export default function WorldClient() {
   const allFilteredSessions = useMemo(() => {
     if (!sessions) return []
     // Upcoming tab includes both scheduled and planning sessions
-    const filtered = sessions.filter(s => activeTab === 'past' ? s.locked : !s.locked)
+    const filtered = sessions.filter(s => {
+        const matchesTab = activeTab === 'past' ? s.locked : !s.locked;
+        if (!matchesTab) return false;
+
+        if (s.system === 'PF' && !pfFilter) return false;
+        if (s.system === 'DnD' && !dndFilter) return false;
+        
+        return true;
+    })
     return filtered.sort((a, b) => {
         if (activeTab === 'past') return (b.date || 0) - (a.date || 0)
         
@@ -1005,13 +1016,44 @@ export default function WorldClient() {
 
   return (
     <div className="container mx-auto py-8 px-4 max-w-7xl">
-      <div className="flex items-center mb-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8">
         <Button variant="ghost" size="sm" className="sm:px-3 sm:w-auto w-9 px-0" asChild>
           <Link href="/">
             <ChevronLeft className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Back to Home</span>
           </Link>
         </Button>
+
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+            <div className="flex items-center bg-muted/30 p-1 rounded-md gap-1 mr-2">
+                <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => setPfFilter(!pfFilter)}
+                    className={cn(
+                        "h-9 w-9 p-0 transition-all duration-300",
+                        pfFilter ? "opacity-100 scale-110 brightness-110 shadow-sm" : "opacity-30 grayscale scale-95"
+                    )}
+                    title={pfFilter ? "Hide Pathfinder" : "Show Pathfinder"}
+                >
+                    <img src="/PFVoid.svg" alt="Pathfinder" className="h-6 w-6" />
+                </Button>
+                <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => setDndFilter(!dndFilter)}
+                    className={cn(
+                        "h-9 w-9 p-0 transition-all duration-300",
+                        dndFilter ? "opacity-100 scale-110 brightness-110 shadow-sm" : "opacity-30 grayscale scale-95"
+                    )}
+                    title={dndFilter ? "Hide D&D" : "Show D&D"}
+                >
+                    <img src="/DnDVoid.svg" alt="D&D" className="h-6 w-6" />
+                </Button>
+            </div>
+            <ThemeToggle />
+            <UserButton />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -1230,7 +1272,7 @@ export default function WorldClient() {
           </Card>
 
           <div className="hidden lg:block">
-            <QuestList worldId={world._id} worldOwner={world.owner} />
+            <QuestList worldId={world._id} worldOwner={world.owner} filters={{ pf: pfFilter, dnd: dndFilter }} />
           </div>
         </div>
 
@@ -1259,7 +1301,7 @@ export default function WorldClient() {
 
         {/* Bottom on mobile, hidden on desktop */}
         <div className="lg:hidden">
-          <QuestList worldId={world._id} worldOwner={world.owner} />
+          <QuestList worldId={world._id} worldOwner={world.owner} filters={{ pf: pfFilter, dnd: dndFilter }} />
         </div>
       </div>
     </div>

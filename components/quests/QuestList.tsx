@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Id } from '@/convex/_generated/dataModel'
@@ -13,27 +12,47 @@ import {
 import { useAuth } from '@clerk/nextjs'
 import QuestDialog from './QuestDialog'
 import { toast } from 'sonner'
-import { cn, getLevelBadgeStyle } from '@/lib/utils'
+import { cn, getLevelBadgeStyle, getDualLevelBadgeStyle } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { useState, useMemo } from 'react'
 
 interface QuestListProps {
   worldId?: Id<'worlds'>
   worldOwner?: string
   isSidebar?: boolean
+  filters?: { pf: boolean, dnd: boolean }
 }
 
-export default function QuestList({ worldId, worldOwner, isSidebar = false }: QuestListProps) {
+export default function QuestList({ worldId, worldOwner, isSidebar = false, filters }: QuestListProps) {
   const { userId } = useAuth()
-  const quests = useQuery(api.quests.getQuestsByWorld, { worldId })
+  const questsRaw = useQuery(api.quests.getQuestsByWorld, { worldId })
   const isAdmin = useQuery(api.sessions.isAdminQuery)
   const deleteQuest = useMutation(api.quests.deleteQuest)
-  
+
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingQuest, setEditingQuest] = useState<any>(null)
   const [expandedQuestId, setExpandedQuestId] = useState<Id<'quests'> | null>(null)
 
+  const quests = useMemo(() => {
+    if (!questsRaw) return undefined;
+    if (!filters) return questsRaw;
+
+    return questsRaw.filter(q => {
+        const levelPF = q.levelPF ?? (q.levelDnD === undefined ? q.level : undefined);
+        const levelDnD = q.levelDnD;
+
+        const hasPF = levelPF !== undefined;
+        const hasDnD = levelDnD !== undefined;
+
+        if (filters.pf && hasPF) return true;
+        if (filters.dnd && hasDnD) return true;
+        if (!hasPF && !hasDnD) return true; // TBD quests always show
+
+        return false;
+    });
+  }, [questsRaw, filters]);
   const handleCreate = () => {
     setEditingQuest(null)
     setIsDialogOpen(true)
@@ -87,6 +106,10 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false }: Qu
             const canEdit = isOwner || userId === worldOwner || isAdmin
             const isExpanded = expandedQuestId === quest._id
 
+            const levelPF = quest.levelPF ?? (quest.levelDnD === undefined ? quest.level : undefined)
+            const levelDnD = quest.levelDnD
+            const isDual = levelPF !== undefined && levelDnD !== undefined
+
             return (
               <Card 
                 key={quest._id} 
@@ -105,12 +128,18 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false }: Qu
                             "flex items-center justify-center rounded-full font-bold shrink-0",
                             isSidebar ? "h-6 w-6 text-[10px]" : "h-8 w-8 text-xs"
                         )}
-                        style={getLevelBadgeStyle(quest.level)}
+                        style={getDualLevelBadgeStyle(levelPF, levelDnD)}
                     >
-                      {quest.level > 0 ? quest.level : '?'}
+                      {isDual ? 'V' : (levelPF ?? levelDnD ?? 0) > 0 ? (levelPF ?? levelDnD) : '?'}
                     </div>
                     <div className="min-w-0">
-                        <h4 className={cn("font-bold truncate", isSidebar ? "text-xs" : "text-sm")}>{quest.name}</h4>
+                        <h4 className={cn("font-bold truncate flex items-center gap-1.5", isSidebar ? "text-xs" : "text-sm")}>
+                            <div className="flex items-center shrink-0">
+                                {levelPF !== undefined && <img src="/PFVoid.svg" alt="PF" className="h-3 w-3 -mr-0.5" />}
+                                {levelDnD !== undefined && <img src="/DnDVoid.svg" alt="DnD" className="h-3 w-3" />}
+                            </div>
+                            {quest.name}
+                        </h4>
                         {quest.questgiver && (
                             <p className="text-[10px] text-muted-foreground truncate flex items-center gap-1">
                                 <User className="h-2.5 w-2.5" /> {quest.questgiver}
@@ -175,6 +204,26 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false }: Qu
                                                 {tag}
                                             </span>
                                         ))}
+                                    </div>
+                                </div>
+                            )}
+                            {isDual && (
+                                <div className="flex items-center gap-2 mt-1">
+                                    <div className="flex items-center gap-1 bg-muted/50 px-2 py-1 rounded text-[10px] font-bold border border-border/10">
+                                        <img src="/PFVoid.svg" alt="PF" className="h-3 w-3 mr-0.5" />
+                                        <span 
+                                            className="inline-flex items-center justify-center rounded-full w-4 h-4 text-[8px]"
+                                            style={getLevelBadgeStyle(levelPF)}
+                                        >
+                                            {levelPF}
+                                        </span>
+                                        <img src="/DnDVoid.svg" alt="DnD" className="h-3 w-3 ml-1.5 mr-0.5" />
+                                        <span 
+                                            className="inline-flex items-center justify-center rounded-full w-4 h-4 text-[8px]"
+                                            style={getLevelBadgeStyle(levelDnD)}
+                                        >
+                                            {levelDnD}
+                                        </span>
                                     </div>
                                 </div>
                             )}

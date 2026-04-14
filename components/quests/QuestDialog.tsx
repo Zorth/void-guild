@@ -24,7 +24,9 @@ interface QuestDialogProps {
   quest?: {
     _id: Id<'quests'>
     name: string
-    level: number
+    level?: number
+    levelPF?: number
+    levelDnD?: number
     description?: string
     questgiver?: string
     reward?: string
@@ -35,7 +37,8 @@ interface QuestDialogProps {
 
 export default function QuestDialog({ isOpen, onClose, worldId, quest }: QuestDialogProps) {
   const [name, setName] = useState('')
-  const [level, setLevel] = useState(0)
+  const [levelPF, setLevelPF] = useState<number | null>(null)
+  const [levelDnD, setLevelDnD] = useState<number | null>(null)
   const [description, setDescription] = useState('')
   const [questgiver, setQuestgiver] = useState('')
   const [reward, setReward] = useState('')
@@ -48,14 +51,17 @@ export default function QuestDialog({ isOpen, onClose, worldId, quest }: QuestDi
   useEffect(() => {
     if (quest) {
       setName(quest.name)
-      setLevel(quest.level)
+      // Migration logic: if level exists but levelPF doesn't, use level as levelPF
+      setLevelPF(quest.levelPF ?? quest.level ?? null)
+      setLevelDnD(quest.levelDnD ?? null)
       setDescription(quest.description || '')
       setQuestgiver(quest.questgiver || '')
       setReward(quest.reward || '')
       setTagsString(quest.tags?.join(', ') || '')
     } else {
       setName('')
-      setLevel(0)
+      setLevelPF(null)
+      setLevelDnD(null)
       setDescription('')
       setQuestgiver('')
       setReward('')
@@ -65,6 +71,7 @@ export default function QuestDialog({ isOpen, onClose, worldId, quest }: QuestDi
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
     setIsSubmitting(true)
 
     const tags = tagsString
@@ -77,7 +84,8 @@ export default function QuestDialog({ isOpen, onClose, worldId, quest }: QuestDi
         await updateQuest({
           questId: quest._id,
           name,
-          level,
+          levelPF,
+          levelDnD,
           description,
           questgiver,
           reward,
@@ -88,7 +96,8 @@ export default function QuestDialog({ isOpen, onClose, worldId, quest }: QuestDi
       } else {
         await createQuest({
           name,
-          level,
+          levelPF,
+          levelDnD,
           description,
           questgiver,
           reward,
@@ -133,31 +142,48 @@ export default function QuestDialog({ isOpen, onClose, worldId, quest }: QuestDi
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-semibold flex items-center gap-2">
-                <Hash className="h-4 w-4 text-muted-foreground" />
-                Level
+                <img src="/PFVoid.svg" alt="PF" className="h-3.5 w-3.5" />
+                Pathfinder Level
               </label>
               <Input
                 type="number"
                 min={0}
                 max={20}
-                value={level}
-                onChange={(e) => setLevel(parseInt(e.target.value) || 0)}
+                value={levelPF !== null ? levelPF : ''}
+                onChange={(e) => setLevelPF(e.target.value === '' ? null : parseInt(e.target.value))}
                 className="bg-muted/30"
+                placeholder="TBD"
               />
-              <p className="text-[10px] text-muted-foreground">Set to 0 if unknown</p>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-semibold flex items-center gap-2">
-                <User className="h-4 w-4 text-muted-foreground" />
-                Questgiver
+                <img src="/DnDVoid.svg" alt="DnD" className="h-3.5 w-3.5" />
+                D&D Level
               </label>
               <Input
-                value={questgiver}
-                onChange={(e) => setQuestgiver(e.target.value)}
-                placeholder="NPC or Character Name"
+                type="number"
+                min={0}
+                max={20}
+                value={levelDnD !== null ? levelDnD : ''}
+                onChange={(e) => setLevelDnD(e.target.value === '' ? null : parseInt(e.target.value))}
                 className="bg-muted/30"
+                placeholder="TBD"
               />
             </div>
+          </div>
+          <p className="text-[10px] text-muted-foreground -mt-2 italic">Leave empty for TBD.</p>
+
+          <div className="space-y-2">
+            <label className="text-sm font-semibold flex items-center gap-2">
+              <User className="h-4 w-4 text-muted-foreground" />
+              Questgiver
+            </label>
+            <Input
+              value={questgiver}
+              onChange={(e) => setQuestgiver(e.target.value)}
+              placeholder="NPC or Character Name"
+              className="bg-muted/30"
+            />
           </div>
 
           <div className="space-y-2">
