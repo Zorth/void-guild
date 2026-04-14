@@ -10,21 +10,66 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Trophy, Book } from 'lucide-react'
 import ActivityFeed from '@/components/ActivityFeed'
 import { ThemeToggle } from '@/components/ThemeToggle'
-import { useState } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { cn } from '@/lib/utils'
+import Image from 'next/image'
+import logo from './Void_Logo_WhiteTransparent.png'
+import { motion, useAnimationControls } from 'framer-motion'
 
 export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
   const [pfFilter, setPfFilter] = useState(true)
   const [dndFilter, setDndFilter] = useState(true)
+  const [rotation, setRotation] = useState(0)
+  const [velocity, setVelocity] = useState(0)
+  const lastClickTime = useRef<number>(0)
+
+  const handleLogoClick = () => {
+    const now = Date.now()
+    const delta = now - lastClickTime.current
+    
+    // Increase velocity on click
+    // Faster clicks = more velocity boost
+    const boost = Math.max(5, 50 - Math.min(45, delta / 10))
+    setVelocity(v => v + boost)
+    lastClickTime.current = now
+  }
+
+  useEffect(() => {
+    let frameId: number
+
+    const update = () => {
+      if (velocity > 0.1) {
+        setRotation(r => (r + velocity) % 360)
+        // Natural decay
+        setVelocity(v => v * 0.98)
+      } else if (velocity !== 0) {
+        setVelocity(0)
+      }
+      frameId = requestAnimationFrame(update)
+    }
+
+    frameId = requestAnimationFrame(update)
+    return () => cancelAnimationFrame(frameId)
+  }, [velocity])
 
   return (
     <>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8">
-        <div className="flex flex-col gap-1 w-full sm:w-auto">
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Guild of The Void</h1>
-          <p className="text-sm text-muted-foreground max-w-[300px] sm:max-w-none">
-            Management tool for The Void Campaign.
-          </p>
+        <div className="flex flex-row items-center gap-4 w-full sm:w-auto">
+          <motion.div 
+            className="cursor-pointer select-none"
+            onClick={handleLogoClick}
+            animate={{ rotate: rotation }}
+            transition={{ type: "tween", ease: "linear", duration: 0 }}
+          >
+            <Image src={logo} alt="Void Guild Logo" width={64} height={64} priority />
+          </motion.div>
+          <div className="flex flex-col gap-1">
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Guild of The Void</h1>
+            <p className="text-sm text-muted-foreground max-w-[300px] sm:max-w-none">
+              Management tool for The Void Campaign.
+            </p>
+          </div>
         </div>
         <Authenticated>
           <div className="flex items-center gap-2 self-start sm:self-auto">

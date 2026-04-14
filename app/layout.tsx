@@ -149,7 +149,26 @@ export default function RootLayout({
         <ClerkProvider>
           <ConvexClientProvider>
             <TooltipProvider>
-                {children}
+                <div className="min-h-screen flex flex-col">
+                  <div className="flex-1">
+                    {children}
+                  </div>
+                  <footer className="py-12 border-t border-muted/10 mt-12">
+                    <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
+                      <p>
+                        Developed by{' '}
+                        <a 
+                          href="https://zorth.eu" 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="font-medium underline underline-offset-4 hover:text-primary transition-colors"
+                        >
+                          Zorth
+                        </a>
+                      </p>
+                    </div>
+                  </footer>
+                </div>
                 <Toaster position="bottom-right" />
                 <LevelUpListener />
                 <SessionClosedListener />
