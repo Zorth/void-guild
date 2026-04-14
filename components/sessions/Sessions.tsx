@@ -40,6 +40,7 @@ type SessionWithDetails = Doc<'sessions'> & {
     isOwner: boolean;
     characterNames: string[];
     worldName: string; // Add worldName to the type
+    quest: Doc<'quests'> | null;
 }
 
 function useWindowSize() {
@@ -889,7 +890,7 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
                               <div className={cn("font-semibold", "session-world", "flex items-center gap-2 flex-wrap")}>
                                   <div className="flex items-center gap-2 whitespace-nowrap">
                                       {(() => {
-                                          const q = session.quest as any;
+                                          const q = session.quest;
                                           const levelPF = q?.levelPF ?? (q?.levelDnD === undefined ? q?.level : undefined) ?? session.level;
                                           const levelDnD = q?.levelDnD;
                                           const isDual = levelPF !== undefined && levelDnD !== undefined;
