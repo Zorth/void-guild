@@ -946,7 +946,7 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
                               }
                             </div>
                             {(() => {
-                                const q = session.quest as any;
+                                const q = session.quest;
                                 const levelPF = q?.levelPF ?? (q?.levelDnD === undefined ? q?.level : undefined);
                                 const levelDnD = q?.levelDnD;
                                 if (levelPF !== undefined && levelDnD !== undefined) {
