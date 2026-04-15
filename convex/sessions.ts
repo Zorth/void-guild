@@ -849,3 +849,28 @@ export const getPlayerStats = query({
       return stats.sort((a, b) => b.count - a.count);
     },
 });
+
+export const updateInGameDate = mutation({
+  args: {
+    sessionId: v.id('sessions'),
+    inGameDate: v.optional(v.object({
+      year: v.number(),
+      month: v.number(),
+      day: v.number(),
+      endYear: v.optional(v.number()),
+      endMonth: v.optional(v.number()),
+      endDay: v.optional(v.number()),
+    })),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    const session = await ctx.db.get(args.sessionId)
+    if (!session || (session.owner !== user?.subject && !(await isAdmin(ctx)))) {
+      throw new Error('Unauthorized')
+    }
+
+    await ctx.db.patch(args.sessionId, {
+      inGameDate: args.inGameDate,
+    })
+  },
+})

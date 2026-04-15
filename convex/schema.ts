@@ -36,6 +36,14 @@ export default defineSchema({
         }))),
         questId: v.optional(v.id("quests")),
         system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
+        inGameDate: v.optional(v.object({
+            year: v.number(),
+            month: v.number(), // 0-indexed to match JS/internal logic
+            day: v.number(),
+            endYear: v.optional(v.number()),
+            endMonth: v.optional(v.number()),
+            endDay: v.optional(v.number()),
+        })),
         discordThreadId: v.optional(v.string()),
   }),
     worlds: defineTable({
@@ -48,6 +56,8 @@ export default defineSchema({
             factions: v.array(v.string()) 
         }))),
         reputationVisible: v.optional(v.boolean()),
+        calendar: v.optional(v.string()), // JSON string from Fantasy Calendar
+        calendarVisible: v.optional(v.boolean()),
         description: v.optional(v.string()),
         mapEmbed: v.optional(v.string()),
     }).index('by_owner', ['owner']),

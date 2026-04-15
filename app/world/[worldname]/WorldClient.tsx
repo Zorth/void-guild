@@ -24,6 +24,7 @@ import { ThemeToggle } from '@/components/ThemeToggle'
 import '@/components/sessions/sessions.css'
 import QuestList from '@/components/quests/QuestList'
 import ReputationSystem from '@/components/world/ReputationSystem'
+import WorldCalendar from '@/components/world/WorldCalendar'
 
 function WorldDescription({ 
   worldId, 
@@ -204,6 +205,7 @@ export default function WorldClient() {
   const isGM = useQuery(api.sessions.isGameMasterQuery)
   const userCharacters = useQuery(api.characters.listCharacters)
   const renameWorld = useMutation(api.worlds.renameWorld)
+  const updateSessionInGameDate = useMutation(api.sessions.updateInGameDate)
   
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming')
   const [pfFilter, setPfFilter] = useState(true)
@@ -213,6 +215,23 @@ export default function WorldClient() {
   const [isEditingName, setIsEditingName] = useState(false)
   const [isEditingMap, setIsEditingMap] = useState(false)
   const [newName, setNewName] = useState('')
+  const [viewMode, setViewMode] = useState<'reputation' | 'calendar'>('reputation')
+
+  const isOwner = world ? userId === world.owner : false
+  const repVisible = world?.reputationVisible ?? false
+  const calVisible = world?.calendarVisible ?? false
+  
+  // Only show switcher if user is owner OR both systems are public
+  const showSwitcher = isOwner || (repVisible && calVisible)
+  
+  // Determine which system to actually display
+  const effectiveViewMode = useMemo(() => {
+    if (isOwner) return viewMode;
+    if (repVisible && calVisible) return viewMode;
+    if (repVisible) return 'reputation';
+    if (calVisible) return 'calendar';
+    return null;
+  }, [isOwner, viewMode, repVisible, calVisible]);
 
   useEffect(() => {
     if (world) {
@@ -233,6 +252,18 @@ export default function WorldClient() {
         router.push(`/world/${encodedNewName}`)
     } catch (e) {
         alert(e instanceof Error ? e.message : 'Failed to rename world')
+    }
+  }
+
+  const handleDropSession = async (sessionId: string, year: number, month: number, day: number) => {
+    try {
+        await updateSessionInGameDate({
+            sessionId: sessionId as Id<'sessions'>,
+            inGameDate: { year, month, day }
+        });
+        toast.success("Session in-game date updated!");
+    } catch (e) {
+        toast.error("Failed to update session date.");
     }
   }
 
@@ -449,6 +480,13 @@ export default function WorldClient() {
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: Math.min(i * 0.05, 0.3) }}
                           className="border-b pb-2 last:border-0"
+                          draggable={userId === session.owner}
+                          onDragStart={(e) => {
+                            if (userId === session.owner) {
+                                e.dataTransfer.setData('sessionId', session._id);
+                                e.dataTransfer.effectAllowed = 'move';
+                            }
+                          }}
                         >
                           <Link
                             href={`/sessions/${session._id}`}
@@ -545,10 +583,66 @@ export default function WorldClient() {
             isEditing={isEditingMap}
             setIsEditing={setIsEditingMap}
           />
-          <ReputationSystem
-            worldId={world._id}
-            worldName={world.name}
-          />
+
+          {showSwitcher && (
+            <div className="flex justify-center -mb-4 relative z-10">
+              <div className="bg-muted p-1 rounded-full border border-border/50 flex gap-1 shadow-sm">
+                <Button 
+                  variant={viewMode === 'reputation' ? "secondary" : "ghost"} 
+                  size="sm" 
+                  className="rounded-full h-8 px-4 text-xs font-bold gap-2"
+                  onClick={() => setViewMode('reputation')}
+                >
+                  <Users className="h-3.5 w-3.5" />
+                  Reputation
+                </Button>
+                <Button 
+                  variant={viewMode === 'calendar' ? "secondary" : "ghost"} 
+                  size="sm" 
+                  className="rounded-full h-8 px-4 text-xs font-bold gap-2"
+                  onClick={() => setViewMode('calendar')}
+                >
+                  <Calendar className="h-3.5 w-3.5" />
+                  Calendar
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <AnimatePresence mode="wait">
+            {effectiveViewMode === 'reputation' ? (
+              <motion.div
+                key="reputation"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                <ReputationSystem
+                  worldId={world._id}
+                  worldName={world.name}
+                />
+              </motion.div>
+            ) : effectiveViewMode === 'calendar' ? (
+              <motion.div
+                key="calendar"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                <WorldCalendar 
+                  worldId={world._id}
+                  worldName={world.name}
+                  calendarJSON={world.calendar}
+                  isOwner={userId === world.owner}
+                  isVisible={world.calendarVisible ?? false}
+                  sessions={sessions || []}
+                  onDropSession={handleDropSession}
+                />
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
         </div>
 
         <div className="lg:hidden">
