@@ -336,7 +336,16 @@ export default function SessionClient() {
   const calendarLink = getGoogleCalendarLink()
 
   return (
-    <div className={cn("container mx-auto px-4 py-8", session.isOwner ? "max-w-6xl" : "max-w-4xl")}>
+    <div className={cn("container mx-auto px-4 py-8", session.isOwner ? "max-w-7xl" : "max-w-4xl")}>
+      {userId === session.owner && (
+        <aside className="hidden 2xl:block fixed left-4 top-32 w-48 z-40">
+          <ToolSidebar 
+              sessionId={session._id} 
+              worldName={session.worldName}
+              characters={session.attendingCharacters.map(c => ({ id: c._id, name: c.name }))} 
+          />
+        </aside>
+      )}
       <div className="flex justify-between items-center mb-6">
         <Button variant="ghost" size="sm" className="sm:px-3 sm:w-auto w-9 px-0" asChild>
           <Link href="/">
@@ -383,19 +392,9 @@ export default function SessionClient() {
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-8 items-start">
-        {session.isOwner && (
-          <aside className="hidden lg:block lg:sticky lg:top-8 w-48 shrink-0">
-            <ToolSidebar 
-                sessionId={session._id} 
-                worldName={session.worldName}
-                characters={session.attendingCharacters.map(c => ({ id: c._id, name: c.name }))} 
-            />
-          </aside>
-        )}
-        <div className="flex-grow w-full">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="md:col-span-2 space-y-8">
+      <div className="w-full">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
+            <div className="md:col-span-9 space-y-8">
           <Card className={session.locked ? "border-amber-200 bg-amber-50/10" : session.planning ? "border-purple-200 bg-purple-50/10" : ""}>
             <CardHeader>
               <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
@@ -637,7 +636,7 @@ export default function SessionClient() {
           />
         </div>
 
-        <div className="space-y-8">
+        <div className="md:col-span-3 space-y-8">
           {(session.isOwner || isAdmin) && !session.locked && (
             <SessionManagement 
                 session={session}

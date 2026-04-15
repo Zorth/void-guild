@@ -1,5 +1,6 @@
 import { query, mutation } from './_generated/server'
 import { v } from 'convex/values'
+import { Doc } from './_generated/dataModel'
 
 export const getWorldByOwner = query({
   args: {},

@@ -542,7 +542,7 @@ export default function WorldCalendar({
                                                     <div key={e.id} className="h-1 w-1 rounded-full bg-primary/60" />
                                                 ))}
                                                 {daySessions.map(s => (
-                                                    <div key={s._id} className="h-1 w-1 rounded-full bg-purple-500/60 shadow-[0_0_2px_rgba(168,85,247,0.5)]" title="Gaming Session" />
+                                                    <div key={s._id} className="h-1 w-1 rounded-full bg-purple-500/60 shadow-[0_0_2px_rgba(168,85,247,0.5)]" title={s.quest?.name || "Session"} />
                                                 ))}
                                             </div>
                                         </div>
@@ -578,7 +578,7 @@ export default function WorldCalendar({
                                                                             : "No Attendees"}
                                                                     </span>
                                                                     <span className="text-[8px] uppercase tracking-widest font-black opacity-60">
-                                                                        {s.quest?.name || "Gaming Session"}
+                                                                        {s.quest?.name || "Session"}
                                                                     </span>
                                                                 </div>
                                                                 <ExternalLink className="h-3 w-3 text-purple-500/40 group-hover/sess:text-purple-500 transition-colors shrink-0" />
