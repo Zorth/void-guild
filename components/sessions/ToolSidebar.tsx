@@ -195,7 +195,7 @@ export default function ToolSidebar({ sessionId, worldName, characters }: ToolSi
     if (!isMounted) return null
 
     return (
-        <div className="flex flex-col gap-4 w-full max-w-[200px]">
+        <div className="flex flex-col gap-4 w-full">
             {/* Tab Switcher */}
             <div className="flex bg-muted/50 p-1 rounded-lg border border-border/50">
                 <button

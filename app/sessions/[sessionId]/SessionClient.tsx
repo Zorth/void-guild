@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { useState, useEffect, useMemo } from 'react'
 import { Id, Doc } from '@/convex/_generated/dataModel'
 import Link from 'next/link'
-import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, Unlock, Globe, Scroll, Trophy } from 'lucide-react'
+import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, Unlock, Globe, Scroll, Trophy, Menu } from 'lucide-react'
 import { useAuth, SignInButton } from '@clerk/nextjs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn, formatDate, formatTime as formatTimeUtil, getLevelBadgeStyle, getDualLevelBadgeStyle } from '@/lib/utils'
@@ -34,6 +34,8 @@ import {
     DialogHeader,
     DialogTitle,
     DialogDescription,
+    DialogFooter,
+    DialogClose,
 } from '@/components/ui/dialog'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -336,15 +338,18 @@ export default function SessionClient() {
   const calendarLink = getGoogleCalendarLink()
 
   return (
-    <div className={cn("container mx-auto px-4 py-8", session.isOwner ? "max-w-7xl" : "max-w-4xl")}>
+    <div className={cn("container mx-auto px-4 py-8", (session.isOwner || isAdmin) ? "max-w-7xl" : "max-w-4xl")}>
       {userId === session.owner && (
-        <aside className="hidden 2xl:block fixed left-4 top-32 w-48 z-40">
-          <ToolSidebar 
-              sessionId={session._id} 
-              worldName={session.worldName}
-              characters={session.attendingCharacters.map(c => ({ id: c._id, name: c.name }))} 
-          />
-        </aside>
+        <>
+          {/* Desktop Fixed Sidebar */}
+          <aside className="hidden 2xl:block fixed left-4 top-32 w-48 z-40">
+            <ToolSidebar 
+                sessionId={session._id} 
+                worldName={session.worldName}
+                characters={session.attendingCharacters.map(c => ({ id: c._id, name: c.name }))} 
+            />
+          </aside>
+        </>
       )}
       <div className="flex justify-between items-center mb-6">
         <Button variant="ghost" size="sm" className="sm:px-3 sm:w-auto w-9 px-0" asChild>
@@ -354,6 +359,43 @@ export default function SessionClient() {
           </Link>
         </Button>
         <div className="flex gap-2">
+            {userId === session.owner && (
+              <div className="2xl:hidden">
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="sm:px-3 sm:w-auto w-9 px-0">
+                      <Menu className="h-4 w-4 sm:mr-2" />
+                      <span className="hidden sm:inline">Voidmaster Tools</span>
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-none w-screen h-[100dvh] m-0 rounded-none p-0 overflow-hidden bg-background border-none flex flex-col">
+                    <DialogHeader className="p-4 pt-[calc(1rem+env(safe-area-inset-top))] border-b bg-muted/30 shrink-0">
+                      <DialogTitle className="flex items-center gap-2">
+                        <Shield className="h-4 w-4" />
+                        Voidmaster Tools
+                      </DialogTitle>
+                      <DialogDescription>
+                        Manage your session, initiative, and world clock.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="p-4 flex-grow overflow-y-auto">
+                      <div className="max-w-md mx-auto">
+                        <ToolSidebar 
+                            sessionId={session._id} 
+                            worldName={session.worldName}
+                            characters={session.attendingCharacters.map(c => ({ id: c._id, name: c.name }))} 
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] border-t bg-muted/30 shrink-0">
+                      <DialogClose asChild>
+                        <Button variant="secondary" className="w-full h-12 text-lg font-bold">Close Tools</Button>
+                      </DialogClose>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            )}
             {calendarLink && (
                 <Button variant="outline" size="sm" asChild className="sm:px-3 sm:w-auto w-9 px-0">
                     <a href={calendarLink} target="_blank" rel="noopener noreferrer">
