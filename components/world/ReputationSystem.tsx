@@ -141,7 +141,10 @@ export default function ReputationSystem({
 
     const sortedCharacters = useMemo(() => {
         if (!charactersRaw) return []
-        return [...charactersRaw].sort((a, b) => a.name.localeCompare(b.name))
+        return [...charactersRaw].sort((a, b) => {
+            if (b.lvl !== a.lvl) return b.lvl - a.lvl
+            return a.name.localeCompare(b.name)
+        })
     }, [charactersRaw])
 
     if (data !== undefined && !isOwner && !isVisible) return null
