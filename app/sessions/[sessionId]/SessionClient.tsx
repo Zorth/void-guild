@@ -44,7 +44,8 @@ import InterestedPlayersList from '@/components/sessions/details/InterestedPlaye
 import SessionManagement from '@/components/sessions/details/SessionManagement'
 import SessionJoinForm from '@/components/sessions/details/SessionJoinForm'
 import QuestList from '@/components/quests/QuestList'
-import InitiativeTracker from '@/components/sessions/InitiativeTracker'
+import ToolSidebar from '@/components/sessions/ToolSidebar'
+import ReputationSystem from '@/components/world/ReputationSystem'
 
 interface SessionWithGM extends Doc<'sessions'> {
     attendingCharacters: Doc<'characters'>[];
@@ -374,8 +375,9 @@ export default function SessionClient() {
       <div className="flex flex-col lg:flex-row gap-8 items-start">
         {session.isOwner && (
           <aside className="lg:sticky lg:top-8 w-full lg:w-48 shrink-0">
-            <InitiativeTracker 
+            <ToolSidebar 
                 sessionId={session._id} 
+                worldName={session.worldName}
                 characters={session.attendingCharacters.map(c => ({ id: c._id, name: c.name }))} 
             />
           </aside>
@@ -616,6 +618,12 @@ export default function SessionClient() {
               />
             </CardContent>
           </Card>
+
+          <ReputationSystem 
+            worldId={session.world} 
+            worldName={session.worldName} 
+            charactersInSession={session.characters}
+          />
         </div>
 
         <div className="space-y-8">
