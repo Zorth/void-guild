@@ -374,7 +374,7 @@ export default function SessionClient() {
 
       <div className="flex flex-col lg:flex-row gap-8 items-start">
         {session.isOwner && (
-          <aside className="lg:sticky lg:top-8 w-full lg:w-48 shrink-0">
+          <aside className="hidden lg:block lg:sticky lg:top-8 w-48 shrink-0">
             <ToolSidebar 
                 sessionId={session._id} 
                 worldName={session.worldName}
