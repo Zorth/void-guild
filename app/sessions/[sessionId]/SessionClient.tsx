@@ -5,7 +5,7 @@ import { useQuery, useMutation, useAction, Authenticated, Unauthenticated } from
 import { api } from '@/convex/_generated/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Id, Doc } from '@/convex/_generated/dataModel'
 import Link from 'next/link'
 import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, Unlock, Globe, Scroll, Trophy } from 'lucide-react'
@@ -76,11 +76,22 @@ export default function SessionClient() {
   const selectQuest = useMutation(api.sessions.selectQuest)
   const expressInterest = useMutation(api.sessions.expressInterest)
   const withdrawInterest = useMutation(api.sessions.withdrawInterest)
+  const updateInGameDate = useMutation(api.sessions.updateInGameDate)
   const sendNotification = useAction(api.discord.sendSessionNotification)
 
   const isAdmin = useQuery(api.sessions.isAdminQuery)
   const allCharacters = useQuery(api.characters.listAllCharacters, isAdmin ? undefined : "skip")
   const worldQuests = useQuery(api.quests.getQuestsByWorld, session?.world ? { worldId: session.world } : "skip")
+
+  const currentWorldDate = useMemo(() => {
+    if (!world?.calendar) return null;
+    try {
+        const parsed = JSON.parse(world.calendar);
+        return parsed.dynamic_data;
+    } catch (e) {
+        return null;
+    }
+  }, [world?.calendar]);
 
   const [selectedCharacterId, setSelectedCharacterId] = useState<Id<'characters'> | ''>('')
   const [selectedAdminCharacterId, setSelectedAdminCharacterId] = useState<Id<'characters'> | ''>('')
@@ -632,10 +643,17 @@ export default function SessionClient() {
                 session={session}
                 isAdmin={isAdmin}
                 quests={worldQuests}
+                currentWorldDate={currentWorldDate}
                 onSelectQuest={async (questId) => {
                   if (session?._id) {
                     await selectQuest({ sessionId: session._id, questId });
                     toast.success(questId ? "Quest selected" : "Quest removed");
+                  }
+                }}
+                onUpdateInGameDate={async (inGameDate) => {
+                  if (session?._id) {
+                    await updateInGameDate({ sessionId: session._id, inGameDate });
+                    toast.success("In-game date updated");
                   }
                 }}
                 onSendToDiscord={handleSendToDiscord}

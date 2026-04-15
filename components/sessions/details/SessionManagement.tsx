@@ -2,8 +2,10 @@
 
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { Pencil, CheckCircle2, Shield, Send, Bell, XCircle, Scroll } from 'lucide-react'
+import { Pencil, CheckCircle2, Shield, Send, Bell, XCircle, Scroll, Calendar, CalendarRange, Clock } from 'lucide-react'
 import SessionDialog from '@/components/sessions/SessionDialog'
+import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
     AlertDialog,
     AlertDialogAction,
@@ -31,7 +33,9 @@ interface SessionManagementProps {
   session: any // Using any for simplicity as it includes combined GM data
   isAdmin: boolean
   quests?: Doc<'quests'>[]
+  currentWorldDate?: { year: number, month: number, day: number }
   onSelectQuest: (questId?: Id<'quests'>) => void
+  onUpdateInGameDate: (inGameDate?: any) => void
   onSendToDiscord: (type: 'new' | 'remind' | 'cancel') => void
   onLock: () => void
   onForceLock: () => void
@@ -42,13 +46,39 @@ export default function SessionManagement({
   session,
   isAdmin,
   quests,
+  currentWorldDate,
   onSelectQuest,
+  onUpdateInGameDate,
   onSendToDiscord,
   onLock,
   onForceLock,
   xpGainsPreview
 }: SessionManagementProps) {
   const [isQuestDialogOpen, setIsQuestDialogOpen] = useState(false)
+  const [isInGameDateDialogOpen, setIsInGameDateDialogOpen] = useState(false)
+
+  // In-game date editing state
+  const [tempDate, setTempDate] = useState({
+    year: session.inGameDate?.year ?? currentWorldDate?.year ?? 1,
+    month: session.inGameDate?.month ?? currentWorldDate?.month ?? 0,
+    day: session.inGameDate?.day ?? currentWorldDate?.day ?? 1,
+    hasEnd: !!session.inGameDate?.endDay,
+    endYear: session.inGameDate?.endYear ?? session.inGameDate?.year ?? currentWorldDate?.year ?? 1,
+    endMonth: session.inGameDate?.endMonth ?? session.inGameDate?.month ?? currentWorldDate?.month ?? 0,
+    endDay: session.inGameDate?.endDay ?? session.inGameDate?.day ?? currentWorldDate?.day ?? 1,
+  })
+
+  const handleSaveInGameDate = () => {
+    onUpdateInGameDate({
+        year: tempDate.year,
+        month: tempDate.month,
+        day: tempDate.day,
+        endYear: tempDate.hasEnd ? tempDate.endYear : undefined,
+        endMonth: tempDate.hasEnd ? tempDate.endMonth : undefined,
+        endDay: tempDate.hasEnd ? tempDate.endDay : undefined,
+    })
+    setIsInGameDateDialogOpen(false)
+  }
 
   return (
     <Card>
@@ -122,6 +152,111 @@ export default function SessionManagement({
                                     </div>
                                 </Button>
                             ))}
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            </div>
+        </div>
+
+        <div className="space-y-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <Calendar className="h-3 w-3" />
+                In-Game Date
+            </h4>
+            <div className="flex items-center justify-between p-2 bg-muted/30 rounded-md border border-border/40">
+                <div className="text-sm truncate mr-2">
+                    {session.inGameDate ? (
+                        <div className="flex flex-col">
+                            <span className="font-medium text-primary">
+                                Day {session.inGameDate.day}, Month {session.inGameDate.month + 1}, Year {session.inGameDate.year}
+                            </span>
+                            {session.inGameDate.endDay && (
+                                <span className="text-[10px] text-muted-foreground">
+                                    to Day {session.inGameDate.endDay}, Month {session.inGameDate.endMonth + 1}, Year {session.inGameDate.endYear}
+                                </span>
+                            )}
+                        </div>
+                    ) : (
+                        <span className="italic text-muted-foreground">No date set</span>
+                    )}
+                </div>
+                <Dialog open={isInGameDateDialogOpen} onOpenChange={setIsInGameDateDialogOpen}>
+                    <DialogTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-7 text-[10px] uppercase font-bold tracking-tight">
+                            {session.inGameDate ? "Edit" : "Set"}
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                            <DialogTitle>Set In-Game Date</DialogTitle>
+                            <DialogDescription>
+                                Specify when this session takes place in your world's timeline.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-6 py-4">
+                            <div className="space-y-4">
+                                <h5 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 border-b pb-1">
+                                    <Clock className="h-3 w-3" /> Start Date
+                                </h5>
+                                <div className="grid grid-cols-3 gap-2">
+                                    <div className="space-y-1">
+                                        <label className="text-[9px] font-bold uppercase ml-1">Day</label>
+                                        <Input type="number" className="h-8 text-xs" value={tempDate.day} onChange={e => setTempDate({...tempDate, day: parseInt(e.target.value)})} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[9px] font-bold uppercase ml-1">Month (1-indexed)</label>
+                                        <Input type="number" className="h-8 text-xs" value={tempDate.month + 1} onChange={e => setTempDate({...tempDate, month: parseInt(e.target.value) - 1})} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[9px] font-bold uppercase ml-1">Year</label>
+                                        <Input type="number" className="h-8 text-xs" value={tempDate.year} onChange={e => setTempDate({...tempDate, year: parseInt(e.target.value)})} />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4 border-t pt-4">
+                                <div className="flex items-center space-x-2">
+                                    <Checkbox 
+                                        id="has-end-date" 
+                                        checked={tempDate.hasEnd} 
+                                        onCheckedChange={(checked) => setTempDate({...tempDate, hasEnd: !!checked})} 
+                                    />
+                                    <label htmlFor="has-end-date" className="text-sm font-medium leading-none cursor-pointer">
+                                        Span multiple days?
+                                    </label>
+                                </div>
+
+                                {tempDate.hasEnd && (
+                                    <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                                        <h5 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 border-b pb-1">
+                                            <CalendarRange className="h-3 w-3" /> End Date
+                                        </h5>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] font-bold uppercase ml-1">Day</label>
+                                                <Input type="number" className="h-8 text-xs" value={tempDate.endDay} onChange={e => setTempDate({...tempDate, endDay: parseInt(e.target.value)})} />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] font-bold uppercase ml-1">Month</label>
+                                                <Input type="number" className="h-8 text-xs" value={tempDate.endMonth + 1} onChange={e => setTempDate({...tempDate, endMonth: parseInt(e.target.value) - 1})} />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] font-bold uppercase ml-1">Year</label>
+                                                <Input type="number" className="h-8 text-xs" value={tempDate.endYear} onChange={e => setTempDate({...tempDate, endYear: parseInt(e.target.value)})} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="flex justify-between items-center mt-4">
+                            <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => onUpdateInGameDate(undefined)}>
+                                Clear Date
+                            </Button>
+                            <div className="flex gap-2">
+                                <Button variant="ghost" size="sm" onClick={() => setIsInGameDateDialogOpen(false)}>Cancel</Button>
+                                <Button size="sm" onClick={handleSaveInGameDate}>Save Date</Button>
+                            </div>
                         </div>
                     </DialogContent>
                 </Dialog>

@@ -78,7 +78,21 @@ export const getSessionsByWorld = query({
       .filter((q) => q.eq(q.field('world'), args.worldId))
       .collect()
 
-    return sessions.sort((a, b) => {
+    const sessionsWithDetails = await Promise.all(
+      sessions.map(async (session) => {
+        const characterDocs = await Promise.all(
+          session.characters.map((id) => ctx.db.get(id))
+        )
+        const questDoc = session.questId ? await ctx.db.get(session.questId) : null
+        return {
+          ...session,
+          characterNames: characterDocs.filter((c): c is Doc<'characters'> => c !== null).map((c) => c.name),
+          quest: questDoc,
+        }
+      })
+    )
+
+    return sessionsWithDetails.sort((a, b) => {
         if (a.date && b.date) return b.date - a.date
         if (a.date) return -1
         if (b.date) return 1
@@ -403,6 +417,36 @@ export const updateWorldMap = mutation({
 
     await ctx.db.patch(args.worldId, {
       mapEmbed: args.mapEmbed,
+    })
+  },
+})
+
+export const toggleCalendarVisibility = mutation({
+  args: { worldId: v.id('worlds') },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    const world = await ctx.db.get(args.worldId)
+    if (!world || world.owner !== user?.subject) {
+      throw new Error('Unauthorized')
+    }
+
+    await ctx.db.patch(args.worldId, {
+      calendarVisible: !(world.calendarVisible ?? false),
+    })
+  },
+})
+
+export const updateWorldCalendar = mutation({
+  args: { worldId: v.id('worlds'), calendar: v.string() },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    const world = await ctx.db.get(args.worldId)
+    if (!world || world.owner !== user?.subject) {
+      throw new Error('Unauthorized')
+    }
+
+    await ctx.db.patch(args.worldId, {
+      calendar: args.calendar,
     })
   },
 })
