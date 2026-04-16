@@ -2,6 +2,7 @@ import { Metadata } from 'next'
 import { fetchQuery } from 'convex/nextjs'
 import { api } from '@/convex/_generated/api'
 import SessionClient from './SessionClient'
+import { formatInGameYear } from '@/lib/utils'
 
 type Props = {
   params: Promise<{ sessionId: string }>
@@ -16,6 +17,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     if (!session) {
       return { title: 'Session Not Found | Void Guild' }
     }
+
+    const world = await fetchQuery(api.worlds.getWorldByName, { name: session.worldName })
+    const { eras, yearZeroExists } = (() => {
+        if (!world?.calendar) return { eras: [], yearZeroExists: false }
+        try {
+            const parsed = JSON.parse(world.calendar)
+            return {
+                eras: parsed.static_data?.eras || parsed.static?.eras || [],
+                yearZeroExists: parsed.static_data?.settings?.year_zero_exists || parsed.static?.settings?.year_zero_exists || false
+            }
+        } catch (e) {
+            return { eras: [], yearZeroExists: false }
+        }
+    })()
 
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'
 
@@ -50,13 +65,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     let inGameDateStr = ""
     if (session.inGameDate) {
         const { year, month, day, era, endYear, endMonth, endDay } = session.inGameDate
-        const eraStr = era ? ` ${era}` : ""
-        const start = `${year}/${String(month + 1).padStart(2, '0')}/${String(day).padStart(2, '0')}${eraStr}`
+        
+        const formatPart = (y: number, m: number, d: number) => {
+            if (era) return `${y}/${String(m + 1).padStart(2, '0')}/${String(d).padStart(2, '0')} ${era}`
+            return `${formatInGameYear(y, eras, yearZeroExists)}/${String(m + 1).padStart(2, '0')}/${String(d).padStart(2, '0')}`
+        }
+
+        const start = formatPart(year, month, day)
         if (endDay) {
             const ey = endYear ?? year
             const em = endMonth ?? month
-            const ed = endDay
-            const end = `${ey}/${String(em + 1).padStart(2, '0')}/${String(ed).padStart(2, '0')}${eraStr}`
+            const end = formatPart(ey, em, endDay)
             inGameDateStr = `\n🌍 ${start} - ${end}`
         } else {
             inGameDateStr = `\n🌍 ${start}`

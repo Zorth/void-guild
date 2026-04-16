@@ -15,14 +15,63 @@ const getQuestLevelStr = (q: any) => {
     return "Lvl ?";
 };
 
-const formatInGameDate = (ig: any) => {
-    if (!ig) return null;
-    const eraStr = ig.era ? ` ${ig.era}` : "";
-    const start = `${ig.year}/${String(ig.month + 1).padStart(2, '0')}/${String(ig.day).padStart(2, '0')}${eraStr}`;
+const formatInGameDate = (ig: any, eras: any[] = [], globalYearZero: boolean = false) => {
+    if (!ig) return "";
+
+    const formatPart = (y: number, m: number, d: number) => {
+        if (ig.era) {
+            return `${y}/${String(m + 1).padStart(2, '0')}/${String(d).padStart(2, '0')} ${ig.era}`;
+        }
+        
+        if (!eras || eras.length === 0) {
+            return `${y}/${String(m + 1).padStart(2, '0')}/${String(d).padStart(2, '0')}`;
+        }
+
+        // Sort eras by their date (year) ascending to find the right one
+        const sortedEras = [...eras].sort((a, b) => {
+            const yearA = typeof a.date === 'object' ? a.date.year : a.date;
+            const yearB = typeof b.date === 'object' ? b.date.year : b.date;
+            return yearA - yearB;
+        });
+
+        // Find the era that this year falls into
+        let currentEra = sortedEras[0];
+        for (const era of sortedEras) {
+            const eraDateValue = typeof era.date === 'object' ? era.date.year : era.date;
+            if (y >= eraDateValue) {
+                currentEra = era;
+            } else {
+                break;
+            }
+        }
+
+        const eraDateValue = typeof currentEra.date === 'object' ? currentEra.date.year : currentEra.date;
+        
+        let eraYear;
+        // If restart is false, we show the absolute year
+        const yearZeroExists = currentEra.year_zero_exists ?? currentEra.settings?.year_zero_exists ?? globalYearZero;
+        if (currentEra.settings?.restart === false) {
+            eraYear = y;
+        } else {
+            eraYear = y - eraDateValue + (yearZeroExists ? 0 : 1);
+        }
+
+        let eraLabel = currentEra.abbreviation || currentEra.name;
+        if (currentEra.name.length > 15 && !currentEra.abbreviation) {
+            eraLabel = currentEra.name
+                .split(/[\s-]+/)
+                .map((word: string) => word[0]?.toUpperCase())
+                .join('');
+        }
+
+        return `${eraLabel} ${eraYear}/${String(m + 1).padStart(2, '0')}/${String(d).padStart(2, '0')}`;
+    };
+
+    const start = formatPart(ig.year, ig.month, ig.day);
     if (ig.endDay) {
         const ey = ig.endYear ?? ig.year;
         const em = ig.endMonth ?? ig.month;
-        const end = `${ey}/${String(em + 1).padStart(2, '0')}/${String(ig.endDay).padStart(2, '0')}${eraStr}`;
+        const end = formatPart(ey, em, ig.endDay);
         return `${start} - ${end}`;
     }
     return start;
@@ -144,7 +193,20 @@ export const syncSessionToDiscord = internalAction({
         }
     }
 
-    const inGameDateInfo = formatInGameDate(session.inGameDate);
+    const { eras, yearZeroExists } = (() => {
+      if (!session.worldCalendar) return { eras: [], yearZeroExists: false }
+      try {
+        const parsed = JSON.parse(session.worldCalendar)
+        return {
+          eras: parsed.static_data?.eras || parsed.static?.eras || [],
+          yearZeroExists: parsed.static_data?.settings?.year_zero_exists || parsed.static?.settings?.year_zero_exists || false
+        }
+      } catch (e) {
+        return { eras: [], yearZeroExists: false }
+      }
+    })()
+
+    const inGameDateInfo = formatInGameDate(session.inGameDate, eras, yearZeroExists);
 
     const messageContent = `# ${systemEmoji} [${session.worldName}](${worldLink})\n` +
       `**System**: ${systemName}\n` +
@@ -376,7 +438,20 @@ export const sendSessionNotification = action({
     const interestCount = (session.interestedPlayers || []).length;
     const playersValue = `${session.attendingCharacters.length}/${session.maxPlayers}` + (interestCount > 0 ? ` (+${interestCount} interested)` : "");
 
-    const inGameDateInfo = formatInGameDate(session.inGameDate);
+    const { eras, yearZeroExists } = (() => {
+      if (!session.worldCalendar) return { eras: [], yearZeroExists: false }
+      try {
+        const parsed = JSON.parse(session.worldCalendar)
+        return {
+          eras: parsed.static_data?.eras || parsed.static?.eras || [],
+          yearZeroExists: parsed.static_data?.settings?.year_zero_exists || parsed.static?.settings?.year_zero_exists || false
+        }
+      } catch (e) {
+        return { eras: [], yearZeroExists: false }
+      }
+    })()
+
+    const inGameDateInfo = formatInGameDate(session.inGameDate, eras, yearZeroExists);
 
     const embed: any = {
       title: embedTitle,
@@ -622,6 +697,7 @@ export const getInternalSessionDetails = internalQuery({
     return {
       ...session,
       worldName: world?.name || "Unknown World",
+      worldCalendar: world?.calendar || null,
       attendingCharacters: attendingCharacters.filter((c): c is any => c !== null),
       gmCharacterName: gmCharacter?.name || null,
       quests: [...quests, ...worldlessQuests],

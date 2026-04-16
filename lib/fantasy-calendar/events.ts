@@ -133,19 +133,19 @@ export class EventEvaluator {
 
     evaluate_operator(operator: string, a: any, b: any, c?: any): boolean {
         switch (operator) {
-            case '==': return a == b;
-            case '!=': return a != b;
-            case '>=': return a >= b;
-            case '<=': return a <= b;
-            case '>': return a > b;
-            case '<': return a < b;
+            case '==': return !!(a == b);
+            case '!=': return !!(a != b);
+            case '>=': return !!(a >= b);
+            case '<=': return !!(a <= b);
+            case '>': return !!(a > b);
+            case '<': return !!(a < b);
             case '%':
-                if (c === undefined) return a % b === 0;
-                return (a - c) % b === 0;
-            case '&&': return a && b;
-            case '||': return a || b;
+                if (c === undefined) return !!(a % b === 0);
+                return !!((a - c) % b === 0);
+            case '&&': return !!(a && b);
+            case '||': return !!(a || b);
             case 'NAND': return !(a && b);
-            case '^': return a ^ b;
+            case '^': return !!(a ^ b);
             default: return false;
         }
     }

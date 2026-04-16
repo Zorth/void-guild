@@ -45,6 +45,53 @@ export function formatTime(date: Date | number | string) {
   return `${hours}:${minutes}`;
 }
 
+export function formatInGameYear(year: number, eras?: any[], globalYearZero: boolean = false, options?: { useAbbreviation?: boolean, labelFirst?: boolean }) {
+  if (!eras || eras.length === 0) {
+    return year.toString();
+  }
+
+  // Sort eras by their date (year) ascending to find the right one
+  const sortedEras = [...eras].sort((a, b) => {
+    const yearA = typeof a.date === 'object' ? a.date.year : a.date;
+    const yearB = typeof b.date === 'object' ? b.date.year : b.date;
+    return yearA - yearB;
+  });
+
+  // Find the era that this year falls into
+  let currentEra = sortedEras[0];
+  for (const era of sortedEras) {
+    const eraDateValue = typeof era.date === 'object' ? era.date.year : era.date;
+    if (year >= eraDateValue) {
+      currentEra = era;
+    } else {
+      break;
+    }
+  }
+
+  const eraDateValue = typeof currentEra.date === 'object' ? currentEra.date.year : currentEra.date;
+  
+  // If restart is false, we show the absolute year
+  const yearZeroExists = currentEra.year_zero_exists ?? currentEra.settings?.year_zero_exists ?? globalYearZero;
+  const eraYear = currentEra.settings?.restart === false 
+    ? year 
+    : year - eraDateValue + (yearZeroExists ? 0 : 1);
+  
+  let eraLabel = currentEra.abbreviation || currentEra.name;
+  if (options?.useAbbreviation) {
+    // Generate abbreviation from name if not provided (split by spaces and hyphens)
+    eraLabel = currentEra.abbreviation || currentEra.name
+      .split(/[\s-]+/)
+      .map((word: string) => word[0]?.toUpperCase())
+      .join('');
+  }
+
+  if (options?.labelFirst) {
+    return `${eraLabel} ${eraYear}`;
+  }
+
+  return `${eraYear} ${eraLabel}`;
+}
+
 export function getLevelBadgeStyle(level: number | undefined) {
   if (level === undefined || level === 0) return { backgroundColor: '#1f2937', color: '#f9fafb' }; // Inverted (dark) for TBD
 

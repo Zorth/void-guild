@@ -420,6 +420,7 @@ export default function SessionClient() {
               isAdmin={isAdmin}
               quests={worldQuests}
               currentWorldDate={currentWorldDate}
+              worldCalendar={world?.calendar}
               onSelectQuest={async (questId) => {
                 if (session?._id) {
                   await selectQuest({ sessionId: session._id, questId });

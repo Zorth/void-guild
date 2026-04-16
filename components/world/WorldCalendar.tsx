@@ -21,12 +21,9 @@ import {
     CalendarDays,
     Book,
     ExternalLink,
-    Thermometer,
-    CloudRain,
-    Sun,
     Moon as MoonIcon
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, formatInGameYear } from '@/lib/utils'
 import { Id } from '@/convex/_generated/dataModel'
 import {
     Dialog,
@@ -123,6 +120,7 @@ interface FantasyCalendarJSON {
         months: FantasyMonth[];
         weekdays: string[];
         moons?: FantasyMoon[];
+        eras?: any[];
         seasons?: {
             data: FantasySeason[];
             global_settings: {
@@ -279,6 +277,7 @@ export default function WorldCalendar({
                     })),
                     weekdays: weekdays || ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5", "Day 6", "Day 7"],
                     moons: staticData.moons || yearData.moons || [],
+                    eras: staticData.eras || yearData.eras || [],
                     seasons: staticData.seasons || yearData.seasons || { data: [], global_settings: { enable_weather: false } },
                     settings: staticData.settings || yearData.settings || { year_zero_exists: false }
                 },
@@ -348,7 +347,7 @@ export default function WorldCalendar({
         
         // Simplified Gregorian-like logic if interval is a string like "4,!100,400"
         if (typeof leapDay.interval === 'string') {
-            const parts = leapDay.interval.split(',').map(p => p.trim());
+            const parts = (leapDay.interval as string).split(',').map((p: string) => p.trim());
             let isLeap = false;
             for (const part of parts) {
                 if (part.startsWith('!')) {
@@ -648,7 +647,7 @@ export default function WorldCalendar({
                         {calendar.name || "World Calendar"}
                     </CardTitle>
                     <div className="text-sm font-medium px-2 py-0.5 bg-primary/10 text-primary rounded-md border border-primary/20">
-                        Today: {calendar.dynamic_data.day} {todayMonthName}, {calendar.dynamic_data.year}
+                        Today: {calendar.dynamic_data.day} {todayMonthName}, {formatInGameYear(calendar.dynamic_data.year, calendar.static_data.eras, calendar.static_data.settings?.year_zero_exists)}
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -740,7 +739,7 @@ export default function WorldCalendar({
                     </Button>
                     <div className="text-center">
                         <h2 className="text-xl font-bold tracking-tight">{currentMonth.name}</h2>
-                        <p className="text-sm text-muted-foreground font-medium">Year {viewYear}</p>
+                        <p className="text-sm text-muted-foreground font-medium">Year {formatInGameYear(viewYear, calendar.static_data.eras, calendar.static_data.settings?.year_zero_exists)}</p>
                     </div>
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { if(viewMonth === calendar.static_data.n_months-1) { setViewMonth(0); setViewYear(v=>v+1); } else setViewMonth(v=>v+1); }}>
                         <ChevronRight className="h-5 w-5" />
@@ -818,17 +817,6 @@ export default function WorldCalendar({
                                                     );
                                                 })}
                                             </div>
-
-                                            {/* Weather Icon */}
-                                            {epochData[calculateEpoch(viewYear, viewMonth, d)]?.weather && (
-                                                <div className="absolute top-0 left-0 p-0.5 opacity-40 group-hover:opacity-100 transition-opacity">
-                                                    {epochData[calculateEpoch(viewYear, viewMonth, d)].weather.precipitation.key !== 'None' ? (
-                                                        <CloudRain className="h-3 w-3 text-blue-400" />
-                                                    ) : (
-                                                        <Sun className="h-3 w-3 text-amber-400" />
-                                                    )}
-                                                </div>
-                                            )}
                                             
                                             <div className="flex flex-col gap-0.5 mt-1 -mx-1 sm:-mx-2 w-[calc(100%+0.5rem)] sm:w-[calc(100%+1rem)]">
                                                 {/* Session Bars with Fixed Lanes for Alignment */}
@@ -877,38 +865,6 @@ export default function WorldCalendar({
                                             )}
                                         </div>
                                         <div className="p-2 space-y-2 max-h-64 overflow-y-auto">
-                                            {/* Sun & Moon Details */}
-                                            {epochData[calculateEpoch(viewYear, viewMonth, d)]?.season?.time && (
-                                                <div className="flex items-center justify-between px-2 py-1 bg-amber-500/5 rounded border border-amber-500/10 text-[10px] text-amber-600 dark:text-amber-400 font-medium">
-                                                    <div className="flex items-center gap-1">
-                                                        <Sun className="h-3 w-3" />
-                                                        <span className="opacity-70">Sunrise:</span> {epochData[calculateEpoch(viewYear, viewMonth, d)].season.time.sunrise.string}
-                                                    </div>
-                                                    <div className="flex items-center gap-1">
-                                                        <span className="opacity-70">Sunset:</span> {epochData[calculateEpoch(viewYear, viewMonth, d)].season.time.sunset.string}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Weather Details */}
-                                            {epochData[calculateEpoch(viewYear, viewMonth, d)]?.weather && (
-                                                <div className="flex flex-col gap-1 px-2 py-1 bg-blue-500/5 rounded border border-blue-500/10 text-[10px] font-medium">
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
-                                                            <Thermometer className="h-3 w-3" />
-                                                            <span>{epochData[calculateEpoch(viewYear, viewMonth, d)].weather.temperature.metric.actual}°C ({epochData[calculateEpoch(viewYear, viewMonth, d)].weather.temperature.imperial.actual}°F)</span>
-                                                        </div>
-                                                        <span className="text-muted-foreground/70 italic">{epochData[calculateEpoch(viewYear, viewMonth, d)].weather.temperature.cinematic}</span>
-                                                    </div>
-                                                    {epochData[calculateEpoch(viewYear, viewMonth, d)].weather.precipitation.key !== 'None' && (
-                                                        <div className="flex items-center gap-1 text-blue-500">
-                                                            <CloudRain className="h-3 w-3" />
-                                                            <span>{epochData[calculateEpoch(viewYear, viewMonth, d)].weather.precipitation.key}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-
                                             {calendar.static_data.moons?.length && (
                                                 <div className="flex flex-wrap gap-2 p-1">
                                                     {calendar.static_data.moons.filter(m => !m.hidden).map((moon, mi) => {

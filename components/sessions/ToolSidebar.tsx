@@ -6,7 +6,7 @@ import { Reorder, AnimatePresence, motion } from 'framer-motion'
 import { ChevronLeft, ChevronRight, Plus, X, GripVertical, Sword, Clock, Play, Pause, Minus, CalendarDays, Calendar as CalendarIcon, Info, ArrowLeft, ArrowRight, Flag, CheckCircle2, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { cn } from '@/lib/utils'
+import { cn, formatInGameYear } from '@/lib/utils'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Id } from '@/convex/_generated/dataModel'
@@ -42,6 +42,10 @@ interface FantasyCalendarJSON {
             type: string;
         }[];
         weekdays: string[];
+        eras?: any[];
+        settings?: {
+            year_zero_exists?: boolean;
+        };
     };
 }
 
@@ -428,7 +432,7 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
                 };
                 
                 const formatDate = (y: number, m: number, d: number) => 
-                    `${y}/${(m + 1).toString().padStart(2, '0')}/${d.toString().padStart(2, '0')}`;
+                    `${formatInGameYear(y, calendarConfig.static_data.eras, calendarConfig.static_data.settings?.year_zero_exists, { useAbbreviation: true, labelFirst: true })}/${(m + 1).toString().padStart(2, '0')}/${d.toString().padStart(2, '0')}`;
                 
                 return { 
                     id: s._id, 
@@ -680,7 +684,7 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
                                                 {currentDate.day} {calendarConfig.static_data.months[currentDate.month]?.name || 'Unknown Month'}
                                             </div>
                                             <div className="text-[10px] font-bold text-muted-foreground">
-                                                Year {currentDate.year}
+                                                Year {formatInGameYear(currentDate.year, calendarConfig.static_data.eras, calendarConfig.static_data.settings?.year_zero_exists)}
                                             </div>
                                         </div>
                                         <Button

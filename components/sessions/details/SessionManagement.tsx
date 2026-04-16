@@ -25,15 +25,16 @@ import {
     DialogTrigger,
     DialogDescription,
 } from '@/components/ui/dialog'
-import { getLevelBadgeStyle, CharacterRankIcon, cn } from '@/lib/utils'
+import { getLevelBadgeStyle, CharacterRankIcon, cn, formatInGameYear } from '@/lib/utils'
 import { Doc, Id } from '@/convex/_generated/dataModel'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 
 interface SessionManagementProps {
   session: any // Using any for simplicity as it includes combined GM data
   isAdmin: boolean
   quests?: Doc<'quests'>[]
   currentWorldDate?: { year: number, month: number, day: number }
+  worldCalendar?: string
   onSelectQuest: (questId?: Id<'quests'>) => void
   onUpdateInGameDate: (inGameDate?: any) => void
   onSendToDiscord: (type: 'new' | 'remind' | 'cancel') => void
@@ -47,6 +48,7 @@ export default function SessionManagement({
   isAdmin,
   quests,
   currentWorldDate,
+  worldCalendar,
   onSelectQuest,
   onUpdateInGameDate,
   onSendToDiscord,
@@ -56,6 +58,19 @@ export default function SessionManagement({
 }: SessionManagementProps) {
   const [isQuestDialogOpen, setIsQuestDialogOpen] = useState(false)
   const [isInGameDateDialogOpen, setIsInGameDateDialogOpen] = useState(false)
+
+  const { eras, yearZeroExists } = useMemo(() => {
+    if (!worldCalendar) return { eras: [], yearZeroExists: false }
+    try {
+      const parsed = JSON.parse(worldCalendar)
+      return {
+        eras: parsed.static_data?.eras || parsed.static?.eras || [],
+        yearZeroExists: parsed.static_data?.settings?.year_zero_exists || parsed.static?.settings?.year_zero_exists || false
+      }
+    } catch (e) {
+      return { eras: [], yearZeroExists: false }
+    }
+  }, [worldCalendar])
 
   // In-game date editing state
   const [tempDate, setTempDate] = useState({
@@ -170,11 +185,17 @@ export default function SessionManagement({
                     {session.inGameDate ? (
                         <div className="flex flex-col">
                             <span className="font-medium text-primary">
-                                {session.inGameDate.year}/{String(session.inGameDate.month + 1).padStart(2, '0')}/{String(session.inGameDate.day).padStart(2, '0')}{session.inGameDate.era && ` ${session.inGameDate.era}`}
+                                {session.inGameDate.era 
+                                    ? `${session.inGameDate.year}/${String(session.inGameDate.month + 1).padStart(2, '0')}/${String(session.inGameDate.day).padStart(2, '0')} ${session.inGameDate.era}`
+                                    : `${formatInGameYear(session.inGameDate.year, eras, yearZeroExists)}/${String(session.inGameDate.month + 1).padStart(2, '0')}/${String(session.inGameDate.day).padStart(2, '0')}`
+                                }
                             </span>
                             {session.inGameDate.endDay && (
                                 <span className="text-[10px] text-muted-foreground">
-                                    to {session.inGameDate.endYear}/{String(session.inGameDate.endMonth! + 1).padStart(2, '0')}/{String(session.inGameDate.endDay).padStart(2, '0')}{session.inGameDate.era && ` ${session.inGameDate.era}`}
+                                    to {session.inGameDate.era 
+                                        ? `${session.inGameDate.endYear ?? session.inGameDate.year}/${String(session.inGameDate.endMonth! + 1).padStart(2, '0')}/${String(session.inGameDate.endDay).padStart(2, '0')} ${session.inGameDate.era}`
+                                        : `${formatInGameYear(session.inGameDate.endYear ?? session.inGameDate.year, eras, yearZeroExists)}/${String(session.inGameDate.endMonth! + 1).padStart(2, '0')}/${String(session.inGameDate.endDay).padStart(2, '0')}`
+                                    }
                                 </span>
                             )}
                         </div>
