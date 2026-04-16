@@ -96,12 +96,18 @@ export class EventEvaluator {
                 cond_1 = Number(values[subcon[2]]);
                 cond_2 = values[subcon[3]] !== undefined ? Number(values[subcon[3]]) : undefined;
             } else if (category === "Date") {
-                // Simplified: Date is exactly
-                selected = epoch_data.epoch;
-                // Need a way to get epoch from date. 
-                // In WorldCalendar.tsx we have evaluate_calendar_start
-                // For now, let's assume we can't easily do this without the full date manager
-                return false; 
+                const year = epoch_data.year;
+                const month = epoch_data.timespan_index;
+                const day = epoch_data.day;
+                
+                const v_year = Number(values[0]);
+                const v_month = Number(values[1]);
+                const v_day = Number(values[2]);
+                
+                const current_total = (year * 100000) + (month * 1000) + day;
+                const target_total = (v_year * 100000) + (v_month * 1000) + v_day;
+                
+                return this.evaluate_operator(operator, current_total, target_total);
             } else if (category === "Moons") {
                 selected = epoch_data.moon_phase?.[values[0]];
                 cond_1 = Number(values[subcon[2]]);

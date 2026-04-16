@@ -51,6 +51,7 @@ import { toast } from 'sonner'
 
 // Fantasy Calendar Library Imports
 import { Climate } from '@/lib/fantasy-calendar/climate'
+import { EventEvaluator } from '@/lib/fantasy-calendar/events'
 import { Random } from '@/lib/fantasy-calendar/random'
 import { precisionRound, clone } from '@/lib/fantasy-calendar/utils'
 
@@ -142,6 +143,8 @@ interface FantasyCalendarJSON {
             first_day?: number;
         };
     };
+    events?: any[];
+    event_categories?: any[];
 }
 
 interface WorldCalendarProps {
@@ -418,6 +421,19 @@ export default function WorldCalendar({
         }
     }
 
+    const getYearDay = useMemo(() => (y: number, m: number, d: number) => {
+        if (!calendar) return 0;
+        let day = 0;
+        for (let i = 0; i < m; i++) {
+            day += calendar.static_data.months[i]?.length || 30;
+            calendar.static_data.year_data?.leap_days?.forEach((ld: any) => {
+                if (ld.timespan === i && isLeapYear(y, ld)) day += 1;
+            });
+        }
+        day += d;
+        return day;
+    }, [calendar]);
+
     const epochData = useMemo(() => {
         if (!calendar) return {};
         
@@ -439,7 +455,13 @@ export default function WorldCalendar({
                 epoch,
                 year: viewYear,
                 timespan_index: viewMonth,
+                timespan_number: viewMonth + 1,
+                timespan_name: currentMonth.name,
                 day: d,
+                year_day: getYearDay(viewYear, viewMonth, d),
+                inverse_day: (currentMonth.length || 30) - d + 1,
+                intercalary: currentMonth.type === 'intercalary',
+                week_day: weekdayIndex + 1,
                 week_day_name: calendar.static_data.weekdays[weekdayIndex],
                 moon_phase: (calendar.static_data.moons || []).map(moon => getMoonPhase(moon, epoch))
             };
@@ -449,6 +471,37 @@ export default function WorldCalendar({
         if (calendar.static_data.seasons) {
             const climate = new Climate(data, calendar.static_data, calendar.dynamic_data, startEpoch, startEpoch + currentMonth.length - 1);
             climate.generate();
+        }
+
+        // Evaluate Events
+        if (calendar.events && calendar.events.length > 0) {
+            const eventEvaluator = new EventEvaluator(
+                calendar.static_data,
+                calendar.dynamic_data,
+                calendar.events,
+                calendar.event_categories || [],
+                data
+            );
+            const evaluated = eventEvaluator.evaluate(startEpoch, endEpoch + 1);
+            
+            // Map evaluated events back to days
+            Object.entries(evaluated.valid).forEach(([eventIndexStr, epochs]) => {
+                const eventIndex = parseInt(eventIndexStr);
+                const event = calendar.events![eventIndex];
+                if (event.settings?.hide) return;
+
+                const category = (calendar.event_categories || []).find(c => c.id === event.event_category_id);
+                
+                (epochs as number[]).forEach(epoch => {
+                    if (data[epoch]) {
+                        if (!data[epoch].events) data[epoch].events = [];
+                        data[epoch].events.push({
+                            ...event,
+                            category
+                        });
+                    }
+                });
+            });
         }
 
         return data;
@@ -804,6 +857,15 @@ export default function WorldCalendar({
                                                 {d}
                                             </span>
 
+                                            {/* Event indicators */}
+                                            {epochData[calculateEpoch(viewYear, viewMonth, d)]?.events?.length > 0 && (
+                                                <div className="absolute top-1 left-1 flex gap-0.5">
+                                                    {epochData[calculateEpoch(viewYear, viewMonth, d)].events.slice(0, 3).map((_: any, ei: number) => (
+                                                        <div key={ei} className="w-1 h-1 rounded-full bg-amber-500/60" />
+                                                    ))}
+                                                </div>
+                                            )}
+
                                             {/* Moons in corner */}
                                             <div className="absolute top-0 right-0 p-0.5 flex flex-col items-end gap-0.5 opacity-40 group-hover:opacity-100 transition-opacity">
                                                 {calendar.static_data.moons?.filter(m => !m.hidden).map((moon, mi) => {
@@ -882,7 +944,27 @@ export default function WorldCalendar({
                                                     })}
                                                 </div>
                                             )}
-                                            {dayLanes.length === 0 && <p className="text-[10px] text-muted-foreground italic text-center py-2">No sessions</p>}
+
+                                            {epochData[calculateEpoch(viewYear, viewMonth, d)]?.events?.length > 0 && (
+                                                <div className="space-y-1">
+                                                    <p className="text-[9px] font-black uppercase text-amber-500 ml-1 mb-1">Events</p>
+                                                    {epochData[calculateEpoch(viewYear, viewMonth, d)].events.map((event: any, ei: number) => (
+                                                        <div key={ei} className="px-2 py-1 bg-amber-500/5 rounded border border-amber-500/10 text-[10px] font-medium flex flex-col gap-0.5">
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="text-amber-700 dark:text-amber-400">{event.name}</span>
+                                                                {event.category && (
+                                                                    <span className="text-[8px] opacity-50 px-1 rounded-sm bg-amber-500/10 uppercase">{event.category.name}</span>
+                                                                )}
+                                                            </div>
+                                                            {event.description && (
+                                                                <div className="text-[9px] text-muted-foreground italic leading-tight" dangerouslySetInnerHTML={{ __html: event.description }} />
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            
+                                            {dayLanes.length === 0 && !epochData[calculateEpoch(viewYear, viewMonth, d)]?.events?.length && <p className="text-[10px] text-muted-foreground italic text-center py-2">No activities</p>}
                                             
                                             {dayLanes.length > 0 && (
                                                 <div className="space-y-1">
