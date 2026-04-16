@@ -197,7 +197,7 @@ export default function SessionManagement({
                             {session.inGameDate.endDay && (
                                 <span className="text-[10px] text-muted-foreground">
                                     to {session.inGameDate.era 
-                                        ? `${session.inGameDate.endYear ?? session.inGameDate.year}/${String(session.inGameDate.endMonth! + 1).padStart(2, '0')}/${String(session.inGameDate.endDay).padStart(2, '0')} ${session.inGameDate.era}`
+                                        ? `${session.inGameDate.endYear ?? session.inGameDate.year}/${String(session.inGameDate.endMonth! + 1).padStart(2, '0')}/${String(session.inGameDate.day).padStart(2, '0')} ${session.inGameDate.era}`
                                         : `${formatInGameYear(session.inGameDate.endYear ?? session.inGameDate.year, eras, yearZeroExists)}/${String(session.inGameDate.endMonth! + 1).padStart(2, '0')}/${String(session.inGameDate.endDay).padStart(2, '0')}`
                                     }
                                 </span>
@@ -281,7 +281,7 @@ export default function SessionManagement({
                             </div>
                         </div>
                         <div className="flex justify-between items-center mt-4">
-                            <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => onUpdateInGameDate(undefined)}>
+                            <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => onUpdateInGameDate(undefined)} disabled={session.locked}>
                                 Clear Date
                             </Button>
                             <div className="flex gap-2">

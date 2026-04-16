@@ -453,11 +453,11 @@ export default function SessionClient() {
   );
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,672px)_320px] 2xl:grid-cols-[1fr_672px_1fr] gap-8 justify-center flex-1 w-full">
+    <div className="min-h-screen bg-background flex flex-col px-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] 2xl:grid-cols-[1fr_672px_1fr] gap-8 justify-center flex-1 w-full max-w-[1600px] mx-auto">
         {/* Header row spanning all columns */}
-        <header className="col-span-full px-4 py-8">
-            <div className="max-w-[1400px] mx-auto flex justify-between items-center">
+        <header className="col-span-full py-8">
+            <div className="flex justify-between items-center w-full">
                 <Button variant="ghost" size="sm" className="sm:px-3 sm:w-auto w-9 px-0" asChild>
                     <Link href="/">
                         <ChevronLeft className="h-4 w-4 sm:mr-2" />
