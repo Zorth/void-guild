@@ -1,13 +1,14 @@
 'use client'
 
-import { Authenticated, Unauthenticated, AuthLoading } from 'convex/react'
+import { Authenticated, Unauthenticated, AuthLoading, useQuery } from 'convex/react'
+import { api } from '@/convex/_generated/api'
 import { SignInButton, UserButton } from '@clerk/nextjs'
 import Characters from '@/components/characters/Characters'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Trophy, Book } from 'lucide-react'
+import { Trophy, Book, Globe } from 'lucide-react'
 import ActivityFeed from '@/components/ActivityFeed'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -22,6 +23,9 @@ export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
   const [rotation, setRotation] = useState(0)
   const [velocity, setVelocity] = useState(0)
   const lastClickTime = useRef<number>(0)
+
+  const isGM = useQuery(api.sessions.isGameMasterQuery)
+  const ownedWorld = useQuery(api.worlds.getWorldByOwner)
 
   const handleLogoClick = () => {
     const now = Date.now()
@@ -111,6 +115,17 @@ export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
                 <span className="hidden sm:inline">Stats</span>
               </Button>
             </Link>
+            {(isGM || ownedWorld) && (
+              <Link href={ownedWorld ? `/world/${encodeURIComponent(ownedWorld.name)}` : "/world"}>
+                <Button variant="outline" size="sm" className={cn(
+                  "flex items-center gap-2 h-9 w-9 sm:w-auto sm:px-3 p-0",
+                  ownedWorld && "border-amber-500/50 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+                )}>
+                  <Globe className="h-4 w-4" />
+                  <span className="hidden sm:inline">{ownedWorld ? "Your World" : "Worlds"}</span>
+                </Button>
+              </Link>
+            )}
             <ThemeToggle />
             <UserButton />
           </div>

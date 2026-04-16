@@ -241,7 +241,7 @@ export default function Characters({ filters }: { filters?: { pf: boolean, dnd: 
           </CardContent>
         </Card>
 
-        {/* World Management Actions */}
+        {/* World Management Actions - Back at bottom */}
         <div className="flex flex-col gap-3 mt-6 w-full">
           <Link href="/world" className="w-full">
             <Button variant="default" className="w-full flex items-center justify-center gap-3 h-12 text-md font-bold shadow-md hover:shadow-lg transition-all rounded-xl">
