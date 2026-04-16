@@ -384,6 +384,15 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
         }
     }, [items.length, currentIndex, round])
 
+    const handleReset = () => {
+        const sessionCharacterIds = new Set(characters.map(c => c.id))
+        const resetItems = items.filter(item => sessionCharacterIds.has(item.id))
+        setItems(resetItems)
+        setCurrentIndex(0)
+        setRound(1)
+        toast.info("Initiative reset to session players")
+    }
+
     const addItem = () => {
         if (!newName.trim()) return
         const newItem = { id: `custom-${Date.now()}`, name: newName.trim() }
@@ -597,9 +606,14 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
                                 </div>
                             </div>
                         ) : (
-                            <Button variant="ghost" className="h-9 border border-dashed border-border/50 hover:border-border hover:bg-muted/30 text-muted-foreground text-xs" onClick={() => setIsAdding(true)}>
-                                <Plus className="h-3 w-3 mr-2" /> Add Entry
-                            </Button>
+                            <div className="flex gap-2">
+                                <Button variant="ghost" className="h-9 flex-grow border border-dashed border-border/50 hover:border-border hover:bg-muted/30 text-muted-foreground text-xs" onClick={() => setIsAdding(true)}>
+                                    <Plus className="h-3 w-3 mr-2" /> Add Entry
+                                </Button>
+                                <Button variant="ghost" className="h-9 px-3 border border-dashed border-border/50 hover:border-destructive hover:bg-destructive/5 hover:text-destructive text-muted-foreground text-xs" onClick={handleReset}>
+                                    Reset
+                                </Button>
+                            </div>
                         )}
                     </motion.div>
                 )}
