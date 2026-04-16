@@ -119,7 +119,7 @@ export default function SessionClient() {
             session.attendingCharacters.forEach(c => userIds.add(c.userId));
         }
         if (session.interestedPlayers) {
-            session.interestedPlayers.forEach(p => userIds.add(p.userId));
+            session.interestedPlayers.forEach(p => p.userId.startsWith('user_') ? userIds.add(p.userId) : null);
         }
         if (userIds.size > 0) {
             getUsernames(Array.from(userIds)).then(setUserMetadata);
@@ -337,7 +337,7 @@ export default function SessionClient() {
 
   const calendarLink = getGoogleCalendarLink()
 
-  const isOwnerOrAdmin = session.isOwner || isAdmin;
+  const isOwnerOrAdmin = session.isOwner || !!isAdmin;
 
   const rightColumnContent = (
     <div className="space-y-8">
@@ -454,7 +454,7 @@ export default function SessionClient() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col px-4">
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] 2xl:grid-cols-[1fr_672px_1fr] gap-8 justify-center flex-1 w-full max-w-[1600px] mx-auto">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[1fr_672px_1fr] gap-8 justify-center flex-1 w-full max-w-[1600px] mx-auto">
         {/* Header row spanning all columns */}
         <header className="col-span-full py-8">
             <div className="flex justify-between items-center w-full">
@@ -512,7 +512,7 @@ export default function SessionClient() {
                             </a>
                         </Button>
                     )}
-                    {isAdmin && session.locked && (
+                    {(isAdmin || session.isOwner) && session.locked && (
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
                                 <Button variant="destructive" size="sm" className="sm:px-3 sm:w-auto w-9 px-0">
@@ -521,22 +521,38 @@ export default function SessionClient() {
                                 </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>Are you sure you want to unlock the session?</AlertDialogTitle>
-                                    <AlertDialogDescription className="text-destructive font-bold">
-                                        This will undo XP given to characters in this session.
-                                        WARNING: This will break XP values if this isn&apos;t the latest session for these characters.
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter className="flex-wrap justify-end">
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={handleUnlock} variant="destructive">
-                                        Unlock (Revert XP)
-                                    </AlertDialogAction>
-                                    <AlertDialogAction onClick={handleForceUnlock} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
-                                        Force Unlock (Keep XP)
-                                    </AlertDialogAction>
-                                </AlertDialogFooter>                    
+                                {isAdmin ? (
+                                    <>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Admin: Unlock Session</AlertDialogTitle>
+                                            <AlertDialogDescription className="text-destructive font-bold">
+                                                Choose how to unlock this session.
+                                                WARNING: Reverting XP will break current XP values if this isn&apos;t the latest session for these characters.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter className="flex-wrap justify-end">
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={handleUnlock} variant="destructive">
+                                                Unlock (Revert XP)
+                                            </AlertDialogAction>
+                                            <AlertDialogAction onClick={handleForceUnlock} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                                                Force Unlock (Keep XP)
+                                            </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </>
+                                ) : (
+                                    <>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Unlock Restricted</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                Only Guild Admins can unlock a session once it has been finalized.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Close</AlertDialogCancel>
+                                        </AlertDialogFooter>
+                                    </>
+                                )}
                             </AlertDialogContent>
                         </AlertDialog>
                     )}

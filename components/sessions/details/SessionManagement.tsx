@@ -444,7 +444,7 @@ export default function SessionManagement({
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        ) : isAdmin && (
+        ) : (session.isOwner || isAdmin) && (
             <AlertDialog>
                 <AlertDialogTrigger asChild>
                     <Button variant="destructive" className="w-full justify-start">
@@ -453,22 +453,38 @@ export default function SessionManagement({
                     </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure you want to unlock the session?</AlertDialogTitle>
-                        <AlertDialogDescription className="text-destructive font-bold">
-                            This will undo XP given to characters in this session.
-                            WARNING: This will break XP values if this isn&apos;t the latest session for these characters.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter className="flex-wrap justify-end">
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={onUnlock} variant="destructive">
-                            Unlock (Revert XP)
-                        </AlertDialogAction>
-                        <AlertDialogAction onClick={onForceUnlock} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
-                            Force Unlock (Keep XP)
-                        </AlertDialogAction>
-                    </AlertDialogFooter>                    
+                    {isAdmin ? (
+                        <>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Admin: Unlock Session</AlertDialogTitle>
+                                <AlertDialogDescription className="text-destructive font-bold">
+                                    Choose how to unlock this session.
+                                    WARNING: Reverting XP will break current XP values if this isn&apos;t the latest session for these characters.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter className="flex-wrap justify-end">
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={onUnlock} variant="destructive">
+                                    Unlock (Revert XP)
+                                </AlertDialogAction>
+                                <AlertDialogAction onClick={onForceUnlock} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                                    Force Unlock (Keep XP)
+                                </AlertDialogAction>
+                            </AlertDialogFooter>                    
+                        </>
+                    ) : (
+                        <>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Unlock Restricted</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Only Guild Admins can unlock a session once it has been finalized.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Close</AlertDialogCancel>
+                            </AlertDialogFooter>
+                        </>
+                    )}
                 </AlertDialogContent>
             </AlertDialog>
         )}
