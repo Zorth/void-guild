@@ -62,6 +62,7 @@ export default function SessionManagement({
     year: session.inGameDate?.year ?? currentWorldDate?.year ?? 1,
     month: session.inGameDate?.month ?? currentWorldDate?.month ?? 0,
     day: session.inGameDate?.day ?? currentWorldDate?.day ?? 1,
+    era: session.inGameDate?.era ?? '',
     hasEnd: !!session.inGameDate?.endDay,
     endYear: session.inGameDate?.endYear ?? session.inGameDate?.year ?? currentWorldDate?.year ?? 1,
     endMonth: session.inGameDate?.endMonth ?? session.inGameDate?.month ?? currentWorldDate?.month ?? 0,
@@ -73,6 +74,7 @@ export default function SessionManagement({
         year: tempDate.year,
         month: tempDate.month,
         day: tempDate.day,
+        era: tempDate.era || undefined,
         endYear: tempDate.hasEnd ? tempDate.endYear : undefined,
         endMonth: tempDate.hasEnd ? tempDate.endMonth : undefined,
         endDay: tempDate.hasEnd ? tempDate.endDay : undefined,
@@ -168,11 +170,11 @@ export default function SessionManagement({
                     {session.inGameDate ? (
                         <div className="flex flex-col">
                             <span className="font-medium text-primary">
-                                Day {session.inGameDate.day}, Month {session.inGameDate.month + 1}, Year {session.inGameDate.year}
+                                {session.inGameDate.year}/{String(session.inGameDate.month + 1).padStart(2, '0')}/{String(session.inGameDate.day).padStart(2, '0')}{session.inGameDate.era && ` ${session.inGameDate.era}`}
                             </span>
                             {session.inGameDate.endDay && (
                                 <span className="text-[10px] text-muted-foreground">
-                                    to Day {session.inGameDate.endDay}, Month {session.inGameDate.endMonth + 1}, Year {session.inGameDate.endYear}
+                                    to {session.inGameDate.endYear}/{String(session.inGameDate.endMonth! + 1).padStart(2, '0')}/{String(session.inGameDate.endDay).padStart(2, '0')}{session.inGameDate.era && ` ${session.inGameDate.era}`}
                                 </span>
                             )}
                         </div>
@@ -198,18 +200,22 @@ export default function SessionManagement({
                                 <h5 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 border-b pb-1">
                                     <Clock className="h-3 w-3" /> Start Date
                                 </h5>
-                                <div className="grid grid-cols-3 gap-2">
+                                <div className="grid grid-cols-4 gap-2">
                                     <div className="space-y-1">
                                         <label className="text-[9px] font-bold uppercase ml-1">Day</label>
                                         <Input type="number" className="h-8 text-xs" value={tempDate.day} onChange={e => setTempDate({...tempDate, day: parseInt(e.target.value)})} />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[9px] font-bold uppercase ml-1">Month (1-indexed)</label>
+                                        <label className="text-[9px] font-bold uppercase ml-1">Month</label>
                                         <Input type="number" className="h-8 text-xs" value={tempDate.month + 1} onChange={e => setTempDate({...tempDate, month: parseInt(e.target.value) - 1})} />
                                     </div>
                                     <div className="space-y-1">
                                         <label className="text-[9px] font-bold uppercase ml-1">Year</label>
                                         <Input type="number" className="h-8 text-xs" value={tempDate.year} onChange={e => setTempDate({...tempDate, year: parseInt(e.target.value)})} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[9px] font-bold uppercase ml-1">Era</label>
+                                        <Input type="text" className="h-8 text-xs" placeholder="e.g. 2E" value={tempDate.era} onChange={e => setTempDate({...tempDate, era: e.target.value})} />
                                     </div>
                                 </div>
                             </div>

@@ -337,457 +337,490 @@ export default function SessionClient() {
 
   const calendarLink = getGoogleCalendarLink()
 
-  return (
-    <div className={cn("container mx-auto px-4 py-8", (session.isOwner || isAdmin) ? "max-w-7xl" : "max-w-4xl")}>
-      {userId === session.owner && (
+  const isOwnerOrAdmin = session.isOwner || isAdmin;
+
+  const rightColumnContent = (
+    <div className="space-y-8">
+      {userId !== session.owner ? (
         <>
-          {/* Desktop Fixed Sidebar */}
-          <aside className="hidden 2xl:block fixed left-4 top-32 w-48 z-40">
-            <ToolSidebar 
-                sessionId={session._id} 
-                worldName={session.worldName}
-                characters={session.attendingCharacters.map(c => ({ id: c._id, name: c.name }))} 
-            />
-          </aside>
-        </>
-      )}
-      <div className="flex justify-between items-center mb-6">
-        <Button variant="ghost" size="sm" className="sm:px-3 sm:w-auto w-9 px-0" asChild>
-          <Link href="/">
-            <ChevronLeft className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Back to Home</span>
-          </Link>
-        </Button>
-        <div className="flex gap-2">
-            {userId === session.owner && (
-              <div className="2xl:hidden">
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="sm:px-3 sm:w-auto w-9 px-0">
-                      <Menu className="h-4 w-4 sm:mr-2" />
-                      <span className="hidden sm:inline">Voidmaster Tools</span>
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-none w-screen h-[100dvh] m-0 rounded-none p-0 overflow-hidden bg-background border-none flex flex-col">
-                    <DialogHeader className="p-4 pt-[calc(1rem+env(safe-area-inset-top))] border-b bg-muted/30 shrink-0">
-                      <DialogTitle className="flex items-center gap-2">
-                        <Shield className="h-4 w-4" />
-                        Voidmaster Tools
-                      </DialogTitle>
-                      <DialogDescription>
-                        Manage your session, initiative, and world clock.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="p-4 flex-grow overflow-y-auto">
-                      <div className="max-w-md mx-auto">
-                        <ToolSidebar 
-                            sessionId={session._id} 
-                            worldName={session.worldName}
-                            characters={session.attendingCharacters.map(c => ({ id: c._id, name: c.name }))} 
-                        />
-                      </div>
-                    </div>
-                    <DialogFooter className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] border-t bg-muted/30 shrink-0">
-                      <DialogClose asChild>
-                        <Button variant="secondary" className="w-full h-12 text-lg font-bold">Close Tools</Button>
-                      </DialogClose>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              </div>
-            )}
-            {calendarLink && (
-                <Button variant="outline" size="sm" asChild className="sm:px-3 sm:w-auto w-9 px-0">
-                    <a href={calendarLink} target="_blank" rel="noopener noreferrer">
-                        <Calendar className="h-4 w-4 sm:mr-2" />
-                        <span className="hidden sm:inline">Add to Calendar</span>
-                    </a>
-                </Button>
-            )}
-            {isAdmin && session.locked && (
-                <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                        <Button variant="destructive" size="sm" className="sm:px-3 sm:w-auto w-9 px-0">
-                            <Unlock className="h-4 w-4 sm:mr-2" />
-                            <span className="hidden sm:inline">Unlock Session</span>
-                        </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>Are you sure you want to unlock the session?</AlertDialogTitle>
-                            <AlertDialogDescription className="text-destructive font-bold">
-                                This will undo XP given to characters in this session.
-                                WARNING: This will break XP values if this isn&apos;t the latest session for these characters.
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter className="flex-wrap justify-end">
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleUnlock} variant="destructive">
-                                Unlock (Revert XP)
-                            </AlertDialogAction>
-                            <AlertDialogAction onClick={handleForceUnlock} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
-                                Force Unlock (Keep XP)
-                            </AlertDialogAction>
-                        </AlertDialogFooter>                    </AlertDialogContent>
-                </AlertDialog>
-            )}
-        </div>
-      </div>
-
-      <div className="w-full">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
-            <div className="md:col-span-9 space-y-8">
-          <Card className={session.locked ? "border-amber-200 bg-amber-50/10" : session.planning ? "border-purple-200 bg-purple-50/10" : ""}>
-            <CardHeader>
-              <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-                <div className="space-y-4 flex-grow">
-                  <div>
-                    <CardTitle className="text-3xl font-bold flex flex-wrap items-center gap-3">
-                        <span>{session.worldName}</span>
-                        <div className="flex items-center gap-2 shrink-0">
-                            {session.locked && <LockIcon className="h-5 w-5 text-amber-500" />}
-                            {session.planning && <div className="text-[10px] bg-purple-600 text-white px-2 py-0.5 rounded-full uppercase tracking-widest font-black shadow-sm">Planning</div>}
-                            <a 
-                                href={`https://void.tarragon.be/Session-Reports/${session.date ? new Date(session.date).toISOString().slice(0, 10) : 'TBD'}-${session.worldName.replace(/\s+/g, '-')}`} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="text-muted-foreground hover:text-purple-500"
-                                onClick={() => track('session_report_viewed', { worldName: session.worldName })}
-                            >
-                                <Book size={20} />
-                            </a>
-                            <Link 
-                                href={`/world/${encodeURIComponent(session.worldName)}`}
-                                className="text-muted-foreground hover:text-purple-500"
-                                title="View World Details"
-                            >
-                                <Globe size={20} />
-                            </Link>
-                        </div>
+          <Authenticated>
+            {!hasUserCharacterInSession && (
+                <Card className={session.planning ? "border-purple-200 bg-purple-50/20" : ""}>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                        Interested?
+                        {session.planning && <div className="text-[8px] bg-purple-600 text-white px-1.5 py-0.5 rounded-full uppercase tracking-widest font-black">Planning</div>}
                     </CardTitle>
-                    <div className="text-lg text-muted-foreground mt-1">
-                        {session.date ? (
-                            <>{formatDate(new Date(session.date))} at {formatTimeUtil(new Date(session.date))}</>
-                        ) : (
-                            <span className="italic">Date and Time TBD</span>
-                        )}
+                </CardHeader>
+                <CardContent>
+                    {session.locked ? (
+                    <div className="text-sm text-muted-foreground italic text-center p-4 bg-muted/30 rounded-md">
+                        This session has ended.
                     </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    {session.date ? (
-                        <div className="space-y-1">
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <Clock className="h-4 w-4 shrink-0" />
-                                <span>Please arrive between {formatTimeUtil(new Date(session.date))} and {formatTimeUtil(new Date(session.date + 30 * 60 * 1000))}</span>
-                            </div>
-                            <p className="text-[10px] text-muted-foreground ml-6 italic">Session starts at second listed time.</p>
-                        </div>
                     ) : (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Clock className="h-4 w-4 shrink-0" />
-                            <span>Arrival time will be announced once a date is set.</span>
-                        </div>
-                    )}
-                    {session.location && (
-                        <div className="flex items-center gap-2 text-sm text-primary hover:underline">
-                            <MapPin className="h-4 w-4 shrink-0" />
-                            <a href={session.location} target="_blank" rel="noopener noreferrer">
-                                View session location on Google Maps
-                            </a>
-                        </div>
-                    )}
-                  </div>
-
-                  <div className="mt-2 flex gap-2 flex-wrap items-center">
-                    <div className="flex items-center gap-2 bg-secondary px-2 py-0.5 rounded-md whitespace-nowrap">
-                        <span className="text-sm font-medium">
-                            Session Level {session.level ?? 'TBD'}
-                        </span>
-                        {session.system && (
-                            <img 
-                                src={session.system === 'PF' ? '/PFVoid.svg' : '/DnDVoid.svg'} 
-                                alt={session.system} 
-                                className="h-4 w-4"
-                            />
+                    <div className="space-y-4">
+                        {session.planning ? (
+                            <div className="text-sm text-purple-700 dark:text-purple-300 italic text-center p-4 bg-purple-500/10 rounded-md">
+                                This session is in <b>planning</b>. Let the Voidmaster know you&apos;re interested!
+                            </div>
+                        ) : isFull && !currentInterestedPlayers?.some(p => p.userId === userId) && (
+                            <div className="text-sm text-destructive italic text-center p-4 bg-destructive/5 rounded-md">
+                                This session is currently full, but you can still express interest.
+                            </div>
                         )}
-                    </div>
-                    {session.isOwner && session.gmCharacterData && (
-                        <span className="text-sm font-medium px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded-md flex items-center gap-1 whitespace-nowrap">
-                            <Shield className="h-3 w-3" /> GM: {session.gmCharacterData.name}
-                            {session.gmCharacterData.system && (
-                                <img 
-                                    src={session.gmCharacterData.system === 'PF' ? '/PFVoid.svg' : '/DnDVoid.svg'} 
-                                    alt={session.gmCharacterData.system} 
-                                    className="h-3.5 w-3.5 ml-0.5"
-                                />
-                            )}
-                        </span>
-                    )}
-                  </div>
-                </div>
-                <div className="bg-muted px-3 py-1 rounded-full text-sm font-semibold whitespace-nowrap self-start">
-                    {session.attendingCharacters.length} / {session.maxPlayers} Players
-                </div>
-              </div>
-              {session.locked && (
-                <div className="mt-4 p-3 bg-amber-100/50 border border-amber-200 rounded-md text-sm text-amber-700 font-medium flex items-center gap-2">
-                    <LockIcon className="h-4 w-4" /> 
-                    <span>This session has ended. Participating characters have been awarded XP.</span>
-                </div>
-              )}
-            </CardHeader>
-
-            {session.quest && (() => {
-                const q = session.quest;
-                const levelPF = q.levelPF ?? (q.levelDnD === undefined ? q.level : undefined);
-                const levelDnD = q.levelDnD;
-                const isDual = levelPF !== undefined && levelDnD !== undefined;
-
-                return (
-                    <div className="px-6 pb-6">
-                        <div className="bg-primary/5 border border-primary/20 rounded-lg overflow-hidden">
-                            <div className="bg-primary/10 px-4 py-2 border-b border-primary/20 flex items-center justify-between">
-                                <div className="flex items-center gap-2 font-bold text-sm">
-                                    <Scroll className="h-4 w-4 text-primary" />
-                                    Active Quest
-                                </div>
-                                <div 
-                                    className="flex items-center justify-center rounded-full font-bold h-6 w-6 text-[10px]"
-                                    style={getDualLevelBadgeStyle(levelPF, levelDnD)}
-                                >
-                                    {isDual ? 'V' : (levelPF ?? levelDnD ?? 0) > 0 ? (levelPF ?? levelDnD) : '?'}
-                                </div>
-                            </div>
-                            <div className="p-4 space-y-3">
-                                <h4 className="font-bold text-lg">{q.name}</h4>
-                                {q.description && (
-                                    <div className="text-sm text-muted-foreground leading-relaxed [&_>_*:first-child]:mt-0 [&>p]:mt-2 [&>ul]:list-disc [&>ul]:pl-4 [&>ul]:mt-2 [&>ol]:list-decimal [&>ol]:pl-4 [&>ol]:mt-2 [&>blockquote]:border-l-4 [&>blockquote]:pl-4 [&>blockquote]:italic [&>blockquote]:mt-2 [&_a]:text-primary [&_a]:underline">
-                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                            {q.description}
-                                        </ReactMarkdown>
-                                    </div>
-                                )}
-                                <div className="flex flex-wrap gap-4 pt-1">
-                                    {q.reward && (
-                                        <div className="flex items-start gap-2 text-xs">
-                                            <Trophy className="h-3.5 w-3.5 text-yellow-500 shrink-0" />
-                                            <span><span className="font-bold text-muted-foreground uppercase mr-1">Reward:</span> {q.reward}</span>
-                                        </div>
-                                    )}
-                                    {isDual && (
-                                        <div className="flex items-center gap-1 bg-muted/50 px-2 py-0.5 rounded text-[10px] font-bold border border-border/20">
-                                            <img src="/PFVoid.svg" alt="PF" className="h-3 w-3 mr-0.5" />
-                                            <span 
-                                                className="inline-flex items-center justify-center rounded-full w-4 h-4 text-[8px]"
-                                                style={getLevelBadgeStyle(levelPF)}
-                                            >
-                                                {levelPF}
-                                            </span>
-                                            <img src="/DnDVoid.svg" alt="DnD" className="h-3 w-3 ml-1.5 mr-0.5" />
-                                            <span 
-                                                className="inline-flex items-center justify-center rounded-full w-4 h-4 text-[8px]"
-                                                style={getLevelBadgeStyle(levelDnD)}
-                                            >
-                                                {levelDnD}
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                );
-            })()}
-
-            <CardContent>
-              <h3 className="text-xl font-semibold mb-4 flex items-center justify-between">
-                Attending Characters
-                {isAdmin && (
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" size="sm" className="ml-2 h-7 w-7 p-0">
-                        +
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
-                      <DialogHeader>
-                        <DialogTitle>Admin: Add Character</DialogTitle>
-                        <DialogDescription>Select a character to add to this session.</DialogDescription>
-                      </DialogHeader>
-                      <div className="grid gap-4 py-4">
-                        {session.locked ? (
-                          <p className="text-sm text-muted-foreground italic text-center p-4 bg-muted/30 rounded-md">This session has ended.</p>
-                        ) : isFull ? (
-                          <p className="text-sm text-destructive italic text-center p-4 bg-destructive/5 rounded-md">This session is full, cannot add more.</p>
-                        ) : allCharacters && allCharacters.length > 0 ? (
-                          <div className="space-y-4">
-                            <div className="flex flex-col gap-2">
-                              <label htmlFor="admin-character-select" className="text-sm font-medium">Select Character</label>
-                              <select
-                                id="admin-character-select"
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                value={selectedAdminCharacterId}
-                                onChange={(e) => setSelectedAdminCharacterId(e.target.value as Id<'characters'>)}
-                              >
-                                <option value="">-- Choose a character --</option>
-                                {adminAvailableCharacters.map((char) => (
-                                  <option key={char._id} value={char._id}>{char.name} (Lvl {char.lvl})</option>
-                                ))}
-                              </select>
-                            </div>
-                            <Button className="w-full" disabled={!selectedAdminCharacterId} onClick={handleAdminAddCharacter}>Add Character (Admin)</Button>
-                          </div>
+                        {currentInterestedPlayers?.some(p => p.userId === userId) ? (
+                        <Button className="w-full" variant="outline" onClick={handleWithdrawInterest} disabled={isExpressingInterest}>
+                            {isExpressingInterest ? 'Updating...' : 'Not anymore :('}
+                        </Button>
                         ) : (
-                          <p className="text-sm text-muted-foreground italic text-center p-4 bg-muted/10 rounded-md">No characters available to add.</p>
+                        <Button className="w-full" onClick={handleExpressInterest} disabled={isExpressingInterest} variant={session.planning ? "default" : "outline"}>
+                            {isExpressingInterest ? 'Updating...' : 'Yes! :)'}
+                        </Button>
                         )}
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+                    </div>
+                    )}
+                </CardContent>
+                </Card>
                 )}
-              </h3>
-              <AttendingCharactersList 
-                characters={session.attendingCharacters}
-                userCharacterIds={userCharacterIds}
+
+                <SessionJoinForm 
                 sessionLocked={session.locked}
                 sessionPlanning={session.planning}
-                isSessionOwner={session.isOwner}
-                onLeave={handleLeave}
-                userMetadata={userMetadata}
-                leavingCharacterId={leavingCharacterId}
-              />
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xl font-semibold mb-4">Interested Players</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <InterestedPlayersList 
-                interestedPlayers={currentInterestedPlayers} 
-                userMetadata={userMetadata}
-              />
-            </CardContent>
-          </Card>
+                isFull={isFull}
+                availableCharacters={availableCharacters}
+                userCharactersCount={userCharacters?.length ?? 0}
+                selectedCharacterId={selectedCharacterId}
+                hasUserCharacterInSession={hasUserCharacterInSession}
+                onCharacterSelect={(id) => setSelectedCharacterId(id)}
+                onJoin={handleJoin}
+                isJoining={isJoining}
+                />
+          </Authenticated>
 
-          <ReputationSystem 
-            worldId={session.world} 
-            worldName={session.worldName} 
-            charactersInSession={session.characters}
+          <Unauthenticated>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Join the Void</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">
+                        Sign in to join this session, express interest, or manage your characters.
+                    </p>
+                    <SignInButton mode="modal">
+                        <Button className="w-full">Sign In / Sign Up</Button>
+                    </SignInButton>
+                </CardContent>
+            </Card>
+          </Unauthenticated>
+        </>
+      ) : (
+        (session.isOwner || isAdmin) && !session.locked && (
+          <SessionManagement 
+              session={session}
+              isAdmin={isAdmin}
+              quests={worldQuests}
+              currentWorldDate={currentWorldDate}
+              onSelectQuest={async (questId) => {
+                if (session?._id) {
+                  await selectQuest({ sessionId: session._id, questId });
+                  toast.success(questId ? "Quest selected" : "Quest removed");
+                }
+              }}
+              onUpdateInGameDate={async (inGameDate) => {
+                if (session?._id) {
+                  await updateInGameDate({ sessionId: session._id, inGameDate });
+                  toast.success("In-game date updated");
+                }
+              }}
+              onSendToDiscord={handleSendToDiscord}
+              onLock={handleLock}
+              onForceLock={handleForceLock}
+              xpGainsPreview={xpGainsPreview || []}
           />
-        </div>
+        )
+      )}
 
-        <div className="md:col-span-3 space-y-8">
-          {(session.isOwner || isAdmin) && !session.locked && (
-            <SessionManagement 
-                session={session}
-                isAdmin={isAdmin}
-                quests={worldQuests}
-                currentWorldDate={currentWorldDate}
-                onSelectQuest={async (questId) => {
-                  if (session?._id) {
-                    await selectQuest({ sessionId: session._id, questId });
-                    toast.success(questId ? "Quest selected" : "Quest removed");
-                  }
-                }}
-                onUpdateInGameDate={async (inGameDate) => {
-                  if (session?._id) {
-                    await updateInGameDate({ sessionId: session._id, inGameDate });
-                    toast.success("In-game date updated");
-                  }
-                }}
-                onSendToDiscord={handleSendToDiscord}
-                onLock={handleLock}
-                onForceLock={handleForceLock}
-                xpGainsPreview={xpGainsPreview || []}
-            />
-          )}
-
-          {userId !== session.owner ? (
-            <>
-              <Authenticated>
-                {!hasUserCharacterInSession && (
-                    <Card className={session.planning ? "border-purple-200 bg-purple-50/20" : ""}>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            Interested?
-                            {session.planning && <div className="text-[8px] bg-purple-600 text-white px-1.5 py-0.5 rounded-full uppercase tracking-widest font-black">Planning</div>}
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {session.locked ? (
-                        <div className="text-sm text-muted-foreground italic text-center p-4 bg-muted/30 rounded-md">
-                            This session has ended.
-                        </div>
-                        ) : (
-                        <div className="space-y-4">
-                            {session.planning ? (
-                                <div className="text-sm text-purple-700 dark:text-purple-300 italic text-center p-4 bg-purple-500/10 rounded-md">
-                                    This session is in <b>planning</b>. Let the Voidmaster know you&apos;re interested to help them pick a date!
-                                </div>
-                            ) : isFull && !currentInterestedPlayers?.some(p => p.userId === userId) && (
-                                <div className="text-sm text-destructive italic text-center p-4 bg-destructive/5 rounded-md">
-                                    This session is currently full, but you can still express interest.
-                                </div>
-                            )}
-                            {currentInterestedPlayers?.some(p => p.userId === userId) ? (
-                            <Button className="w-full" variant="outline" onClick={handleWithdrawInterest} disabled={isExpressingInterest}>
-                                {isExpressingInterest ? 'Updating...' : 'Not anymore :('}
-                            </Button>
-                            ) : (
-                            <Button className="w-full" onClick={handleExpressInterest} disabled={isExpressingInterest} variant={session.planning ? "default" : "outline"}>
-                                {isExpressingInterest ? 'Updating...' : 'Yes! :)'}
-                            </Button>
-                            )}
-                        </div>                            )}
-                            </CardContent>
-                            </Card>
-                            )}
-
-                            <SessionJoinForm 
-                            sessionLocked={session.locked}
-                            sessionPlanning={session.planning}
-                            isFull={isFull}
-                            availableCharacters={availableCharacters}
-                            userCharactersCount={userCharacters?.length ?? 0}
-                            selectedCharacterId={selectedCharacterId}
-                            hasUserCharacterInSession={hasUserCharacterInSession}
-                            onCharacterSelect={(id) => setSelectedCharacterId(id)}
-                            onJoin={handleJoin}
-                            isJoining={isJoining}
-                            />              </Authenticated>
-
-              <Unauthenticated>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Join the Void</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-sm text-muted-foreground mb-4">
-                            Sign in to join this session, express interest, or manage your characters.
-                        </p>
-                        <SignInButton mode="modal">
-                            <Button className="w-full">Sign In / Sign Up</Button>
-                        </SignInButton>
-                    </CardContent>
-                </Card>
-              </Unauthenticated>
-            </>
-          ) : null}
-
-          <QuestList 
-            worldId={session?.world} 
-            worldOwner={world?.owner} 
-            isSidebar={true} 
-            filters={{ pf: session?.system === 'PF', dnd: session?.system === 'DnD' }} 
-          />
-        </div>
-      </div>
+      <QuestList 
+        worldId={session?.world} 
+        worldOwner={world?.owner} 
+        isSidebar={true} 
+        filters={{ pf: session?.system === 'PF', dnd: session?.system === 'DnD' }} 
+      />
     </div>
-      <div className="text-center mt-8 text-sm text-muted-foreground">
-        Thank you for playing with us!<br/>
-        We encourage tipping your <b className="text-primary">Voidmaster</b> for their hard work.
+  );
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      <div className="grid grid-cols-1 2xl:grid-cols-[1fr_672px_1fr] flex-1 w-full">
+        {/* Header row spanning all columns */}
+        <header className="col-span-full px-4 py-8">
+            <div className="max-w-[1400px] mx-auto flex justify-between items-center">
+                <Button variant="ghost" size="sm" className="sm:px-3 sm:w-auto w-9 px-0" asChild>
+                    <Link href="/">
+                        <ChevronLeft className="h-4 w-4 sm:mr-2" />
+                        <span className="hidden sm:inline">Back to Home</span>
+                    </Link>
+                </Button>
+                <div className="flex gap-2">
+                    {userId === session.owner && (
+                        <div className="2xl:hidden">
+                            <Dialog>
+                                <DialogTrigger asChild>
+                                    <Button variant="outline" size="sm" className="sm:px-3 sm:w-auto w-9 px-0">
+                                        <Menu className="h-4 w-4 sm:mr-2" />
+                                        <span className="hidden sm:inline">Voidmaster Tools</span>
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-none w-screen h-[100dvh] m-0 rounded-none p-0 overflow-hidden bg-background border-none flex flex-col">
+                                    <DialogHeader className="p-4 pt-[calc(1rem+env(safe-area-inset-top))] border-b bg-muted/30 shrink-0">
+                                        <DialogTitle className="flex items-center gap-2">
+                                            <Shield className="h-4 w-4" />
+                                            Voidmaster Tools
+                                        </DialogTitle>
+                                        <DialogDescription>
+                                            Manage your session, initiative, and world clock.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <div className="p-4 flex-grow overflow-y-auto">
+                                        <div className="max-w-md mx-auto">
+                                            <ToolSidebar 
+                                                sessionId={session._id} 
+                                                worldId={session.world}
+                                                worldName={session.worldName}
+                                                characters={session.attendingCharacters.map(c => ({ id: c._id, name: c.name }))} 
+                                                isAdmin={!!isAdmin}
+                                            />
+                                        </div>
+                                    </div>
+                                    <DialogFooter className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] border-t bg-muted/30 shrink-0">
+                                        <DialogClose asChild>
+                                            <Button variant="secondary" className="w-full h-12 text-lg font-bold">Close Tools</Button>
+                                        </DialogClose>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                        </div>
+                    )}
+                    {calendarLink && (
+                        <Button variant="outline" size="sm" asChild className="sm:px-3 sm:w-auto w-9 px-0">
+                            <a href={calendarLink} target="_blank" rel="noopener noreferrer">
+                                <Calendar className="h-4 w-4 sm:mr-2" />
+                                <span className="hidden sm:inline">Add to Calendar</span>
+                            </a>
+                        </Button>
+                    )}
+                    {isAdmin && session.locked && (
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="sm" className="sm:px-3 sm:w-auto w-9 px-0">
+                                    <Unlock className="h-4 w-4 sm:mr-2" />
+                                    <span className="hidden sm:inline">Unlock Session</span>
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you sure you want to unlock the session?</AlertDialogTitle>
+                                    <AlertDialogDescription className="text-destructive font-bold">
+                                        This will undo XP given to characters in this session.
+                                        WARNING: This will break XP values if this isn&apos;t the latest session for these characters.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter className="flex-wrap justify-end">
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={handleUnlock} variant="destructive">
+                                        Unlock (Revert XP)
+                                    </AlertDialogAction>
+                                    <AlertDialogAction onClick={handleForceUnlock} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                                        Force Unlock (Keep XP)
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>                    
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    )}
+                </div>
+            </div>
+        </header>
+
+        {/* Left Side: Stretches to edge */}
+        <aside className="hidden 2xl:flex justify-end">
+            {isOwnerOrAdmin && (
+                <div className="w-80 sticky top-0 h-screen overflow-y-auto p-6 z-40">
+                    <ToolSidebar 
+                        sessionId={session._id} 
+                        worldId={session.world}
+                        worldName={session.worldName}
+                        characters={session.attendingCharacters.map(c => ({ id: c._id, name: c.name }))} 
+                        isAdmin={!!isAdmin}
+                    />
+                </div>
+            )}
+            {!isOwnerOrAdmin && (
+                <div className="w-80" />
+            )}
+        </aside>
+
+        {/* Central pillar area */}
+        <main className="w-full max-w-2xl mx-auto 2xl:mx-0 space-y-8 pb-12">
+              <Card className={session.locked ? "border-amber-200 bg-amber-50/10" : session.planning ? "border-purple-200 bg-purple-50/10" : ""}>
+                <CardHeader>
+                  <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                    <div className="space-y-4 flex-grow">
+                      <div>
+                        <CardTitle className="text-3xl font-bold flex flex-wrap items-center gap-3">
+                            <span>{session.worldName}</span>
+                            <div className="flex items-center gap-2 shrink-0">
+                                {session.locked && <LockIcon className="h-5 w-5 text-amber-500" />}
+                                {session.planning && <div className="text-[10px] bg-purple-600 text-white px-2 py-0.5 rounded-full uppercase tracking-widest font-black shadow-sm">Planning</div>}
+                                <a 
+                                    href={`https://void.tarragon.be/Session-Reports/${session.date ? new Date(session.date).toISOString().slice(0, 10) : 'TBD'}-${session.worldName.replace(/\s+/g, '-')}`} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="text-muted-foreground hover:text-purple-500"
+                                    onClick={() => track('session_report_viewed', { worldName: session.worldName })}
+                                >
+                                    <Book size={20} />
+                                </a>
+                                <Link 
+                                    href={`/world/${encodeURIComponent(session.worldName)}`}
+                                    className="text-muted-foreground hover:text-purple-500"
+                                    title="View World Details"
+                                >
+                                    <Globe size={20} />
+                                </Link>
+                            </div>
+                        </CardTitle>
+                        <div className="text-lg text-muted-foreground mt-1">
+                            {session.date ? (
+                                <>{formatDate(new Date(session.date))} at {formatTimeUtil(new Date(session.date))}</>
+                            ) : (
+                                <span className="italic">Date and Time TBD</span>
+                            )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        {session.date ? (
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <Clock className="h-4 w-4 shrink-0" />
+                                    <span>Please arrive between {formatTimeUtil(new Date(session.date))} and {formatTimeUtil(new Date(session.date + 30 * 60 * 1000))}</span>
+                                </div>
+                                <p className="text-[10px] text-muted-foreground ml-6 italic">Session starts at second listed time.</p>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Clock className="h-4 w-4 shrink-0" />
+                                <span>Arrival time will be announced once a date is set.</span>
+                            </div>
+                        )}
+                        {session.location && (
+                            <div className="flex items-center gap-2 text-sm text-primary hover:underline">
+                                <MapPin className="h-4 w-4 shrink-0" />
+                                <a href={session.location} target="_blank" rel="noopener noreferrer">
+                                    View session location on Google Maps
+                                </a>
+                            </div>
+                        )}
+                      </div>
+
+                      <div className="mt-2 flex gap-2 flex-wrap items-center">
+                        <div className="flex items-center gap-2 bg-secondary px-2 py-0.5 rounded-md whitespace-nowrap">
+                            <span className="text-sm font-medium">
+                                Session Level {session.level ?? 'TBD'}
+                            </span>
+                            {session.system && (
+                                <img 
+                                    src={session.system === 'PF' ? '/PFVoid.svg' : '/DnDVoid.svg'} 
+                                    alt={session.system} 
+                                    className="h-4 w-4"
+                                />
+                            )}
+                        </div>
+                        {session.isOwner && session.gmCharacterData && (
+                            <span className="text-sm font-medium px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded-md flex items-center gap-1 whitespace-nowrap">
+                                <Shield className="h-3 w-3" /> GM: {session.gmCharacterData.name}
+                                {session.gmCharacterData.system && (
+                                    <img 
+                                        src={session.gmCharacterData.system === 'PF' ? '/PFVoid.svg' : '/DnDVoid.svg'} 
+                                        alt={session.gmCharacterData.system} 
+                                        className="h-3.5 w-3.5 ml-0.5"
+                                    />
+                                )}
+                            </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="bg-muted px-3 py-1 rounded-full text-sm font-semibold whitespace-nowrap self-start">
+                        {session.attendingCharacters.length} / {session.maxPlayers} Players
+                    </div>
+                  </div>
+                  {session.locked && (
+                    <div className="mt-4 p-3 bg-amber-100/50 border border-amber-200 rounded-md text-sm text-amber-700 font-medium flex items-center gap-2">
+                        <LockIcon className="h-4 w-4" /> 
+                        <span>This session has ended. Participating characters have been awarded XP.</span>
+                    </div>
+                  )}
+                </CardHeader>
+
+                {session.quest && (() => {
+                    const q = session.quest;
+                    const levelPF = q.levelPF ?? (q.levelDnD === undefined ? q.level : undefined);
+                    const levelDnD = q.levelDnD;
+                    const isDual = levelPF !== undefined && levelDnD !== undefined;
+
+                    return (
+                        <div className="px-6 pb-6">
+                            <div className="bg-primary/5 border border-primary/20 rounded-lg overflow-hidden">
+                                <div className="bg-primary/10 px-4 py-2 border-b border-primary/20 flex items-center justify-between">
+                                    <div className="flex items-center gap-2 font-bold text-sm">
+                                        <Scroll className="h-4 w-4 text-primary" />
+                                        Active Quest
+                                    </div>
+                                    <div 
+                                        className="flex items-center justify-center rounded-full font-bold h-6 w-6 text-[10px]"
+                                        style={getDualLevelBadgeStyle(levelPF, levelDnD)}
+                                    >
+                                        {isDual ? 'V' : (levelPF ?? levelDnD ?? 0) > 0 ? (levelPF ?? levelDnD) : '?'}
+                                    </div>
+                                </div>
+                                <div className="p-4 space-y-3">
+                                    <h4 className="font-bold text-lg">{q.name}</h4>
+                                    {q.description && (
+                                        <div className="text-sm text-muted-foreground leading-relaxed [&_>_*:first-child]:mt-0 [&>p]:mt-2 [&>ul]:list-disc [&>ul]:pl-4 [&>ul]:mt-2 [&>ol]:list-decimal [&>ol]:pl-4 [&>ol]:mt-2 [&>blockquote]:border-l-4 [&>blockquote]:pl-4 [&>blockquote]:italic [&>blockquote]:mt-2 [&_a]:text-primary [&_a]:underline">
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                                {q.description}
+                                            </ReactMarkdown>
+                                        </div>
+                                    )}
+                                    <div className="flex flex-wrap gap-4 pt-1">
+                                        {q.reward && (
+                                            <div className="flex items-start gap-2 text-xs">
+                                                <Trophy className="h-3.5 w-3.5 text-yellow-500 shrink-0" />
+                                                <span><span className="font-bold text-muted-foreground uppercase mr-1">Reward:</span> {q.reward}</span>
+                                            </div>
+                                        )}
+                                        {isDual && (
+                                            <div className="flex items-center gap-1 bg-muted/50 px-2 py-0.5 rounded text-[10px] font-bold border border-border/20">
+                                                <img src="/PFVoid.svg" alt="PF" className="h-3 w-3 mr-0.5" />
+                                                <span 
+                                                    className="inline-flex items-center justify-center rounded-full w-4 h-4 text-[8px]"
+                                                    style={getLevelBadgeStyle(levelPF)}
+                                                >
+                                                    {levelPF}
+                                                </span>
+                                                <img src="/DnDVoid.svg" alt="DnD" className="h-3 w-3 ml-1.5 mr-0.5" />
+                                                <span 
+                                                    className="inline-flex items-center justify-center rounded-full w-4 h-4 text-[8px]"
+                                                    style={getLevelBadgeStyle(levelDnD)}
+                                                >
+                                                    {levelDnD}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })()}
+
+                <CardContent>
+                  <h3 className="text-xl font-semibold mb-4 flex items-center justify-between">
+                    Attending Characters
+                    {isAdmin && (
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm" className="ml-2 h-7 w-7 p-0">
+                            +
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[425px]">
+                          <DialogHeader>
+                            <DialogTitle>Admin: Add Character</DialogTitle>
+                            <DialogDescription>Select a character to add to this session.</DialogDescription>
+                          </DialogHeader>
+                          <div className="grid gap-4 py-4">
+                            {session.locked ? (
+                              <p className="text-sm text-muted-foreground italic text-center p-4 bg-muted/30 rounded-md">This session has ended.</p>
+                            ) : isFull ? (
+                              <p className="text-sm text-destructive italic text-center p-4 bg-destructive/5 rounded-md">This session is full, cannot add more.</p>
+                            ) : allCharacters && allCharacters.length > 0 ? (
+                              <div className="space-y-4">
+                                <div className="flex flex-col gap-2">
+                                  <label htmlFor="admin-character-select" className="text-sm font-medium">Select Character</label>
+                                  <select
+                                    id="admin-character-select"
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    value={selectedAdminCharacterId}
+                                    onChange={(e) => setSelectedAdminCharacterId(e.target.value as Id<'characters'>)}
+                                  >
+                                    <option value="">-- Choose a character --</option>
+                                    {adminAvailableCharacters.map((char) => (
+                                      <option key={char._id} value={char._id}>{char.name} (Lvl {char.lvl})</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <Button className="w-full" disabled={!selectedAdminCharacterId} onClick={handleAdminAddCharacter}>Add Character (Admin)</Button>
+                              </div>
+                            ) : (
+                              <p className="text-sm text-muted-foreground italic text-center p-4 bg-muted/10 rounded-md">No characters available to add.</p>
+                            )}
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    )}
+                  </h3>
+                  <AttendingCharactersList 
+                    characters={session.attendingCharacters}
+                    userCharacterIds={userCharacterIds}
+                    sessionLocked={session.locked}
+                    sessionPlanning={session.planning}
+                    isSessionOwner={session.isOwner}
+                    onLeave={handleLeave}
+                    userMetadata={userMetadata}
+                    leavingCharacterId={leavingCharacterId}
+                  />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-xl font-semibold">Interested Players</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <InterestedPlayersList 
+                    interestedPlayers={currentInterestedPlayers} 
+                    userMetadata={userMetadata}
+                  />
+                </CardContent>
+              </Card>
+
+              <ReputationSystem 
+                worldId={session.world} 
+                worldName={session.worldName} 
+                charactersInSession={session.characters}
+              />
+
+              {/* MOBILE ONLY content */}
+              <div className="lg:hidden space-y-8">
+                {rightColumnContent}
+              </div>
+
+              <div className="text-center mt-12 mb-8 text-sm text-muted-foreground">
+                Thank you for playing with us!<br/>
+                We encourage tipping your <b className="text-primary">Voidmaster</b> for their hard work.
+              </div>
+        </main>
+
+        {/* Right Column: Sits to the right of the centered pillar */}
+        <aside className="hidden lg:block w-80 flex-none z-30">
+          <div className="sticky top-8 overflow-y-auto max-h-[calc(100vh-4rem)] custom-scrollbar pb-8">
+            {rightColumnContent}
+          </div>
+        </aside>
+
+        {/* Right Section Spacer */}
+        <div className="hidden 2xl:block"></div>
       </div>
 
       <AlertDialog open={isJoinSuccessDialogOpen} onOpenChange={setIsJoinSuccessDialogOpen}>

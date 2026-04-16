@@ -42,35 +42,35 @@ export default function AttendingCharactersList({
             <li 
                 key={char._id} 
                 className={cn(
-                    "flex items-center justify-between p-4 rounded-lg border transition-colors",
+                    "flex items-center justify-between p-4 rounded-lg border transition-colors gap-3",
                     isUserCharacter 
                         ? "bg-[rgba(147,51,234,0.1)] border-2 border-[#D8B4FE] hover:border-[#E9D5FF] hover:bg-[rgba(147,51,234,0.2)] shadow-sm" 
                         : "bg-muted/20"
                 )}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 min-w-0">
                 {metadata?.imageUrl && (
                     <img 
                         src={metadata.imageUrl} 
                         alt={metadata.name} 
-                        className="w-8 h-8 rounded-full border border-border"
+                        className="w-8 h-8 rounded-full border border-border shrink-0"
                     />
                 )}
-                <div>
-                    <div className="font-bold flex items-center gap-2">
-                        {char.name}
-                        {isUserCharacter && <span className="text-[10px] bg-purple-200 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded-full uppercase tracking-wider font-bold">You</span>}
+                <div className="min-w-0">
+                    <div className="font-bold flex items-center flex-wrap gap-2">
+                        <span className="break-words">{char.name}</span>
+                        {isUserCharacter && <span className="text-[10px] bg-purple-200 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded-full uppercase tracking-wider font-bold shrink-0">You</span>}
                         {/* Book Icon */}
                         <a
                             href={`https://void.tarragon.be/Player-Characters/${char.name.replace(/\s+/g, '-')}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-muted-foreground hover:text-purple-500"
+                            className="text-muted-foreground hover:text-purple-500 shrink-0"
                         >
                             <Book size={16} />
                         </a>
                     </div>
-                    <div className="text-[10px] text-muted-foreground mt-1">
+                    <div className="text-[10px] text-muted-foreground mt-1 whitespace-normal">
                       {char.class}
                     </div>
                     {char.websiteLink && (

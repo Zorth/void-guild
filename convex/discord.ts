@@ -5,6 +5,29 @@ import { Id } from "./_generated/dataModel";
 
 const DISCORD_API_BASE = "https://discord.com/api/v10";
 
+// Helper formatting logic
+const getQuestLevelStr = (q: any) => {
+    const pf = q.levelPF ?? (q.levelDnD === undefined ? q.level : undefined);
+    const dnd = q.levelDnD;
+    if (pf !== undefined && dnd !== undefined) return `Lvl PF:${pf}/DnD:${dnd}`;
+    if (pf !== undefined) return `Lvl PF:${pf}`;
+    if (dnd !== undefined) return `Lvl DnD:${dnd}`;
+    return "Lvl ?";
+};
+
+const formatInGameDate = (ig: any) => {
+    if (!ig) return null;
+    const eraStr = ig.era ? ` ${ig.era}` : "";
+    const start = `${ig.year}/${String(ig.month + 1).padStart(2, '0')}/${String(ig.day).padStart(2, '0')}${eraStr}`;
+    if (ig.endDay) {
+        const ey = ig.endYear ?? ig.year;
+        const em = ig.endMonth ?? ig.month;
+        const end = `${ey}/${String(em + 1).padStart(2, '0')}/${String(ig.endDay).padStart(2, '0')}${eraStr}`;
+        return `${start} - ${end}`;
+    }
+    return start;
+};
+
 /**
  * Syncs a session's state to a Discord Forum post.
  * Creates the post if it doesn't exist, otherwise updates it.
@@ -42,16 +65,6 @@ export const syncSessionToDiscord = internalAction({
       dateStr = `${day}/${month}`;
     }
     
-    // Level formatting logic
-    const getQuestLevelStr = (q: any) => {
-        const pf = q.levelPF ?? (q.levelDnD === undefined ? q.level : undefined);
-        const dnd = q.levelDnD;
-        if (pf !== undefined && dnd !== undefined) return `Lvl PF:${pf}/DnD:${dnd}`;
-        if (pf !== undefined) return `Lvl PF:${pf}`;
-        if (dnd !== undefined) return `Lvl DnD:${dnd}`;
-        return "Lvl ?";
-    };
-
     // Format: (DD/MM) The Void: <WorldName> [Lvl X] [<signupCharacters>/<MaxCharacters>]
     // OR: (PLANNING) The Void: <WorldName> [Lvl X] [<interestCount> Interested]
     const isPlanning = session.planning || !session.date;
@@ -131,11 +144,14 @@ export const syncSessionToDiscord = internalAction({
         }
     }
 
+    const inGameDateInfo = formatInGameDate(session.inGameDate);
+
     const messageContent = `# ${systemEmoji} [${session.worldName}](${worldLink})\n` +
       `**System**: ${systemName}\n` +
       `**Level**: ${levelInfo}\n` +
       `**Location**: ${locationInfo}\n` +
       `**Date**: ${dateInfo}\n` +
+      (inGameDateInfo ? `**In-Game Date**: ${inGameDateInfo}\n` : "") +
       questContent + "\n" +
       `[**VIEW SESSION ON GUILD**]( ${sessionLink} )\n\n` +
       (isPlanning 
@@ -322,16 +338,6 @@ export const sendSessionNotification = action({
       ? process.env.DISCORD_ROLE_ID_PF 
       : process.env.DISCORD_ROLE_ID_DND;
 
-    // Level formatting logic
-    const getQuestLevelStr = (q: any) => {
-        const pf = q.levelPF ?? (q.levelDnD === undefined ? q.level : undefined);
-        const dnd = q.levelDnD;
-        if (pf !== undefined && dnd !== undefined) return `PF:${pf}/DnD:${dnd}`;
-        if (pf !== undefined) return `PF:${pf}`;
-        if (dnd !== undefined) return `DnD:${dnd}`;
-        return "?";
-    };
-
     let levelInfo = (session.level && session.level > 0) 
       ? `Level ${session.level}` 
       : "Discuss what you're going to do to decide the mission's level";
@@ -370,6 +376,8 @@ export const sendSessionNotification = action({
     const interestCount = (session.interestedPlayers || []).length;
     const playersValue = `${session.attendingCharacters.length}/${session.maxPlayers}` + (interestCount > 0 ? ` (+${interestCount} interested)` : "");
 
+    const inGameDateInfo = formatInGameDate(session.inGameDate);
+
     const embed: any = {
       title: embedTitle,
       description: embedDescription,
@@ -383,6 +391,10 @@ export const sendSessionNotification = action({
       timestamp: new Date().toISOString(),
       url: (args.type !== 'cancel' && threadLink) ? threadLink : sessionLink,
     };
+
+    if (inGameDateInfo && args.type !== 'cancel') {
+      embed.fields.push({ name: 'In-Game Date', value: inGameDateInfo, inline: false });
+    }
 
     if (session.location && args.type !== 'cancel') {
       embed.fields.push({ name: 'Location', value: `[View on Google Maps](${session.location})`, inline: false });

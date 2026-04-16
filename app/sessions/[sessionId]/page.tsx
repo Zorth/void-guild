@@ -46,7 +46,24 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     }
 
     const title = `${session.worldName} | ${session.system === 'PF' ? 'Pathfinder' : 'D&D 5e'} ${session.planning ? '(Planning)' : ''}`
-    const description = `📅 ${dateInfo}\n👥 Players: ${session.attendingCharacters.length}/${session.maxPlayers}\n⚔️ Level: ${session.level ?? 'TBD'}`
+    
+    let inGameDateStr = ""
+    if (session.inGameDate) {
+        const { year, month, day, era, endYear, endMonth, endDay } = session.inGameDate
+        const eraStr = era ? ` ${era}` : ""
+        const start = `${year}/${String(month + 1).padStart(2, '0')}/${String(day).padStart(2, '0')}${eraStr}`
+        if (endDay) {
+            const ey = endYear ?? year
+            const em = endMonth ?? month
+            const ed = endDay
+            const end = `${ey}/${String(em + 1).padStart(2, '0')}/${String(ed).padStart(2, '0')}${eraStr}`
+            inGameDateStr = `\n🌍 ${start} - ${end}`
+        } else {
+            inGameDateStr = `\n🌍 ${start}`
+        }
+    }
+
+    const description = `📅 ${dateInfo}${inGameDateStr}\n👥 Players: ${session.attendingCharacters.length}/${session.maxPlayers}\n⚔️ Level: ${session.level ?? 'TBD'}`
 
     // NOTE: Discord does NOT support SVG images in link previews. 
     // It is highly recommended to provide PNG versions (e.g., /PFVoid.png) for the preview to work.

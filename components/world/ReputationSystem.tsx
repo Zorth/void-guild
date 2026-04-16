@@ -40,61 +40,62 @@ function ReputationCell({
     }
   }
 
+  const numberDisplay = (
+    <span className={cn(
+      "text-xs font-mono min-w-[3ch] text-center font-bold px-1.5 py-0.5 rounded border border-transparent transition-all",
+      isOwner ? "cursor-pointer hover:border-primary/30 hover:bg-primary/5" : "cursor-default",
+      value > 0 ? "text-green-600 bg-green-500/10 border-green-500/20" : 
+      value < 0 ? "text-red-600 bg-red-500/10 border-red-500/20" : 
+      "text-muted-foreground bg-muted/30 border-muted-foreground/10"
+    )}>
+      {value}
+    </span>
+  )
+
+  if (!isOwner) {
+    return <div className="h-7 flex items-center">{numberDisplay}</div>
+  }
+
   return (
     <div className="flex items-center gap-1 group/cell h-7">
-      <span className={cn(
-        "text-xs font-mono min-w-[2ch] text-center font-bold px-1.5 py-0.5 rounded border border-transparent transition-all",
-        value > 0 ? "text-green-600 bg-green-500/10 border-green-500/20" : 
-        value < 0 ? "text-red-600 bg-red-500/10 border-red-500/20" : 
-        "text-muted-foreground bg-muted/30 border-muted-foreground/10"
-      )}>
-        {value}
-      </span>
-      {isOwner && (
-        <div className="flex items-center gap-0.5 opacity-0 group-hover/cell:opacity-100 transition-opacity">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-5 w-5 hover:bg-red-500/10 hover:text-red-600"
-            onClick={() => updateReputation({ worldId, characterId: charId, factionName: faction, delta: -1 })}
-          >
-            <Minus className="h-3 w-3" />
-          </Button>
-          <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
-            <PopoverTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-5 px-1 text-[10px] text-muted-foreground hover:text-primary"
-                onClick={() => setEditValue(value.toString())}
-              >
-                Set
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-24 p-2">
-              <div className="flex flex-col gap-2">
-                <Input 
-                    type="number" 
-                    className="h-7 text-xs text-center px-1" 
-                    value={editValue} 
-                    onChange={(e) => setEditValue(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleManualSet()}
-                    autoFocus
-                />
-                <Button size="sm" className="h-6 text-[10px]" onClick={handleManualSet}>Save</Button>
-              </div>
-            </PopoverContent>
-          </Popover>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-5 w-5 hover:bg-green-500/10 hover:text-green-600"
-            onClick={() => updateReputation({ worldId, characterId: charId, factionName: faction, delta: 1 })}
-          >
-            <Plus className="h-3 w-3" />
-          </Button>
-        </div>
-      )}
+      <Button 
+        variant="ghost" 
+        size="icon" 
+        className="h-5 w-5 hover:bg-red-500/10 hover:text-red-600 opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0"
+        onClick={() => updateReputation({ worldId, characterId: charId, factionName: faction, delta: -1 })}
+      >
+        <Minus className="h-3 w-3" />
+      </Button>
+
+      <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+        <PopoverTrigger asChild>
+          <button onClick={() => setEditValue(value.toString())}>
+            {numberDisplay}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-24 p-2">
+          <div className="flex flex-col gap-2">
+            <Input 
+                type="number" 
+                className="h-7 text-xs text-center px-1" 
+                value={editValue} 
+                onChange={(e) => setEditValue(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleManualSet()}
+                autoFocus
+            />
+            <Button size="sm" className="h-6 text-[10px]" onClick={handleManualSet}>Save</Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      <Button 
+        variant="ghost" 
+        size="icon" 
+        className="h-5 w-5 hover:bg-green-500/10 hover:text-green-600 opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0"
+        onClick={() => updateReputation({ worldId, characterId: charId, factionName: faction, delta: 1 })}
+      >
+        <Plus className="h-3 w-3" />
+      </Button>
     </div>
   )
 }
@@ -207,7 +208,7 @@ export default function ReputationSystem({
                     <table className="w-full text-left border-collapse min-w-[600px]">
                         <thead>
                             <tr className="border-b border-border/40 bg-muted/20">
-                                <th className="px-6 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground sticky left-0 bg-muted/20 z-10 backdrop-blur-sm border-r border-border/40 min-w-[150px]">Character</th>
+                                <th className="px-6 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground sticky left-0 bg-muted/20 z-10 backdrop-blur-sm border-r border-border/40 min-w-[180px]">Character</th>
                                 {displayedFactions.map(faction => (
                                     <th key={faction} className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground min-w-[120px]">
                                         {faction}
@@ -219,25 +220,18 @@ export default function ReputationSystem({
                             {sortedCharacters.length > 0 ? (
                                 sortedCharacters.map(char => (
                                     <tr key={char._id} className="border-b border-border/30 hover:bg-primary/5 transition-colors">
-                                        <td className="px-6 py-3 sticky left-0 bg-card/90 z-10 backdrop-blur-sm border-r border-border/40">
-                                            <div className="flex flex-col gap-0.5">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-bold text-sm tracking-tight">{char.name}</span>
+                                        <td className="px-6 py-3 sticky left-0 bg-card/90 z-10 backdrop-blur-sm border-r border-border/40 min-w-0">
+                                            <div className="flex flex-col gap-0.5 min-w-0">
+                                                <div className="flex items-center flex-wrap gap-2 min-w-0">
+                                                    <span className="font-bold text-sm tracking-tight break-words">{char.name}</span>
                                                     <span 
-                                                        className="inline-flex items-center justify-center rounded-full w-4 h-4 text-[8px] font-bold"
+                                                        className="inline-flex items-center justify-center rounded-full w-4 h-4 text-[8px] font-bold shrink-0"
                                                         style={getLevelBadgeStyle(char.lvl)}
                                                     >
                                                         {char.lvl}
                                                     </span>
-                                                    {char.system && (
-                                                        <img 
-                                                            src={char.system === 'PF' ? '/PFVoid.svg' : '/DnDVoid.svg'} 
-                                                            alt={char.system} 
-                                                            className="h-3 w-3 opacity-60"
-                                                        />
-                                                    )}
                                                 </div>
-                                                <span className="text-[9px] text-muted-foreground uppercase tracking-widest font-medium">{char.class}</span>
+                                                <span className="text-[9px] text-muted-foreground uppercase tracking-widest font-medium whitespace-normal">{char.class}</span>
                                             </div>
                                         </td>
                                         {displayedFactions.map(faction => (
