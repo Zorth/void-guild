@@ -155,7 +155,7 @@ export default function ReputationSystem({
     const displayedFactions = groupFilter === 'all' ? factions : (activeGroup?.factions || [])
 
     return (
-        <Card className="flex flex-col bg-card/50 relative group border-border/40 gap-0 py-0 overflow-hidden mt-8 w-full max-w-full">
+        <Card className="flex flex-col bg-card/50 relative group border-border/40 gap-0 py-0 overflow-hidden mt-8">
             <CardHeader className="flex flex-row items-center justify-between px-6 py-2 border-b border-border/50 pb-2">
                 <CardTitle className="text-lg font-bold flex items-center gap-2">
                     <Handshake className="h-4 w-4 text-primary" />
@@ -175,7 +175,7 @@ export default function ReputationSystem({
                     )}
                 </div>
             </CardHeader>
-            <CardContent className="px-0 py-0 relative w-full overflow-hidden">
+            <CardContent className="px-0 py-0 relative">
                 <div className="bg-muted/30 px-6 py-2 border-b border-border/50 flex flex-wrap items-center gap-4">
                     <div className="flex items-center gap-2">
                         <Users className="h-3.5 w-3.5 text-muted-foreground" />
@@ -204,13 +204,13 @@ export default function ReputationSystem({
                     </div>
                 </div>
 
-                <div className="overflow-x-auto custom-scrollbar w-full">
-                    <table className="w-full text-left border-collapse min-w-[400px]">
+                <div className="overflow-x-auto custom-scrollbar">
+                    <table className="w-full text-left border-collapse min-w-[600px]">
                         <thead>
                             <tr className="border-b border-border/40 bg-muted/20">
-                                <th className="px-6 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground sticky left-0 bg-background z-20 border-r border-border/40 min-w-[140px]">Character</th>
+                                <th className="px-6 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground sticky left-0 bg-muted/20 z-10 backdrop-blur-sm border-r border-border/40 min-w-[180px]">Character</th>
                                 {displayedFactions.map(faction => (
-                                    <th key={faction} className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground min-w-[100px]">
+                                    <th key={faction} className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground min-w-[120px]">
                                         {faction}
                                     </th>
                                 ))}
@@ -219,8 +219,8 @@ export default function ReputationSystem({
                         <tbody>
                             {sortedCharacters.length > 0 ? (
                                 sortedCharacters.map(char => (
-                                    <tr key={char._id} className="border-b border-border/30 hover:bg-primary/5 transition-colors group/row">
-                                        <td className="px-6 py-3 sticky left-0 bg-background z-10 border-r border-border/40 min-w-0">
+                                    <tr key={char._id} className="border-b border-border/30 hover:bg-primary/5 transition-colors">
+                                        <td className="px-6 py-3 sticky left-0 bg-card/90 z-10 backdrop-blur-sm border-r border-border/40 min-w-0">
                                             <div className="flex flex-col gap-0.5 min-w-0">
                                                 <div className="flex items-center flex-wrap gap-2 min-w-0">
                                                     <span className="font-bold text-sm tracking-tight break-words">{char.name}</span>
