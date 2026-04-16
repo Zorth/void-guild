@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import Link from 'next/link'
 import { Reorder, AnimatePresence, motion } from 'framer-motion'
-import { ChevronLeft, ChevronRight, Plus, X, GripVertical, Sword, Clock, Play, Pause, Minus, CalendarDays, Calendar as CalendarIcon, Info, ArrowLeft, ArrowRight, Flag, CheckCircle2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, X, GripVertical, Sword, Clock, Play, Pause, Minus, CalendarDays, Calendar as CalendarIcon, Info, ArrowLeft, ArrowRight, Flag, CheckCircle2, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
@@ -21,21 +22,6 @@ import { toast } from 'sonner'
 interface InitiativeItem {
     id: string;
     name: string;
-}
-
-interface CalendarEvent {
-    id: string;
-    name: string;
-    description?: string;
-    year: number;
-    month: number; // 0-indexed
-    day: number;
-    isRecurring: boolean;
-    recurrence?: {
-        type: 'annually' | 'monthly';
-        startYear?: number;
-        endYear?: number;
-    }
 }
 
 interface FantasyCalendarJSON {
@@ -57,7 +43,6 @@ interface FantasyCalendarJSON {
         }[];
         weekdays: string[];
     };
-    events: CalendarEvent[];
 }
 
 interface ToolSidebarProps {
@@ -414,22 +399,6 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
     }
 
     // --- Calendar Tool Helpers ---
-    const checkEventOccurs = (event: CalendarEvent, y: number, m: number, d: number) => {
-        const startYear = event.recurrence?.startYear ?? event.year
-        const endYear = event.recurrence?.endYear
-
-        if (y < startYear) return false
-        if (endYear !== undefined && y > endYear) return false
-
-        if (event.recurrence?.type === 'annually') {
-            return event.month === m && event.day === d
-        }
-        if (event.recurrence?.type === 'monthly') {
-            return event.day === d
-        }
-        return event.year === y && event.month === m && event.day === d
-    }
-
     const checkSessionOccurs = (session: any, y: number, m: number, d: number) => {
         if (!session.inGameDate) return false
         const start = session.inGameDate
@@ -445,64 +414,31 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
         return currentTotal >= startTotal && currentTotal <= endTotal
     }
 
-    const todayEvents = useMemo(() => {
+    const todaySessions = useMemo(() => {
         if (!calendarConfig || !currentDate) return []
-        const events = calendarConfig.events
-            .filter(e => checkEventOccurs(e, currentDate.year, currentDate.month, currentDate.day))
-            .map(e => ({ ...e, type: 'event' as const }))
         
-        const sessions = (worldSessions || [])
+        return (worldSessions || [])
             .filter(s => checkSessionOccurs(s, currentDate.year, currentDate.month, currentDate.day))
-            .map(s => ({ 
-                id: s._id, 
-                name: s.quest?.name || "Session", 
-                type: 'session' as const,
-                description: s.characterNames?.join(', ') || 'No attendees'
-            }))
-
-        return [...events, ...sessions]
-    }, [calendarConfig, currentDate, worldSessions])
-
-    const upcomingEvents = useMemo(() => {
-        if (!calendarConfig || !currentDate) return []
-        const results: { item: any, date: { year: number, month: number, day: number }, type: 'event' | 'session' }[] = []
-        
-        const checkDate = { ...currentDate }
-        // Look ahead up to 1 year
-        for (let i = 1; i < 366 && results.length < 5; i++) {
-            // Increment checkDate
-            checkDate.day++
-            const monthLen = calendarConfig.static_data.months[checkDate.month]?.length
-            if (monthLen === undefined) break 
-            
-            if (checkDate.day > monthLen) {
-                checkDate.day = 1
-                checkDate.month++
-                if (checkDate.month >= calendarConfig.static_data.n_months) {
-                    checkDate.month = 0
-                    checkDate.year++
-                }
-            }
-
-            const dayEvents = calendarConfig.events.filter(e => checkEventOccurs(e, checkDate.year, checkDate.month, checkDate.day))
-            dayEvents.forEach(e => {
-                if (results.length < 5) {
-                    results.push({ item: e, date: { ...checkDate }, type: 'event' })
-                }
+            .map(s => {
+                const start = s.inGameDate!;
+                const end = {
+                    year: start.endYear ?? start.year,
+                    month: start.endMonth ?? start.month,
+                    day: start.endDay ?? start.day
+                };
+                
+                const formatDate = (y: number, m: number, d: number) => 
+                    `${y}/${(m + 1).toString().padStart(2, '0')}/${d.toString().padStart(2, '0')}`;
+                
+                return { 
+                    id: s._id, 
+                    players: s.characterNames?.join(', ') || 'No attendees',
+                    dateRange: start.endDay 
+                        ? `${formatDate(start.year, start.month, start.day)} - ${formatDate(end.year, end.month, end.day)}`
+                        : formatDate(start.year, start.month, start.day),
+                    quest: s.quest?.name
+                };
             })
-
-            const daySessions = (worldSessions || []).filter(s => checkSessionOccurs(s, checkDate.year, checkDate.month, checkDate.day))
-            daySessions.forEach(s => {
-                if (results.length < 5) {
-                    results.push({ 
-                        item: { id: s._id, name: s.quest?.name || "Session" }, 
-                        date: { ...checkDate }, 
-                        type: 'session' 
-                    })
-                }
-            })
-        }
-        return results.slice(0, 5)
     }, [calendarConfig, currentDate, worldSessions])
 
     const isSessionStart = useMemo(() => {
@@ -784,55 +720,49 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
                                         </Button>
                                     </div>
 
-                                    {/* Today's Events */}
-                                    {todayEvents.length > 0 && (
+                                    {/* Today's Sessions */}
+                                    {todaySessions.length > 0 && (
                                         <div className="space-y-1.5">
-                                            <p className="text-[11px] font-black uppercase tracking-tighter text-muted-foreground ml-1">Today&apos;s Events</p>
+                                            <p className="text-[11px] font-black uppercase tracking-tighter text-muted-foreground ml-1">Today&apos;s Sessions</p>
                                             <div className="space-y-1">
-                                                {todayEvents.map(e => (
-                                                    <div key={e.id} className={cn(
-                                                        "flex items-center gap-2 p-2 rounded border transition-colors",
-                                                        e.type === 'session' ? "bg-purple-500/10 border-purple-500/30" : "bg-primary/5 border-primary/20"
-                                                    )}>
-                                                        <div className={cn("h-2 w-2 rounded-full shrink-0", e.type === 'session' ? "bg-purple-500" : "bg-primary")} />
-                                                        <span className="text-sm font-bold truncate flex-grow">{e.name}</span>
-                                                        {e.description && (
-                                                            <TooltipProvider>
-                                                                <Tooltip>
-                                                                    <TooltipTrigger asChild>
-                                                                        <Info className="h-4 w-4 text-muted-foreground/50" />
-                                                                    </TooltipTrigger>
-                                                                    <TooltipContent>
-                                                                        <p className="text-xs max-w-[200px]">{e.description}</p>
-                                                                    </TooltipContent>
-                                                                </Tooltip>
-                                                            </TooltipProvider>
-                                                        )}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Upcoming Events */}
-                                    {upcomingEvents.length > 0 && (
-                                        <div className="space-y-1.5">
-                                            <p className="text-[11px] font-black uppercase tracking-tighter text-muted-foreground ml-1">Upcoming</p>
-                                            <div className="flex flex-col gap-1.5">
-                                                {upcomingEvents.map(({ item, date, type }, idx) => (
-                                                    <div key={`${item.id}-${idx}`} className={cn(
-                                                        "flex items-center gap-2.5 p-2 rounded border transition-colors",
-                                                        type === 'session' ? "bg-purple-500/5 border-purple-500/20" : "bg-muted/20 border-border/50"
-                                                    )}>
-                                                        <div className="flex flex-col items-center justify-center min-w-[40px] h-10 bg-background rounded border border-border/50 shrink-0">
-                                                            <span className="text-xs font-black leading-none">{date.day}</span>
-                                                            <span className="text-[10px] font-bold uppercase text-muted-foreground leading-none">{(calendarConfig.static_data.months[date.month]?.name || '???').slice(0, 3)}</span>
-                                                        </div>
-                                                        <div className="flex flex-col min-w-0 flex-grow">
-                                                            <span className="text-sm font-bold truncate">{item.name}</span>
-                                                            <span className="text-[10px] text-muted-foreground truncate">Year {date.year}</span>
-                                                        </div>
-                                                    </div>
+                                                {todaySessions.map(s => (
+                                                    <TooltipProvider key={s.id}>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <div className="flex items-center gap-2 p-2 rounded border transition-colors bg-purple-500/10 border-purple-500/30 group/sess">
+                                                                    <div className="flex flex-col gap-0.5 flex-grow overflow-hidden">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <div className="h-2 w-2 rounded-full shrink-0 bg-purple-500" />
+                                                                            <span className="text-sm font-bold truncate text-purple-700 dark:text-purple-300">
+                                                                                {s.players}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="text-[10px] font-medium text-muted-foreground ml-4">
+                                                                            {s.dateRange}
+                                                                        </div>
+                                                                    </div>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-7 w-7 opacity-0 group-hover/sess:opacity-100 hover:bg-purple-500/20 text-purple-600 transition-all shrink-0"
+                                                                        asChild
+                                                                    >
+                                                                        <Link href={`/sessions/${s.id}`}>
+                                                                            <ExternalLink className="h-3.5 w-3.5" />
+                                                                        </Link>
+                                                                    </Button>
+                                                                </div>
+                                                            </TooltipTrigger>
+                                                            {s.quest && (
+                                                                <TooltipContent>
+                                                                    <div className="flex flex-col gap-1 max-w-[200px]">
+                                                                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Active Quest</p>
+                                                                        <p className="text-xs font-bold text-primary">{s.quest}</p>
+                                                                    </div>
+                                                                </TooltipContent>
+                                                            )}
+                                                        </Tooltip>
+                                                    </TooltipProvider>
                                                 ))}
                                             </div>
                                         </div>
