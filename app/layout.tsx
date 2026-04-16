@@ -115,11 +115,10 @@ export const metadata: Metadata = {
     images: [`${baseUrl}/PFVoid.svg`],
   },
   robots: {
-    index: false,
-    follow: false,
+    index: true,
+    follow: true,
   },
   other: {
-    'robots': 'noai, noimageai',
     'ai-content': 'no',
   },
 }

@@ -86,6 +86,7 @@ interface FantasyMoon {
     shift: number;
     granularity: number;
     color: string;
+    shadow_color?: string;
     hidden: boolean;
     custom_phase?: boolean;
     custom_cycle?: string;
@@ -373,13 +374,10 @@ export default function WorldCalendar({
         
         const yearZeroExists = calendar.static_data.settings?.year_zero_exists || false;
         
-        // If the calendar already has an epoch for today, we can use it as a base if it matches the current dynamic date
-        // But for arbitrary y,m,d we need to calculate it.
-        
         let epoch = 0;
         const startYear = yearZeroExists ? 0 : 1;
 
-        // Simplified for now, but we'll use a more robust version if needed
+        // Sum full years
         for (let currY = startYear; currY < y; currY++) {
             epoch += calendar.static_data.year_len || 365;
             calendar.static_data.year_data?.leap_days?.forEach((ld: any) => {
@@ -387,6 +385,7 @@ export default function WorldCalendar({
             });
         }
         
+        // Sum full months in the current year
         for (let i = 0; i < m; i++) {
             epoch += calendar.static_data.months[i]?.length || 30;
             calendar.static_data.year_data?.leap_days?.forEach((ld: any) => {
@@ -394,7 +393,7 @@ export default function WorldCalendar({
             });
         }
         
-        epoch += d; // 1-indexed day
+        epoch += d; 
         return epoch;
     }, [calendar]);
 
@@ -404,15 +403,19 @@ export default function WorldCalendar({
             return custom_cycle[Math.abs(epoch % custom_cycle.length)] || 0;
         }
 
-        const moonPositionData = ((epoch - moon.shift) / moon.cycle);
+        const shift = Number(moon.shift || 0);
+        const cycle = Number(moon.cycle || 1);
+        const granularity = Number(moon.granularity || 24);
+
+        const moonPositionData = ((epoch - shift) / cycle);
         const moonPosition = (moonPositionData - Math.floor(moonPositionData));
         
         if (moon.cycle_rounding === "floor") {
-            return Math.floor(moonPosition * moon.granularity) % moon.granularity;
+            return Math.floor(moonPosition * granularity) % granularity;
         } else if (moon.cycle_rounding === "ceil") {
-            return Math.ceil(moonPosition * moon.granularity) % moon.granularity;
+            return Math.ceil(moonPosition * granularity) % granularity;
         } else {
-            return Math.round(moonPosition * moon.granularity) % moon.granularity;
+            return Math.round(moonPosition * granularity) % granularity;
         }
     }
 
@@ -668,13 +671,42 @@ export default function WorldCalendar({
                                     </Button>
                                 </DialogTrigger>
                                 <DialogContent className="max-w-2xl">
-                                    <DialogHeader><DialogTitle>Re-import Calendar</DialogTitle></DialogHeader>
-                                    <Textarea 
-                                        placeholder='{"name": "My World", ...}'
-                                        className="min-h-[300px] font-mono text-xs"
-                                        value={importText}
-                                        onChange={(e) => setImportText(e.target.value)}
-                                    />
+                                    <DialogHeader>
+                                        <DialogTitle>Re-import Calendar</DialogTitle>
+                                        <DialogDescription>
+                                            Upload or paste the exported JSON from Fantasy-Calendar.com.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <div className="space-y-4">
+                                        <div className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-lg p-6 hover:bg-muted/50 transition-colors">
+                                            <input
+                                                type="file"
+                                                id="calendar-file-reimport"
+                                                accept=".json"
+                                                className="hidden"
+                                                onChange={async (e) => {
+                                                    const file = e.target.files?.[0]
+                                                    if (file) {
+                                                        const text = await file.text()
+                                                        setImportText(text)
+                                                        toast.info(`Loaded ${file.name} (${(file.size / 1024).toFixed(1)} KB)`)
+                                                    }
+                                                }}
+                                            />
+                                            <Button asChild variant="outline" className="gap-2">
+                                                <label htmlFor="calendar-file-reimport">
+                                                    <Upload className="h-4 w-4" />
+                                                    Select JSON File
+                                                </label>
+                                            </Button>
+                                        </div>
+                                        <Textarea 
+                                            placeholder='{"name": "My World", ...}'
+                                            className="min-h-[300px] font-mono text-xs"
+                                            value={importText}
+                                            onChange={(e) => setImportText(e.target.value)}
+                                        />
+                                    </div>
                                     <div className="flex justify-end gap-2">
                                         <Button variant="ghost" onClick={() => setIsImportOpen(false)}>Cancel</Button>
                                         <Button onClick={handleImport}>Replace</Button>
@@ -779,8 +811,9 @@ export default function WorldCalendar({
                                                     const epoch = calculateEpoch(viewYear, viewMonth, d);
                                                     const phase = epochData[epoch]?.moon_phase?.[mi] ?? 0;
                                                     return (
-                                                        <svg key={mi} width="10" height="10" viewBox="0 0 32 32" className="fill-current text-primary/60">
-                                                            <path d={moon_paths[Math.floor((phase / moon.granularity) * moon_paths.length)]} />
+                                                        <svg key={mi} width="12" height="12" viewBox="0 0 32 32">
+                                                            <circle cx="16" cy="16" r="9.5" fill={moon.shadow_color || "#29344a"} />
+                                                            <path d={moon_paths[Math.floor((phase / moon.granularity) * moon_paths.length)]} fill={moon.color || "#d5f4f1"} />
                                                         </svg>
                                                     );
                                                 })}
@@ -882,11 +915,12 @@ export default function WorldCalendar({
                                                         const epoch = calculateEpoch(viewYear, viewMonth, d);
                                                         const phase = epochData[epoch]?.moon_phase?.[mi] ?? 0;
                                                         return (
-                                                            <div key={mi} className="flex items-center gap-1 px-1.5 py-0.5 bg-muted/50 rounded-full border border-border/50">
-                                                                <svg width="12" height="12" viewBox="0 0 32 32" className="fill-current text-primary/60">
-                                                                    <path d={moon_paths[Math.floor((phase / moon.granularity) * moon_paths.length)]} />
+                                                            <div key={mi} className="flex items-center gap-1.5 px-2 py-1 bg-muted/50 rounded-full border border-border/50">
+                                                                <svg width="16" height="16" viewBox="0 0 32 32">
+                                                                    <circle cx="16" cy="16" r="9.5" fill={moon.shadow_color || "#29344a"} />
+                                                                    <path d={moon_paths[Math.floor((phase / moon.granularity) * moon_paths.length)]} fill={moon.color || "#d5f4f1"} />
                                                                 </svg>
-                                                                <span className="text-[9px] font-bold text-muted-foreground">{moon.name}</span>
+                                                                <span className="text-[10px] font-bold text-muted-foreground">{moon.name}</span>
                                                             </div>
                                                         );
                                                     })}
