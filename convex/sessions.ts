@@ -783,8 +783,8 @@ export const forceUnlockSession = mutation({
   
       const isAdminUser = await isAdmin(ctx)
       const session = await ctx.db.get(args.sessionId)
-      if (!session || (session.owner !== user.subject && !isAdminUser)) {
-        throw new Error('Only the session owner or an admin can unlock it.')
+      if (!session || !isAdminUser) {
+        throw new Error('Only an admin can force unlock this session.')
       }
   
       if (!session.locked) return

@@ -341,7 +341,7 @@ export default function SessionClient() {
 
   const rightColumnContent = (
     <div className="space-y-8">
-      {userId !== session.owner ? (
+      {!session.isOwner ? (
         <>
           <Authenticated>
             {!hasUserCharacterInSession && (
@@ -414,10 +414,10 @@ export default function SessionClient() {
           </Unauthenticated>
         </>
       ) : (
-        (session.isOwner || isAdmin) && !session.locked && (
+        session.isOwner && (
           <SessionManagement 
               session={session}
-              isAdmin={isAdmin}
+              isAdmin={!!isAdmin}
               quests={worldQuests}
               currentWorldDate={currentWorldDate}
               worldCalendar={world?.calendar}
@@ -436,6 +436,8 @@ export default function SessionClient() {
               onSendToDiscord={handleSendToDiscord}
               onLock={handleLock}
               onForceLock={handleForceLock}
+              onUnlock={handleUnlock}
+              onForceUnlock={handleForceUnlock}
               xpGainsPreview={xpGainsPreview || []}
           />
         )
@@ -452,7 +454,7 @@ export default function SessionClient() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <div className="grid grid-cols-1 2xl:grid-cols-[1fr_672px_1fr] flex-1 w-full">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,672px)_320px] 2xl:grid-cols-[1fr_672px_1fr] gap-8 justify-center flex-1 w-full">
         {/* Header row spanning all columns */}
         <header className="col-span-full px-4 py-8">
             <div className="max-w-[1400px] mx-auto flex justify-between items-center">
@@ -561,7 +563,7 @@ export default function SessionClient() {
         </aside>
 
         {/* Central pillar area */}
-        <main className="w-full max-w-2xl mx-auto 2xl:mx-0 space-y-8 pb-12">
+        <main className="w-full max-w-2xl mx-auto lg:mx-0 lg:col-start-1 2xl:col-start-2 space-y-8 pb-12">
               <Card className={session.locked ? "border-amber-200 bg-amber-50/10" : session.planning ? "border-purple-200 bg-purple-50/10" : ""}>
                 <CardHeader>
                   <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
@@ -814,7 +816,7 @@ export default function SessionClient() {
         </main>
 
         {/* Right Column: Sits to the right of the centered pillar */}
-        <aside className="hidden lg:block w-80 flex-none z-30">
+        <aside className="hidden lg:block w-80 flex-none z-30 lg:col-start-2 2xl:col-start-3">
           <div className="sticky top-8 overflow-y-auto max-h-[calc(100vh-4rem)] custom-scrollbar pb-8">
             {rightColumnContent}
           </div>

@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { Pencil, CheckCircle2, Shield, Send, Bell, XCircle, Scroll, Calendar, CalendarRange, Clock } from 'lucide-react'
+import { Pencil, CheckCircle2, Shield, Send, Bell, XCircle, Scroll, Calendar, CalendarRange, Clock, Unlock } from 'lucide-react'
 import SessionDialog from '@/components/sessions/SessionDialog'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -40,6 +40,8 @@ interface SessionManagementProps {
   onSendToDiscord: (type: 'new' | 'remind' | 'cancel') => void
   onLock: () => void
   onForceLock: () => void
+  onUnlock: () => void
+  onForceUnlock: () => void
   xpGainsPreview?: any[]
 }
 
@@ -54,6 +56,8 @@ export default function SessionManagement({
   onSendToDiscord,
   onLock,
   onForceLock,
+  onUnlock,
+  onForceUnlock,
   xpGainsPreview
 }: SessionManagementProps) {
   const [isQuestDialogOpen, setIsQuestDialogOpen] = useState(false)
@@ -118,7 +122,7 @@ export default function SessionManagement({
                 </div>
                 <Dialog open={isQuestDialogOpen} onOpenChange={setIsQuestDialogOpen}>
                     <DialogTrigger asChild>
-                        <Button variant="outline" size="sm" className="h-7 text-[10px] uppercase font-bold tracking-tight">
+                        <Button variant="outline" size="sm" className="h-7 text-[10px] uppercase font-bold tracking-tight" disabled={session.locked}>
                             {session.quest ? "Change" : "Select"}
                         </Button>
                     </DialogTrigger>
@@ -205,7 +209,7 @@ export default function SessionManagement({
                 </div>
                 <Dialog open={isInGameDateDialogOpen} onOpenChange={setIsInGameDateDialogOpen}>
                     <DialogTrigger asChild>
-                        <Button variant="outline" size="sm" className="h-7 text-[10px] uppercase font-bold tracking-tight">
+                        <Button variant="outline" size="sm" className="h-7 text-[10px] uppercase font-bold tracking-tight" disabled={session.locked}>
                             {session.inGameDate ? "Edit" : "Set"}
                         </Button>
                     </DialogTrigger>
@@ -293,7 +297,7 @@ export default function SessionManagement({
         <div className="space-y-2">
             <Dialog>
                 <DialogTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start">
+                    <Button variant="outline" className="w-full justify-start" disabled={session.locked}>
                         <img src="/discord-icon.svg" alt="Discord" className="mr-2 h-4 w-4" />
                         Post Message
                     </Button>
@@ -356,7 +360,7 @@ export default function SessionManagement({
         <SessionDialog 
             session={session} 
             trigger={
-                <Button variant="outline" className="w-full justify-start">
+                <Button variant="outline" className="w-full justify-start" disabled={session.locked}>
                     <Pencil className="h-4 w-4 mr-2" />
                     Edit Session
                 </Button>
@@ -364,81 +368,110 @@ export default function SessionManagement({
             hasWorld={true}
         />
 
-        <AlertDialog>
-            <AlertDialogTrigger asChild>
-                <Button variant="default" className="w-full justify-start" disabled={session.planning}>
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                    End Session
-                </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent className="max-w-2xl">
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Confirm End of Session</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        The following characters will be awarded XP and potentially level up based on the session level ({session.level ?? 'Level TBD'}).
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <div className="py-4 space-y-4 max-h-[400px] overflow-auto">
-                    <div className="grid grid-cols-3 font-bold text-sm border-b pb-2">
-                        <span>Character</span>
-                        <span className="text-center">XP Gain</span>
-                        <span className="text-right">New Level</span>
-                    </div>
-                    {xpGainsPreview?.map((p) => (
-                        <div key={p.id} className="grid grid-cols-3 text-sm items-center py-2 border-b last:border-0">
-                            <div className="flex flex-col">
-                                <span className="font-semibold">{p.name}</span>
-                                <div className="flex items-center gap-1 mt-0.5">
-                                    <CharacterRankIcon rank={p.rank} />
-                                    <span 
-                                        className="inline-flex align-middle justify-center w-14 rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap"
-                                        style={getLevelBadgeStyle(p.currentLvl)}
-                                    >
-                                        Lvl {p.currentLvl}
-                                    </span>
-                                    <span className="text-[10px] text-muted-foreground">({p.currentXp} XP)</span>
-                                </div>
-                                {p.isGMCharacter && <span className="text-[10px] text-primary flex items-center gap-1"><Shield className="h-2 w-2"/> GM</span>}
-                            </div>
-                            <div className="text-center font-mono text-green-600">
-                                +{p.xpGain}
-                            </div>
-                            <div className="text-right">
-                                {p.newLvl > p.currentLvl ? (
-                                    <div className="flex flex-col items-end">
-                                        <span 
-                                            className="inline-flex align-middle justify-center w-14 rounded-full px-2 py-0.5 text-[10px] font-bold border-2 border-green-500 bg-green-100 text-green-700 whitespace-nowrap"
-                                        >
-                                            Lvl {p.newLvl} ↑
-                                        </span>
-                                        <div className="text-[10px] text-muted-foreground">({p.newXp} XP)</div>
-                                    </div>
-                                ) : (
-                                    <div className="flex flex-col items-end">
+        {!session.locked ? (
+            <AlertDialog>
+                <AlertDialogTrigger asChild>
+                    <Button variant="default" className="w-full justify-start">
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                        End Session
+                    </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="max-w-2xl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Confirm End of Session</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            The following characters will be awarded XP and potentially level up based on the session level ({session.level ?? 'Level TBD'}).
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="py-4 space-y-4 max-h-[400px] overflow-auto">
+                        <div className="grid grid-cols-3 font-bold text-sm border-b pb-2">
+                            <span>Character</span>
+                            <span className="text-center">XP Gain</span>
+                            <span className="text-right">New Level</span>
+                        </div>
+                        {xpGainsPreview?.map((p) => (
+                            <div key={p.id} className="grid grid-cols-3 text-sm items-center py-2 border-b last:border-0">
+                                <div className="flex flex-col">
+                                    <span className="font-semibold">{p.name}</span>
+                                    <div className="flex items-center gap-1 mt-0.5">
+                                        <CharacterRankIcon rank={p.rank} />
                                         <span 
                                             className="inline-flex align-middle justify-center w-14 rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap"
-                                            style={getLevelBadgeStyle(p.newLvl)}
+                                            style={getLevelBadgeStyle(p.currentLvl)}
                                         >
-                                            Lvl {p.newLvl}
+                                            Lvl {p.currentLvl}
                                         </span>
-                                        <div className="text-[10px] text-muted-foreground">({p.newXp} XP)</div>
+                                        <span className="text-[10px] text-muted-foreground">({p.currentXp} XP)</span>
                                     </div>
-                                )}
+                                    {p.isGMCharacter && <span className="text-[10px] text-primary flex items-center gap-1"><Shield className="h-2 w-2"/> GM</span>}
+                                </div>
+                                <div className="text-center font-mono text-green-600">
+                                    +{p.xpGain}
+                                </div>
+                                <div className="text-right">
+                                    {p.newLvl > p.currentLvl ? (
+                                        <div className="flex flex-col items-end">
+                                            <span 
+                                                className="inline-flex align-middle justify-center w-14 rounded-full px-2 py-0.5 text-[10px] font-bold border-2 border-green-500 bg-green-100 text-green-700 whitespace-nowrap"
+                                            >
+                                                Lvl {p.newLvl} ↑
+                                            </span>
+                                            <div className="text-[10px] text-muted-foreground">({p.newXp} XP)</div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col items-end">
+                                            <span 
+                                                className="inline-flex align-middle justify-center w-14 rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap"
+                                                style={getLevelBadgeStyle(p.newLvl)}
+                                            >
+                                                Lvl {p.newLvl}
+                                            </span>
+                                            <div className="text-[10px] text-muted-foreground">({p.newXp} XP)</div>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    ))}
-                </div>
-                <AlertDialogFooter className="flex-wrap justify-end">
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={onLock} disabled={session.level === undefined}>Confirm & Award XP</AlertDialogAction>
-                    {isAdmin && (
-                        <AlertDialogAction onClick={onForceLock} variant="destructive">
-                            Force Close (No XP)
+                        ))}
+                    </div>
+                    <AlertDialogFooter className="flex-wrap justify-end">
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={onLock} disabled={session.level === undefined || session.planning}>Confirm & Award XP</AlertDialogAction>
+                        {isAdmin && (
+                            <AlertDialogAction onClick={onForceLock} variant="destructive">
+                                Force Close (No XP)
+                            </AlertDialogAction>
+                        )}
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        ) : isAdmin && (
+            <AlertDialog>
+                <AlertDialogTrigger asChild>
+                    <Button variant="destructive" className="w-full justify-start">
+                        <Unlock className="h-4 w-4 mr-2" />
+                        Unlock Session
+                    </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure you want to unlock the session?</AlertDialogTitle>
+                        <AlertDialogDescription className="text-destructive font-bold">
+                            This will undo XP given to characters in this session.
+                            WARNING: This will break XP values if this isn&apos;t the latest session for these characters.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="flex-wrap justify-end">
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={onUnlock} variant="destructive">
+                            Unlock (Revert XP)
                         </AlertDialogAction>
-                    )}
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
+                        <AlertDialogAction onClick={onForceUnlock} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                            Force Unlock (Keep XP)
+                        </AlertDialogAction>
+                    </AlertDialogFooter>                    
+                </AlertDialogContent>
+            </AlertDialog>
+        )}
       </CardContent>
     </Card>
   )
