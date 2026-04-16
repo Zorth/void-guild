@@ -333,6 +333,13 @@ export default function WorldCalendar({
         await saveCalendar(updated)
     }
 
+    const handleSetToday = async (year: number, month: number, day: number) => {
+        if (!calendar) return
+        const updated = { ...calendar, dynamic_data: { ...calendar.dynamic_data, year, month, day } }
+        await saveCalendar(updated)
+        toast.success(`World date set to ${day} ${calendar.static_data.months[month].name}, ${year}`)
+    }
+
     // Helper: Check if a year is a leap year (simplified FC logic)
     const isLeapYear = (y: number, leapDay: any) => {
         if (!leapDay.interval) return false;
@@ -822,8 +829,19 @@ export default function WorldCalendar({
                                         </div>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-64 p-0 overflow-hidden">
-                                        <div className="bg-muted/50 px-4 py-2 border-b border-border/50 flex justify-between items-center">
-                                            <span className="text-xs font-bold uppercase tracking-wider">{d} {currentMonth.name}</span>
+                                        <div className="bg-muted/50 px-4 py-2 border-b border-border/50 flex justify-between items-center gap-2">
+                                            <span className="text-xs font-bold uppercase tracking-wider truncate">{d} {currentMonth.name}</span>
+                                            {isOwner && (
+                                                <Button 
+                                                    variant="outline" 
+                                                    size="sm" 
+                                                    className="h-6 px-2 text-[9px] font-black uppercase tracking-tighter gap-1 hover:bg-primary/10 hover:text-primary transition-colors"
+                                                    onClick={() => handleSetToday(viewYear, viewMonth, d)}
+                                                >
+                                                    <Clock className="h-3 w-3" />
+                                                    Set Today
+                                                </Button>
+                                            )}
                                         </div>
                                         <div className="p-2 space-y-2 max-h-64 overflow-y-auto">
                                             {/* Sun & Moon Details */}
