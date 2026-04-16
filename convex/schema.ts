@@ -40,6 +40,7 @@ export default defineSchema({
             year: v.number(),
             month: v.number(), // 0-indexed to match JS/internal logic
             day: v.number(),
+            era: v.optional(v.string()),
             endYear: v.optional(v.number()),
             endMonth: v.optional(v.number()),
             endDay: v.optional(v.number()),

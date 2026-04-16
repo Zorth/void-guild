@@ -13,6 +13,8 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn, formatDate, formatTime, getLevelBadgeStyle } from '@/lib/utils'
 import { useState, useEffect, useMemo } from 'react'
+import { toast } from 'sonner'
+import { Id } from '@/convex/_generated/dataModel'
 import { getUsernames, UserMetadata } from '@/app/stats/actions'
 import { useAuth, UserButton } from '@clerk/nextjs'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -481,7 +483,7 @@ export default function WorldClient() {
                           transition={{ delay: Math.min(i * 0.05, 0.3) }}
                           className="border-b pb-2 last:border-0"
                           draggable={userId === session.owner}
-                          onDragStart={(e) => {
+                          onDragStart={(e: any) => {
                             if (userId === session.owner) {
                                 e.dataTransfer.setData('sessionId', session._id);
                                 e.dataTransfer.effectAllowed = 'move';

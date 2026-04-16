@@ -61,6 +61,13 @@ export const renameWorld = mutation({
   },
 })
 
+export const getWorld = query({
+  args: { worldId: v.id('worlds') },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.worldId)
+  },
+})
+
 export const getWorldByName = query({
   args: { name: v.string() },
   handler: async (ctx, args) => {
