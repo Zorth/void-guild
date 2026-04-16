@@ -620,6 +620,11 @@ export default function WorldCalendar({
         return lanes
     }, [calendar, sessions, viewYear, viewMonth, currentMonth])
 
+    const maxLane = useMemo(() => {
+        if (sessionLanes.length === 0) return -1
+        return Math.max(...sessionLanes.map(sl => sl.lane))
+    }, [sessionLanes])
+
     const isCurrentMonth = viewYear === calendar.dynamic_data.year && viewMonth === calendar.dynamic_data.month
     const weekdays = calendar.static_data.weekdays || ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5", "Day 6", "Day 7"]
     const todayMonthName = months[calendar.dynamic_data.month]?.name || months[0].name
@@ -731,7 +736,7 @@ export default function WorldCalendar({
                                     <PopoverTrigger asChild>
                                         <div 
                                             className={cn(
-                                                "bg-card aspect-square sm:aspect-video p-1 sm:p-2 flex flex-col transition-colors relative group cursor-pointer overflow-hidden",
+                                                "bg-card aspect-square sm:aspect-video p-1 sm:p-2 flex flex-col transition-colors relative group cursor-pointer",
                                                 isToday ? "bg-primary/10" : "hover:bg-muted/10",
                                                 dayLanes.length > 0 && !isToday && "bg-purple-500/5"
                                             )}
@@ -785,21 +790,27 @@ export default function WorldCalendar({
                                                 </div>
                                             )}
                                             
-                                            <div className="flex flex-col gap-0.5 w-full">
-                                                {/* Session Bars */}
-                                                {dayLanes.map(sl => {
+                                            <div className="flex flex-col gap-0.5 mt-1 -mx-1 sm:-mx-2 w-[calc(100%+0.5rem)] sm:w-[calc(100%+1rem)]">
+                                                {/* Session Bars with Fixed Lanes for Alignment */}
+                                                {[...Array(maxLane + 1)].map((_, laneIndex) => {
+                                                    const sl = sessionLanes.find(l => 
+                                                        l.lane === laneIndex && 
+                                                        checkSessionOccurs(l.session, viewYear, viewMonth, d)
+                                                    )
+                                                    
+                                                    if (!sl) return <div key={laneIndex} className="h-1.5 sm:h-2 w-full" /> // Spacer for empty lane
+
                                                     const isStart = sl.session.inGameDate!.year === viewYear && sl.session.inGameDate!.month === viewMonth && sl.session.inGameDate!.day === d
                                                     const isEnd = (sl.session.inGameDate!.endYear ?? sl.session.inGameDate!.year) === viewYear && (sl.session.inGameDate!.endMonth ?? sl.session.inGameDate!.month) === viewMonth && (sl.session.inGameDate!.endDay ?? sl.session.inGameDate!.day) === d
                                                     
                                                     return (
                                                         <div 
-                                                            key={sl.session._id} 
+                                                            key={laneIndex} 
                                                             className={cn(
-                                                                "h-1.5 sm:h-2 w-full bg-purple-500/60 shadow-[0_0_2px_rgba(168,85,247,0.3)] relative group/bar transition-all",
-                                                                isStart && "rounded-l-full ml-1 w-[calc(100%-4px)]",
-                                                                isEnd && "rounded-r-full mr-1 w-[calc(100%-4px)]",
-                                                                isStart && isEnd && "w-[calc(100%-8px)]",
-                                                                !isStart && !isEnd && "w-full"
+                                                                "h-1.5 sm:h-2 bg-purple-500/60 shadow-[0_0_2px_rgba(168,85,247,0.3)] relative group/bar transition-all shrink-0 z-10",
+                                                                isStart ? "rounded-l-full ml-1" : "ml-0",
+                                                                isEnd ? "rounded-r-full mr-1" : "mr-0",
+                                                                isStart && isEnd ? "w-[calc(100%-8px)]" : isStart ? "w-[calc(100%-4px+1px)]" : isEnd ? "w-[calc(100%-4px)]" : "w-[calc(100%+1px)]"
                                                             )}
                                                             title={sl.session.quest?.name || "Session"}
                                                         >
