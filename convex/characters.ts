@@ -10,12 +10,8 @@ async function isAdmin(ctx: QueryCtx) {
   if (!identity) return false
   
   // We prioritize the 'admin' claim from the JWT token (configured in Clerk JWT templates).
-  return (
-    identity.admin === true ||
-    identity.admin === 'true' ||
-    (identity.publicMetadata as { admin?: boolean | string } | undefined)?.admin === true ||
-    (identity.publicMetadata as { admin?: boolean | string } | undefined)?.admin === 'true'
-  )
+  const adminClaim = identity.admin ?? (identity.publicMetadata as any)?.admin ?? (identity.public_metadata as any)?.admin;
+  return adminClaim === true || String(adminClaim).toLowerCase() === 'true';
 }
 
 export const listCharacters = query({

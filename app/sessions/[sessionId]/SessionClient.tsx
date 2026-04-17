@@ -341,7 +341,7 @@ export default function SessionClient() {
 
   const rightColumnContent = (
     <div className="space-y-8">
-      {!session.isOwner ? (
+      {!isOwnerOrAdmin ? (
         <>
           <Authenticated>
             {!hasUserCharacterInSession && (
@@ -414,7 +414,7 @@ export default function SessionClient() {
           </Unauthenticated>
         </>
       ) : (
-        session.isOwner && (
+        isOwnerOrAdmin && (
           <SessionManagement 
               session={session}
               isAdmin={!!isAdmin}

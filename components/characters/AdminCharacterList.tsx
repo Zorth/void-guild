@@ -22,7 +22,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 export default function AdminCharacterList() {
   // All hooks must be called unconditionally at the top level
   const isAdmin = useQuery(api.sessions.isAdminQuery)
-  const allCharacters = useQuery(api.characters.listAllCharacters, isAdmin === true ? undefined : "skip")
+  const allCharacters = useQuery(api.characters.listAllCharacters, !!isAdmin ? undefined : "skip")
   const adminUpdateCharacter = useMutation(api.characters.adminUpdateCharacter)
 
   const [selectedCharacter, setSelectedCharacter] = useState<Doc<'characters'> | null>(null)
@@ -38,8 +38,7 @@ export default function AdminCharacterList() {
     system: 'PF' as 'PF' | 'DnD',
   })
 
-  // Handle loading states and non-admin access after all hooks are called
-  if (isAdmin === undefined || (isAdmin && allCharacters === undefined)) {
+  if (isAdmin === undefined) {
     return <Skeleton className="h-9 w-40" />
   }
 

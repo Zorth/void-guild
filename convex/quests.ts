@@ -8,12 +8,9 @@ async function isAdmin(ctx: QueryCtx) {
   const identity = await ctx.auth.getUserIdentity()
   if (!identity) return false
 
-  return (
-    identity.admin === true ||
-    identity.admin === 'true' ||
-    (identity.publicMetadata as { admin?: boolean | string } | undefined)?.admin === true ||
-    (identity.publicMetadata as { admin?: boolean | string } | undefined)?.admin === 'true'
-  )
+  // We prioritize the 'admin' claim from the JWT token (configured in Clerk JWT templates).
+  const adminClaim = identity.admin ?? (identity.publicMetadata as any)?.admin ?? (identity.public_metadata as any)?.admin;
+  return adminClaim === true || String(adminClaim).toLowerCase() === 'true';
 }
 
 export const createQuest = mutation({
