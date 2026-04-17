@@ -22,6 +22,7 @@ import { toast } from 'sonner'
 interface InitiativeItem {
     id: string;
     name: string;
+    counter?: number;
 }
 
 interface FantasyCalendarJSON {
@@ -106,9 +107,37 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
     const [editingTimeValue, setEditingTimeValue] = useState('')
     const lastTickRef = useRef<number | null>(null)
 
+    const [isDraggingTime, setIsDraggingTime] = useState(false);
+    const progressBarRef = useRef<HTMLDivElement>(null);
+
+    const timeSettings = useMemo(() => {
+        if (!calendarConfig) return { sunrise: 6 * 3600, sunset: 18 * 3600 };
+        
+        // Find current season's sunrise/sunset
+        const seasons = calendarConfig.static_data.seasons?.data || [];
+        const currentMonth = calendarConfig.dynamic_data.month;
+        
+        // Fantasy Calendar seasons are often mapped to months, but the structure can vary.
+        // As a robust fallback, we check if seasons exist.
+        if (seasons.length > 0) {
+            // Find the season for the current month
+            // This is a simplified heuristic: find season closest to current month index
+            const seasonIndex = Math.floor((currentMonth / calendarConfig.static_data.n_months) * seasons.length);
+            const season = seasons[seasonIndex];
+            
+            if (season?.time) {
+                return {
+                    sunrise: (season.time.sunrise.hour * 3600) + (season.time.sunrise.minute * 60),
+                    sunset: (season.time.sunset.hour * 3600) + (season.time.sunset.minute * 60)
+                };
+            }
+        }
+
+        return { sunrise: 6 * 3600, sunset: 18 * 3600 };
+    }, [calendarConfig]);
+
     const sunMoonInfo = useMemo(() => {
-        const sunrise = 6 * 3600; // 06:00
-        const sunset = 18 * 3600; // 18:00
+        const { sunrise, sunset } = timeSettings;
         const dayLength = sunset - sunrise;
         const nightLength = 86400 - sunset + sunrise;
 
@@ -129,7 +158,39 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
                 progress
             };
         }
-    }, [timeSeconds]);
+    }, [timeSeconds, timeSettings]);
+
+    const handleSunMoonDrag = (_: any, info: { point: { x: number } }) => {
+        if (!progressBarRef.current) return;
+        const rect = progressBarRef.current.getBoundingClientRect();
+        const padding = 16; // px-4
+        const availableWidth = rect.width - (padding * 2);
+        const x = Math.max(0, Math.min(info.point.x - rect.left - padding, availableWidth));
+        const progress = x / availableWidth;
+        
+        const { sunrise, sunset } = timeSettings;
+        const dayLength = sunset - sunrise;
+        const nightLength = 86400 - sunset + sunrise;
+
+        if (sunMoonInfo.type === 'sun') {
+            setTimeSeconds(sunrise + (progress * dayLength));
+        } else {
+            const nightSeconds = progress * nightLength;
+            if (nightSeconds <= (86400 - sunset)) {
+                setTimeSeconds(sunset + nightSeconds);
+            } else {
+                setTimeSeconds(nightSeconds - (86400 - sunset));
+            }
+        }
+    };
+
+    const jumpToTime = (targetSeconds: number) => {
+        if (timeSeconds >= targetSeconds) {
+            incrementDay()
+        }
+        setTimeSeconds(targetSeconds)
+        toast.info(`Time jumped to ${formatTime(targetSeconds)}`)
+    }
 
     // Source of truth for date is now the world object directly
     const currentDate = useMemo(() => {
@@ -322,12 +383,20 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
         return () => cancelAnimationFrame(rafId)
     }, [isClockRunning, multiplier, calendarConfig, incrementDay, decrementDay])
 
+    const updateCounter = (id: string, delta: number) => {
+        setItems(prev => prev.map(item => 
+            item.id === id ? { ...item, counter: (item.counter || 0) + delta } : item
+        ))
+    }
+
     // Sync initiative characters
     useEffect(() => {
         if (!isMounted) return
         setItems(prevItems => {
             const existingIds = new Set(prevItems.map(item => item.id))
-            const newChars = characters.filter(char => !existingIds.has(char.id))
+            const newChars = characters
+                .filter(char => !existingIds.has(char.id))
+                .map(char => ({ ...char, counter: 0 }))
             if (newChars.length === 0) return prevItems
             return [...prevItems, ...newChars]
         })
@@ -400,7 +469,9 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
 
     const handleReset = () => {
         const sessionCharacterIds = new Set(characters.map(c => c.id))
-        const resetItems = items.filter(item => sessionCharacterIds.has(item.id))
+        const resetItems = items
+            .filter(item => sessionCharacterIds.has(item.id))
+            .map(item => ({ ...item, counter: 0 }))
         setItems(resetItems)
         setCurrentIndex(0)
         setRound(1)
@@ -409,7 +480,7 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
 
     const addItem = () => {
         if (!newName.trim()) return
-        const newItem = { id: `custom-${Date.now()}`, name: newName.trim() }
+        const newItem = { id: `custom-${Date.now()}`, name: newName.trim(), counter: 0 }
         setItems([...items, newItem])
         setNewName('')
         setIsAdding(false)
@@ -538,23 +609,65 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
                             </div>
                         </div>
 
-                        <Reorder.Group axis="y" values={items} onReorder={setItems} className="flex flex-col gap-2">
+                        <Reorder.Group axis="y" values={items} onReorder={setItems} className="flex flex-col gap-2 min-h-[50px]">
                             <AnimatePresence initial={false}>
                                 {items.map((item, index) => (
                                     <Reorder.Item
                                         key={item.id}
                                         value={item}
+                                        layout
                                         initial={{ opacity: 0, y: -10 }}
-                                        animate={{ opacity: 1, y: 0 }}
+                                        animate={{ 
+                                            opacity: 1, 
+                                            y: 0,
+                                            scale: 1,
+                                            zIndex: index === currentIndex ? 10 : 0
+                                        }}
                                         exit={{ opacity: 0, scale: 0.95 }}
+                                        whileDrag={{ 
+                                            scale: 1.03, 
+                                            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+                                            zIndex: 50
+                                        }}
+                                        transition={{ 
+                                            type: "spring", 
+                                            stiffness: 600, 
+                                            damping: 30,
+                                            mass: 1
+                                        }}
                                         className={cn(
-                                            "relative group flex items-center gap-2 p-2 rounded-md border text-sm transition-all bg-card cursor-grab active:cursor-grabbing",
-                                            index === currentIndex ? "bg-[rgba(147,51,234,0.1)] border-2 border-[#D8B4FE] shadow-sm z-10" : "border-border/50 hover:border-border"
+                                            "relative group flex items-center gap-2 p-2 rounded-md border text-sm bg-card cursor-grab active:cursor-grabbing touch-none",
+                                            index === currentIndex ? "bg-purple-500/10 border-purple-300 dark:border-purple-800 shadow-sm" : "border-border/50 hover:border-border"
                                         )}
                                     >
-                                        <GripVertical className="h-3 w-3 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors shrink-0" />
-                                        <span className="flex-grow truncate font-medium">{item.name}</span>
-                                        <button onClick={(e) => { e.stopPropagation(); removeItem(item.id); }} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-destructive/10 hover:text-destructive rounded transition-all shrink-0">
+                                        <GripVertical className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors shrink-0" />
+                                        <span className="flex-grow truncate font-medium select-none">{item.name}</span>
+                                        
+                                        <div className="flex items-center gap-1 bg-muted/50 rounded-md p-0.5 border border-border/50" onClick={(e) => e.stopPropagation()}>
+                                            <button 
+                                                onClick={() => updateCounter(item.id, -1)}
+                                                className="h-6 w-6 flex items-center justify-center hover:bg-destructive/10 hover:text-destructive rounded transition-all text-xs font-black"
+                                            >
+                                                -
+                                            </button>
+                                            <span className={cn(
+                                                "min-w-[20px] text-center text-[10px] font-black tabular-nums",
+                                                (item.counter || 0) > 0 ? "text-blue-500" : (item.counter || 0) < 0 ? "text-red-500" : "text-muted-foreground"
+                                            )}>
+                                                {item.counter || 0}
+                                            </span>
+                                            <button 
+                                                onClick={() => updateCounter(item.id, 1)}
+                                                className="h-6 w-6 flex items-center justify-center hover:bg-primary/10 hover:text-primary rounded transition-all text-xs font-black"
+                                            >
+                                                +
+                                            </button>
+                                        </div>
+
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); removeItem(item.id); }} 
+                                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-destructive/10 hover:text-destructive rounded transition-all shrink-0"
+                                        >
                                             <X className="h-3 w-3" />
                                         </button>
                                     </Reorder.Item>
@@ -620,22 +733,69 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
                                 )}
 
                                 {/* Sun/Moon Progress Indicator */}
-                                <div className="relative w-full h-4 mt-2 flex items-center px-4">
+                                <div ref={progressBarRef} className="relative w-full h-8 mt-2 flex items-center px-4 touch-none">
                                     <div className="absolute inset-x-4 h-0.5 bg-muted-foreground/10 rounded-full" />
                                     <motion.div 
-                                        className="absolute"
+                                        className="absolute cursor-grab active:cursor-grabbing z-20"
+                                        onPanStart={() => setIsDraggingTime(true)}
+                                        onPanEnd={() => setIsDraggingTime(false)}
+                                        onPan={handleSunMoonDrag}
                                         initial={false}
                                         animate={{ 
-                                            left: `calc(${sunMoonInfo.progress * 100}% - ${sunMoonInfo.progress * 46}px + 16px)` 
+                                            left: `calc(${sunMoonInfo.progress * 100}% + ${16 - (sunMoonInfo.progress * 32)}px - 10px)`
                                         }}
-                                        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                                        transition={isDraggingTime ? { type: "just" } : { type: "spring", stiffness: 300, damping: 30 }}
                                     >
-                                        {sunMoonInfo.type === 'sun' ? (
-                                            <Sun className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500/20" />
-                                        ) : (
-                                            <Moon className="h-3.5 w-3.5 text-blue-400 fill-blue-400/20" />
-                                        )}
+                                        <div className="p-4 -m-4">
+                                            {sunMoonInfo.type === 'sun' ? (
+                                                <Sun className="h-5 w-5 text-yellow-500 fill-yellow-500/20" />
+                                            ) : (
+                                                <Moon className="h-5 w-5 text-blue-400 fill-blue-400/20" />
+                                            )}
+                                        </div>
                                     </motion.div>
+                                    
+                                    {/* Labels */}
+                                    <div className="absolute inset-x-4 bottom-0 flex justify-between px-1">
+                                        <span className="text-[8px] font-bold text-muted-foreground/50 uppercase">{sunMoonInfo.type === 'sun' ? 'Dawn' : 'Sunset'}</span>
+                                        <span className="text-[8px] font-bold text-muted-foreground/50 uppercase">{sunMoonInfo.type === 'sun' ? 'Dusk' : 'Sunrise'}</span>
+                                    </div>
+                                </div>
+
+                                {/* Quick Jump Buttons */}
+                                <div className="grid grid-cols-4 gap-1 mt-3">
+                                    <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-7 text-[8px] font-black uppercase tracking-tighter hover:bg-blue-500/10 hover:text-blue-500"
+                                        onClick={() => jumpToTime((timeSettings.sunset + 3 * 3600) % 86400)}
+                                    >
+                                        <Moon className="h-2 w-2 mr-1" /> Night
+                                    </Button>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-7 text-[8px] font-black uppercase tracking-tighter hover:bg-orange-500/10 hover:text-orange-500"
+                                        onClick={() => jumpToTime(timeSettings.sunrise)}
+                                    >
+                                        <Sun className="h-2 w-2 mr-1" /> Dawn
+                                    </Button>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-7 text-[8px] font-black uppercase tracking-tighter hover:bg-yellow-500/10 hover:text-yellow-500"
+                                        onClick={() => jumpToTime(12 * 3600)}
+                                    >
+                                        <Sun className="h-2 w-2 mr-1 fill-yellow-500/20" /> Noon
+                                    </Button>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-7 text-[8px] font-black uppercase tracking-tighter hover:bg-purple-500/10 hover:text-purple-500"
+                                        onClick={() => jumpToTime(timeSettings.sunset)}
+                                    >
+                                        <Moon className="h-2 w-2 mr-1 fill-purple-500/20" /> Dusk
+                                    </Button>
                                 </div>
                             </div>
 
