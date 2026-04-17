@@ -7,19 +7,32 @@ import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { ChevronLeft, Globe, ChevronRight } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useState, useEffect } from 'react'
-import { getUsernames, UserMetadata } from '@/app/stats/actions'
+import { useMemo } from 'react'
+import { UserMetadata } from '@/app/stats/actions'
 
 export default function WorldsListPage() {
   const worlds = useQuery(api.worlds.listAllWorlds)
-  const [userMetadata, setUserMetadata] = useState<Record<string, UserMetadata>>({})
 
-  useEffect(() => {
-    if (worlds && worlds.length > 0) {
-      const ownerIds = Array.from(new Set(worlds.map((w) => w.owner)))
-      getUsernames(ownerIds).then(setUserMetadata)
-    }
-  }, [worlds])
+  const ownerIds = useMemo(() => {
+    if (!worlds) return [];
+    return Array.from(new Set(worlds.map((w) => w.owner)));
+  }, [worlds]);
+
+  const usersMetadataRaw = useQuery(api.users.getUsersByIds, { userIds: ownerIds });
+
+  const userMetadata = useMemo(() => {
+    if (!usersMetadataRaw) return {};
+    const map: Record<string, UserMetadata> = {};
+    usersMetadataRaw.forEach(user => {
+        map[user.userId] = {
+            name: user.name || user.username || `User ${user.userId.slice(-4)}`,
+            imageUrl: user.imageUrl,
+            extraSessionsPlayed: user.extraSessionsPlayed,
+            extraSessionsRan: user.extraSessionsRan,
+        };
+    });
+    return map;
+  }, [usersMetadataRaw]);
 
   return (
     <div className="container mx-auto py-8 px-4 max-w-4xl">

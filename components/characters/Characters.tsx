@@ -30,16 +30,20 @@ import { Doc } from '@/convex/_generated/dataModel'
 import Sessions from '@/components/sessions/Sessions'
 import CreateCharacter from './CreateCharacter'
 import AdminCharacterList from './AdminCharacterList'
+import AdminUserList from './AdminUserList'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getLevelBadgeStyle, CharacterRankIcon, getXPBarStyles } from '@/lib/utils'
 import { track } from '@vercel/analytics'
 import { useMemo } from 'react'
+import { Authenticated } from 'convex/react'
 import Link from 'next/link'
 
 export default function Characters({ filters }: { filters?: { pf: boolean, dnd: boolean } }) {
   const charactersRaw = useQuery(api.characters.listCharacters)
   const updateCharacter = useMutation(api.characters.updateCharacter)
   const deleteCharacter = useMutation(api.characters.deleteCharacter)
+
+  const isAdmin = useQuery(api.sessions.isAdminQuery)
 
   const characters = useMemo(() => {
     if (!charactersRaw) return charactersRaw;
@@ -137,7 +141,10 @@ export default function Characters({ filters }: { filters?: { pf: boolean, dnd: 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle>Your Characters</CardTitle>
-            <AdminCharacterList />
+            <div className="flex items-center gap-2">
+                <AdminUserList />
+                <AdminCharacterList />
+            </div>
           </CardHeader>
           <CardContent>
             {characters === undefined ? (

@@ -97,6 +97,10 @@ export default defineSchema({
         isAdmin: v.boolean(),
         isGM: v.boolean(),
         name: v.optional(v.string()),
+        username: v.optional(v.string()),
         email: v.optional(v.string()),
+        imageUrl: v.optional(v.string()),
+        extraSessionsPlayed: v.optional(v.number()),
+        extraSessionsRan: v.optional(v.number()),
     }).index('by_userId', ['userId']),
 })

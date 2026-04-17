@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/popover'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useAuth } from '@clerk/nextjs'
-import { getUsernames, UserMetadata } from '@/app/stats/actions'
+import { UserMetadata } from '@/app/stats/actions'
 import {
     Tooltip,
     TooltipContent,
@@ -257,14 +257,26 @@ function MonthOverview({
     // Optimistic UI for availability
     const [optimisticAvailability, setOptimisticAvailability] = useState<Record<number, boolean>>({});
 
-    const [userMetadata, setUserMetadata] = useState<Record<string, UserMetadata>>({});
-
-    useEffect(() => {
-        if (availability && availability.length > 0) {
-            const userIds = Array.from(new Set(availability.map(a => a.userId)));
-            getUsernames(userIds).then(setUserMetadata);
-        }
+    const userIds = useMemo(() => {
+        if (!availability) return [];
+        return Array.from(new Set(availability.map(a => a.userId)));
     }, [availability]);
+
+    const usersMetadataRaw = useQuery(api.users.getUsersByIds, { userIds });
+
+    const userMetadata = useMemo(() => {
+        if (!usersMetadataRaw) return {};
+        const map: Record<string, UserMetadata> = {};
+        usersMetadataRaw.forEach(user => {
+            map[user.userId] = {
+                name: user.name || user.username || `User ${user.userId.slice(-4)}`,
+                imageUrl: user.imageUrl,
+                extraSessionsPlayed: user.extraSessionsPlayed,
+                extraSessionsRan: user.extraSessionsRan,
+            };
+        });
+        return map;
+    }, [usersMetadataRaw]);
     
     // To align with Mon-Sun (Mon = 0, ..., Sun = 6):
     const firstDayOfWeek = (firstDayOfMonth.getDay() + 6) % 7;

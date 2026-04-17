@@ -6,8 +6,8 @@ import { useEffect } from 'react'
 import { useAuth } from '@clerk/nextjs'
 
 /**
- * Background component that syncs Clerk user metadata (roles) to the Convex database.
- * This ensures that admin/gamemaster permissions are persisted even if JWT claims fail.
+ * Background component that syncs Clerk user metadata (roles, extra sessions) to the Convex database.
+ * This ensures that user data is persisted and kept up to date.
  */
 export default function UserSync() {
   const { userId, isSignedIn } = useAuth()
@@ -15,6 +15,7 @@ export default function UserSync() {
 
   useEffect(() => {
     if (isSignedIn && userId) {
+      // Sync basic info via mutation (fast, uses JWT)
       syncUser().catch(console.error)
     }
   }, [isSignedIn, userId, syncUser])

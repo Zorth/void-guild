@@ -15,7 +15,7 @@ import { cn, formatDate, formatTime, getLevelBadgeStyle } from '@/lib/utils'
 import { useState, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
 import { Id } from '@/convex/_generated/dataModel'
-import { getUsernames, UserMetadata } from '@/app/stats/actions'
+import { UserMetadata } from '@/app/stats/actions'
 import { useAuth, UserButton } from '@clerk/nextjs'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Input } from '@/components/ui/input'
@@ -219,6 +219,27 @@ export default function WorldClient() {
   const [newName, setNewName] = useState('')
   const [viewMode, setViewMode] = useState<'reputation' | 'calendar'>('reputation')
 
+  const userIds = useMemo(() => {
+    if (!world) return [];
+    return [world.owner];
+  }, [world]);
+
+  const usersMetadataRaw = useQuery(api.users.getUsersByIds, { userIds });
+
+  const userMetadata = useMemo(() => {
+    if (!usersMetadataRaw) return {};
+    const map: Record<string, UserMetadata> = {};
+    usersMetadataRaw.forEach(user => {
+        map[user.userId] = {
+            name: user.name || user.username || `User ${user.userId.slice(-4)}`,
+            imageUrl: user.imageUrl,
+            extraSessionsPlayed: user.extraSessionsPlayed,
+            extraSessionsRan: user.extraSessionsRan,
+        };
+    });
+    return map;
+  }, [usersMetadataRaw]);
+
   const isOwner = world ? userId === world.owner : false
   const repVisible = world?.reputationVisible ?? false
   const calVisible = world?.calendarVisible ?? false
@@ -238,7 +259,6 @@ export default function WorldClient() {
   useEffect(() => {
     if (world) {
       setNewName(world.name)
-      getUsernames([world.owner]).then(setUserMetadata)
     }
   }, [world])
 

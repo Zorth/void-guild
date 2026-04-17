@@ -5,21 +5,32 @@ import { api } from '@/convex/_generated/api'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn, formatDate, formatTime } from '@/lib/utils'
 import { Sparkles, Trophy, User } from 'lucide-react'
-import { useState, useEffect } from 'react'
-import { getUsernames, UserMetadata } from '@/app/stats/actions'
+import { useMemo } from 'react'
+import { UserMetadata } from '@/app/stats/actions'
 
 export default function ActivityFeed() {
   const activities = useQuery(api.activity.listActivity)
-  const [userMetadata, setUserMetadata] = useState<Record<string, UserMetadata>>({})
 
-  useEffect(() => {
-    if (activities) {
-        const userIds = Array.from(new Set(activities.map(a => a.userId).filter((id): id is string => !!id)))
-        if (userIds.length > 0) {
-            getUsernames(userIds).then(setUserMetadata)
-        }
-    }
-  }, [activities])
+  const userIds = useMemo(() => {
+    if (!activities) return [];
+    return Array.from(new Set(activities.map(a => a.userId).filter((id): id is string => !!id)));
+  }, [activities]);
+
+  const usersMetadataRaw = useQuery(api.users.getUsersByIds, { userIds });
+
+  const userMetadata = useMemo(() => {
+    if (!usersMetadataRaw) return {};
+    const map: Record<string, UserMetadata> = {};
+    usersMetadataRaw.forEach(user => {
+        map[user.userId] = {
+            name: user.name || user.username || `User ${user.userId.slice(-4)}`,
+            imageUrl: user.imageUrl,
+            extraSessionsPlayed: user.extraSessionsPlayed,
+            extraSessionsRan: user.extraSessionsRan,
+        };
+    });
+    return map;
+  }, [usersMetadataRaw]);
 
   if (activities === undefined) {
     return (

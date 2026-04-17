@@ -6,8 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { ChevronLeft, Crown, Shield, Swords, Book } from 'lucide-react'
-import { useMemo, useEffect, useState } from 'react'
-import { getUsernames, UserMetadata } from './actions'
+import { useMemo } from 'react'
+import { UserMetadata } from './actions'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@clerk/nextjs'
 import { cn } from '@/lib/utils'
@@ -17,25 +17,35 @@ export default function StatsPage() {
     const characters = useQuery(api.characters.listAllCharactersPublic);
     const gmStatsRaw = useQuery(api.sessions.getGMStats);
     const playerStatsRaw = useQuery(api.sessions.getPlayerStats);
-    const [userMetadata, setUserMetadata] = useState<Record<string, UserMetadata>>({});
+
+    const userIds = useMemo(() => {
+        if (!gmStatsRaw || !playerStatsRaw) return [];
+        return Array.from(new Set([
+            ...gmStatsRaw.map(s => s.userId),
+            ...playerStatsRaw.map(s => s.userId)
+        ]));
+    }, [gmStatsRaw, playerStatsRaw]);
+
+    const usersMetadataRaw = useQuery(api.users.getUsersByIds, { userIds });
+
+    const userMetadata = useMemo(() => {
+        if (!usersMetadataRaw) return {};
+        const map: Record<string, UserMetadata> = {};
+        usersMetadataRaw.forEach(user => {
+            map[user.userId] = {
+                name: user.name || user.username || `User ${user.userId.slice(-4)}`,
+                imageUrl: user.imageUrl,
+                extraSessionsPlayed: user.extraSessionsPlayed,
+                extraSessionsRan: user.extraSessionsRan,
+            };
+        });
+        return map;
+    }, [usersMetadataRaw]);
   
     const sortedCharacters = useMemo(() => {
       if (!characters) return [];
       return [...characters].sort((a, b) => b.lvl - a.lvl || b.xp - a.xp);
     }, [characters]);
-
-    useEffect(() => {
-        if (gmStatsRaw && playerStatsRaw) {
-            const userIds = new Set([
-                ...gmStatsRaw.map(s => s.userId),
-                ...playerStatsRaw.map(s => s.userId)
-            ]);
-            
-            if (userIds.size > 0) {
-                getUsernames(Array.from(userIds)).then(setUserMetadata);
-            }
-        }
-    }, [gmStatsRaw, playerStatsRaw]);
 
     const gmStats = useMemo(() => {
         if (!gmStatsRaw) return null;
