@@ -728,7 +728,7 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
                                                 {currentDate.day} {calendarConfig.static_data.months[currentDate.month]?.name || 'Unknown Month'}
                                             </div>
                                             <div className="text-[10px] font-bold text-muted-foreground">
-                                                Year {formatInGameYear(currentDate.year, calendarConfig.static_data.eras, calendarConfig.static_data.settings?.year_zero_exists)}
+                                                {formatInGameYear(currentDate.year, calendarConfig.static_data.eras, calendarConfig.static_data.settings?.year_zero_exists, { useAbbreviation: true, labelFirst: true })}
                                             </div>
                                         </div>
                                         <Button

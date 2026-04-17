@@ -67,8 +67,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         const { year, month, day, era, endYear, endMonth, endDay } = session.inGameDate
         
         const formatPart = (y: number, m: number, d: number) => {
-            if (era) return `${y}/${String(m + 1).padStart(2, '0')}/${String(d).padStart(2, '0')} ${era}`
-            return `${formatInGameYear(y, eras, yearZeroExists)}/${String(m + 1).padStart(2, '0')}/${String(d).padStart(2, '0')}`
+            if (era) return `${era} ${y}/${String(m + 1).padStart(2, '0')}/${String(d).padStart(2, '0')}`
+            return `${formatInGameYear(y, eras, yearZeroExists, { useAbbreviation: true, labelFirst: true })}/${String(m + 1).padStart(2, '0')}/${String(d).padStart(2, '0')}`
         }
 
         const start = formatPart(year, month, day)

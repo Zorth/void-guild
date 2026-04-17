@@ -20,7 +20,7 @@ const formatInGameDate = (ig: any, eras: any[] = [], globalYearZero: boolean = f
 
     const formatPart = (y: number, m: number, d: number) => {
         if (ig.era) {
-            return `${y}/${String(m + 1).padStart(2, '0')}/${String(d).padStart(2, '0')} ${ig.era}`;
+            return `${ig.era} ${y}/${String(m + 1).padStart(2, '0')}/${String(d).padStart(2, '0')}`;
         }
         
         if (!eras || eras.length === 0) {

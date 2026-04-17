@@ -700,7 +700,7 @@ export default function WorldCalendar({
                         {calendar.name || "World Calendar"}
                     </CardTitle>
                     <div className="text-sm font-medium px-2 py-0.5 bg-primary/10 text-primary rounded-md border border-primary/20">
-                        Today: {calendar.dynamic_data.day} {todayMonthName}, {formatInGameYear(calendar.dynamic_data.year, calendar.static_data.eras, calendar.static_data.settings?.year_zero_exists)}
+                        Today: {calendar.dynamic_data.day} {todayMonthName}, {formatInGameYear(calendar.dynamic_data.year, calendar.static_data.eras, calendar.static_data.settings?.year_zero_exists, { useAbbreviation: true, labelFirst: true })}
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -792,7 +792,7 @@ export default function WorldCalendar({
                     </Button>
                     <div className="text-center">
                         <h2 className="text-xl font-bold tracking-tight">{currentMonth.name}</h2>
-                        <p className="text-sm text-muted-foreground font-medium">Year {formatInGameYear(viewYear, calendar.static_data.eras, calendar.static_data.settings?.year_zero_exists)}</p>
+                        <p className="text-sm text-muted-foreground font-medium">{formatInGameYear(viewYear, calendar.static_data.eras, calendar.static_data.settings?.year_zero_exists, { useAbbreviation: true, labelFirst: true })}</p>
                     </div>
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { if(viewMonth === calendar.static_data.n_months-1) { setViewMonth(0); setViewYear(v=>v+1); } else setViewMonth(v=>v+1); }}>
                         <ChevronRight className="h-5 w-5" />

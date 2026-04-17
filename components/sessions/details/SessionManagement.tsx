@@ -190,15 +190,15 @@ export default function SessionManagement({
                         <div className="flex flex-col">
                             <span className="font-medium text-primary">
                                 {session.inGameDate.era 
-                                    ? `${session.inGameDate.year}/${String(session.inGameDate.month + 1).padStart(2, '0')}/${String(session.inGameDate.day).padStart(2, '0')} ${session.inGameDate.era}`
-                                    : `${formatInGameYear(session.inGameDate.year, eras, yearZeroExists)}/${String(session.inGameDate.month + 1).padStart(2, '0')}/${String(session.inGameDate.day).padStart(2, '0')}`
+                                    ? `${session.inGameDate.era} ${session.inGameDate.year}/${String(session.inGameDate.month + 1).padStart(2, '0')}/${String(session.inGameDate.day).padStart(2, '0')}`
+                                    : `${formatInGameYear(session.inGameDate.year, eras, yearZeroExists, { useAbbreviation: true, labelFirst: true })}/${String(session.inGameDate.month + 1).padStart(2, '0')}/${String(session.inGameDate.day).padStart(2, '0')}`
                                 }
                             </span>
                             {session.inGameDate.endDay && (
                                 <span className="text-[10px] text-muted-foreground">
                                     to {session.inGameDate.era 
-                                        ? `${session.inGameDate.endYear ?? session.inGameDate.year}/${String(session.inGameDate.endMonth! + 1).padStart(2, '0')}/${String(session.inGameDate.day).padStart(2, '0')} ${session.inGameDate.era}`
-                                        : `${formatInGameYear(session.inGameDate.endYear ?? session.inGameDate.year, eras, yearZeroExists)}/${String(session.inGameDate.endMonth! + 1).padStart(2, '0')}/${String(session.inGameDate.endDay).padStart(2, '0')}`
+                                        ? `${session.inGameDate.era} ${session.inGameDate.endYear ?? session.inGameDate.year}/${String(session.inGameDate.endMonth! + 1).padStart(2, '0')}/${String(session.inGameDate.day).padStart(2, '0')}`
+                                        : `${formatInGameYear(session.inGameDate.endYear ?? session.inGameDate.year, eras, yearZeroExists, { useAbbreviation: true, labelFirst: true })}/${String(session.inGameDate.endMonth! + 1).padStart(2, '0')}/${String(session.inGameDate.endDay).padStart(2, '0')}`
                                     }
                                 </span>
                             )}
