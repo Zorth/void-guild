@@ -753,7 +753,7 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
                                         animate={{ 
                                             left: `calc(${sunMoonInfo.progress * 100}% + ${16 - (sunMoonInfo.progress * 32)}px - 10px)`
                                         }}
-                                        transition={isDraggingTime ? { type: "just" } : { type: "spring", stiffness: 300, damping: 30 }}
+                                        transition={isDraggingTime ? { duration: 0 } : { type: "spring", stiffness: 300, damping: 30 }}
                                     >
                                         <div className="p-4 -m-4">
                                             {sunMoonInfo.type === 'sun' ? (
