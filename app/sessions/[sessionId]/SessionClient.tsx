@@ -1,6 +1,6 @@
 'use client'
 
-import { useParams, useRouter, notFound } from 'next/navigation'
+import { useParams, notFound } from 'next/navigation'
 import { useQuery, useMutation, useAction, Authenticated, Unauthenticated } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -11,7 +11,7 @@ import Link from 'next/link'
 import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, Unlock, Globe, Scroll, Trophy, Menu } from 'lucide-react'
 import { useAuth, SignInButton } from '@clerk/nextjs'
 import { Skeleton } from '@/components/ui/skeleton'
-import { cn, formatDate, formatTime as formatTimeUtil, getLevelBadgeStyle, getDualLevelBadgeStyle } from '@/lib/utils'
+import { formatDate, formatTime as formatTimeUtil, getLevelBadgeStyle, getDualLevelBadgeStyle } from '@/lib/utils'
 import { fireJoinParticles, fireGoldParticles } from '@/lib/particles'
 import { toast } from 'sonner'
 import { track } from '@vercel/analytics'
@@ -61,7 +61,6 @@ interface SessionWithGM extends Doc<'sessions'> {
 export default function SessionClient() {
   const params = useParams()
   const sessionId = params.sessionId as string
-  const router = useRouter()
 
   const { userId } = useAuth()
   const session = useQuery(api.sessions.getSession, { sessionId }) as SessionWithGM | undefined | null
@@ -90,10 +89,10 @@ export default function SessionClient() {
     try {
         const parsed = JSON.parse(world.calendar);
         return parsed.dynamic_data;
-    } catch (e) {
+    } catch {
         return null;
     }
-  }, [world?.calendar]);
+  }, [world]);
 
   const [selectedCharacterId, setSelectedCharacterId] = useState<Id<'characters'> | ''>('')
   const [selectedAdminCharacterId, setSelectedAdminCharacterId] = useState<Id<'characters'> | ''>('')

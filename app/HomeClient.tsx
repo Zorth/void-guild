@@ -6,40 +6,27 @@ import { SignInButton, UserButton } from '@clerk/nextjs'
 import Characters from '@/components/characters/Characters'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Trophy, Book, Globe, Sparkles } from 'lucide-react'
 import ActivityFeed from '@/components/ActivityFeed'
 import { ThemeToggle } from '@/components/ThemeToggle'
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
 import logo from './Void_Logo_WhiteTransparent.png'
-import { motion, useAnimationControls, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 
 export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
   const [pfFilter, setPfFilter] = useState(true)
   const [dndFilter, setDndFilter] = useState(true)
   const [rotation, setRotation] = useState(0)
   const [velocity, setVelocity] = useState(0)
+  const [hasReachedRainbow, setHasReachedRainbow] = useState(false)
   const lastClickTime = useRef<number>(0)
 
   const incrementLogoClicks = useMutation(api.users.incrementLogoClicks)
   const isGM = useQuery(api.sessions.isGameMasterQuery)
   const ownedWorld = useQuery(api.worlds.getWorldByOwner)
-  const identity = useQuery(api.sessions.debugIdentity)
-
-  useEffect(() => {
-    if (identity) {
-      console.log('--- AUTH DEBUG START ---')
-      console.log('Status:', (identity as any).status || 'authenticated')
-      console.log('Subject:', identity.subject)
-      console.log('Issuer:', identity.issuer)
-      console.log('Keys:', identity.keys)
-      console.log('Full Identity:', identity.identity)
-      console.log('--- AUTH DEBUG END ---')
-    }
-  }, [identity])
 
   const handleLogoClick = () => {
     const now = Date.now()
@@ -58,8 +45,12 @@ export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
     let frameId: number
 
     const update = () => {
-      if (velocity > 0.1) {
-        setRotation(r => (r + velocity) % 360)
+      if (velocity > 15 && !hasReachedRainbow) {
+        setHasReachedRainbow(true)
+      }
+
+      if (velocity > 0.1 || hasReachedRainbow) {
+        setRotation(r => (r + Math.max(velocity, hasReachedRainbow ? 1.5 : 0)) % 360)
         // Natural decay
         setVelocity(v => v * 0.98)
       } else if (velocity !== 0) {
@@ -70,16 +61,16 @@ export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
 
     frameId = requestAnimationFrame(update)
     return () => cancelAnimationFrame(frameId)
-  }, [velocity])
+  }, [velocity, hasReachedRainbow])
 
-  const isRainbow = velocity > 20
+  const isRainbow = hasReachedRainbow
 
   return (
     <>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8">
         <div className="flex flex-row items-center gap-4 w-full sm:w-auto">
           <motion.div 
-            className={cn("cursor-pointer select-none", isRainbow && "rainbow-logo")}
+            className={cn("cursor-pointer select-none", isRainbow && "rainbow-logo hyper-spin")}
             onClick={handleLogoClick}
             animate={{ rotate: rotation }}
             transition={{ type: "tween", ease: "linear", duration: 0 }}

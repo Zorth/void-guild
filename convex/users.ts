@@ -1,6 +1,6 @@
-import { mutation, query } from './_generated/server'
+import { mutation, query, MutationCtx } from './_generated/server'
 import { v } from 'convex/values'
-import { isAdmin, isGameMaster, extractClaim } from './roles'
+import { isAdmin, extractClaim } from './roles'
 
 /**
  * Syncs the current user's metadata and roles from Clerk (via JWT) to the database.
@@ -67,6 +67,37 @@ export const syncUser = mutation({
 })
 
 /**
+ * Increments the logoClicks counter for the current user.
+ */
+export const incrementLogoClicks = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) return null
+
+    const userRecord = await ctx.db
+      .query('users')
+      .withIndex('by_userId', (q) => q.eq('userId', identity.subject))
+      .first()
+
+    if (userRecord) {
+      await ctx.db.patch(userRecord._id, {
+        logoClicks: (userRecord.logoClicks || 0) + 1,
+      })
+    } else {
+      // Create user record if it doesn't exist yet
+      await ctx.db.insert('users', {
+        userId: identity.subject,
+        isAdmin: false,
+        isGM: false,
+        name: identity.name,
+        logoClicks: 1,
+      })
+    }
+  },
+})
+
+/**
  * Gets multiple users by their Clerk userIds.
  */
 export const getUsersByIds = query({
@@ -101,7 +132,7 @@ export const listUsers = query({
 /**
  * Internal logic for updating or inserting a user record.
  */
-async function updateUserData(ctx: any, args: {
+async function updateUserData(ctx: MutationCtx, args: {
   userId: string;
   isAdmin: boolean;
   isGM: boolean;
@@ -112,10 +143,11 @@ async function updateUserData(ctx: any, args: {
 }) {
   const userRecord = await ctx.db
     .query('users')
-    .withIndex('by_userId', (q: any) => q.eq('userId', args.userId))
+    .withIndex('by_userId', (q) => q.eq('userId', args.userId))
     .first()
 
-  const { userId, ...patchData } = args
+  const patchData = { ...args }
+  delete (patchData as any).userId
 
   if (userRecord) {
     await ctx.db.patch(userRecord._id, patchData)

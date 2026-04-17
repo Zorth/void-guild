@@ -3,7 +3,6 @@
 import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { AlertCircle, RefreshCw, Home } from 'lucide-react'
-import Link from 'next/link'
 
 export default function GlobalError({
   error,
@@ -29,7 +28,7 @@ export default function GlobalError({
         <div className="space-y-2">
           <h1 className="text-3xl font-bold font-taroca">The Void has glitched</h1>
           <p className="text-muted-foreground">
-            An unexpected error has occurred in the Guild's systems.
+            An unexpected error has occurred in the Guild&apos;s systems.
           </p>
         </div>
 

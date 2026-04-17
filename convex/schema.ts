@@ -102,5 +102,6 @@ export default defineSchema({
         imageUrl: v.optional(v.string()),
         extraSessionsPlayed: v.optional(v.number()),
         extraSessionsRan: v.optional(v.number()),
+        logoClicks: v.optional(v.number()),
     }).index('by_userId', ['userId']),
 })
