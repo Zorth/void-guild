@@ -14,54 +14,47 @@ import { useState, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
 import logo from './Void_Logo_WhiteTransparent.png'
-import { motion } from 'framer-motion'
+import { motion, useMotionValue, useAnimationFrame } from 'framer-motion'
 
 export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
   const [pfFilter, setPfFilter] = useState(true)
   const [dndFilter, setDndFilter] = useState(true)
-  const [rotation, setRotation] = useState(0)
-  const [velocity, setVelocity] = useState(0)
+  const rotation = useMotionValue(0)
+  const velocityRef = useRef(0)
   const [hasReachedRainbow, setHasReachedRainbow] = useState(false)
-  const lastClickTime = useRef<number>(0)
 
   const incrementLogoClicks = useMutation(api.users.incrementLogoClicks)
   const isGM = useQuery(api.sessions.isGameMasterQuery)
   const ownedWorld = useQuery(api.worlds.getWorldByOwner)
 
   const handleLogoClick = () => {
-    const now = Date.now()
-    const delta = now - lastClickTime.current
-
-    // Increase velocity on click
-    // Faster clicks = more velocity boost
-    const boost = Math.max(5, 50 - Math.min(45, delta / 10))
-    setVelocity(v => v + boost)
-    lastClickTime.current = now
-
-    // Persistent tracking
+    // Balanced boost to allow building momentum
+    velocityRef.current += 6
+    
     incrementLogoClicks().catch(console.error)
   }
-  useEffect(() => {
-    let frameId: number
 
-    const update = () => {
-      if (velocity > 15 && !hasReachedRainbow) {
-        setHasReachedRainbow(true)
-      }
+  useAnimationFrame((time, delta) => {
+    const deltaMultiplier = delta / 16.67
 
-      if (velocity > 0.1 || hasReachedRainbow) {
-        setRotation(r => (r + Math.max(velocity, hasReachedRainbow ? 1.5 : 0)) % 360)
-        // Natural decay
-        setVelocity(v => v * 0.98)
-      } else if (velocity !== 0) {
-        setVelocity(0)
-      }
-      frameId = requestAnimationFrame(update)
+    // Threshold of 40 means ~8-10 clicks to unlock
+    if (velocityRef.current > 40 && !hasReachedRainbow) {
+      setHasReachedRainbow(true)
     }
 
-    frameId = requestAnimationFrame(update)
-    return () => cancelAnimationFrame(frameId)
-  }, [velocity, hasReachedRainbow])
+    if (velocityRef.current > 0.05 || hasReachedRainbow) {
+      const currentRotation = rotation.get()
+      const speed = Math.max(velocityRef.current, hasReachedRainbow ? 0.8 : 0)
+      
+      rotation.set((currentRotation + (speed * deltaMultiplier * 0.4)) % 360)
+      
+      // Slower decay (0.992) to allow stacking speed over a few seconds
+      if (velocityRef.current > 0) {
+        velocityRef.current *= Math.pow(0.992, deltaMultiplier)
+        if (velocityRef.current < 0.05) velocityRef.current = 0
+      }
+    }
+  })
 
   const isRainbow = hasReachedRainbow
 
@@ -72,8 +65,7 @@ export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
           <motion.div 
             className={cn("cursor-pointer select-none", isRainbow && "rainbow-logo hyper-spin")}
             onClick={handleLogoClick}
-            animate={{ rotate: rotation }}
-            transition={{ type: "tween", ease: "linear", duration: 0 }}
+            style={{ rotate: rotation }}
           >
             <Image src={logo} alt="Void Guild Logo" width={64} height={64} priority />
           </motion.div>
