@@ -212,7 +212,6 @@ export default function WorldClient() {
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming')
   const [pfFilter, setPfFilter] = useState(true)
   const [dndFilter, setDndFilter] = useState(true)
-  const [userMetadata, setUserMetadata] = useState<Record<string, UserMetadata>>({})
   const [sessionsLimit, setSessionsLimit] = useState(5)
   const [isEditingName, setIsEditingName] = useState(false)
   const [isEditingMap, setIsEditingMap] = useState(false)
