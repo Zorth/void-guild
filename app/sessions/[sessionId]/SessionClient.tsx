@@ -15,7 +15,7 @@ import { cn, formatDate, formatTime as formatTimeUtil, getLevelBadgeStyle, getDu
 import { fireJoinParticles, fireGoldParticles } from '@/lib/particles'
 import { toast } from 'sonner'
 import { track } from '@vercel/analytics'
-import { getUsernames, UserMetadata } from '@/app/stats/actions'
+import { UserMetadata } from '@/app/stats/actions'
 import {
     AlertDialog,
     AlertDialogAction,
@@ -97,12 +97,41 @@ export default function SessionClient() {
 
   const [selectedCharacterId, setSelectedCharacterId] = useState<Id<'characters'> | ''>('')
   const [selectedAdminCharacterId, setSelectedAdminCharacterId] = useState<Id<'characters'> | ''>('')
-  const [userMetadata, setUserMetadata] = useState<Record<string, UserMetadata>>({})
   const [isJoining, setIsJoining] = useState(false)
   const [isExpressingInterest, setIsExpressingInterest] = useState(false)
   const [leavingCharacterId, setLeavingCharacterId] = useState<string | null>(null)
   const [optimisticInterestedPlayers, setOptimisticInterestedPlayers] = useState<{ userId: string; username: string }[] | null>(null)
   const [isJoinSuccessDialogOpen, setIsJoinSuccessDialogOpen] = useState(false)
+
+  const userIds = useMemo(() => {
+    if (!session) return [];
+    const ids = new Set<string>();
+    if (session.attendingCharacters) {
+        session.attendingCharacters.forEach(c => ids.add(c.userId));
+    }
+    if (session.interestedPlayers) {
+        session.interestedPlayers.forEach(p => {
+            if (p.userId.startsWith('user_')) ids.add(p.userId);
+        });
+    }
+    return Array.from(ids);
+  }, [session?.attendingCharacters, session?.interestedPlayers]);
+
+  const usersMetadataRaw = useQuery(api.users.getUsersByIds, { userIds });
+
+  const userMetadata = useMemo(() => {
+    if (!usersMetadataRaw) return {};
+    const map: Record<string, UserMetadata> = {};
+    usersMetadataRaw.forEach(user => {
+        map[user.userId] = {
+            name: user.name || user.username || `User ${user.userId.slice(-4)}`,
+            imageUrl: user.imageUrl,
+            extraSessionsPlayed: user.extraSessionsPlayed,
+            extraSessionsRan: user.extraSessionsRan,
+        };
+    });
+    return map;
+  }, [usersMetadataRaw]);
 
   useEffect(() => {
     if (session?.interestedPlayers) {
@@ -112,73 +141,67 @@ export default function SessionClient() {
 
   const currentInterestedPlayers = optimisticInterestedPlayers ?? session?.interestedPlayers ?? []
 
-  useEffect(() => {
-    if (session) {
-        const userIds = new Set<string>();
-        if (session.attendingCharacters) {
-            session.attendingCharacters.forEach(c => userIds.add(c.userId));
-        }
-        if (session.interestedPlayers) {
-            session.interestedPlayers.forEach(p => p.userId.startsWith('user_') ? userIds.add(p.userId) : null);
-        }
-        if (userIds.size > 0) {
-            getUsernames(Array.from(userIds)).then(setUserMetadata);
-        }
-    }
-  }, [session?.attendingCharacters, session?.interestedPlayers])
-
   const isLoading = session === undefined || 
                     isAdmin === undefined || 
                     (isAdmin && allCharacters === undefined);
 
   if (isLoading) {
     return (
-        <div className="container mx-auto px-4 py-8 max-w-4xl">
-            <div className="flex justify-between items-center mb-6">
-                <Skeleton className="h-9 w-32" />
-                <div className="flex gap-2">
-                    <Skeleton className="h-9 w-24" />
-                </div>
-            </div>
+        <div className="min-h-screen bg-background flex flex-col px-4">
+            <div className="grid grid-cols-1 lg:grid-cols-[672px_320px] 2xl:grid-cols-[1fr_672px_1fr] gap-8 justify-center flex-1 w-full max-w-[1600px] mx-auto">
+                <header className="col-span-full py-8">
+                    <div className="flex justify-between items-center w-full">
+                        <Skeleton className="h-9 w-32" />
+                        <div className="flex gap-2">
+                            <Skeleton className="h-9 w-24" />
+                            <Skeleton className="h-9 w-24" />
+                        </div>
+                    </div>
+                </header>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div className="md:col-span-2 space-y-8">
+                <aside className="hidden 2xl:block col-start-1">
+                    <div className="flex justify-end p-6">
+                        <Skeleton className="h-[500px] w-80 rounded-lg" />
+                    </div>
+                </aside>
+
+                <main className="w-full max-w-2xl mx-auto lg:mx-0 lg:col-start-1 2xl:col-start-2 space-y-8 pb-12">
                     <Card>
                         <CardHeader>
-                            <div className="flex justify-between items-start">
-                                <div className="space-y-4 flex-grow">
-                                    <Skeleton className="h-9 w-64" />
-                                    <Skeleton className="h-6 w-48" />
+                            <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                                <div className="space-y-4 flex-grow w-full">
+                                    <Skeleton className="h-10 w-3/4" />
+                                    <Skeleton className="h-6 w-1/2" />
                                     <div className="space-y-2">
-                                        <Skeleton className="h-4 w-72" />
-                                        <Skeleton className="h-4 w-60" />
+                                        <Skeleton className="h-4 w-2/3" />
+                                        <Skeleton className="h-4 w-1/2" />
                                     </div>
                                 </div>
-                                <Skeleton className="h-7 w-20 rounded-full" />
+                                <Skeleton className="h-7 w-24 rounded-full" />
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <Skeleton className="h-7 w-48 mb-4" />
-                            <div className="space-y-3">
-                                <Skeleton className="h-20 w-full" />
-                                <Skeleton className="h-20 w-full" />
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-                <div className="space-y-8">
-                    <Card>
-                        <CardHeader>
-                            <Skeleton className="h-7 w-32" />
-                        </CardHeader>
-                        <CardContent>
+                            <Skeleton className="h-6 w-48 mb-6" />
                             <div className="space-y-4">
-                                <Skeleton className="h-10 w-full" />
-                                <Skeleton className="h-10 w-full" />
+                                <Skeleton className="h-16 w-full" />
+                                <Skeleton className="h-16 w-full" />
+                                <Skeleton className="h-16 w-full" />
                             </div>
                         </CardContent>
                     </Card>
-                </div>
+                </main>
+
+                <aside className="hidden lg:block w-80 lg:col-start-2 2xl:col-start-3">
+                    <div className="space-y-8 py-0">
+                        <Card>
+                            <CardHeader><Skeleton className="h-8 w-32" /></CardHeader>
+                            <CardContent className="space-y-4">
+                                <Skeleton className="h-10 w-full" />
+                                <Skeleton className="h-10 w-full" />
+                            </CardContent>
+                        </Card>
+                    </div>
+                </aside>
             </div>
         </div>
     )
@@ -454,24 +477,24 @@ export default function SessionClient() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col px-4">
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[1fr_672px_1fr] gap-8 justify-center flex-1 w-full max-w-[1600px] mx-auto">
+      <div className="grid grid-cols-1 lg:grid-cols-[672px_320px] 2xl:grid-cols-[1fr_672px_1fr] gap-8 justify-center flex-1 w-full max-w-[1600px] mx-auto">
         {/* Header row spanning all columns */}
         <header className="col-span-full py-8">
             <div className="flex justify-between items-center w-full">
-                <Button variant="ghost" size="sm" className="sm:px-3 sm:w-auto w-9 px-0" asChild>
+                <Button variant="ghost" size="sm" className="sm:px-3 sm:w-auto w-9 px-0 h-9" asChild>
                     <Link href="/">
                         <ChevronLeft className="h-4 w-4 sm:mr-2" />
                         <span className="hidden sm:inline">Back to Home</span>
                     </Link>
                 </Button>
                 <div className="flex gap-2">
-                    {userId === session.owner && (
+                    {isOwnerOrAdmin && (
                         <div className="2xl:hidden">
                             <Dialog>
                                 <DialogTrigger asChild>
-                                    <Button variant="outline" size="sm" className="sm:px-3 sm:w-auto w-9 px-0">
+                                    <Button variant="outline" size="sm" className="sm:px-3 sm:w-auto w-9 px-0 h-9">
                                         <Menu className="h-4 w-4 sm:mr-2" />
-                                        <span className="hidden sm:inline">Voidmaster Tools</span>
+                                        <span className="hidden sm:inline font-bold">Tools</span>
                                     </Button>
                                 </DialogTrigger>
                                 <DialogContent className="max-w-none w-screen h-[100dvh] m-0 rounded-none p-0 overflow-hidden bg-background border-none flex flex-col">
@@ -484,8 +507,8 @@ export default function SessionClient() {
                                             Manage your session, initiative, and world clock.
                                         </DialogDescription>
                                     </DialogHeader>
-                                    <div className="p-4 flex-grow overflow-y-auto">
-                                        <div className="max-w-md mx-auto">
+                                    <div className="p-4 flex-grow overflow-y-auto custom-scrollbar">
+                                        <div className="max-w-md mx-auto h-full pb-20">
                                             <ToolSidebar 
                                                 sessionId={session._id} 
                                                 worldId={session.world}
@@ -495,7 +518,7 @@ export default function SessionClient() {
                                             />
                                         </div>
                                     </div>
-                                    <DialogFooter className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] border-t bg-muted/30 shrink-0">
+                                    <DialogFooter className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] border-t bg-muted/30 shrink-0 mt-auto">
                                         <DialogClose asChild>
                                             <Button variant="secondary" className="w-full h-12 text-lg font-bold">Close Tools</Button>
                                         </DialogClose>
@@ -505,19 +528,19 @@ export default function SessionClient() {
                         </div>
                     )}
                     {calendarLink && (
-                        <Button variant="outline" size="sm" asChild className="sm:px-3 sm:w-auto w-9 px-0">
+                        <Button variant="outline" size="sm" asChild className="sm:px-3 sm:w-auto w-9 px-0 h-9">
                             <a href={calendarLink} target="_blank" rel="noopener noreferrer">
                                 <Calendar className="h-4 w-4 sm:mr-2" />
-                                <span className="hidden sm:inline">Add to Calendar</span>
+                                <span className="hidden sm:inline">Calendar</span>
                             </a>
                         </Button>
                     )}
                     {(isAdmin || session.isOwner) && session.locked && (
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
-                                <Button variant="destructive" size="sm" className="sm:px-3 sm:w-auto w-9 px-0">
+                                <Button variant="destructive" size="sm" className="sm:px-3 sm:w-auto w-9 px-0 h-9">
                                     <Unlock className="h-4 w-4 sm:mr-2" />
-                                    <span className="hidden sm:inline">Unlock Session</span>
+                                    <span className="hidden sm:inline">Unlock</span>
                                 </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
@@ -561,9 +584,9 @@ export default function SessionClient() {
         </header>
 
         {/* Left Side: Stretches to edge */}
-        <aside className="hidden 2xl:flex justify-end">
+        <aside className="hidden 2xl:flex justify-end lg:col-start-1">
             {isOwnerOrAdmin && (
-                <div className="w-80 sticky top-0 h-screen overflow-y-auto p-6 z-40">
+                <div className="w-80 sticky top-0 h-screen overflow-y-auto p-6 z-40 custom-scrollbar">
                     <ToolSidebar 
                         sessionId={session._id} 
                         worldId={session.world}
@@ -583,10 +606,10 @@ export default function SessionClient() {
               <Card className={session.locked ? "border-amber-200 bg-amber-50/10" : session.planning ? "border-purple-200 bg-purple-50/10" : ""}>
                 <CardHeader>
                   <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-                    <div className="space-y-4 flex-grow">
+                    <div className="space-y-4 flex-grow w-full">
                       <div>
-                        <CardTitle className="text-3xl font-bold flex flex-wrap items-center gap-3">
-                            <span>{session.worldName}</span>
+                        <CardTitle className="text-2xl sm:text-3xl font-bold flex flex-wrap items-center gap-2 sm:gap-3">
+                            <span className="break-words">{session.worldName}</span>
                             <div className="flex items-center gap-2 shrink-0">
                                 {session.locked && <LockIcon className="h-5 w-5 text-amber-500" />}
                                 {session.planning && <div className="text-[10px] bg-purple-600 text-white px-2 py-0.5 rounded-full uppercase tracking-widest font-black shadow-sm">Planning</div>}
@@ -594,21 +617,21 @@ export default function SessionClient() {
                                     href={`https://void.tarragon.be/Session-Reports/${session.date ? new Date(session.date).toISOString().slice(0, 10) : 'TBD'}-${session.worldName.replace(/\s+/g, '-')}`} 
                                     target="_blank" 
                                     rel="noopener noreferrer"
-                                    className="text-muted-foreground hover:text-purple-500"
+                                    className="text-muted-foreground hover:text-purple-500 transition-colors"
                                     onClick={() => track('session_report_viewed', { worldName: session.worldName })}
                                 >
                                     <Book size={20} />
                                 </a>
                                 <Link 
                                     href={`/world/${encodeURIComponent(session.worldName)}`}
-                                    className="text-muted-foreground hover:text-purple-500"
+                                    className="text-muted-foreground hover:text-purple-500 transition-colors"
                                     title="View World Details"
                                 >
                                     <Globe size={20} />
                                 </Link>
                             </div>
                         </CardTitle>
-                        <div className="text-lg text-muted-foreground mt-1">
+                        <div className="text-base sm:text-lg text-muted-foreground mt-1">
                             {session.date ? (
                                 <>{formatDate(new Date(session.date))} at {formatTimeUtil(new Date(session.date))}</>
                             ) : (
