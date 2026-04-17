@@ -1,6 +1,6 @@
 'use client'
 
-import { Authenticated, Unauthenticated, AuthLoading, useQuery } from 'convex/react'
+import { Authenticated, Unauthenticated, AuthLoading, useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { SignInButton, UserButton } from '@clerk/nextjs'
 import Characters from '@/components/characters/Characters'
@@ -8,14 +8,14 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Trophy, Book, Globe } from 'lucide-react'
+import { Trophy, Book, Globe, Sparkles } from 'lucide-react'
 import ActivityFeed from '@/components/ActivityFeed'
 import { ThemeToggle } from '@/components/ThemeToggle'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
 import logo from './Void_Logo_WhiteTransparent.png'
-import { motion, useAnimationControls } from 'framer-motion'
+import { motion, useAnimationControls, AnimatePresence } from 'framer-motion'
 
 export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
   const [pfFilter, setPfFilter] = useState(true)
@@ -24,6 +24,7 @@ export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
   const [velocity, setVelocity] = useState(0)
   const lastClickTime = useRef<number>(0)
 
+  const incrementLogoClicks = useMutation(api.users.incrementLogoClicks)
   const isGM = useQuery(api.sessions.isGameMasterQuery)
   const ownedWorld = useQuery(api.worlds.getWorldByOwner)
   const identity = useQuery(api.sessions.debugIdentity)
@@ -43,14 +44,16 @@ export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
   const handleLogoClick = () => {
     const now = Date.now()
     const delta = now - lastClickTime.current
-    
+
     // Increase velocity on click
     // Faster clicks = more velocity boost
     const boost = Math.max(5, 50 - Math.min(45, delta / 10))
     setVelocity(v => v + boost)
     lastClickTime.current = now
-  }
 
+    // Persistent tracking
+    incrementLogoClicks().catch(console.error)
+  }
   useEffect(() => {
     let frameId: number
 
@@ -69,12 +72,14 @@ export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
     return () => cancelAnimationFrame(frameId)
   }, [velocity])
 
+  const isRainbow = velocity > 20
+
   return (
     <>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8">
         <div className="flex flex-row items-center gap-4 w-full sm:w-auto">
           <motion.div 
-            className="cursor-pointer select-none"
+            className={cn("cursor-pointer select-none", isRainbow && "rainbow-logo")}
             onClick={handleLogoClick}
             animate={{ rotate: rotation }}
             transition={{ type: "tween", ease: "linear", duration: 0 }}
@@ -82,7 +87,10 @@ export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
             <Image src={logo} alt="Void Guild Logo" width={64} height={64} priority />
           </motion.div>
           <div className="flex flex-col gap-1">
-            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Guild of The Void</h1>
+            <h1 className={cn("text-3xl sm:text-4xl font-bold tracking-tight transition-all duration-500 flex items-center gap-2", isRainbow && "rainbow-text scale-105 origin-left")}>
+                Guild of The Void
+                {isRainbow && <Sparkles className="h-6 w-6 text-yellow-500 animate-pulse" />}
+            </h1>
             <p className="text-sm text-muted-foreground max-w-[300px] sm:max-w-none">
               Management tool for The Void Campaign.
             </p>

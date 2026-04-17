@@ -280,3 +280,41 @@
 .animate-page-in {
   animation: page-in 0.2s ease-out forwards;
 }
+
+.rainbow-text {
+  background: linear-gradient(
+    to right,
+    #ff0000,
+    #ff8800,
+    #ffff00,
+    #00ff00,
+    #0000ff,
+    #8800ff,
+    #ff0000
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-size: 200% auto;
+  animation: rainbow-scroll 2s linear infinite;
+}
+
+.rainbow-logo {
+  animation: rainbow-logo-glow 2s linear infinite;
+}
+
+@keyframes rainbow-scroll {
+  to {
+    background-position: 200% center;
+  }
+}
+
+@keyframes rainbow-logo-glow {
+  0% { filter: drop-shadow(0 0 8px #ff0000); }
+  17% { filter: drop-shadow(0 0 8px #ff8800); }
+  33% { filter: drop-shadow(0 0 8px #ffff00); }
+  50% { filter: drop-shadow(0 0 8px #00ff00); }
+  67% { filter: drop-shadow(0 0 8px #0000ff); }
+  83% { filter: drop-shadow(0 0 8px #8800ff); }
+  100% { filter: drop-shadow(0 0 8px #ff0000); }
+}
