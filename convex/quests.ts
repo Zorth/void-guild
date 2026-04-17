@@ -1,18 +1,6 @@
 import { query, mutation, QueryCtx } from './_generated/server'
 import { v } from 'convex/values'
-
-/**
- * Checks if the authenticated user has Admin permissions.
- */
-async function isAdmin(ctx: QueryCtx) {
-  const identity = await ctx.auth.getUserIdentity()
-  if (!identity) return false
-
-  // We prioritize the 'admin' claim from the JWT token (configured in Clerk JWT templates).
-  const adminClaim = identity.admin ?? (identity.publicMetadata as any)?.admin ?? (identity.public_metadata as any)?.admin;
-  return adminClaim === true || String(adminClaim).toLowerCase() === 'true';
-}
-
+import { isAdmin } from './roles'
 export const createQuest = mutation({
   args: {
     name: v.string(),

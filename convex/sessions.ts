@@ -2,36 +2,10 @@ import { query, mutation, QueryCtx } from './_generated/server'
 import { v } from 'convex/values'
 import { Doc, Id } from './_generated/dataModel'
 import { internal } from './_generated/api'
+import { isAdmin, isGameMaster } from './roles'
 
 /**
- * Checks if the authenticated user has Game Master permissions.
- */
-async function isGameMaster(ctx: QueryCtx) {
-  const identity = await ctx.auth.getUserIdentity()
-  if (!identity) return false
-  
-  const isAdminUser = await isAdmin(ctx)
-  if (isAdminUser) return true
-
-  // We prioritize the 'gamemaster' claim from the JWT token (configured in Clerk JWT templates).
-  const gmClaim = identity.gamemaster ?? (identity.publicMetadata as any)?.gamemaster ?? (identity.public_metadata as any)?.gamemaster;
-  return gmClaim === true || String(gmClaim).toLowerCase() === 'true';
-}
-
-/**
- * Checks if the authenticated user has Admin permissions.
- */
-async function isAdmin(ctx: QueryCtx) {
-  const identity = await ctx.auth.getUserIdentity()
-  if (!identity) return false
-  
-  // We prioritize the 'admin' claim from the JWT token (configured in Clerk JWT templates).
-  const adminClaim = identity.admin ?? (identity.publicMetadata as any)?.admin ?? (identity.public_metadata as any)?.admin;
-  return adminClaim === true || String(adminClaim).toLowerCase() === 'true';
-}
-
-/**
- * Calculates XP gain based on session level and character level.
+ * XP gain based on session level and character level.
  */
 export function calculateXPGain(sessionLevel: number, characterLevel: number, isGM: boolean): number {
   if (isGM) return 250
@@ -55,6 +29,22 @@ function calculateNewStats(oldLvl: number, oldXp: number, gain: number) {
     const newXp = totalXp % 1000
     return { lvl: Math.max(1, newLvl), xp: Math.max(0, newXp) }
 }
+
+export const debugIdentity = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) return { status: 'not authenticated' }
+    return {
+      identity,
+      tokenIdentifier: identity.tokenIdentifier,
+      issuer: identity.issuer,
+      subject: identity.subject,
+      keys: Object.keys(identity),
+      allProps: { ...identity }
+    }
+  },
+})
 
 export const isGameMasterQuery = query({
   args: {},

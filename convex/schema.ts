@@ -92,4 +92,11 @@ export default defineSchema({
         tags: v.optional(v.array(v.string())),
         owner: v.string(), // Clerk userId of the creator
     }).index('by_worldId', ['worldId']),
+    users: defineTable({
+        userId: v.string(), // Clerk subject
+        isAdmin: v.boolean(),
+        isGM: v.boolean(),
+        name: v.optional(v.string()),
+        email: v.optional(v.string()),
+    }).index('by_userId', ['userId']),
 })

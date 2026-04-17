@@ -9,6 +9,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next"
 import { Toaster } from 'sonner'
 import LevelUpListener from '@/components/LevelUpListener'
 import SessionClosedListener from '@/components/SessionClosedListener'
+import UserSync from '@/components/UserSync'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ThemeToggle } from '@/components/ThemeToggle'
 
@@ -171,6 +172,7 @@ export default function RootLayout({
                 <Toaster position="bottom-right" />
                 <LevelUpListener />
                 <SessionClosedListener />
+                <UserSync />
             </TooltipProvider>
           </ConvexClientProvider>
         </ClerkProvider>

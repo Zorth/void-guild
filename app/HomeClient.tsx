@@ -26,6 +26,19 @@ export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
 
   const isGM = useQuery(api.sessions.isGameMasterQuery)
   const ownedWorld = useQuery(api.worlds.getWorldByOwner)
+  const identity = useQuery(api.sessions.debugIdentity)
+
+  useEffect(() => {
+    if (identity) {
+      console.log('--- AUTH DEBUG START ---')
+      console.log('Status:', (identity as any).status || 'authenticated')
+      console.log('Subject:', identity.subject)
+      console.log('Issuer:', identity.issuer)
+      console.log('Keys:', identity.keys)
+      console.log('Full Identity:', identity.identity)
+      console.log('--- AUTH DEBUG END ---')
+    }
+  }, [identity])
 
   const handleLogoClick = () => {
     const now = Date.now()

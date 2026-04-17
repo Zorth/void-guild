@@ -1,18 +1,6 @@
 import { query, mutation } from './_generated/server'
 import { v } from 'convex/values'
-
-async function isGameMaster(ctx: any) {
-  const identity = await ctx.auth.getUserIdentity()
-  if (!identity) return false
-  
-  // Reuse logic from sessions.ts or just check here for simplicity
-  return (
-    identity.gamemaster === true ||
-    identity.gamemaster === 'true' ||
-    (identity.publicMetadata as { gamemaster?: boolean | string } | undefined)?.gamemaster === true ||
-    (identity.publicMetadata as { gamemaster?: boolean | string } | undefined)?.gamemaster === 'true'
-  )
-}
+import { isGameMaster } from './roles'
 
 export const getAvailabilityForMonth = query({
   args: { 
