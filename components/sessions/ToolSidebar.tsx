@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import { Reorder, AnimatePresence, motion } from 'framer-motion'
-import { ChevronLeft, ChevronRight, Plus, X, GripVertical, Sword, Clock, Play, Pause, Minus, CalendarDays, Calendar as CalendarIcon, Info, ArrowLeft, ArrowRight, Flag, CheckCircle2, ExternalLink } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, X, GripVertical, Sword, Clock, Play, Pause, Minus, CalendarDays, Calendar as CalendarIcon, Info, ArrowLeft, ArrowRight, Flag, CheckCircle2, ExternalLink, Sun, Moon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn, formatInGameYear } from '@/lib/utils'
@@ -105,6 +105,31 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
     const [isEditingTime, setIsEditingTime] = useState(false)
     const [editingTimeValue, setEditingTimeValue] = useState('')
     const lastTickRef = useRef<number | null>(null)
+
+    const sunMoonInfo = useMemo(() => {
+        const sunrise = 6 * 3600; // 06:00
+        const sunset = 18 * 3600; // 18:00
+        const dayLength = sunset - sunrise;
+        const nightLength = 86400 - sunset + sunrise;
+
+        if (timeSeconds >= sunrise && timeSeconds < sunset) {
+            return {
+                type: 'sun' as const,
+                progress: (timeSeconds - sunrise) / dayLength
+            };
+        } else {
+            let progress;
+            if (timeSeconds >= sunset) {
+                progress = (timeSeconds - sunset) / nightLength;
+            } else {
+                progress = (86400 - sunset + timeSeconds) / nightLength;
+            }
+            return {
+                type: 'moon' as const,
+                progress
+            };
+        }
+    }, [timeSeconds]);
 
     // Source of truth for date is now the world object directly
     const currentDate = useMemo(() => {
@@ -593,6 +618,25 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
                                         {formatTime(timeSeconds)}
                                     </div>
                                 )}
+
+                                {/* Sun/Moon Progress Indicator */}
+                                <div className="relative w-full h-4 mt-2 flex items-center px-4">
+                                    <div className="absolute inset-x-4 h-0.5 bg-muted-foreground/10 rounded-full" />
+                                    <motion.div 
+                                        className="absolute"
+                                        initial={false}
+                                        animate={{ 
+                                            left: `calc(${sunMoonInfo.progress * 100}% - ${sunMoonInfo.progress * 46}px + 16px)` 
+                                        }}
+                                        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                                    >
+                                        {sunMoonInfo.type === 'sun' ? (
+                                            <Sun className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500/20" />
+                                        ) : (
+                                            <Moon className="h-3.5 w-3.5 text-blue-400 fill-blue-400/20" />
+                                        )}
+                                    </motion.div>
+                                </div>
                             </div>
 
                             <div className="flex flex-col gap-2 p-2 rounded-lg border border-border/50 bg-card shadow-sm">
