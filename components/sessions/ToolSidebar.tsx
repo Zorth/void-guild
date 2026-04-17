@@ -652,7 +652,7 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
                                             onChange={(e) => setAdjustmentAmount(Number(e.target.value))}
                                         />
                                         <select 
-                                            className="text-[8px] font-black text-muted-foreground bg-transparent border-none focus:ring-0 focus:outline-none cursor-pointer p-0 ml-1 hover:text-foreground transition-colors appearance-none text-right pr-0"
+                                            className="text-[10px] font-black text-muted-foreground bg-transparent border-none focus:ring-0 focus:outline-none cursor-pointer p-0 ml-1 hover:text-foreground transition-colors appearance-none text-right pr-0"
                                             value={adjustmentUnit}
                                             onChange={(e) => setAdjustmentUnit(e.target.value as 's' | 'm' | 'h')}
                                         >
@@ -678,16 +678,16 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
                                         {isClockRunning ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5 ml-0.5" />}
                                     </Button>
                                     <div className="flex-grow flex flex-col gap-1">
-                                        <span className="text-[8px] font-bold text-muted-foreground uppercase ml-1 tracking-wider">Multiplier</span>
+                                        <span className="text-[10px] font-bold text-muted-foreground uppercase ml-1 tracking-wider">Multiplier</span>
                                         <div className="flex items-center bg-muted/20 rounded border border-border/50 px-2 h-6">
                                             <input 
                                                 type="number"
                                                 step="0.1"
-                                                className="w-full bg-transparent border-none text-[10px] font-bold text-center focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                className="w-full bg-transparent border-none text-xs font-bold text-center focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                 value={multiplier}
                                                 onChange={(e) => setMultiplier(Number(e.target.value))}
                                             />
-                                            <span className="text-[8px] font-bold text-muted-foreground ml-1">X</span>
+                                            <span className="text-[10px] font-bold text-muted-foreground ml-1">X</span>
                                         </div>
                                     </div>
                                 </div>
