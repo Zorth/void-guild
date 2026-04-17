@@ -44,6 +44,15 @@ interface FantasyCalendarJSON {
         }[];
         weekdays: string[];
         eras?: any[];
+        seasons?: {
+            data: {
+                name: string;
+                time?: {
+                    sunrise: { hour: number; minute: number };
+                    sunset: { hour: number; minute: number };
+                };
+            }[];
+        };
         settings?: {
             year_zero_exists?: boolean;
         };
