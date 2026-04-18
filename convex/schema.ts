@@ -46,7 +46,7 @@ export default defineSchema({
             endDay: v.optional(v.number()),
         })),
         discordThreadId: v.optional(v.string()),
-  }),
+  }).index('by_locked', ['locked']).index('by_owner', ['owner']),
     worlds: defineTable({
         name: v.string(),
         owner: v.string(), // Clerk userId of the world owner

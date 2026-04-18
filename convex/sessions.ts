@@ -776,62 +776,6 @@ export const forceUnlockSession = mutation({
 })
 
 
-export const getGMStats = query({
-    handler: async (ctx) => {
-      const lockedSessions = await ctx.db
-        .query('sessions')
-        .filter((q) => q.eq(q.field('locked'), true))
-        .collect();
-  
-      const gmStats = new Map<string, number>();
-  
-      for (const session of lockedSessions) {
-        const owner = session.owner;
-        gmStats.set(owner, (gmStats.get(owner) || 0) + 1);
-      }
-  
-      const stats = Array.from(gmStats.entries()).map(([ownerId, sessionCount]) => ({
-        userId: ownerId,
-        count: sessionCount,
-      }));
-  
-      return stats.sort((a, b) => b.count - a.count);
-    },
-});
-
-export const getPlayerStats = query({
-    handler: async (ctx) => {
-      const lockedSessions = await ctx.db
-        .query('sessions')
-        .filter((q) => q.eq(q.field('locked'), true))
-        .collect();
-  
-      const playerSessionCounts = new Map<string, number>();
-      const allCharacters = await ctx.db.query("characters").collect();
-      const characterIdToUserId = new Map(allCharacters.map(c => [c._id, c.userId]));
-  
-      for (const session of lockedSessions) {
-        const userIdsInSession = new Set<string>();
-        for (const characterId of session.characters) {
-          const userId = characterIdToUserId.get(characterId);
-          if (userId) {
-            userIdsInSession.add(userId);
-          }
-        }
-        for (const userId of userIdsInSession) {
-          playerSessionCounts.set(userId, (playerSessionCounts.get(userId) || 0) + 1);
-        }
-      }
-  
-      const stats = Array.from(playerSessionCounts.entries()).map(([userId, count]) => ({
-        userId,
-        count,
-      }));
-  
-      return stats.sort((a, b) => b.count - a.count);
-    },
-});
-
 export const updateInGameDate = mutation({
   args: {
     sessionId: v.id('sessions'),

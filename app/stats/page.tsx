@@ -15,63 +15,15 @@ import { cn } from '@/lib/utils'
 export default function StatsPage() {
     const { userId } = useAuth();
     const characters = useQuery(api.characters.listAllCharactersPublic);
-    const gmStatsRaw = useQuery(api.sessions.getGMStats);
-    const playerStatsRaw = useQuery(api.sessions.getPlayerStats);
+    const leaderboardStats = useQuery(api.users.getLeaderboardStats);
 
-    const userIds = useMemo(() => {
-        if (!gmStatsRaw || !playerStatsRaw) return [];
-        return Array.from(new Set([
-            ...gmStatsRaw.map(s => s.userId),
-            ...playerStatsRaw.map(s => s.userId)
-        ]));
-    }, [gmStatsRaw, playerStatsRaw]);
-
-    const usersMetadataRaw = useQuery(api.users.getUsersByIds, { userIds });
-
-    const userMetadata = useMemo(() => {
-        if (!usersMetadataRaw) return {};
-        const map: Record<string, UserMetadata> = {};
-        usersMetadataRaw.forEach(user => {
-            map[user.userId] = {
-                name: user.name || user.username || `User ${user.userId.slice(-4)}`,
-                imageUrl: user.imageUrl,
-                extraSessionsPlayed: user.extraSessionsPlayed,
-                extraSessionsRan: user.extraSessionsRan,
-            };
-        });
-        return map;
-    }, [usersMetadataRaw]);
-  
     const sortedCharacters = useMemo(() => {
       if (!characters) return [];
       return [...characters].sort((a, b) => b.lvl - a.lvl || b.xp - a.xp);
     }, [characters]);
 
-    const gmStats = useMemo(() => {
-        if (!gmStatsRaw) return null;
-        return gmStatsRaw.map(stat => {
-            const metadata = userMetadata[stat.userId];
-            const extra = metadata?.extraSessionsRan ?? 0;
-            return {
-                ...stat,
-                displayName: metadata?.name || `User ${stat.userId.slice(-4)}`,
-                totalCount: stat.count + extra
-            };
-        }).sort((a, b) => b.totalCount - a.totalCount);
-    }, [gmStatsRaw, userMetadata]);
-
-    const playerStats = useMemo(() => {
-        if (!playerStatsRaw) return null;
-        return playerStatsRaw.map(stat => {
-            const metadata = userMetadata[stat.userId];
-            const extra = metadata?.extraSessionsPlayed ?? 0;
-            return {
-                ...stat,
-                displayName: metadata?.name || `User ${stat.userId.slice(-4)}`,
-                totalCount: stat.count + extra
-            };
-        }).sort((a, b) => b.totalCount - a.totalCount);
-    }, [playerStatsRaw, userMetadata]);
+    const gmStats = leaderboardStats?.gmLeaderboard;
+    const playerStats = leaderboardStats?.playerLeaderboard;
   
 
   return (
@@ -168,7 +120,7 @@ export default function StatsPage() {
                                   )}
                               </span>
                               <span className={cn("font-bold text-sm sm:text-base shrink-0 sm:ml-auto text-muted-foreground", isUser && "text-purple-600 dark:text-purple-400")}>
-                                  {stat.totalCount} <span className="text-[10px] uppercase tracking-wider">Sessions</span>
+                                  {stat.count} <span className="text-[10px] uppercase tracking-wider">Sessions</span>
                               </span>
                           </li>
                         );
@@ -214,7 +166,7 @@ export default function StatsPage() {
                                   )}
                               </span>
                               <span className={cn("font-bold text-sm sm:text-base shrink-0 sm:ml-auto text-muted-foreground", isUser && "text-purple-600 dark:text-purple-400")}>
-                                  {stat.totalCount} <span className="text-[10px] uppercase tracking-wider">Sessions</span>
+                                  {stat.count} <span className="text-[10px] uppercase tracking-wider">Sessions</span>
                               </span>
                           </li>
                         );

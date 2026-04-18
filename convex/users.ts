@@ -134,8 +134,8 @@ export const listUsers = query({
  */
 async function updateUserData(ctx: MutationCtx, args: {
   userId: string;
-  isAdmin: boolean;
-  isGM: boolean;
+  isAdmin?: boolean;
+  isGM?: boolean;
   name?: string;
   username?: string;
   extraSessionsPlayed?: number;
@@ -150,12 +150,16 @@ async function updateUserData(ctx: MutationCtx, args: {
   delete (patchData as any).userId
 
   if (userRecord) {
-    await ctx.db.patch(userRecord._id, patchData)
+    // Only include defined properties in patchData to avoid overwriting with undefined
+    const cleanPatchData = Object.fromEntries(
+      Object.entries(patchData).filter(([_, v]) => v !== undefined)
+    )
+    await ctx.db.patch(userRecord._id, cleanPatchData)
   } else {
     await ctx.db.insert('users', {
       userId: args.userId,
-      isAdmin: args.isAdmin,
-      isGM: args.isGM,
+      isAdmin: args.isAdmin || false,
+      isGM: args.isGM || false,
       name: args.name,
       username: args.username,
       extraSessionsPlayed: args.extraSessionsPlayed || 0,
@@ -170,8 +174,8 @@ async function updateUserData(ctx: MutationCtx, args: {
 export const updateUser = mutation({
   args: {
     userId: v.string(),
-    isAdmin: v.boolean(),
-    isGM: v.boolean(),
+    isAdmin: v.optional(v.boolean()),
+    isGM: v.optional(v.boolean()),
     name: v.optional(v.string()),
     username: v.optional(v.string()),
     extraSessionsPlayed: v.optional(v.number()),
@@ -182,6 +186,68 @@ export const updateUser = mutation({
     if (!isAdminUser) throw new Error('Unauthorized')
     return await updateUserData(ctx, args)
   },
+})
+
+/**
+ * Gets combined leaderboard stats for all users (public).
+ */
+export const getLeaderboardStats = query({
+  args: {},
+  handler: async (ctx) => {
+    const users = await ctx.db.query('users').collect()
+    const lockedSessions = await ctx.db
+      .query('sessions')
+      .withIndex('by_locked', (q) => q.eq('locked', true))
+      .collect()
+
+    const gmCounts = new Map<string, number>()
+    const playerCounts = new Map<string, number>()
+    const allCharacters = await ctx.db.query("characters").collect()
+    const charToUser = new Map(allCharacters.map(c => [c._id, c.userId]))
+
+    for (const session of lockedSessions) {
+      // GM Count
+      gmCounts.set(session.owner, (gmCounts.get(session.owner) || 0) + 1)
+      
+      // Player Count
+      const usersInSession = new Set<string>()
+      for (const charId of session.characters) {
+        const uId = charToUser.get(charId)
+        if (uId) usersInSession.add(uId)
+      }
+      for (const uId of usersInSession) {
+        playerCounts.set(uId, (playerCounts.get(uId) || 0) + 1)
+      }
+    }
+
+    const allUserIds = new Set([
+      ...users.map(u => u.userId),
+      ...gmCounts.keys(),
+      ...playerCounts.keys()
+    ])
+
+    const userMap = new Map(users.map(u => [u.userId, u]))
+
+    const gmLeaderboard = Array.from(allUserIds).map(userId => {
+      const user = userMap.get(userId)
+      return {
+        userId,
+        displayName: user?.name || user?.username || `User ${userId.slice(-4)}`,
+        count: (gmCounts.get(userId) || 0) + (user?.extraSessionsRan || 0)
+      }
+    }).filter(u => u.count > 0).sort((a, b) => b.count - a.count)
+
+    const playerLeaderboard = Array.from(allUserIds).map(userId => {
+      const user = userMap.get(userId)
+      return {
+        userId,
+        displayName: user?.name || user?.username || `User ${userId.slice(-4)}`,
+        count: (playerCounts.get(userId) || 0) + (user?.extraSessionsPlayed || 0)
+      }
+    }).filter(u => u.count > 0).sort((a, b) => b.count - a.count)
+
+    return { gmLeaderboard, playerLeaderboard }
+  }
 })
 
 /**
