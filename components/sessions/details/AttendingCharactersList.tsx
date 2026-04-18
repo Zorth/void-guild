@@ -71,7 +71,7 @@ export default function AttendingCharactersList({
                         </a>
                     </div>
                     <div className="text-[10px] text-muted-foreground mt-1 whitespace-normal">
-                      {char.class}
+                      {char.ancestry} {char.class}
                     </div>
                     {char.websiteLink && (
                         <a 

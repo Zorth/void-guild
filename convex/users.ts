@@ -147,17 +147,18 @@ async function updateUserData(ctx: MutationCtx, args: {
     .first()
 
   const patchData = { ...args }
-  delete (patchData as any).userId
+  const uId = patchData.userId
+  delete (patchData as { userId?: string }).userId
 
   if (userRecord) {
     // Only include defined properties in patchData to avoid overwriting with undefined
     const cleanPatchData = Object.fromEntries(
-      Object.entries(patchData).filter(([_, v]) => v !== undefined)
+      Object.entries(patchData).filter(([, v]) => v !== undefined)
     )
     await ctx.db.patch(userRecord._id, cleanPatchData)
   } else {
     await ctx.db.insert('users', {
-      userId: args.userId,
+      userId: uId,
       isAdmin: args.isAdmin || false,
       isGM: args.isGM || false,
       name: args.name,
@@ -222,27 +223,29 @@ export const getLeaderboardStats = query({
 
     const allUserIds = new Set([
       ...users.map(u => u.userId),
-      ...gmCounts.keys(),
-      ...playerCounts.keys()
-    ])
+      ...Array.from(gmCounts.keys()),
+      ...Array.from(playerCounts.keys())
+    ].filter((id): id is string => typeof id === 'string' && id.length > 0))
 
     const userMap = new Map(users.map(u => [u.userId, u]))
 
     const gmLeaderboard = Array.from(allUserIds).map(userId => {
       const user = userMap.get(userId)
+      const count = (gmCounts.get(userId) || 0) + (user?.extraSessionsRan || 0)
       return {
         userId,
         displayName: user?.name || user?.username || `User ${userId.slice(-4)}`,
-        count: (gmCounts.get(userId) || 0) + (user?.extraSessionsRan || 0)
+        count
       }
     }).filter(u => u.count > 0).sort((a, b) => b.count - a.count)
 
     const playerLeaderboard = Array.from(allUserIds).map(userId => {
       const user = userMap.get(userId)
+      const count = (playerCounts.get(userId) || 0) + (user?.extraSessionsPlayed || 0)
       return {
         userId,
         displayName: user?.name || user?.username || `User ${userId.slice(-4)}`,
-        count: (playerCounts.get(userId) || 0) + (user?.extraSessionsPlayed || 0)
+        count
       }
     }).filter(u => u.count > 0).sort((a, b) => b.count - a.count)
 
