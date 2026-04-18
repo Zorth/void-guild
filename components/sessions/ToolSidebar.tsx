@@ -111,7 +111,7 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
     const [isClockRunning, setIsClockRunning] = useState(false)
     const [multiplier, setMultiplier] = useState(1)
     const [adjustmentAmount, setAdjustmentAmount] = useState(1)
-    const [adjustmentUnit, setAdjustmentUnit] = useState<'s' | 'm' | 'h'>('m')
+    const [adjustmentUnit, setAdjustmentUnit] = useState<'s' | 'm' | 'h'>('h')
     const [isEditingTime, setIsEditingTime] = useState(false)
     const [editingTimeValue, setEditingTimeValue] = useState('')
     const lastTickRef = useRef<number | null>(null)
@@ -359,7 +359,7 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
 
     // Clock Logic
     useEffect(() => {
-        if (!isClockRunning || !calendarConfig) {
+        if (!isClockRunning) {
             lastTickRef.current = null
             return
         }
@@ -390,7 +390,7 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
 
         rafId = requestAnimationFrame(tick)
         return () => cancelAnimationFrame(rafId)
-    }, [isClockRunning, multiplier, calendarConfig, incrementDay, decrementDay])
+    }, [isClockRunning, multiplier, incrementDay, decrementDay])
 
     const updateCounter = (id: string, delta: number) => {
         setItems(prev => prev.map(item => 
@@ -821,13 +821,13 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
                                             onChange={(e) => setAdjustmentAmount(Number(e.target.value))}
                                         />
                                         <select 
-                                            className="text-[10px] font-black text-muted-foreground bg-transparent border-none focus:ring-0 focus:outline-none cursor-pointer p-0 ml-1 hover:text-foreground transition-colors appearance-none text-right pr-0"
+                                            className="text-[10px] font-black text-muted-foreground bg-transparent border-none focus:ring-0 focus:outline-none cursor-pointer p-0 ml-1 hover:text-foreground transition-colors text-right pr-0"
                                             value={adjustmentUnit}
                                             onChange={(e) => setAdjustmentUnit(e.target.value as 's' | 'm' | 'h')}
                                         >
-                                            <option value="s">S</option>
-                                            <option value="m">MIN</option>
-                                            <option value="h">HRS</option>
+                                            <option value="s" className="bg-background text-foreground">S</option>
+                                            <option value="m" className="bg-background text-foreground">MIN</option>
+                                            <option value="h" className="bg-background text-foreground">HRS</option>
                                         </select>
                                     </div>
                                     <Button variant="outline" size="icon" className="h-8 w-8 shrink-0 hover:bg-primary/5 hover:text-primary" onClick={() => adjustTime(adjustmentAmount)}>
