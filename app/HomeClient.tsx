@@ -7,9 +7,10 @@ import Characters from '@/components/characters/Characters'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Trophy, Book, Globe, Sparkles } from 'lucide-react'
+import { Trophy, Book, Globe, Sparkles, Key } from 'lucide-react'
 import ActivityFeed from '@/components/ActivityFeed'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { ApiKeyDialog } from '@/components/ApiKeyDialog'
 import { useState, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
@@ -22,6 +23,7 @@ export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
   const rotation = useMotionValue(0)
   const velocityRef = useRef(0)
   const [hasReachedRainbow, setHasReachedRainbow] = useState(false)
+  const [isApiDialogOpen, setIsApiDialogOpen] = useState(false)
 
   const incrementLogoClicks = useMutation(api.users.incrementLogoClicks)
   const isGM = useQuery(api.sessions.isGameMasterQuery)
@@ -119,19 +121,17 @@ export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
                 <span className="hidden sm:inline">Stats</span>
               </Button>
             </Link>
-            {(isGM || ownedWorld) && (
-              <Link href={ownedWorld ? `/world/${encodeURIComponent(ownedWorld.name)}` : "/world"}>
-                <Button variant="outline" size="sm" className={cn(
-                  "flex items-center gap-2 h-9 w-9 sm:w-auto sm:px-3 p-0",
-                  ownedWorld && "border-amber-500/50 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
-                )}>
-                  <Globe className="h-4 w-4" />
-                  <span className="hidden sm:inline">{ownedWorld ? "Your World" : "Worlds"}</span>
-                </Button>
-              </Link>
-            )}
             <ThemeToggle />
-            <UserButton />
+            <UserButton>
+                <UserButton.MenuItems>
+                    <UserButton.Action 
+                        label="API Access" 
+                        labelIcon={<Key className="h-4 w-4" />} 
+                        onClick={() => setIsApiDialogOpen(true)} 
+                    />
+                </UserButton.MenuItems>
+            </UserButton>
+            <ApiKeyDialog open={isApiDialogOpen} onOpenChange={setIsApiDialogOpen} />
           </div>
         </Authenticated>
         <AuthLoading>

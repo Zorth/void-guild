@@ -254,6 +254,100 @@ export const getLeaderboardStats = query({
 })
 
 /**
+ * Generates a new API key for the current user.
+ */
+export const generateApiKey = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) throw new Error('Not authenticated')
+
+    const apiKey = `vg_${Math.random().toString(36).substring(2)}${Math.random().toString(36).substring(2)}`
+    
+    const userRecord = await ctx.db
+      .query('users')
+      .withIndex('by_userId', (q) => q.eq('userId', identity.subject))
+      .first()
+
+    if (userRecord) {
+      await ctx.db.patch(userRecord._id, { apiKey })
+    } else {
+      await ctx.db.insert('users', {
+        userId: identity.subject,
+        isAdmin: false,
+        isGM: false,
+        name: identity.name,
+        apiKey,
+      })
+    }
+    return apiKey
+  },
+})
+
+/**
+ * Revokes the current user's API key.
+ */
+export const revokeApiKey = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) throw new Error('Not authenticated')
+
+    const userRecord = await ctx.db
+      .query('users')
+      .withIndex('by_userId', (q) => q.eq('userId', identity.subject))
+      .first()
+
+    if (userRecord) {
+      await ctx.db.patch(userRecord._id, { apiKey: undefined })
+    }
+  },
+})
+
+/**
+ * Gets the current user's API key (masked or full).
+ */
+export const getApiKey = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) return null
+
+    const userRecord = await ctx.db
+      .query('users')
+      .withIndex('by_userId', (q) => q.eq('userId', identity.subject))
+      .first()
+
+    return userRecord?.apiKey || null
+  },
+})
+
+/**
+ * Internal query to validate an API key and return the user.
+ */
+export const validateApiKey = query({
+  args: { apiKey: v.string() },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_apiKey', (q) => q.eq('apiKey', args.apiKey))
+      .first()
+
+    if (!user) return null
+
+    // Update last used timestamp
+    // Note: We can't use mutations inside queries, so we'll just return the user
+    // and let the caller decide what to do.
+    return {
+        _id: user._id,
+        userId: user.userId,
+        isAdmin: user.isAdmin,
+        isGM: user.isGM,
+    }
+  },
+})
+
+/**
  * Deprecated: Use updateUser instead.
  */
 export const updateRole = mutation({

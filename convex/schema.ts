@@ -103,5 +103,7 @@ export default defineSchema({
         extraSessionsPlayed: v.optional(v.number()),
         extraSessionsRan: v.optional(v.number()),
         logoClicks: v.optional(v.number()),
-    }).index('by_userId', ['userId']),
+        apiKey: v.optional(v.string()),
+        apiKeyLastUsed: v.optional(v.number()),
+    }).index('by_userId', ['userId']).index('by_apiKey', ['apiKey']),
 })
