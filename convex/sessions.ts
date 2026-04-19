@@ -801,3 +801,50 @@ export const updateInGameDate = mutation({
     })
   },
 })
+
+export const getSessionState = query({
+    args: { sessionId: v.id('sessions') },
+    handler: async (ctx, args) => {
+        return await ctx.db
+            .query('sessionStates')
+            .withIndex('by_sessionId', (q) => q.eq('sessionId', args.sessionId))
+            .first()
+    }
+})
+
+export const updateSessionState = mutation({
+    args: {
+        sessionId: v.id('sessions'),
+        initiative: v.optional(v.array(v.object({
+            id: v.string(),
+            name: v.string(),
+            counter: v.optional(v.number()),
+        }))),
+        currentIndex: v.optional(v.number()),
+        round: v.optional(v.number()),
+        timeSeconds: v.optional(v.number()),
+        isClockRunning: v.optional(v.boolean()),
+        multiplier: v.optional(v.number()),
+    },
+    handler: async (ctx, args) => {
+        const user = await ctx.auth.getUserIdentity()
+        const session = await ctx.db.get(args.sessionId)
+        
+        const isAdminUser = await isAdmin(ctx)
+        if (!session || (session.owner !== user?.subject && !isAdminUser)) {
+          throw new Error('Unauthorized')
+        }
+
+        const existing = await ctx.db
+            .query('sessionStates')
+            .withIndex('by_sessionId', (q) => q.eq('sessionId', args.sessionId))
+            .first()
+
+        const { sessionId, ...state } = args
+        if (existing) {
+            await ctx.db.patch(existing._id, state)
+        } else {
+            await ctx.db.insert('sessionStates', { sessionId, ...state })
+        }
+    }
+})

@@ -91,7 +91,21 @@ export default defineSchema({
         reward: v.optional(v.string()),
         tags: v.optional(v.array(v.string())),
         owner: v.string(), // Clerk userId of the creator
+        isCompleted: v.optional(v.boolean()),
     }).index('by_worldId', ['worldId']),
+    sessionStates: defineTable({
+        sessionId: v.id('sessions'),
+        initiative: v.optional(v.array(v.object({
+            id: v.string(),
+            name: v.string(),
+            counter: v.optional(v.number()),
+        }))),
+        currentIndex: v.optional(v.number()),
+        round: v.optional(v.number()),
+        timeSeconds: v.optional(v.number()),
+        isClockRunning: v.optional(v.boolean()),
+        multiplier: v.optional(v.number()),
+    }).index('by_sessionId', ['sessionId']),
     users: defineTable({
         userId: v.string(), // Clerk subject
         isAdmin: v.boolean(),

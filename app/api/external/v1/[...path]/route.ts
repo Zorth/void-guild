@@ -14,44 +14,77 @@ function getConvexClient() {
 
 export const runtime = 'nodejs';
 
+async function handleResponse(promise: Promise<any>) {
+    try {
+        const result = await promise;
+        return NextResponse.json(result);
+    } catch (e: any) {
+        return NextResponse.json({ error: e.message }, { status: 400 });
+    }
+}
+
 export async function GET(
     req: NextRequest,
     { params }: { params: Promise<{ path: string[] }> }
 ) {
     const { path } = await params;
     const apiKey = req.headers.get('Authorization')?.replace('Bearer ', '');
-
-    if (!apiKey) {
-        return NextResponse.json({ error: 'Missing API key in Authorization header' }, { status: 401 });
-    }
+    if (!apiKey) return NextResponse.json({ error: 'Missing API key' }, { status: 401 });
 
     const convex = getConvexClient();
+    const [resource, id, subresource] = path;
 
-    try {
-        // GET /session/[sessionId]/characters
-        if (path[0] === 'session' && path[2] === 'characters') {
-            const sessionId = path[1];
-            const result = await convex.query(api.external_api.getSessionCharacters, {
-                apiKey,
-                sessionId: sessionId as any
-            });
-            return NextResponse.json(result);
-        }
-
-        // GET /world/[worldId]/calendar
-        if (path[0] === 'world' && path[2] === 'calendar') {
-            const worldId = path[1];
-            const result = await convex.query(api.external_api.getWorldCalendar, {
-                apiKey,
-                worldId: worldId as any
-            });
-            return NextResponse.json(result);
-        }
-
-        return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    } catch (e: any) {
-        return NextResponse.json({ error: e.message }, { status: 400 });
+    switch (resource) {
+        case 'session':
+            if (subresource === 'characters') {
+                return handleResponse(convex.query(api.external_api.getSessionCharacters, { apiKey, sessionId: id }));
+            }
+            if (subresource === 'state') {
+                return handleResponse(convex.query(api.external_api.getSessionState, { apiKey, sessionId: id as any }));
+            }
+            break;
+        case 'world':
+            if (subresource === 'calendar') {
+                return handleResponse(convex.query(api.external_api.getWorldCalendar, { apiKey, worldId: id }));
+            }
+            if (subresource === 'quests') {
+                return handleResponse(convex.query(api.external_api.listQuests, { apiKey, worldId: id }));
+            }
+            if (subresource === 'reputation') {
+                return handleResponse(convex.query(api.external_api.getReputations, { apiKey, worldId: id as any }));
+            }
+            break;
+        case 'character':
+            return handleResponse(convex.query(api.external_api.getCharacter, { apiKey, characterId: id }));
+        case 'quests':
+            return handleResponse(convex.query(api.external_api.listQuests, { apiKey }));
+        case 'search':
+            const q = req.nextUrl.searchParams.get('q') || '';
+            return handleResponse(convex.query(api.external_api.search, { apiKey, query: q }));
+        case 'activity':
+            const limit = parseInt(req.nextUrl.searchParams.get('limit') || '10');
+            return handleResponse(convex.query(api.external_api.getActivity, { apiKey, limit }));
     }
+
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+}
+
+export async function POST(
+    req: NextRequest,
+    { params }: { params: Promise<{ path: string[] }> }
+) {
+    const { path } = await params;
+    const apiKey = req.headers.get('Authorization')?.replace('Bearer ', '');
+    if (!apiKey) return NextResponse.json({ error: 'Missing API key' }, { status: 401 });
+
+    const convex = getConvexClient();
+    const body = await req.json();
+
+    if (path[0] === 'session') {
+        return handleResponse(convex.mutation(api.external_api.createSession, { apiKey, ...body }));
+    }
+
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
 }
 
 export async function PATCH(
@@ -60,36 +93,28 @@ export async function PATCH(
 ) {
     const { path } = await params;
     const apiKey = req.headers.get('Authorization')?.replace('Bearer ', '');
-
-    if (!apiKey) {
-        return NextResponse.json({ error: 'Missing API key in Authorization header' }, { status: 401 });
-    }
+    if (!apiKey) return NextResponse.json({ error: 'Missing API key' }, { status: 401 });
 
     const convex = getConvexClient();
+    const body = await req.json();
+    const [resource, id, subresource] = path;
 
-    try {
-        // PATCH /world/[worldId]/calendar
-        if (path[0] === 'world' && path[2] === 'calendar') {
-            const worldId = path[1];
-            const body = await req.json();
-            const { year, month, day } = body;
-
-            if (year === undefined || month === undefined || day === undefined) {
-                return NextResponse.json({ error: 'Missing year, month, or day in body' }, { status:400 });
+    switch (resource) {
+        case 'world':
+            if (subresource === 'calendar') {
+                return handleResponse(convex.mutation(api.external_api.updateWorldDate, { apiKey, worldId: id, ...body }));
             }
-
-            const result = await convex.mutation(api.external_api.updateWorldDate, {
-                apiKey,
-                worldId: worldId as any,
-                year,
-                month,
-                day
-            });
-            return NextResponse.json(result);
-        }
-
-        return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    } catch (e: any) {
-        return NextResponse.json({ error: e.message }, { status: 400 });
+            break;
+        case 'quest':
+            return handleResponse(convex.mutation(api.external_api.updateQuest, { apiKey, questId: id as any, ...body }));
+        case 'reputation':
+            return handleResponse(convex.mutation(api.external_api.updateReputation, { apiKey, ...body }));
+        case 'session':
+            if (subresource === 'state') {
+                return handleResponse(convex.mutation(api.external_api.updateSessionState, { apiKey, sessionId: id as any, ...body }));
+            }
+            break;
     }
+
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
 }

@@ -22,109 +22,81 @@ https://guild.tarragon.be/api/external/v1
 
 ## Endpoints
 
-### 1. Get Session Characters
-Retrieves a list of characters currently signed up for a specific session.
+### Sessions
+*   **GET** `/session/:sessionId/characters` - List characters in a session.
+*   **GET** `/session/:sessionId/state` - Get live initiative and clock state.
+*   **PATCH** `/session/:sessionId/state` - Update initiative/clock (Owner only).
+*   **POST** `/session` - Create a new session (GM only). Body: `{ date?, level?, maxPlayers, system, location?, planning? }`.
 
-*   **URL:** `/session/:sessionId/characters`
-*   **Method:** `GET`
-*   **Response:** `Array<Character>`
+### Worlds & Quests
+*   **GET** `/world/:worldId/calendar` - Get world calendar config and date.
+*   **PATCH** `/world/:worldId/calendar` - Update world date. Body: `{ year, month, day }`.
+*   **GET** `/world/:worldId/quests` - List quests in a world.
+*   **GET** `/quests` - List all quests (global + worlds).
+*   **PATCH** `/quest/:questId` - Update quest status/details. Body: `{ isCompleted?, name?, description? }`.
 
-**Example Response:**
-```json
-[
-  {
-    "id": "jh7...",
-    "name": "Kaelen",
-    "lvl": 5,
-    "xp": 450,
-    "class": "Fighter",
-    "ancestry": "Human",
-    "userId": "user_..."
-  }
-]
-```
+### Reputation
+*   **GET** `/world/:worldId/reputation` - Get all reputation scores for a world.
+*   **PATCH** `/reputation` - Update a character's reputation. Body: `{ worldId, characterId, factionName, delta }`.
 
-### 2. Get World Calendar
-Retrieves the full configuration and current state of a world's Fantasy Calendar.
+### Characters
+*   **GET** `/character/:characterId` - Get full character details.
 
-*   **URL:** `/world/:worldId/calendar`
-*   **Method:** `GET`
-*   **Response:** `Object`
+### Discovery
+*   **GET** `/search?q=...` - Search for worlds and characters by name.
+*   **GET** `/activity?limit=...` - Get recent activity feed entries.
 
-**Example Response:**
+---
+
+## Data Models
+
+### Character
 ```json
 {
-  "name": "The Void",
-  "calendar": {
-    "name": "Standard Calendar",
-    "dynamic_data": {
-      "year": 2024,
-      "month": 3,
-      "day": 12
-    },
-    "static_data": { ... }
-  }
+  "_id": "jh7...",
+  "name": "Kaelen",
+  "lvl": 5,
+  "xp": 450,
+  "ancestry": "Human",
+  "class": "Fighter",
+  "system": "PF",
+  "userId": "user_..."
 }
 ```
 
-### 3. Update World Date
-Updates the current in-game date for a world. You must be the owner of the world or an admin.
-
-*   **URL:** `/world/:worldId/calendar`
-*   **Method:** `PATCH`
-*   **Body:**
-    ```json
-    {
-      "year": 2024,
-      "month": 3,
-      "day": 13
-    }
-    ```
-*   **Response:**
-    ```json
-    {
-      "success": true,
-      "newDate": { "year": 2024, "month": 3, "day": 13 }
-    }
-    ```
+### Session State
+```json
+{
+  "initiative": [
+    { "id": "char_1", "name": "Kaelen", "counter": 12 },
+    { "id": "custom_1", "name": "Goblin", "counter": 0 }
+  ],
+  "currentIndex": 0,
+  "round": 1,
+  "timeSeconds": 32400,
+  "isClockRunning": false,
+  "multiplier": 1
+}
+```
 
 ---
 
-## Usage Examples
+## Usage Examples (cURL)
 
-### cURL
+### Update Session Initiative
 ```bash
-# Get characters for a session
-curl -H "Authorization: Bearer vg_your_key" \
-     "https://guild.tarragon.be/api/external/v1/session/kds7.../characters"
-
-# Advance the world date
 curl -X PATCH \
      -H "Authorization: Bearer vg_your_key" \
      -H "Content-Type: application/json" \
-     -d '{"year": 2024, "month": 5, "day": 20}' \
-     "https://guild.tarragon.be/api/external/v1/world/j5s9.../calendar"
+     -d '{"initiative": [{"id": "c1", "name": "Hero", "counter": 5}], "currentIndex": 0}' \
+     "https://guild.tarragon.be/api/external/v1/session/[ID]/state"
 ```
 
-### Python
-```python
-import requests
-
-api_key = "vg_your_key"
-headers = {"Authorization": f"Bearer {api_key}"}
-
-# Get world calendar
-response = requests.get(
-    "https://guild.tarragon.be/api/external/v1/world/j5s9.../calendar",
-    headers=headers
-)
-calendar_data = response.json()
-print(f"Current Date: {calendar_data['calendar']['dynamic_data']}")
+### Complete a Quest
+```bash
+curl -X PATCH \
+     -H "Authorization: Bearer vg_your_key" \
+     -H "Content-Type: application/json" \
+     -d '{"isCompleted": true}' \
+     "https://guild.tarragon.be/api/external/v1/quest/[ID]"
 ```
-
----
-
-## Rate Limiting & Security
-*   Keep your API key secret. If compromised, revoke it immediately from the dashboard.
-*   API keys provide access to your private character data and worlds you own.
-*   Currently, there are no strict rate limits, but please be mindful of the Convex deployment limits.
