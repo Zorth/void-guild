@@ -204,23 +204,23 @@ export default function ReputationSystem({
                     </div>
                 </div>
 
-                <div className="overflow-x-auto custom-scrollbar">
-                    <table className="w-full text-left border-collapse min-w-[600px]">
-                        <thead>
-                            <tr className="border-b border-border/40 bg-muted/20">
-                                <th className="px-6 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground sticky left-0 bg-muted/20 z-10 backdrop-blur-sm border-r border-border/40 min-w-[180px]">Character</th>
+                <div className="overflow-auto custom-scrollbar max-h-[400px]">
+                    <table className="w-full text-left border-collapse min-w-[600px] relative">
+                        <thead className="sticky top-0 z-30 shadow-sm">
+                            <tr className="border-b border-border/40 bg-muted">
+                                <th className="px-6 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground sticky left-0 bg-muted z-40 backdrop-blur-sm border-r border-border/40 w-[140px] min-w-[140px]">Character</th>
                                 {displayedFactions.map(faction => (
-                                    <th key={faction} className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground min-w-[120px]">
+                                    <th key={faction} className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground min-w-[120px] bg-muted">
                                         {faction}
                                     </th>
                                 ))}
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody className="relative z-10">
                             {sortedCharacters.length > 0 ? (
                                 sortedCharacters.map(char => (
                                     <tr key={char._id} className="border-b border-border/30 hover:bg-primary/5 transition-colors">
-                                        <td className="px-6 py-3 sticky left-0 bg-card/90 z-10 backdrop-blur-sm border-r border-border/40 min-w-0">
+                                        <td className="px-6 py-3 sticky left-0 bg-card z-20 backdrop-blur-sm border-r border-border/40 w-[140px] min-w-[140px]">
                                             <div className="flex flex-col gap-0.5 min-w-0">
                                                 <div className="flex items-center flex-wrap gap-2 min-w-0">
                                                     <span className="font-bold text-sm tracking-tight break-words">{char.name}</span>
@@ -235,7 +235,7 @@ export default function ReputationSystem({
                                             </div>
                                         </td>
                                         {displayedFactions.map(faction => (
-                                            <td key={faction} className="px-4 py-3 align-middle">
+                                            <td key={faction} className="px-4 py-3 align-middle bg-card/50">
                                                 <ReputationCell
                                                     charId={char._id}
                                                     faction={faction}
