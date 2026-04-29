@@ -23,21 +23,21 @@ https://guild.tarragon.be/api/external/v1
 ## Endpoints
 
 ### Sessions
-*   **GET** `/session/:sessionId/characters` - List characters in a session.
+*   **GET** `/session/:sessionId/characters` - List characters in a session. Returns simplified character objects (using `id` instead of `_id`).
 *   **GET** `/session/:sessionId/state` - Get live initiative and clock state.
-*   **PATCH** `/session/:sessionId/state` - Update initiative/clock (Owner only).
-*   **POST** `/session` - Create a new session (GM only). Body: `{ date?, level?, maxPlayers, system, location?, planning? }`.
+*   **PATCH** `/session/:sessionId/state` - Update initiative/clock (Owner only). Body: `{ initiative?, currentIndex?, round?, timeSeconds?, isClockRunning?, multiplier? }`.
+*   **POST** `/session` - Create a new session (GM only). Body: `{ date?, level?, maxPlayers, system, location?, planning? }`. `system` must be `"PF"` or `"DnD"`.
 
 ### Worlds & Quests
-*   **GET** `/world/:worldId/calendar` - Get world calendar config and date.
+*   **GET** `/world/:worldId/calendar` - Get world calendar config and current date.
 *   **PATCH** `/world/:worldId/calendar` - Update world date. Body: `{ year, month, day }`.
-*   **GET** `/world/:worldId/quests` - List quests in a world.
-*   **GET** `/quests` - List all quests (global + worlds).
-*   **PATCH** `/quest/:questId` - Update quest status/details. Body: `{ isCompleted?, name?, description? }`.
+*   **GET** `/world/:worldId/quests` - List all quests associated with a specific world.
+*   **GET** `/quests` - List all quests (global "The Void" quests + world quests).
+*   **PATCH** `/quest/:questId` - Update quest status/details (Owner/Admin only). Body: `{ isCompleted?, name?, description? }`.
 
 ### Reputation
-*   **GET** `/world/:worldId/reputation` - Get all reputation scores for a world.
-*   **PATCH** `/reputation` - Update a character's reputation. Body: `{ worldId, characterId, factionName, delta }`.
+*   **GET** `/world/:worldId/reputation` - Get all reputation scores for all characters in a world.
+*   **PATCH** `/reputation` - Update a character's reputation (World Owner/Admin only). Body: `{ worldId, characterId, factionName, delta }`.
 
 ### Characters
 *   **GET** `/character/:characterId` - Get full character details.
@@ -60,13 +60,33 @@ https://guild.tarragon.be/api/external/v1
   "ancestry": "Human",
   "class": "Fighter",
   "system": "PF",
-  "userId": "user_..."
+  "userId": "user_...",
+  "rank": "journeyman",
+  "websiteLink": "https://..."
+}
+```
+
+### Quest
+```json
+{
+  "_id": "kq7...",
+  "name": "The Great Escape",
+  "levelPF": 3,
+  "levelDnD": 5,
+  "worldId": "wd7...",
+  "description": "Help the prisoners escape.",
+  "questgiver": "Guard Captain",
+  "reward": "50gp",
+  "tags": ["stealth", "urban"],
+  "owner": "user_...",
+  "isCompleted": false
 }
 ```
 
 ### Session State
 ```json
 {
+  "sessionId": "s7...",
   "initiative": [
     { "id": "char_1", "name": "Kaelen", "counter": 12 },
     { "id": "custom_1", "name": "Goblin", "counter": 0 }
@@ -76,6 +96,40 @@ https://guild.tarragon.be/api/external/v1
   "timeSeconds": 32400,
   "isClockRunning": false,
   "multiplier": 1
+}
+```
+
+### Reputation
+```json
+{
+  "_id": "r7...",
+  "worldId": "w7...",
+  "characterId": "c7...",
+  "factionName": "The Void Guild",
+  "value": 15
+}
+```
+
+### Activity
+```json
+{
+  "_id": "a7...",
+  "type": "session_created",
+  "message": "A new session was created for The Void",
+  "userId": "user_...",
+  "metadata": { "sessionId": "s7..." }
+}
+```
+
+### Search Results
+```json
+{
+  "worlds": [
+    { "id": "w7...", "name": "The Void" }
+  ],
+  "characters": [
+    { "id": "c7...", "name": "Kaelen" }
+  ]
 }
 ```
 
