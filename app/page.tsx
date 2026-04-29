@@ -40,7 +40,7 @@ export default function Home() {
   )
 
   return (
-    <main className="container mx-auto px-4 py-8">
+    <main className="container mx-auto px-4 py-8 pt-[calc(2rem+env(safe-area-inset-top))]">
       <HomeClient skeleton={HomeSkeleton} />
     </main>
   )

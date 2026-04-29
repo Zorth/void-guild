@@ -147,9 +147,9 @@ export default function SessionClient() {
 
   if (isLoading) {
     return (
-        <div className="min-h-screen bg-background flex flex-col px-4">
+        <div className="min-h-screen min-h-[100dvh] bg-background flex flex-col px-4">
             <div className="grid grid-cols-1 lg:grid-cols-[672px_320px] 2xl:grid-cols-[1fr_672px_1fr] gap-8 justify-center flex-1 w-full max-w-[1600px] mx-auto">
-                <header className="col-span-full py-8">
+                <header className="col-span-full py-8 pt-[calc(2rem+env(safe-area-inset-top))]">
                     <div className="flex justify-between items-center w-full">
                         <Skeleton className="h-9 w-32" />
                         <div className="flex gap-2">
@@ -476,10 +476,10 @@ export default function SessionClient() {
   );
 
   return (
-    <div className="min-h-screen bg-background flex flex-col px-4">
+    <div className="min-h-screen min-h-[100dvh] bg-background flex flex-col px-4">
       <div className="grid grid-cols-1 lg:grid-cols-[672px_320px] 2xl:grid-cols-[1fr_672px_1fr] gap-8 justify-center flex-1 w-full max-w-[1600px] mx-auto">
         {/* Header row spanning all columns */}
-        <header className="col-span-full py-8">
+        <header className="col-span-full py-8 pt-[calc(2rem+env(safe-area-inset-top))]">
             <div className="flex justify-between items-center w-full">
                 <Button variant="ghost" size="sm" className="sm:px-3 sm:w-auto w-9 px-0 h-9" asChild>
                     <Link href="/">

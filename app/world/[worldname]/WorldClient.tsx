@@ -310,7 +310,7 @@ export default function WorldClient() {
 
   if (world === undefined) {
     return (
-      <div className="container mx-auto py-8 px-4 max-w-7xl">
+      <div className="container mx-auto py-8 px-4 max-w-7xl pt-[calc(2rem+env(safe-area-inset-top))]">
         <Skeleton className="h-10 w-32 mb-8" />
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             <div className="lg:col-span-4 space-y-8">
@@ -345,7 +345,7 @@ export default function WorldClient() {
   const hasMoreSessions = activeTab === 'past' && allFilteredSessions.length > sessionsLimit
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-7xl">
+    <div className="container mx-auto py-8 px-4 max-w-7xl pt-[calc(2rem+env(safe-area-inset-top))]">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8">
         <Button variant="ghost" size="sm" className="sm:px-3 sm:w-auto w-9 px-0" asChild>
           <Link href="/">

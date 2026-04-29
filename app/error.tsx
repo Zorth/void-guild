@@ -16,7 +16,7 @@ export default function GlobalError({
   }, [error])
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <div className="min-h-screen min-h-[100dvh] flex items-center justify-center p-4">
       <div className="max-w-md w-full text-center space-y-8">
         <div className="relative inline-block">
           <AlertCircle className="h-24 w-24 text-destructive/20 mx-auto" />
