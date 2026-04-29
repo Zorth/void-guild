@@ -52,6 +52,7 @@ import ReputationSystem from '@/components/world/ReputationSystem'
 interface SessionWithGM extends Doc<'sessions'> {
     attendingCharacters: Doc<'characters'>[];
     isOwner: boolean;
+    canManage: boolean;
     gmCharacterData?: Doc<'characters'> | null;
     worldName: string;
     interestedPlayers?: { userId: string; username: string }[];
@@ -363,7 +364,7 @@ export default function SessionClient() {
 
   const rightColumnContent = (
     <div className="space-y-8">
-      {!isOwnerOrAdmin ? (
+      {!session.isOwner && (
         <>
           <Authenticated>
             {!hasUserCharacterInSession && (
@@ -435,8 +436,9 @@ export default function SessionClient() {
             </Card>
           </Unauthenticated>
         </>
-      ) : (
-        isOwnerOrAdmin && (
+      )}
+
+      {isOwnerOrAdmin && (
           <SessionManagement 
               session={session}
               isAdmin={!!isAdmin}
@@ -462,7 +464,6 @@ export default function SessionClient() {
               onForceUnlock={handleForceUnlock}
               xpGainsPreview={xpGainsPreview || []}
           />
-        )
       )}
 
       <QuestList 
@@ -677,7 +678,7 @@ export default function SessionClient() {
                                 />
                             )}
                         </div>
-                        {session.isOwner && session.gmCharacterData && (
+                        {session.gmCharacterData && (
                             <span className="text-sm font-medium px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded-md flex items-center gap-1 whitespace-nowrap">
                                 <Shield className="h-3 w-3" /> GM: {session.gmCharacterData.name}
                                 {session.gmCharacterData.system && (
@@ -816,7 +817,7 @@ export default function SessionClient() {
                     userCharacterIds={userCharacterIds}
                     sessionLocked={session.locked}
                     sessionPlanning={session.planning}
-                    isSessionOwner={session.isOwner}
+                    isSessionOwner={isOwnerOrAdmin}
                     onLeave={handleLeave}
                     userMetadata={userMetadata}
                     leavingCharacterId={leavingCharacterId}

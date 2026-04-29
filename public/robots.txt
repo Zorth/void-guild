@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://guild.tarragon.be/sitemap.xml

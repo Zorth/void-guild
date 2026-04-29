@@ -87,6 +87,9 @@ const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'
 
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
+  alternates: {
+    canonical: '/',
+  },
   title: {
     default: 'Guild of The Void | Character & Session Manager',
     template: '%s | Void Guild'

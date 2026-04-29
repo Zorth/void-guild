@@ -196,7 +196,7 @@ export const getPublicSession = query({
       level: session.level,
       maxPlayers: session.maxPlayers,
       attendingCharacters: attendingCharacters
-        .filter((c): c is any => c !== null)
+        .filter((c): c is Doc<'characters'> => c !== null)
         .map(c => ({ name: c.name, lvl: c.lvl })),
       interestedCount: (session.interestedPlayers || []).length,
       planning: session.planning,
@@ -221,10 +221,11 @@ export const getSession = query({
       session.characters.map((id) => ctx.db.get(id))
     )
 
-    const isOwner = user ? (user.subject === session.owner || isAdminUser) : false
+    const isOwner = user ? (user.subject === session.owner) : false
+    const canManage = user ? (isOwner || isAdminUser) : false
     let gmCharacterData = null
 
-    if (isOwner && session.gmCharacter) {
+    if (session.gmCharacter) {
         const gmChar = await ctx.db.get(session.gmCharacter)
         if (gmChar) {
             gmCharacterData = gmChar
@@ -241,11 +242,12 @@ export const getSession = query({
     return {
       ...session,
       worldName: worldDoc ? (worldDoc as Doc<'worlds'>).name : 'Unknown World', // Assert type before accessing name
-      // Hide gmCharacter ID from non-owners
-      gmCharacter: isOwner ? session.gmCharacter : undefined,
-      gmCharacterData: isOwner ? gmCharacterData : undefined,
+      // Hide gmCharacter ID from non-managers
+      gmCharacter: canManage ? session.gmCharacter : undefined,
+      gmCharacterData: gmCharacterData,
       attendingCharacters: characterDocs.filter((c): c is Doc<'characters'> => c !== null),
       isOwner,
+      canManage,
       interestedPlayers: session.interestedPlayers || [], // Include interested players
       quest: quest,
     }
