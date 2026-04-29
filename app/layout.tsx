@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import localFont from 'next/font/local'
 import './globals.css'
@@ -127,6 +127,12 @@ export const metadata: Metadata = {
   },
 }
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -152,7 +158,7 @@ export default function RootLayout({
         <ClerkProvider>
           <ConvexClientProvider>
             <TooltipProvider>
-                <div className="min-h-screen flex flex-col">
+                <div className="min-h-screen min-h-[100dvh] flex flex-col">
                   <div className="flex-1">
                     {children}
                   </div>
