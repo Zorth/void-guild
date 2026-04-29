@@ -26,7 +26,7 @@ export default function StatsPage() {
   
 
   return (
-    <div className="container mx-auto py-8 px-4">
+    <div className="container mx-auto py-8 px-4 pt-[calc(2rem+env(safe-area-inset-top))]">
       <div className="flex items-center mb-8">
         <Button variant="ghost" size="sm" className="sm:px-3 sm:w-auto w-9 px-0" asChild>
           <Link href="/">
