@@ -46,6 +46,7 @@ import InterestedPlayersList from '@/components/sessions/details/InterestedPlaye
 import SessionManagement from '@/components/sessions/details/SessionManagement'
 import SessionJoinForm from '@/components/sessions/details/SessionJoinForm'
 import QuestList from '@/components/quests/QuestList'
+import LootList from '@/components/sessions/details/LootList'
 import ToolSidebar from '@/components/sessions/ToolSidebar'
 import ReputationSystem from '@/components/world/ReputationSystem'
 
@@ -466,12 +467,19 @@ export default function SessionClient() {
           />
       )}
 
-      <QuestList 
-        worldId={session?.world} 
-        worldOwner={world?.owner} 
-        isSidebar={true} 
-        filters={{ pf: session?.system === 'PF', dnd: session?.system === 'DnD' }} 
-      />
+      {session.locked ? (
+        <LootList 
+          session={session as any} 
+          userCharacterIds={userCharacterIds} 
+        />
+      ) : (
+        <QuestList 
+          worldId={session?.world} 
+          worldOwner={world?.owner} 
+          isSidebar={true} 
+          filters={{ pf: session?.system === 'PF', dnd: session?.system === 'DnD' }} 
+        />
+      )}
     </div>
   );
 

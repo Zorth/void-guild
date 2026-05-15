@@ -803,3 +803,178 @@ export const updateInGameDate = mutation({
     })
   },
 })
+
+export const addLoot = mutation({
+  args: {
+    sessionId: v.id('sessions'),
+    name: v.string(),
+    link: v.optional(v.string()),
+    valueGP: v.number(),
+    isGood: v.boolean(),
+    quantity: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    const session = await ctx.db.get(args.sessionId)
+    if (!session) throw new Error('Session not found')
+
+    const isAdminUser = await isAdmin(ctx)
+    if (session.owner !== user.subject && !isAdminUser) {
+      throw new Error('Only the session owner or an admin can add loot.')
+    }
+
+    const loot = session.loot || []
+    const quantity = args.quantity || 1
+    const newItems = []
+
+    for (let i = 0; i < quantity; i++) {
+        newItems.push({
+            id: crypto.randomUUID(),
+            name: args.name,
+            link: args.link,
+            valueGP: args.valueGP,
+            isGood: args.isGood,
+        })
+    }
+
+    const newLoot = [
+      ...loot,
+      ...newItems,
+    ]
+
+    await ctx.db.patch(args.sessionId, { loot: newLoot })
+  },
+})
+
+export const editLoot = mutation({
+  args: {
+    sessionId: v.id('sessions'),
+    lootId: v.string(),
+    name: v.string(),
+    link: v.optional(v.string()),
+    valueGP: v.number(),
+    isGood: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    const session = await ctx.db.get(args.sessionId)
+    if (!session) throw new Error('Session not found')
+
+    const isAdminUser = await isAdmin(ctx)
+    if (session.owner !== user.subject && !isAdminUser) {
+      throw new Error('Only the session owner or an admin can edit loot.')
+    }
+
+    const loot = (session.loot || []).map((item) => {
+      if (item.id === args.lootId) {
+        return {
+          ...item,
+          name: args.name,
+          link: args.link,
+          valueGP: args.valueGP,
+          isGood: args.isGood,
+        }
+      }
+      return item
+    })
+
+    await ctx.db.patch(args.sessionId, { loot })
+  },
+})
+
+export const deleteLoot = mutation({
+  args: {
+    sessionId: v.id('sessions'),
+    lootId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    const session = await ctx.db.get(args.sessionId)
+    if (!session) throw new Error('Session not found')
+
+    const isAdminUser = await isAdmin(ctx)
+    if (session.owner !== user.subject && !isAdminUser) {
+      throw new Error('Only the session owner or an admin can delete loot.')
+    }
+
+    const loot = (session.loot || []).filter((item) => item.id !== args.lootId)
+
+    await ctx.db.patch(args.sessionId, { loot })
+  },
+})
+
+export const claimLoot = mutation({
+  args: {
+    sessionId: v.id('sessions'),
+    lootId: v.string(),
+    characterId: v.id('characters'),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    const session = await ctx.db.get(args.sessionId)
+    if (!session) throw new Error('Session not found')
+
+    const character = await ctx.db.get(args.characterId)
+    if (!character || character.userId !== user.subject) {
+      throw new Error('Character not found or you do not own it')
+    }
+
+    if (!session.characters.includes(args.characterId)) {
+      throw new Error('Character is not part of this session')
+    }
+
+    const loot = (session.loot || []).map((item) => {
+      if (item.id === args.lootId) {
+        if (item.claimedBy) {
+          throw new Error('Item already claimed')
+        }
+        return { ...item, claimedBy: args.characterId }
+      }
+      return item
+    })
+
+    await ctx.db.patch(args.sessionId, { loot })
+  },
+})
+
+export const unclaimLoot = mutation({
+  args: {
+    sessionId: v.id('sessions'),
+    lootId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    const session = await ctx.db.get(args.sessionId)
+    if (!session) throw new Error('Session not found')
+
+    const lootItem = (session.loot || []).find(item => item.id === args.lootId)
+    if (!lootItem) throw new Error('Loot item not found')
+
+    if (!lootItem.claimedBy) return
+
+    const character = await ctx.db.get(lootItem.claimedBy)
+    const isAdminUser = await isAdmin(ctx)
+    if (character?.userId !== user.subject && session.owner !== user.subject && !isAdminUser) {
+      throw new Error('You do not have permission to unclaim this item')
+    }
+
+    const loot = (session.loot || []).map((item) => {
+      if (item.id === args.lootId) {
+        return { ...item, claimedBy: undefined }
+      }
+      return item
+    })
+
+    await ctx.db.patch(args.sessionId, { loot })
+  },
+})

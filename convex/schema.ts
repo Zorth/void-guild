@@ -46,6 +46,14 @@ export default defineSchema({
             endDay: v.optional(v.number()),
         })),
         discordThreadId: v.optional(v.string()),
+        loot: v.optional(v.array(v.object({
+            id: v.string(),
+            name: v.string(),
+            link: v.optional(v.string()),
+            valueGP: v.number(),
+            isGood: v.boolean(),
+            claimedBy: v.optional(v.id("characters")),
+        }))),
   }).index('by_locked', ['locked']).index('by_owner', ['owner']),
     worlds: defineTable({
         name: v.string(),
