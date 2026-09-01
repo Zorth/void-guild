@@ -279,9 +279,9 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
               onChange={(e) => setGmCharacter(e.target.value as Id<'characters'> | '')}
             >
               <option value="">-- No GM Character --</option>
-              {userCharacters?.filter(c => c.system === system).map((char) => (
+              {userCharacters?.map((char) => (
                 <option key={char._id} value={char._id}>
-                  {char.name} (Lvl {char.lvl})
+                  {char.name} (Lvl {char.lvl}{char.system ? ` - ${char.system}` : ''})
                 </option>
               ))}
             </select>
