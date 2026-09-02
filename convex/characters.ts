@@ -72,16 +72,18 @@ export const createCharacter = mutation({
     if (!user) {
       throw new Error('Not authenticated')
     }
+    const system = args.system || 'PF'
+    const lvl = system === 'DnD' ? 3 : 1
     const characterId = await ctx.db.insert('characters', {
       name: args.name,
       ancestry: args.ancestry,
       class: args.class,
       websiteLink: args.websiteLink,
       userId: user.subject,
-      lvl: 1,
+      lvl,
       xp: 0,
       rank: 'none',
-      system: args.system || 'PF',
+      system,
     })
 
     await ctx.scheduler.runAfter(0, internal.activity.logActivity, {
