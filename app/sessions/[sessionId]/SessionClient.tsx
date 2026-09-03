@@ -217,6 +217,9 @@ export default function SessionClient() {
   const hasUserCharacterInSession = (userCharacters ?? []).some(userChar =>
     session.attendingCharacters.some(sessionChar => sessionChar._id === userChar._id)
   )
+  const userCharactersInSession = (session.attendingCharacters ?? []).filter(sessionChar =>
+    userCharacterIds.has(sessionChar._id)
+  )
 
   const handleJoin = async (event: React.MouseEvent) => {
     if (!selectedCharacterId) return
@@ -408,16 +411,19 @@ export default function SessionClient() {
                 )}
 
                 <SessionJoinForm 
-                sessionLocked={session.locked}
-                sessionPlanning={session.planning}
-                isFull={isFull}
-                availableCharacters={availableCharacters}
-                userCharactersCount={userCharacters?.length ?? 0}
-                selectedCharacterId={selectedCharacterId}
-                hasUserCharacterInSession={hasUserCharacterInSession}
-                onCharacterSelect={(id) => setSelectedCharacterId(id)}
-                onJoin={handleJoin}
-                isJoining={isJoining}
+                  sessionLocked={session.locked}
+                  sessionPlanning={session.planning}
+                  isFull={isFull}
+                  availableCharacters={availableCharacters}
+                  userCharactersCount={userCharacters?.length ?? 0}
+                  selectedCharacterId={selectedCharacterId}
+                  hasUserCharacterInSession={hasUserCharacterInSession}
+                  userCharactersInSession={userCharactersInSession}
+                  onCharacterSelect={(id) => setSelectedCharacterId(id)}
+                  onJoin={handleJoin}
+                  onLeave={handleLeave}
+                  isJoining={isJoining}
+                  leavingCharacterId={leavingCharacterId}
                 />
           </Authenticated>
 
