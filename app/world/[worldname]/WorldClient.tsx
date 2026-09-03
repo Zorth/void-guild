@@ -11,7 +11,7 @@ import {
   Plus, Settings, Pencil, Map
 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
-import { cn, formatDate, formatTime, getLevelBadgeStyle } from '@/lib/utils'
+import { cn, formatDate, formatTime, getLevelBadgeStyle, getDualLevelBadgeStyle } from '@/lib/utils'
 import { useState, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
 import { Id } from '@/convex/_generated/dataModel'
@@ -527,12 +527,43 @@ export default function WorldClient() {
                             <div className="flex flex-col gap-2">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2 whitespace-nowrap">
-                                  <span 
-                                    className="inline-flex items-center justify-center w-20 rounded-full px-2.5 py-0.5 text-xs font-bold"
-                                    style={getLevelBadgeStyle(session.level)}
-                                  >
-                                      Lvl {session.level ?? 'TBD'}
-                                  </span>
+                                  {(() => {
+                                      const q = session.quest;
+                                      const levelPF = q?.levelPF ?? (q?.levelDnD === undefined ? q?.level : undefined);
+                                      const levelDnD = q?.levelDnD;
+                                      
+                                      let displayLevel: number | 'V' | 'TBD' = 'TBD';
+                                      let badgeStyle: React.CSSProperties = {};
+
+                                      if (session.system === 'PF') {
+                                          const l = levelPF ?? session.level;
+                                          displayLevel = (typeof l === 'number' || l === 'V') ? l : 'TBD';
+                                          if (typeof displayLevel === 'number') badgeStyle = getLevelBadgeStyle(displayLevel);
+                                      } else if (session.system === 'DnD') {
+                                          const l = levelDnD ?? (q?.levelPF === undefined ? q?.level : undefined) ?? session.level;
+                                          displayLevel = (typeof l === 'number' || l === 'V') ? l : 'TBD';
+                                          if (typeof displayLevel === 'number') badgeStyle = getLevelBadgeStyle(displayLevel);
+                                      } else {
+                                          const isDual = levelPF !== undefined && levelDnD !== undefined && levelPF !== levelDnD;
+                                          if (isDual) {
+                                              displayLevel = 'V';
+                                              badgeStyle = getDualLevelBadgeStyle(levelPF, levelDnD);
+                                          } else {
+                                              const l = levelPF ?? levelDnD ?? session.level;
+                                              displayLevel = (typeof l === 'number' || l === 'V') ? l : 'TBD';
+                                              if (typeof displayLevel === 'number') badgeStyle = getLevelBadgeStyle(displayLevel);
+                                          }
+                                      }
+
+                                      return (
+                                          <span 
+                                            className="inline-flex items-center justify-center w-20 rounded-full px-2.5 py-0.5 text-xs font-bold"
+                                            style={badgeStyle}
+                                          >
+                                              Lvl {displayLevel}
+                                          </span>
+                                      );
+                                  })()}
                                   {session.system && (
                                     <img 
                                         src={session.system === 'PF' ? '/PFVoid.svg' : '/DnDVoid.svg'} 

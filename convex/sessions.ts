@@ -60,12 +60,28 @@ export const isAdminQuery = query({
     },
 })
 
+export function computeEffectiveLevel(session: Doc<'sessions'>, quest: Doc<'quests'> | null): number | undefined {
+  if (!quest) return session.level
+  const levelPF = quest.levelPF ?? (quest.levelDnD === undefined ? quest.level : undefined)
+  const levelDnD = quest.levelDnD
+  if (session.system === 'PF') {
+    return levelPF ?? session.level
+  }
+  if (session.system === 'DnD') {
+    return levelDnD ?? (quest.levelPF === undefined ? quest.level : undefined) ?? session.level
+  }
+  if (levelPF !== undefined && levelDnD === undefined) return levelPF
+  if (levelDnD !== undefined && levelPF === undefined) return levelDnD
+  if (levelPF !== undefined && levelDnD !== undefined && levelPF === levelDnD) return levelPF
+  return session.level
+}
+
 export const listSessions = query({
   args: { past: v.boolean() },
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
     if (!user) {
-      return null
+      return []
     }
 
     const sessions = await ctx.db
@@ -76,12 +92,13 @@ export const listSessions = query({
     const sessionsWithDetails = await Promise.all(
       sessions.map(async (session) => {
         const characterDocs = await Promise.all(
-          session.characters.map((id) => ctx.db.get(id))
+          (session.characters || []).map((id) => ctx.db.get(id))
         )
-        const worldDoc = await ctx.db.get(session.world as Id<'worlds'>)
+        const worldDoc = session.world ? await ctx.db.get(session.world as Id<'worlds'>) : null
         const questDoc = session.questId ? await ctx.db.get(session.questId) : null
         return {
           ...session,
+          level: computeEffectiveLevel(session, questDoc),
           worldName: worldDoc ? (worldDoc as Doc<'worlds'>).name : 'Unknown World',
           characterNames: characterDocs.filter((c): c is Doc<'characters'> => c !== null).map((c) => c.name),
           isOwner: user.subject === session.owner,
@@ -119,12 +136,13 @@ export const publicListSessions = query({
     const sessionsWithDetails = await Promise.all(
       sessions.map(async (session) => {
         const characterDocs = await Promise.all(
-          session.characters.map((id) => ctx.db.get(id))
+          (session.characters || []).map((id) => ctx.db.get(id))
         )
-        const worldDoc = await ctx.db.get(session.world as Id<'worlds'>)
+        const worldDoc = session.world ? await ctx.db.get(session.world as Id<'worlds'>) : null
         const questDoc = session.questId ? await ctx.db.get(session.questId) : null
         return {
           ...session,
+          level: computeEffectiveLevel(session, questDoc),
           worldName: worldDoc ? (worldDoc as Doc<'worlds'>).name : 'Unknown World',
           characterNames: characterDocs.filter((c): c is Doc<'characters'> => c !== null).map((c) => c.name),
           isOwner: false,
@@ -230,10 +248,9 @@ export const getAttendingCharacterRelationships = query({
 
     const currentSessionTime = currentSession.date || currentSession._creationTime
 
-    const myPastSessions = allSessions.filter(s => 
+    const pastSessions = allSessions.filter(s => 
       s._id !== args.sessionId &&
-      (s.date || s._creationTime) <= currentSessionTime &&
-      (Array.isArray(s.characters) && s.characters.includes(args.userCharacterId) || s.gmCharacter === args.userCharacterId)
+      (s.date || s._creationTime) <= currentSessionTime
     )
 
     const worldIds = Array.from(new Set(allSessions.map(s => s.world).filter((w): w is Id<'worlds'> => Boolean(w))))
@@ -264,9 +281,12 @@ export const getAttendingCharacterRelationships = query({
     for (const targetId of allAttendingIds) {
       if (targetId === args.userCharacterId) continue
 
-      const coPastSessions = myPastSessions.filter(s => 
-        (Array.isArray(s.characters) && s.characters.includes(targetId)) || s.gmCharacter === targetId
-      )
+      const coPastSessions = pastSessions.filter(s => {
+        const chars = Array.isArray(s.characters) ? s.characters : []
+        const hasUser = chars.includes(args.userCharacterId) || s.gmCharacter === args.userCharacterId
+        const hasTarget = chars.includes(targetId) || s.gmCharacter === targetId
+        return hasUser && hasTarget
+      })
 
       const count = coPastSessions.length
       const isNew = count === 0
@@ -289,11 +309,22 @@ export const getAttendingCharacterRelationships = query({
         streak += 1
       }
 
-      for (let i = myPastSessions.length - 1; i >= 0; i--) {
-        const pastS = myPastSessions[i]
+      // Filter past sessions to those where EITHER user character OR target character participated
+      const relevantPastSessions = pastSessions.filter(s => {
+        const chars = Array.isArray(s.characters) ? s.characters : []
+        const hasUser = chars.includes(args.userCharacterId) || s.gmCharacter === args.userCharacterId
+        const hasTarget = chars.includes(targetId) || s.gmCharacter === targetId
+        return hasUser || hasTarget
+      })
+
+      // Mutual streak calculation: break if EITHER character played a past session without the other
+      for (let i = relevantPastSessions.length - 1; i >= 0; i--) {
+        const pastS = relevantPastSessions[i]
         const pastChars = Array.isArray(pastS.characters) ? pastS.characters : []
-        const targetInPast = pastChars.includes(targetId) || pastS.gmCharacter === targetId
-        if (targetInPast) {
+        const hasUser = pastChars.includes(args.userCharacterId) || pastS.gmCharacter === args.userCharacterId
+        const hasTarget = pastChars.includes(targetId) || pastS.gmCharacter === targetId
+        
+        if (hasUser && hasTarget) {
           streak += 1
         } else {
           break
@@ -348,6 +379,7 @@ export const getSession = query({
 
     return {
       ...session,
+      level: computeEffectiveLevel(session, quest),
       worldName: worldDoc ? (worldDoc as Doc<'worlds'>).name : 'Unknown World',
       // Hide gmCharacter ID from non-managers
       gmCharacter: canManage ? session.gmCharacter : undefined,

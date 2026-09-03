@@ -1,6 +1,7 @@
 import { query, mutation } from './_generated/server'
 import { v } from 'convex/values'
 import { Doc } from './_generated/dataModel'
+import { computeEffectiveLevel } from './sessions'
 
 export const getWorldByOwner = query({
   args: {},
@@ -94,6 +95,7 @@ export const getSessionsByWorld = query({
         const questDoc = session.questId ? await ctx.db.get(session.questId) : null
         return {
           ...session,
+          level: computeEffectiveLevel(session, questDoc),
           characterNames: characterDocs.filter((c): c is Doc<'characters'> => c !== null).map((c) => c.name),
           quest: questDoc,
         }

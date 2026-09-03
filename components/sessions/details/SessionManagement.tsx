@@ -25,7 +25,7 @@ import {
     DialogTrigger,
     DialogDescription,
 } from '@/components/ui/dialog'
-import { getLevelBadgeStyle, CharacterRankIcon, cn, formatInGameYear } from '@/lib/utils'
+import { getLevelBadgeStyle, getDualLevelBadgeStyle, CharacterRankIcon, cn, formatInGameYear } from '@/lib/utils'
 import { Doc, Id } from '@/convex/_generated/dataModel'
 import { useState, useMemo } from 'react'
 
@@ -157,12 +157,42 @@ export default function SessionManagement({
                                 >
                                     <div className="flex flex-col items-start gap-1">
                                         <div className="flex items-center gap-2 font-bold text-sm">
-                                            <div 
-                                                className="flex items-center justify-center rounded-full h-5 w-5 text-[8px]"
-                                                style={getLevelBadgeStyle(quest.level)}
-                                            >
-                                                {(quest.level ?? 0) > 0 ? quest.level : '?'}
-                                            </div>
+                                            {(() => {
+                                                const levelPF = quest.levelPF ?? (quest.levelDnD === undefined ? quest.level : undefined);
+                                                const levelDnD = quest.levelDnD;
+                                                
+                                                let displayLevel: number | 'V' | '?' = '?';
+                                                let badgeStyle: React.CSSProperties = {};
+
+                                                if (session.system === 'PF') {
+                                                    const l = levelPF ?? quest.level;
+                                                    displayLevel = (l ?? 0) > 0 ? l! : '?';
+                                                    if (typeof displayLevel === 'number') badgeStyle = getLevelBadgeStyle(displayLevel);
+                                                } else if (session.system === 'DnD') {
+                                                    const l = levelDnD ?? (quest.levelPF === undefined ? quest.level : undefined) ?? quest.level;
+                                                    displayLevel = (l ?? 0) > 0 ? l! : '?';
+                                                    if (typeof displayLevel === 'number') badgeStyle = getLevelBadgeStyle(displayLevel);
+                                                } else {
+                                                    const isDual = levelPF !== undefined && levelDnD !== undefined && levelPF !== levelDnD;
+                                                    if (isDual) {
+                                                        displayLevel = 'V';
+                                                        badgeStyle = getDualLevelBadgeStyle(levelPF, levelDnD);
+                                                    } else {
+                                                        const l = levelPF ?? levelDnD ?? quest.level;
+                                                        displayLevel = (l ?? 0) > 0 ? l! : '?';
+                                                        if (typeof displayLevel === 'number') badgeStyle = getLevelBadgeStyle(displayLevel);
+                                                    }
+                                                }
+
+                                                return (
+                                                    <div 
+                                                        className="flex items-center justify-center rounded-full h-5 w-5 text-[8px]"
+                                                        style={badgeStyle}
+                                                    >
+                                                        {displayLevel}
+                                                    </div>
+                                                );
+                                            })()}
                                             {quest.name}
                                         </div>
                                         {quest.description && (

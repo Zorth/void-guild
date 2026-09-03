@@ -737,7 +737,29 @@ export default function SessionClient() {
                     const q = session.quest;
                     const levelPF = q.levelPF ?? (q.levelDnD === undefined ? q.level : undefined);
                     const levelDnD = q.levelDnD;
-                    const isDual = levelPF !== undefined && levelDnD !== undefined;
+                    
+                    const isDual = levelPF !== undefined && levelDnD !== undefined && levelPF !== levelDnD;
+                    let displayLevel: number | 'V' | '?' = '?';
+                    let badgeStyle: React.CSSProperties = {};
+
+                    if (session.system === 'PF') {
+                        const l = levelPF ?? session.level;
+                        displayLevel = (l ?? 0) > 0 ? l! : '?';
+                        if (typeof displayLevel === 'number') badgeStyle = getLevelBadgeStyle(displayLevel);
+                    } else if (session.system === 'DnD') {
+                        const l = levelDnD ?? (q.levelPF === undefined ? q.level : undefined) ?? session.level;
+                        displayLevel = (l ?? 0) > 0 ? l! : '?';
+                        if (typeof displayLevel === 'number') badgeStyle = getLevelBadgeStyle(displayLevel);
+                    } else {
+                        if (isDual) {
+                            displayLevel = 'V';
+                            badgeStyle = getDualLevelBadgeStyle(levelPF, levelDnD);
+                        } else {
+                            const l = levelPF ?? levelDnD ?? session.level;
+                            displayLevel = (l ?? 0) > 0 ? l! : '?';
+                            if (typeof displayLevel === 'number') badgeStyle = getLevelBadgeStyle(displayLevel);
+                        }
+                    }
 
                     return (
                         <div className="px-6 pb-6">
@@ -749,9 +771,9 @@ export default function SessionClient() {
                                     </div>
                                     <div 
                                         className="flex items-center justify-center rounded-full font-bold h-6 w-6 text-[10px]"
-                                        style={getDualLevelBadgeStyle(levelPF, levelDnD)}
+                                        style={badgeStyle}
                                     >
-                                        {isDual ? 'V' : (levelPF ?? levelDnD ?? 0) > 0 ? (levelPF ?? levelDnD) : '?'}
+                                        {displayLevel}
                                     </div>
                                 </div>
                                 <div className="p-4 space-y-3">
