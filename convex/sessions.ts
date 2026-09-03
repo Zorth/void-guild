@@ -811,6 +811,7 @@ export const addLoot = mutation({
     link: v.optional(v.string()),
     valueGP: v.number(),
     isGood: v.boolean(),
+    isPerCharacter: v.optional(v.boolean()),
     quantity: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
@@ -836,6 +837,7 @@ export const addLoot = mutation({
             link: args.link,
             valueGP: args.valueGP,
             isGood: args.isGood,
+            isPerCharacter: args.isPerCharacter ?? false,
         })
     }
 
@@ -856,6 +858,7 @@ export const editLoot = mutation({
     link: v.optional(v.string()),
     valueGP: v.number(),
     isGood: v.boolean(),
+    isPerCharacter: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
@@ -877,6 +880,7 @@ export const editLoot = mutation({
           link: args.link,
           valueGP: args.valueGP,
           isGood: args.isGood,
+          isPerCharacter: args.isPerCharacter ?? false,
         }
       }
       return item

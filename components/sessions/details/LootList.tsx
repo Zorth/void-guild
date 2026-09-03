@@ -19,6 +19,7 @@ interface LootItem {
     link?: string;
     valueGP: number;
     isGood: boolean;
+    isPerCharacter?: boolean;
     claimedBy?: Id<'characters'>;
 }
 
@@ -41,6 +42,7 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
     const [link, setLink] = useState('')
     const [valueGP, setValueGP] = useState<string>('0')
     const [isGood, setIsGood] = useState(false)
+    const [isPerCharacter, setIsPerCharacter] = useState(false)
     const [quantity, setQuantity] = useState<string>('1')
 
     const loot = (session as any).loot as LootItem[] || []
@@ -50,6 +52,7 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
         setLink('')
         setValueGP('0')
         setIsGood(false)
+        setIsPerCharacter(false)
         setQuantity('1')
         setEditingItem(null)
     }
@@ -62,6 +65,7 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                 link: link || undefined,
                 valueGP: parseFloat(valueGP) || 0,
                 isGood,
+                isPerCharacter,
                 quantity: parseInt(quantity) || 1
             })
             setIsAddDialogOpen(false)
@@ -82,6 +86,7 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                 link: link || undefined,
                 valueGP: parseFloat(valueGP) || 0,
                 isGood,
+                isPerCharacter,
             })
             setEditingItem(null)
             resetForm()
@@ -141,14 +146,16 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
     }
 
     const calculations = useMemo(() => {
-        if (session.attendingCharacters.length === 0) return null
+        const attendingCount = session.attendingCharacters.length
+        if (attendingCount === 0) return null
 
         const totalValue = loot.reduce((sum, item) => {
-            const val = item.isGood ? item.valueGP : item.valueGP / 2
-            return sum + val
+            const baseVal = item.isGood ? item.valueGP : item.valueGP / 2
+            const itemTotal = item.isPerCharacter ? baseVal * attendingCount : baseVal
+            return sum + itemTotal
         }, 0)
 
-        const sharePerPlayer = totalValue / session.attendingCharacters.length
+        const sharePerPlayer = totalValue / attendingCount
 
         const userClaimedValue = loot
             .filter(item => item.claimedBy && userCharacterIds.has(item.claimedBy))
@@ -215,11 +222,20 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                                         />
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <Checkbox id="isGood" checked={isGood} onCheckedChange={(val) => setIsGood(!!val)} />
-                                    <label htmlFor="isGood" className="text-sm font-medium cursor-pointer">
-                                        Is &quot;Good&quot; (Full resale value)
-                                    </label>
+                                <div className="flex flex-col gap-2 pt-1">
+                                    <div className="flex items-center gap-2">
+                                        <Checkbox id="isGood" checked={isGood} onCheckedChange={(val) => setIsGood(!!val)} />
+                                        <label htmlFor="isGood" className="text-sm font-medium cursor-pointer">
+                                            Is &quot;Good&quot; (Full resale value)
+                                        </label>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Checkbox id="isPerCharacter" checked={isPerCharacter} onCheckedChange={(val) => setIsPerCharacter(!!val)} />
+                                        <label htmlFor="isPerCharacter" className="text-sm font-medium cursor-pointer flex items-center gap-1.5">
+                                            For <span className="font-bold underline text-primary">EACH</span> character
+                                            <span className="text-xs text-muted-foreground font-normal">(Added to every player&apos;s share)</span>
+                                        </label>
+                                    </div>
                                 </div>
                             </div>
                             <DialogFooter>
@@ -256,12 +272,15 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                         const claimedCharacter = session.attendingCharacters.find(c => c._id === item.claimedBy)
                         const isClaimedByMe = item.claimedBy && userCharacterIds.has(item.claimedBy)
                         const resaleValue = item.isGood ? item.valueGP : item.valueGP / 2
+                        const totalItemValue = item.isPerCharacter 
+                            ? resaleValue * (session.attendingCharacters.length || 1) 
+                            : resaleValue
 
                         return (
                             <Card key={item.id} className="bg-card/50 overflow-hidden border-border/40">
                                 <div className="p-3 flex items-center justify-between gap-3">
                                     <div className="min-w-0 flex-1">
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
                                             <h4 className="font-bold text-sm truncate">
                                                 {item.link ? (
                                                     <a href={item.link} target="_blank" rel="noopener noreferrer" className="hover:underline flex items-center gap-1 text-primary">
@@ -272,14 +291,29 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                                                     item.name
                                                 )}
                                             </h4>
+                                            {item.isPerCharacter && (
+                                                <span className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded uppercase font-bold">
+                                                    For EACH Character
+                                                </span>
+                                            )}
                                             {!item.isGood && (
                                                 <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded uppercase font-bold text-muted-foreground">Used</span>
                                             )}
                                         </div>
                                         <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
-                                            <span>Value: {formatGP(item.valueGP)}</span>
-                                            <span className="opacity-50">|</span>
-                                            <span>Resale: {formatGP(resaleValue)}</span>
+                                            {item.isPerCharacter ? (
+                                                <>
+                                                    <span>Value: {formatGP(item.valueGP)} / player</span>
+                                                    <span className="opacity-50">|</span>
+                                                    <span>Total: {formatGP(totalItemValue)}</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span>Value: {formatGP(item.valueGP)}</span>
+                                                    <span className="opacity-50">|</span>
+                                                    <span>Resale: {formatGP(resaleValue)}</span>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
 
@@ -325,6 +359,7 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                                                         setLink(item.link || '')
                                                         setValueGP(item.valueGP.toString())
                                                         setIsGood(item.isGood)
+                                                        setIsPerCharacter(!!item.isPerCharacter)
                                                     }}
                                                 >
                                                     <Edit2 className="h-3.5 w-3.5" />
@@ -371,11 +406,20 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                                     onChange={(e) => setValueGP(e.target.value)} 
                                 />
                             </div>
-                            <div className="flex items-center gap-2">
-                                <Checkbox id="isGoodEdit" checked={isGood} onCheckedChange={(val) => setIsGood(!!val)} />
-                                <label htmlFor="isGoodEdit" className="text-sm font-medium cursor-pointer">
-                                    Is &quot;Good&quot; (Full resale value)
-                                </label>
+                            <div className="flex flex-col gap-2 pt-1">
+                                <div className="flex items-center gap-2">
+                                    <Checkbox id="isGoodEdit" checked={isGood} onCheckedChange={(val) => setIsGood(!!val)} />
+                                    <label htmlFor="isGoodEdit" className="text-sm font-medium cursor-pointer">
+                                        Is &quot;Good&quot; (Full resale value)
+                                    </label>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Checkbox id="isPerCharacterEdit" checked={isPerCharacter} onCheckedChange={(val) => setIsPerCharacter(!!val)} />
+                                    <label htmlFor="isPerCharacterEdit" className="text-sm font-medium cursor-pointer flex items-center gap-1.5">
+                                        For <span className="font-bold underline text-primary">EACH</span> character
+                                        <span className="text-xs text-muted-foreground font-normal">(Added to every player&apos;s share)</span>
+                                    </label>
+                                </div>
                             </div>
                         </div>
                         <DialogFooter>

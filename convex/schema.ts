@@ -52,6 +52,7 @@ export default defineSchema({
             link: v.optional(v.string()),
             valueGP: v.number(),
             isGood: v.boolean(),
+            isPerCharacter: v.optional(v.boolean()),
             claimedBy: v.optional(v.id("characters")),
         }))),
   }).index('by_locked', ['locked']).index('by_owner', ['owner']),
