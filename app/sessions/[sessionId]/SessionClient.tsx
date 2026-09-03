@@ -215,9 +215,9 @@ export default function SessionClient() {
 
   const userCharacterIds = new Set(userCharacters?.map(c => c._id) ?? [])
   const hasUserCharacterInSession = (userCharacters ?? []).some(userChar =>
-    session.attendingCharacters.some(sessionChar => sessionChar._id === userChar._id)
+    (session?.attendingCharacters ?? []).some(sessionChar => sessionChar._id === userChar._id)
   )
-  const userCharactersInSession = (session.attendingCharacters ?? []).filter(sessionChar =>
+  const userCharactersInSession = (session?.attendingCharacters ?? []).filter(sessionChar =>
     userCharacterIds.has(sessionChar._id)
   )
   const userCharacterInSessionId = userCharactersInSession[0]?._id
@@ -833,7 +833,7 @@ export default function SessionClient() {
                     )}
                   </h3>
                   <AttendingCharactersList 
-                    characters={session.attendingCharacters}
+                    characters={session.attendingCharacters || []}
                     userCharacterIds={userCharacterIds}
                     sessionLocked={session.locked}
                     sessionPlanning={session.planning}

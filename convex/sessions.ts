@@ -233,10 +233,10 @@ export const getAttendingCharacterRelationships = query({
     const myPastSessions = allSessions.filter(s => 
       s._id !== args.sessionId &&
       (s.date || s._creationTime) <= currentSessionTime &&
-      (s.characters.includes(args.userCharacterId) || s.gmCharacter === args.userCharacterId)
+      (Array.isArray(s.characters) && s.characters.includes(args.userCharacterId) || s.gmCharacter === args.userCharacterId)
     )
 
-    const worldIds = Array.from(new Set(allSessions.map(s => s.world)))
+    const worldIds = Array.from(new Set(allSessions.map(s => s.world).filter((w): w is Id<'worlds'> => Boolean(w))))
     const worlds = await Promise.all(worldIds.map(id => ctx.db.get(id)))
     const worldMap = new Map<string, string>()
     worlds.forEach(w => {
@@ -255,8 +255,9 @@ export const getAttendingCharacterRelationships = query({
       streak: number;
     }> = {}
 
+    const currentChars = Array.isArray(currentSession.characters) ? currentSession.characters : []
     const allAttendingIds = Array.from(new Set([
-      ...currentSession.characters,
+      ...currentChars,
       ...(currentSession.gmCharacter ? [currentSession.gmCharacter] : [])
     ]))
 
@@ -264,7 +265,7 @@ export const getAttendingCharacterRelationships = query({
       if (targetId === args.userCharacterId) continue
 
       const coPastSessions = myPastSessions.filter(s => 
-        s.characters.includes(targetId) || s.gmCharacter === targetId
+        (Array.isArray(s.characters) && s.characters.includes(targetId)) || s.gmCharacter === targetId
       )
 
       const count = coPastSessions.length
@@ -277,20 +278,21 @@ export const getAttendingCharacterRelationships = query({
           _id: last._id,
           date: last.date,
           inGameDate: last.inGameDate,
-          worldName: worldMap.get(last.world) || 'Unknown World',
+          worldName: last.world ? (worldMap.get(last.world) || 'Unknown World') : 'Unknown World',
         }
       }
 
       let streak = 0
-      const bothInCurrent = (currentSession.characters.includes(args.userCharacterId) || currentSession.gmCharacter === args.userCharacterId) &&
-                            (currentSession.characters.includes(targetId) || currentSession.gmCharacter === targetId)
+      const bothInCurrent = (currentChars.includes(args.userCharacterId) || currentSession.gmCharacter === args.userCharacterId) &&
+                            (currentChars.includes(targetId) || currentSession.gmCharacter === targetId)
       if (bothInCurrent) {
         streak += 1
       }
 
       for (let i = myPastSessions.length - 1; i >= 0; i--) {
         const pastS = myPastSessions[i]
-        const targetInPast = pastS.characters.includes(targetId) || pastS.gmCharacter === targetId
+        const pastChars = Array.isArray(pastS.characters) ? pastS.characters : []
+        const targetInPast = pastChars.includes(targetId) || pastS.gmCharacter === targetId
         if (targetInPast) {
           streak += 1
         } else {
@@ -323,7 +325,7 @@ export const getSession = query({
     if (!session) return null
 
     const characterDocs = await Promise.all(
-      session.characters.map((id) => ctx.db.get(id))
+      (session.characters || []).map((id) => ctx.db.get(id))
     )
 
     const isOwner = user ? (user.subject === session.owner) : false
@@ -337,7 +339,7 @@ export const getSession = query({
         }
     }
 
-    const worldDoc = await ctx.db.get(session.world as Id<'worlds'>) // Explicitly cast to Id<'worlds'>
+    const worldDoc = session.world ? await ctx.db.get(session.world as Id<'worlds'>) : null
     
     let quest = null
     if (session.questId) {
@@ -346,7 +348,7 @@ export const getSession = query({
 
     return {
       ...session,
-      worldName: worldDoc ? (worldDoc as Doc<'worlds'>).name : 'Unknown World', // Assert type before accessing name
+      worldName: worldDoc ? (worldDoc as Doc<'worlds'>).name : 'Unknown World',
       // Hide gmCharacter ID from non-managers
       gmCharacter: canManage ? session.gmCharacter : undefined,
       gmCharacterData: gmCharacterData,
