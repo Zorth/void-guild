@@ -11,6 +11,9 @@
 *   **Session Scheduling:** Game Masters can create and manage upcoming and past sessions.
 *   **Session Participation:** Players can join and leave sessions with their characters.
 *   **XP Tracking:** Sessions award experience points to participating characters.
+*   **System-Aware Quest Levels:** Dual-system quests automatically evaluate and display system-matched levels (`PF` vs `DnD`).
+*   **Character Relationships & Mutual Streaks:** Attending character lists display mutual session streaks (`🔥 3+ streak`), first-time co-adventurer badges (`NEW`), and total shared sessions (`5x`, `10x`).
+*   **World Visit & Streak Tracking:** Badges highlight a character's first visit to a world (`NEW WORLD`), world visit counts, and consecutive world streaks. GM bonus characters are excluded from attendance counts and never break streaks.
 *   **Visual Cues:** Sessions are highlighted with a gold border if owned by the current user and a purple background if one of the user's characters has joined.
 *   **7-Day Overview:** A calendar-like view of upcoming sessions for the next seven days, with visual cues for owned and joined sessions.
 *   **Character Website Links:** Characters can have an associated website link, editable by the owner and visible to all in session details.
