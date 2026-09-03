@@ -282,6 +282,10 @@ export const getAttendingCharacterRelationships = query({
       ...(currentSession.gmCharacter ? [currentSession.gmCharacter] : [])
     ]))
 
+    const isAttending = (charId: string, s: Doc<'sessions'>) => {
+      return Array.isArray(s.characters) && s.characters.includes(charId as Id<'characters'>)
+    }
+
     for (const charId of allAttendingIds) {
       let count = 0
       let isNew = false
@@ -289,12 +293,7 @@ export const getAttendingCharacterRelationships = query({
       let streak = 0
 
       if (charId !== args.userCharacterId) {
-        const coPastSessions = pastSessions.filter(s => {
-          const chars = Array.isArray(s.characters) ? s.characters : []
-          const hasUser = chars.includes(args.userCharacterId) || s.gmCharacter === args.userCharacterId
-          const hasTarget = chars.includes(charId) || s.gmCharacter === charId
-          return hasUser && hasTarget
-        })
+        const coPastSessions = pastSessions.filter(s => isAttending(args.userCharacterId, s) && isAttending(charId, s))
 
         count = coPastSessions.length
         isNew = count === 0
@@ -309,26 +308,19 @@ export const getAttendingCharacterRelationships = query({
           }
         }
 
-        const bothInCurrent = (currentChars.includes(args.userCharacterId) || currentSession.gmCharacter === args.userCharacterId) &&
-                              (currentChars.includes(charId) || currentSession.gmCharacter === charId)
+        const bothInCurrent = isAttending(args.userCharacterId, currentSession) && isAttending(charId, currentSession)
         if (bothInCurrent) {
           streak += 1
         }
 
-        // Filter past sessions to those where EITHER user character OR target character participated
-        const relevantPastSessions = pastSessions.filter(s => {
-          const chars = Array.isArray(s.characters) ? s.characters : []
-          const hasUser = chars.includes(args.userCharacterId) || s.gmCharacter === args.userCharacterId
-          const hasTarget = chars.includes(charId) || s.gmCharacter === charId
-          return hasUser || hasTarget
-        })
+        // Filter past sessions to those where EITHER user character OR target character physically attended
+        const relevantPastSessions = pastSessions.filter(s => isAttending(args.userCharacterId, s) || isAttending(charId, s))
 
         // Mutual streak calculation: break if EITHER character played a past session without the other
         for (let i = relevantPastSessions.length - 1; i >= 0; i--) {
           const pastS = relevantPastSessions[i]
-          const pastChars = Array.isArray(pastS.characters) ? pastS.characters : []
-          const hasUser = pastChars.includes(args.userCharacterId) || pastS.gmCharacter === args.userCharacterId
-          const hasTarget = pastChars.includes(charId) || pastS.gmCharacter === charId
+          const hasUser = isAttending(args.userCharacterId, pastS)
+          const hasTarget = isAttending(charId, pastS)
           
           if (hasUser && hasTarget) {
             streak += 1
@@ -338,11 +330,8 @@ export const getAttendingCharacterRelationships = query({
         }
       }
 
-      // World Stats for this character
-      const charPastSessions = pastSessions.filter(s => {
-        const chars = Array.isArray(s.characters) ? s.characters : []
-        return chars.includes(charId) || s.gmCharacter === charId
-      })
+      // World Stats for this character (only counting physical attendance)
+      const charPastSessions = pastSessions.filter(s => isAttending(charId, s))
 
       const charWorldPastSessions = charPastSessions.filter(s => Boolean(currentSession.world) && s.world === currentSession.world)
       const worldCount = charWorldPastSessions.length
@@ -350,7 +339,7 @@ export const getAttendingCharacterRelationships = query({
 
       let worldStreak = 0
       if (currentSession.world) {
-        const charInCurrent = (currentChars.includes(charId) || currentSession.gmCharacter === charId)
+        const charInCurrent = isAttending(charId, currentSession)
         if (charInCurrent) {
           worldStreak += 1
         }
