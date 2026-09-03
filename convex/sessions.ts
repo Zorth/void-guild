@@ -270,6 +270,10 @@ export const getAttendingCharacterRelationships = query({
         worldName?: string;
       } | null;
       streak: number;
+      worldCount?: number;
+      isNewToWorld?: boolean;
+      worldStreak?: number;
+      worldName?: string;
     }> = {}
 
     const currentChars = Array.isArray(currentSession.characters) ? currentSession.characters : []
@@ -278,64 +282,98 @@ export const getAttendingCharacterRelationships = query({
       ...(currentSession.gmCharacter ? [currentSession.gmCharacter] : [])
     ]))
 
-    for (const targetId of allAttendingIds) {
-      if (targetId === args.userCharacterId) continue
-
-      const coPastSessions = pastSessions.filter(s => {
-        const chars = Array.isArray(s.characters) ? s.characters : []
-        const hasUser = chars.includes(args.userCharacterId) || s.gmCharacter === args.userCharacterId
-        const hasTarget = chars.includes(targetId) || s.gmCharacter === targetId
-        return hasUser && hasTarget
-      })
-
-      const count = coPastSessions.length
-      const isNew = count === 0
-
+    for (const charId of allAttendingIds) {
+      let count = 0
+      let isNew = false
       let lastSessionInfo = null
-      if (count > 0) {
-        const last = coPastSessions[coPastSessions.length - 1]
-        lastSessionInfo = {
-          _id: last._id,
-          date: last.date,
-          inGameDate: last.inGameDate,
-          worldName: last.world ? (worldMap.get(last.world) || 'Unknown World') : 'Unknown World',
+      let streak = 0
+
+      if (charId !== args.userCharacterId) {
+        const coPastSessions = pastSessions.filter(s => {
+          const chars = Array.isArray(s.characters) ? s.characters : []
+          const hasUser = chars.includes(args.userCharacterId) || s.gmCharacter === args.userCharacterId
+          const hasTarget = chars.includes(charId) || s.gmCharacter === charId
+          return hasUser && hasTarget
+        })
+
+        count = coPastSessions.length
+        isNew = count === 0
+
+        if (count > 0) {
+          const last = coPastSessions[coPastSessions.length - 1]
+          lastSessionInfo = {
+            _id: last._id,
+            date: last.date,
+            inGameDate: last.inGameDate,
+            worldName: last.world ? (worldMap.get(last.world) || 'Unknown World') : 'Unknown World',
+          }
+        }
+
+        const bothInCurrent = (currentChars.includes(args.userCharacterId) || currentSession.gmCharacter === args.userCharacterId) &&
+                              (currentChars.includes(charId) || currentSession.gmCharacter === charId)
+        if (bothInCurrent) {
+          streak += 1
+        }
+
+        // Filter past sessions to those where EITHER user character OR target character participated
+        const relevantPastSessions = pastSessions.filter(s => {
+          const chars = Array.isArray(s.characters) ? s.characters : []
+          const hasUser = chars.includes(args.userCharacterId) || s.gmCharacter === args.userCharacterId
+          const hasTarget = chars.includes(charId) || s.gmCharacter === charId
+          return hasUser || hasTarget
+        })
+
+        // Mutual streak calculation: break if EITHER character played a past session without the other
+        for (let i = relevantPastSessions.length - 1; i >= 0; i--) {
+          const pastS = relevantPastSessions[i]
+          const pastChars = Array.isArray(pastS.characters) ? pastS.characters : []
+          const hasUser = pastChars.includes(args.userCharacterId) || pastS.gmCharacter === args.userCharacterId
+          const hasTarget = pastChars.includes(charId) || pastS.gmCharacter === charId
+          
+          if (hasUser && hasTarget) {
+            streak += 1
+          } else {
+            break
+          }
         }
       }
 
-      let streak = 0
-      const bothInCurrent = (currentChars.includes(args.userCharacterId) || currentSession.gmCharacter === args.userCharacterId) &&
-                            (currentChars.includes(targetId) || currentSession.gmCharacter === targetId)
-      if (bothInCurrent) {
-        streak += 1
-      }
-
-      // Filter past sessions to those where EITHER user character OR target character participated
-      const relevantPastSessions = pastSessions.filter(s => {
+      // World Stats for this character
+      const charPastSessions = pastSessions.filter(s => {
         const chars = Array.isArray(s.characters) ? s.characters : []
-        const hasUser = chars.includes(args.userCharacterId) || s.gmCharacter === args.userCharacterId
-        const hasTarget = chars.includes(targetId) || s.gmCharacter === targetId
-        return hasUser || hasTarget
+        return chars.includes(charId) || s.gmCharacter === charId
       })
 
-      // Mutual streak calculation: break if EITHER character played a past session without the other
-      for (let i = relevantPastSessions.length - 1; i >= 0; i--) {
-        const pastS = relevantPastSessions[i]
-        const pastChars = Array.isArray(pastS.characters) ? pastS.characters : []
-        const hasUser = pastChars.includes(args.userCharacterId) || pastS.gmCharacter === args.userCharacterId
-        const hasTarget = pastChars.includes(targetId) || pastS.gmCharacter === targetId
-        
-        if (hasUser && hasTarget) {
-          streak += 1
-        } else {
-          break
+      const charWorldPastSessions = charPastSessions.filter(s => Boolean(currentSession.world) && s.world === currentSession.world)
+      const worldCount = charWorldPastSessions.length
+      const isNewToWorld = Boolean(currentSession.world) && worldCount === 0
+
+      let worldStreak = 0
+      if (currentSession.world) {
+        const charInCurrent = (currentChars.includes(charId) || currentSession.gmCharacter === charId)
+        if (charInCurrent) {
+          worldStreak += 1
+        }
+        for (let i = charPastSessions.length - 1; i >= 0; i--) {
+          const s = charPastSessions[i]
+          if (s.world === currentSession.world) {
+            worldStreak += 1
+          } else {
+            break
+          }
         }
       }
+      const worldName = currentSession.world ? (worldMap.get(currentSession.world) || 'Unknown World') : undefined
 
-      relationships[targetId] = {
+      relationships[charId] = {
         count,
         isNew,
         lastSession: lastSessionInfo,
         streak,
+        worldCount,
+        isNewToWorld,
+        worldStreak,
+        worldName,
       }
     }
 

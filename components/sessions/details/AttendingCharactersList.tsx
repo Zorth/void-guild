@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Book, Trash2, Loader2, Sparkles, Flame, Trophy, Star, Users, ExternalLink } from 'lucide-react'
+import { Book, Trash2, Loader2, Sparkles, Flame, Trophy, Star, Users, ExternalLink, Globe } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Doc, Id } from '@/convex/_generated/dataModel'
@@ -18,6 +18,10 @@ interface CharacterRelationship {
     worldName?: string
   } | null
   streak: number
+  worldCount?: number
+  isNewToWorld?: boolean
+  worldStreak?: number
+  worldName?: string
 }
 
 interface AttendingCharactersListProps {
@@ -92,111 +96,203 @@ export default function AttendingCharactersList({
                     <div className="text-[10px] text-muted-foreground mt-1 whitespace-normal flex items-center flex-wrap gap-1.5">
                       <span>{char.ancestry} {char.class}</span>
 
-                      {hasUserSignedUp && !isUserCharacter && rel && (
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <button
-                              type="button"
-                              className="inline-flex items-center gap-1 focus:outline-none shrink-0"
-                            >
-                              {rel.isNew ? (
-                                <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 hover:bg-emerald-500/25 transition-colors">
-                                  <Sparkles className="h-2.5 w-2.5" />
-                                  NEW
-                                </span>
-                              ) : rel.streak >= 3 ? (
-                                <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/25 hover:bg-orange-500/25 transition-colors">
-                                  <Flame className="h-2.5 w-2.5 fill-orange-500 text-orange-500" />
-                                  {rel.streak} streak
-                                </span>
-                              ) : rel.count >= 10 ? (
-                                <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-300 border border-purple-500/25 hover:bg-purple-500/25 transition-colors">
-                                  <Trophy className="h-2.5 w-2.5 text-purple-500" />
-                                  {rel.count}x
-                                </span>
-                              ) : rel.count >= 5 ? (
-                                <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25 hover:bg-amber-500/25 transition-colors">
-                                  <Star className="h-2.5 w-2.5 fill-amber-500 text-amber-500" />
-                                  {rel.count}x
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25 hover:bg-blue-500/25 transition-colors">
-                                  <Users className="h-2.5 w-2.5" />
-                                  {rel.count}x
-                                </span>
-                              )}
-                            </button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-72 p-3 text-xs space-y-2">
-                            {rel.isNew ? (
-                              <div>
-                                <div className="flex items-center gap-1.5 font-bold text-emerald-600 dark:text-emerald-400 text-sm mb-1">
-                                  <Sparkles className="h-4 w-4" />
-                                  <span>New Party Member!</span>
+                      {hasUserSignedUp && rel && (
+                        isUserCharacter ? (
+                          rel.isNewToWorld ? (
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="inline-flex items-center gap-1 focus:outline-none shrink-0"
+                                >
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 hover:bg-emerald-500/25 transition-colors">
+                                    <Sparkles className="h-2.5 w-2.5" />
+                                    NEW WORLD
+                                  </span>
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-72 p-3 text-xs space-y-2">
+                                <div>
+                                  <div className="flex items-center gap-1.5 font-bold text-emerald-600 dark:text-emerald-400 text-sm mb-1">
+                                    <Sparkles className="h-4 w-4" />
+                                    <span>First Time in {rel.worldName || 'this World'}!</span>
+                                  </div>
+                                  <p className="text-muted-foreground">
+                                    This is your character's first time playing in {rel.worldName || 'this world'}!
+                                  </p>
                                 </div>
-                                <p className="text-muted-foreground">
-                                  This is the first time playing with this character!
-                                </p>
-                              </div>
-                            ) : (
-                              <div>
-                                <div className="flex items-center gap-1.5 font-bold text-sm mb-1">
-                                  {rel.streak >= 3 ? (
-                                    <span className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
-                                      <Flame className="h-4 w-4 fill-orange-500 text-orange-500" />
-                                      {rel.streak}-Session Streak!
+                              </PopoverContent>
+                            </Popover>
+                          ) : (rel.worldCount ?? 0) > 0 ? (
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="inline-flex items-center gap-1 focus:outline-none shrink-0"
+                                >
+                                  {(rel.worldStreak ?? 0) >= 3 ? (
+                                    <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/25 hover:bg-orange-500/25 transition-colors">
+                                      <Flame className="h-2.5 w-2.5 fill-orange-500 text-orange-500" />
+                                      {rel.worldStreak} world streak
                                     </span>
-                                  ) : rel.count >= 10 ? (
-                                    <span className="flex items-center gap-1 text-purple-600 dark:text-purple-400">
-                                      <Trophy className="h-4 w-4 text-purple-500" />
-                                      Battle-hardened Companions! ({rel.count}x)
+                                  ) : (rel.worldCount ?? 0) >= 10 ? (
+                                    <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-300 border border-purple-500/25 hover:bg-purple-500/25 transition-colors">
+                                      <Trophy className="h-2.5 w-2.5 text-purple-500" />
+                                      {rel.worldCount}x world
                                     </span>
-                                  ) : rel.count >= 5 ? (
-                                    <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
-                                      <Star className="h-4 w-4 fill-amber-500 text-amber-500" />
-                                      Frequent Adventurers! ({rel.count}x)
+                                  ) : (rel.worldCount ?? 0) >= 5 ? (
+                                    <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25 hover:bg-amber-500/25 transition-colors">
+                                      <Star className="h-2.5 w-2.5 fill-amber-500 text-amber-500" />
+                                      {rel.worldCount}x world
                                     </span>
                                   ) : (
-                                    <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
-                                      <Users className="h-4 w-4" />
-                                      Played Together ({rel.count}x)
+                                    <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25 hover:bg-blue-500/25 transition-colors">
+                                      <Globe className="h-2.5 w-2.5" />
+                                      {rel.worldCount}x world
                                     </span>
                                   )}
-                                </div>
-
-                                <p className="text-muted-foreground mb-2">
-                                  You have played in <b>{rel.count}</b> session{rel.count > 1 ? 's' : ''} together.
-                                  {rel.streak >= 3 && ` Currently on a ${rel.streak}-session streak!`}
-                                </p>
-
-                                {rel.lastSession && (
-                                  <div className="pt-2 border-t space-y-2">
-                                    <div className="text-[11px] text-muted-foreground">
-                                      <span className="font-semibold text-foreground">Last session together:</span>{' '}
-                                      <span className="font-medium text-primary">{rel.lastSession.worldName}</span>
-                                      {rel.lastSession.date && (
-                                        <span className="block text-[10px] text-muted-foreground mt-0.5">
-                                          {new Date(rel.lastSession.date).toLocaleDateString('en-US', {
-                                            month: 'short',
-                                            day: 'numeric',
-                                            year: 'numeric'
-                                          })}
-                                        </span>
-                                      )}
-                                    </div>
-
-                                    <Button size="sm" variant="outline" className="w-full text-xs h-7 gap-1" asChild>
-                                      <Link href={`/sessions/${rel.lastSession._id}`}>
-                                        <ExternalLink className="h-3.5 w-3.5" />
-                                        Go to last session
-                                      </Link>
-                                    </Button>
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-72 p-3 text-xs space-y-2">
+                                <div>
+                                  <div className="flex items-center gap-1.5 font-bold text-sm mb-1">
+                                    {(rel.worldStreak ?? 0) >= 3 ? (
+                                      <span className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
+                                        <Flame className="h-4 w-4 fill-orange-500 text-orange-500" />
+                                        {rel.worldStreak}-Session World Streak!
+                                      </span>
+                                    ) : (rel.worldCount ?? 0) >= 10 ? (
+                                      <span className="flex items-center gap-1 text-purple-600 dark:text-purple-400">
+                                        <Trophy className="h-4 w-4 text-purple-500" />
+                                        World Veteran! ({rel.worldCount}x)
+                                      </span>
+                                    ) : (rel.worldCount ?? 0) >= 5 ? (
+                                      <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                                        <Star className="h-4 w-4 fill-amber-500 text-amber-500" />
+                                        Frequent Visitor! ({rel.worldCount}x)
+                                      </span>
+                                    ) : (
+                                      <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                                        <Globe className="h-4 w-4" />
+                                        World Explorer ({rel.worldCount}x)
+                                      </span>
+                                    )}
                                   </div>
+
+                                  <p className="text-muted-foreground">
+                                    Your character has played in <b>{rel.worldCount}</b> session{rel.worldCount! > 1 ? 's' : ''} in {rel.worldName || 'this world'}.
+                                    {(rel.worldStreak ?? 0) >= 3 && ` Currently on a ${rel.worldStreak}-session streak in this world!`}
+                                  </p>
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          ) : null
+                        ) : (
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <button
+                                type="button"
+                                className="inline-flex items-center gap-1 focus:outline-none shrink-0"
+                              >
+                                {rel.isNew ? (
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 hover:bg-emerald-500/25 transition-colors">
+                                    <Sparkles className="h-2.5 w-2.5" />
+                                    NEW
+                                  </span>
+                                ) : rel.streak >= 3 ? (
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/25 hover:bg-orange-500/25 transition-colors">
+                                    <Flame className="h-2.5 w-2.5 fill-orange-500 text-orange-500" />
+                                    {rel.streak} streak
+                                  </span>
+                                ) : rel.count >= 10 ? (
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-300 border border-purple-500/25 hover:bg-purple-500/25 transition-colors">
+                                    <Trophy className="h-2.5 w-2.5 text-purple-500" />
+                                    {rel.count}x
+                                  </span>
+                                ) : rel.count >= 5 ? (
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25 hover:bg-amber-500/25 transition-colors">
+                                    <Star className="h-2.5 w-2.5 fill-amber-500 text-amber-500" />
+                                    {rel.count}x
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25 hover:bg-blue-500/25 transition-colors">
+                                    <Users className="h-2.5 w-2.5" />
+                                    {rel.count}x
+                                  </span>
                                 )}
-                              </div>
-                            )}
-                          </PopoverContent>
-                        </Popover>
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-72 p-3 text-xs space-y-2">
+                              {rel.isNew ? (
+                                <div>
+                                  <div className="flex items-center gap-1.5 font-bold text-emerald-600 dark:text-emerald-400 text-sm mb-1">
+                                    <Sparkles className="h-4 w-4" />
+                                    <span>New Party Member!</span>
+                                  </div>
+                                  <p className="text-muted-foreground">
+                                    This is the first time playing with this character!
+                                  </p>
+                                </div>
+                              ) : (
+                                <div>
+                                  <div className="flex items-center gap-1.5 font-bold text-sm mb-1">
+                                    {rel.streak >= 3 ? (
+                                      <span className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
+                                        <Flame className="h-4 w-4 fill-orange-500 text-orange-500" />
+                                        {rel.streak}-Session Streak!
+                                      </span>
+                                    ) : rel.count >= 10 ? (
+                                      <span className="flex items-center gap-1 text-purple-600 dark:text-purple-400">
+                                        <Trophy className="h-4 w-4 text-purple-500" />
+                                        Battle-hardened Companions! ({rel.count}x)
+                                      </span>
+                                    ) : rel.count >= 5 ? (
+                                      <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                                        <Star className="h-4 w-4 fill-amber-500 text-amber-500" />
+                                        Frequent Adventurers! ({rel.count}x)
+                                      </span>
+                                    ) : (
+                                      <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                                        <Users className="h-4 w-4" />
+                                        Played Together ({rel.count}x)
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <p className="text-muted-foreground mb-2">
+                                    You have played in <b>{rel.count}</b> session{rel.count > 1 ? 's' : ''} together.
+                                    {rel.streak >= 3 && ` Currently on a ${rel.streak}-session streak!`}
+                                  </p>
+
+                                  {rel.lastSession && (
+                                    <div className="pt-2 border-t space-y-2">
+                                      <div className="text-[11px] text-muted-foreground">
+                                        <span className="font-semibold text-foreground">Last session together:</span>{' '}
+                                        <span className="font-medium text-primary">{rel.lastSession.worldName}</span>
+                                        {rel.lastSession.date && (
+                                          <span className="block text-[10px] text-muted-foreground mt-0.5">
+                                            {new Date(rel.lastSession.date).toLocaleDateString('en-US', {
+                                              month: 'short',
+                                              day: 'numeric',
+                                              year: 'numeric'
+                                            })}
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      <Button size="sm" variant="outline" className="w-full text-xs h-7 gap-1" asChild>
+                                        <Link href={`/sessions/${rel.lastSession._id}`}>
+                                          <ExternalLink className="h-3.5 w-3.5" />
+                                          Go to last session
+                                        </Link>
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </PopoverContent>
+                          </Popover>
+                        )
                       )}
                     </div>
                     {char.websiteLink && (
