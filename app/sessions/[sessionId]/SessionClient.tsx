@@ -142,6 +142,29 @@ export default function SessionClient() {
 
   const currentInterestedPlayers = optimisticInterestedPlayers ?? session?.interestedPlayers ?? []
 
+  const userCharacterIds = useMemo(() => {
+    return new Set(userCharacters?.map(c => c._id) ?? [])
+  }, [userCharacters])
+
+  const hasUserCharacterInSession = useMemo(() => {
+    return (userCharacters ?? []).some(userChar =>
+      (session?.attendingCharacters ?? []).some(sessionChar => sessionChar._id === userChar._id)
+    )
+  }, [userCharacters, session?.attendingCharacters])
+
+  const userCharactersInSession = useMemo(() => {
+    return (session?.attendingCharacters ?? []).filter(sessionChar =>
+      userCharacterIds.has(sessionChar._id)
+    )
+  }, [session?.attendingCharacters, userCharacterIds])
+
+  const userCharacterInSessionId = userCharactersInSession[0]?._id
+
+  const characterRelationships = useQuery(
+    api.sessions.getAttendingCharacterRelationships,
+    session && userCharacterInSessionId ? { sessionId: session._id, userCharacterId: userCharacterInSessionId } : "skip"
+  )
+
   const isLoading = session === undefined || 
                     isAdmin === undefined || 
                     (isAdmin && allCharacters === undefined);
@@ -212,20 +235,6 @@ export default function SessionClient() {
     notFound()
     return null
   }
-
-  const userCharacterIds = new Set(userCharacters?.map(c => c._id) ?? [])
-  const hasUserCharacterInSession = (userCharacters ?? []).some(userChar =>
-    (session?.attendingCharacters ?? []).some(sessionChar => sessionChar._id === userChar._id)
-  )
-  const userCharactersInSession = (session?.attendingCharacters ?? []).filter(sessionChar =>
-    userCharacterIds.has(sessionChar._id)
-  )
-  const userCharacterInSessionId = userCharactersInSession[0]?._id
-
-  const characterRelationships = useQuery(
-    api.sessions.getAttendingCharacterRelationships,
-    session && userCharacterInSessionId ? { sessionId: session._id, userCharacterId: userCharacterInSessionId } : "skip"
-  )
 
   const handleJoin = async (event: React.MouseEvent) => {
     if (!selectedCharacterId) return
