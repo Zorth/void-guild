@@ -205,6 +205,111 @@ export const getPublicSession = query({
   },
 });
 
+export const getAttendingCharacterRelationships = query({
+  args: {
+    sessionId: v.id('sessions'),
+    userCharacterId: v.id('characters'),
+  },
+  handler: async (ctx, args) => {
+    const currentSession = await ctx.db.get(args.sessionId)
+    if (!currentSession) return {}
+
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) return {}
+
+    const myCharacter = await ctx.db.get(args.userCharacterId)
+    if (!myCharacter || myCharacter.userId !== user.subject) return {}
+
+    const allSessions = await ctx.db.query('sessions').collect()
+    
+    allSessions.sort((a, b) => {
+      const dateA = a.date || a._creationTime
+      const dateB = b.date || b._creationTime
+      return dateA - dateB
+    })
+
+    const currentSessionTime = currentSession.date || currentSession._creationTime
+
+    const myPastSessions = allSessions.filter(s => 
+      s._id !== args.sessionId &&
+      (s.date || s._creationTime) <= currentSessionTime &&
+      (s.characters.includes(args.userCharacterId) || s.gmCharacter === args.userCharacterId)
+    )
+
+    const worldIds = Array.from(new Set(allSessions.map(s => s.world)))
+    const worlds = await Promise.all(worldIds.map(id => ctx.db.get(id)))
+    const worldMap = new Map<string, string>()
+    worlds.forEach(w => {
+      if (w) worldMap.set(w._id, w.name)
+    })
+
+    const relationships: Record<string, {
+      count: number;
+      isNew: boolean;
+      lastSession: {
+        _id: Id<'sessions'>;
+        date?: number;
+        inGameDate?: { year: number; month: number; day: number; era?: string };
+        worldName?: string;
+      } | null;
+      streak: number;
+    }> = {}
+
+    const allAttendingIds = Array.from(new Set([
+      ...currentSession.characters,
+      ...(currentSession.gmCharacter ? [currentSession.gmCharacter] : [])
+    ]))
+
+    for (const targetId of allAttendingIds) {
+      if (targetId === args.userCharacterId) continue
+
+      const coPastSessions = myPastSessions.filter(s => 
+        s.characters.includes(targetId) || s.gmCharacter === targetId
+      )
+
+      const count = coPastSessions.length
+      const isNew = count === 0
+
+      let lastSessionInfo = null
+      if (count > 0) {
+        const last = coPastSessions[coPastSessions.length - 1]
+        lastSessionInfo = {
+          _id: last._id,
+          date: last.date,
+          inGameDate: last.inGameDate,
+          worldName: worldMap.get(last.world) || 'Unknown World',
+        }
+      }
+
+      let streak = 0
+      const bothInCurrent = (currentSession.characters.includes(args.userCharacterId) || currentSession.gmCharacter === args.userCharacterId) &&
+                            (currentSession.characters.includes(targetId) || currentSession.gmCharacter === targetId)
+      if (bothInCurrent) {
+        streak += 1
+      }
+
+      for (let i = myPastSessions.length - 1; i >= 0; i--) {
+        const pastS = myPastSessions[i]
+        const targetInPast = pastS.characters.includes(targetId) || pastS.gmCharacter === targetId
+        if (targetInPast) {
+          streak += 1
+        } else {
+          break
+        }
+      }
+
+      relationships[targetId] = {
+        count,
+        isNew,
+        lastSession: lastSessionInfo,
+        streak,
+      }
+    }
+
+    return relationships
+  },
+});
+
 export const getSession = query({
   args: { sessionId: v.string() },
   handler: async (ctx, args) => {

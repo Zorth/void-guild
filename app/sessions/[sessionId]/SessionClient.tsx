@@ -220,6 +220,12 @@ export default function SessionClient() {
   const userCharactersInSession = (session.attendingCharacters ?? []).filter(sessionChar =>
     userCharacterIds.has(sessionChar._id)
   )
+  const userCharacterInSessionId = userCharactersInSession[0]?._id
+
+  const characterRelationships = useQuery(
+    api.sessions.getAttendingCharacterRelationships,
+    session && userCharacterInSessionId ? { sessionId: session._id, userCharacterId: userCharacterInSessionId } : "skip"
+  )
 
   const handleJoin = async (event: React.MouseEvent) => {
     if (!selectedCharacterId) return
@@ -835,6 +841,8 @@ export default function SessionClient() {
                     onLeave={handleLeave}
                     userMetadata={userMetadata}
                     leavingCharacterId={leavingCharacterId}
+                    relationships={characterRelationships}
+                    hasUserSignedUp={hasUserCharacterInSession}
                   />
                 </CardContent>
               </Card>
