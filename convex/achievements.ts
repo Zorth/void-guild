@@ -215,7 +215,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     title: 'Curious Clicker',
     description: 'Discovered the secret logo clicker easter egg.',
     category: 'hidden',
-    reward: '',
+    reward: 'Rainbow Name & Border Cosmetics',
     checkEligibility: (data) => (data.userDoc?.logoClicks || 0) >= 10,
   },
   {

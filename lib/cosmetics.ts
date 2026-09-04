@@ -38,10 +38,26 @@ export const FONT_OPTIONS: CosmeticOption[] = [
 
 export const COLOR_OPTIONS: CosmeticOption[] = [
   { id: 'default', name: 'Default Theme', unlockedByDefault: true, value: '' },
+  {
+    id: 'rainbow',
+    name: 'Moving Rainbow (RGB)',
+    unlockedByDefault: false,
+    requiredAchievementId: 'secret_logo_clicks',
+    value: 'rainbow-text',
+    previewClass: 'rainbow-text font-bold',
+  },
 ]
 
 export const BORDER_SHAPE_OPTIONS: CosmeticOption[] = [
-  { id: 'default', name: 'Default Solid', unlockedByDefault: true, value: 'rounded-lg border' },
+  { id: 'default', name: 'Default Solid', unlockedByDefault: true, value: 'rounded-lg border border-border' },
+  {
+    id: 'rainbow_border',
+    name: 'Moving Rainbow Border',
+    unlockedByDefault: false,
+    requiredAchievementId: 'secret_logo_clicks',
+    value: 'rounded-lg rainbow-border',
+    previewClass: 'rainbow-border rounded-lg p-1',
+  },
 ]
 
 export const PROFILE_BORDER_OPTIONS: CosmeticOption[] = [
@@ -70,8 +86,8 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
       cardStyle: {},
       nameClassName: '',
       nameStyle: {},
-      subtitleClassName: 'font-normal opacity-75',
-      subtitleStyle: {},
+      subtitleClassName: 'font-normal opacity-80',
+      subtitleStyle: { opacity: 0.8 },
       profileRingClassName: 'border border-border',
     }
   }
@@ -85,8 +101,8 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
   const subFontVal = subFontObj ? subFontObj.value : ''
 
   // Border Shape
-  const shapeObj = BORDER_SHAPE_OPTIONS.find((s) => s.id === cosmetics.borderShape)
-  const cardClassName = shapeObj ? shapeObj.value : ''
+  const shapeObj = BORDER_SHAPE_OPTIONS.find((s) => s.id === cosmetics.borderShape || s.value === cosmetics.borderShape)
+  let cardClassName = shapeObj ? shapeObj.value : ''
 
   // Profile Border
   const profileObj = PROFILE_BORDER_OPTIONS.find((p) => p.id === cosmetics.profileBorder)
@@ -97,22 +113,42 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
   const cardBgStyle = bgObj && bgObj.value ? { backgroundColor: bgObj.value } : cosmetics.bgColor ? { backgroundColor: cosmetics.bgColor } : {}
 
   // Card Border Color
-  const cardBorderStyle = cosmetics.borderColor ? { borderColor: cosmetics.borderColor } : {}
+  let cardBorderStyle: React.CSSProperties = {}
+  if (cosmetics.borderColor && cosmetics.borderColor !== 'rainbow') {
+    cardBorderStyle = { borderColor: cosmetics.borderColor }
+  }
 
   const cardStyle: React.CSSProperties = {
     ...cardBgStyle,
     ...cardBorderStyle,
   }
 
-  // Name Style
-  const nameStyle: React.CSSProperties = cosmetics.nameColor ? { color: cosmetics.nameColor } : {}
-  const nameClassName = nameFontVal
+  // Name Style & Class
+  const colorObj = COLOR_OPTIONS.find((c) => c.id === cosmetics.nameColor || c.value === cosmetics.nameColor)
+  let nameClassName = nameFontVal
+  let nameStyle: React.CSSProperties = {}
 
-  // Subtitle Style (non-bold, slightly darker opacity version)
-  const subtitleStyle: React.CSSProperties = cosmetics.subtitleColor
-    ? { color: cosmetics.subtitleColor, opacity: 0.8 }
-    : {}
-  const subtitleClassName = `${subFontVal} font-normal`
+  if (colorObj?.value === 'rainbow-text' || cosmetics.nameColor === 'rainbow' || cosmetics.nameColor === 'rainbow-text') {
+    nameClassName = `${nameClassName} rainbow-text font-bold`
+    nameStyle = {}
+  } else if (colorObj?.value) {
+    nameStyle = { color: colorObj.value }
+  } else if (cosmetics.nameColor) {
+    nameStyle = { color: cosmetics.nameColor }
+  }
+
+  // Subtitle Style & Class (Always translucent with opacity 0.8)
+  const subColorObj = COLOR_OPTIONS.find((c) => c.id === cosmetics.subtitleColor || c.value === cosmetics.subtitleColor)
+  let subtitleClassName = `${subFontVal} font-normal opacity-80`
+  let subtitleStyle: React.CSSProperties = { opacity: 0.8 }
+
+  if (subColorObj?.value === 'rainbow-text' || cosmetics.subtitleColor === 'rainbow' || cosmetics.subtitleColor === 'rainbow-text') {
+    subtitleClassName = `${subtitleClassName} rainbow-text`
+  } else if (subColorObj?.value) {
+    subtitleStyle = { color: subColorObj.value, opacity: 0.8 }
+  } else if (cosmetics.subtitleColor) {
+    subtitleStyle = { color: cosmetics.subtitleColor, opacity: 0.8 }
+  }
 
   return {
     cardClassName,

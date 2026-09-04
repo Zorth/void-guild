@@ -105,7 +105,8 @@ export default function CharacterCosmeticsTab({
         {/* Preset Color Swatches */}
         {COLOR_OPTIONS.filter((c) => c.id !== 'default').map((opt) => {
           const { isUnlocked, label } = getOptionLockStatus(opt)
-          const isSelected = cosmetics[colorKey] === opt.value
+          const isSelected = cosmetics[colorKey] === opt.value || cosmetics[colorKey] === opt.id
+          const isRainbowOpt = opt.value === 'rainbow-text' || opt.id === 'rainbow'
 
           return (
             <button
@@ -114,16 +115,22 @@ export default function CharacterCosmeticsTab({
               onClick={() => handleSelectOption(colorKey, opt)}
               title={!isUnlocked ? label : opt.name}
               className={cn(
-                'w-8 h-8 rounded-full transition-all flex items-center justify-center relative border',
+                'w-8 h-8 rounded-full transition-all flex items-center justify-center relative border overflow-hidden shrink-0',
+                isRainbowOpt && 'bg-gradient-to-r from-red-500 via-green-500 to-purple-500',
                 isSelected
                   ? 'ring-2 ring-purple-500 ring-offset-2 ring-offset-background scale-110 border-white dark:border-slate-900'
                   : isUnlocked
                     ? 'border-transparent hover:scale-105 shadow-sm'
                     : 'opacity-40 grayscale cursor-not-allowed border-border/40'
               )}
-              style={{ backgroundColor: opt.value }}
+              style={!isRainbowOpt ? { backgroundColor: opt.value } : {}}
             >
-              {!isUnlocked && <Lock className="h-3 w-3 text-white drop-shadow" />}
+              {isRainbowOpt && (
+                <span className="text-[9px] font-black text-white drop-shadow tracking-tighter">
+                  RGB
+                </span>
+              )}
+              {!isUnlocked && <Lock className="h-3 w-3 text-white drop-shadow z-10" />}
             </button>
           )
         })}
@@ -149,27 +156,24 @@ export default function CharacterCosmeticsTab({
 
         <div
           className={cn(
-            'flex items-center justify-between p-4 rounded-lg transition-all gap-3 border',
-            previewStyles.cardClassName || 'bg-muted/20 border-border'
+            'p-3 rounded-lg flex items-center justify-between gap-3 border transition-all',
+            previewStyles.cardClassName
           )}
           style={previewStyles.cardStyle}
         >
           <div className="flex items-center gap-3 min-w-0">
             <div
               className={cn(
-                'w-8 h-8 rounded-full flex items-center justify-center bg-purple-500/20 text-purple-700 dark:text-purple-300 font-bold text-xs shrink-0',
+                'w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center font-bold text-xs shrink-0',
                 previewStyles.profileRingClassName
               )}
             >
-              {characterName.charAt(0) || 'C'}
+              {characterName ? characterName[0]?.toUpperCase() : 'C'}
             </div>
             <div className="min-w-0">
-              <div className="font-bold flex items-center gap-2 flex-wrap">
-                <span className={previewStyles.nameClassName} style={previewStyles.nameStyle}>
+              <div className="font-bold flex items-center gap-2">
+                <span className={cn('break-words', previewStyles.nameClassName)} style={previewStyles.nameStyle}>
                   {characterName || 'Character Name'}
-                </span>
-                <span className="text-[10px] bg-purple-200 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded-full uppercase tracking-wider font-bold shrink-0">
-                  You
                 </span>
               </div>
               <div className="text-[10px] text-muted-foreground mt-0.5">
@@ -276,7 +280,7 @@ export default function CharacterCosmeticsTab({
         <div className="flex flex-col gap-2">
           {BORDER_SHAPE_OPTIONS.map((opt) => {
             const { isUnlocked, label, badgeLabel } = getOptionLockStatus(opt)
-            const isSelected = cosmetics.borderShape === opt.id
+            const isSelected = cosmetics.borderShape === opt.id || cosmetics.borderShape === opt.value
 
             return (
               <button
@@ -285,12 +289,12 @@ export default function CharacterCosmeticsTab({
                 onClick={() => handleSelectOption('borderShape', opt)}
                 title={!isUnlocked ? label : opt.name}
                 className={cn(
-                  'w-full p-3 rounded-lg text-left text-xs transition-all flex items-center justify-between',
+                  'w-full p-3 text-left text-xs transition-all flex items-center justify-between',
                   opt.value,
                   isSelected
-                    ? 'bg-purple-500/15 border-purple-500 font-bold ring-1 ring-purple-500 text-foreground'
+                    ? 'bg-purple-500/25 dark:bg-purple-950/50 font-bold text-foreground'
                     : isUnlocked
-                      ? 'bg-card hover:bg-muted/40 text-foreground'
+                      ? 'bg-card/80 hover:bg-muted/40 text-foreground'
                       : 'bg-muted/20 text-muted-foreground opacity-50 grayscale cursor-not-allowed'
                 )}
               >

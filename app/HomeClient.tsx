@@ -75,9 +75,13 @@ export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
             <Image src={logo} alt="Void Guild Logo" width={64} height={64} priority />
           </motion.div>
           <div className="flex flex-col gap-1">
-            <h1 className={cn("text-3xl sm:text-4xl font-bold tracking-tight transition-all duration-500 flex items-center gap-2", isRainbow && "rainbow-text scale-105 origin-left")}>
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight transition-all duration-500 flex items-center gap-3">
+              <span className={cn("inline-block", isRainbow && "rainbow-text scale-105 origin-left pr-3 mr-1 transition-transform")}>
                 Guild of The Void
-                {isRainbow && <Sparkles className="h-6 w-6 text-yellow-500 animate-pulse" />}
+              </span>
+              {isRainbow && (
+                <Sparkles className="h-6 w-6 text-yellow-500 animate-pulse shrink-0" />
+              )}
             </h1>
             <p className="text-sm text-muted-foreground max-w-[300px] sm:max-w-none">
               Management tool for The Void Campaign.
