@@ -279,7 +279,7 @@
 .gold-card-border {
   border-radius: 0.5rem !important;
   border: 2px solid transparent !important;
-  background: linear-gradient(var(--card), var(--card)) padding-box,
+  background: var(--card-bg, linear-gradient(var(--card), var(--card))) padding-box,
               linear-gradient(to bottom right, #BF953F, #FCF6BA, #AA771C) border-box !important;
   box-shadow: 0 0 12px rgba(212, 175, 55, 0.3) !important;
 }
@@ -292,5 +292,10 @@
 }
 
 .gold-bg-tint {
-  background: linear-gradient(135deg, rgba(191,149,63,0.15) 0%, rgba(252,246,186,0.12) 50%, rgba(170,119,28,0.15) 100%) !important;
+  background: linear-gradient(135deg, rgba(191,149,63,0.18) 0%, rgba(252,246,186,0.12) 50%, rgba(170,119,28,0.18) 100%) !important;
+}
+
+.gold-card-border[data-selected="true"] {
+  background: linear-gradient(#341556, #341556) padding-box,
+              linear-gradient(to bottom right, #BF953F, #FCF6BA, #AA771C) border-box !important;
 }

@@ -143,7 +143,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     title: 'Journeyman Adventurer',
     description: 'Promoted to Journeyman rank with any character.',
     category: 'normal',
-    reward: '',
+    reward: 'Journeyman Silver Border Cosmetic',
     chainId: 'guild_rank',
     tier: 1,
     maxTier: 2,

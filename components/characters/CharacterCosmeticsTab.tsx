@@ -316,6 +316,7 @@ export default function CharacterCosmeticsTab({
               <button
                 key={opt.id}
                 type="button"
+                data-selected={isSelected}
                 onClick={() => handleSelectOption('borderShape', opt)}
                 title={!isUnlocked ? label : opt.name}
                 className={cn(
@@ -355,22 +356,26 @@ export default function CharacterCosmeticsTab({
               cosmetics.bgColor === opt.value ||
               (opt.id === 'default' && (!cosmetics.bgColor || cosmetics.bgColor === 'default'))
 
+            const isGoldTint = opt.value === 'gold-bg-tint'
+
             return (
               <button
                 key={opt.id}
                 type="button"
+                data-selected={isSelected}
                 onClick={() => handleSelectOption('bgColor', opt)}
                 title={!isUnlocked ? label : opt.name}
                 className={cn(
                   'w-full p-3 rounded-lg text-left text-xs transition-all flex items-center justify-between border',
+                  isGoldTint && 'gold-bg-tint',
                   isSelected
-                    ? 'border-2 border-purple-500 ring-1 ring-purple-500 font-bold text-foreground'
+                    ? 'border-2 border-purple-500 ring-2 ring-purple-500 font-bold text-foreground'
                     : isUnlocked
-                      ? 'border-border hover:border-muted-foreground'
+                      ? 'border-border hover:border-muted-foreground text-foreground'
                       : 'border-border/40 opacity-50 grayscale cursor-not-allowed'
                 )}
                 style={{
-                  backgroundColor: opt.value ? opt.value : 'transparent',
+                  backgroundColor: !isGoldTint && opt.value ? opt.value : undefined,
                 }}
               >
                 <span className="font-semibold">{opt.name}</span>

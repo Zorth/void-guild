@@ -77,6 +77,15 @@ This document establishes the official code architecture, design system, compone
    - Color choices MUST be rendered as a row of filled circle swatches (`w-8 h-8 rounded-full`).
    - Default theme color swatches display the actual default filled color (`bg-foreground` for names, `bg-muted-foreground` for subtitles) instead of text labels.
 
+4. **Custom Border CSS & Independent Decoupling**:
+   - Card Border options (`BORDER_SHAPE_OPTIONS`) and Card Background Tint options (`BG_COLOR_OPTIONS`) MUST operate 100% independently in any combination (e.g. Guildmaster Gold Border + Purple Tint, Rainbow Border + Gold Tint, etc.).
+   - Multi-layer background gradient border classes (such as `.gold-card-border`) use CSS `--card-bg` custom variables in `padding-box` (`background: var(--card-bg, linear-gradient(var(--card), var(--card))) padding-box`) so background tints blend over opaque `var(--card)` inside the padding area without being overridden by or leaking into the `border-box` gradient.
+   - When a custom border option button in the menu list is selected (`[data-selected="true"]`), its `padding-box` background layer MUST use an opaque purple gradient (`linear-gradient(#341556, #341556) padding-box`) so option selection is clearly indicated with purple while keeping the metallic border intact.
+
+5. **Card Background Tint Options**:
+   - All unlocked background tint options in customizer option menus (`BG_COLOR_OPTIONS`) MUST display their actual background tint color or gradient class (e.g. `gold-bg-tint`, `rgba(147, 51, 234, 0.15)`) unconditionally at all times so players can preview the tint.
+   - Menu list selection MUST be indicated purely by changing the outer border & ring state (`border-2 border-purple-500 ring-2 ring-purple-500 font-bold`), rather than overwriting the background tint.
+
 ---
 
 ## 5. Optimization & Verification Guidelines

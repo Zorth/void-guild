@@ -527,7 +527,7 @@ export default function Characters({ filters }: { filters?: { pf: boolean; dnd: 
               <DialogFooter className="mt-4">
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button variant="destructive">Delete</Button>
+                    <Button type="button" variant="destructive">Delete</Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>

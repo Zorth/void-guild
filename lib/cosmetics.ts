@@ -215,12 +215,30 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
   // Card Background
   const bgObj = BG_COLOR_OPTIONS.find((b) => b.id === cosmetics.bgColor || b.value === cosmetics.bgColor)
   let cardBgStyle: React.CSSProperties = {}
+  const isGoldBorder = cardClassName.includes('gold-card-border')
+
   if (bgObj?.value === 'gold-bg-tint' || cosmetics.bgColor === 'gold_tint' || cosmetics.bgColor === 'gold-bg-tint') {
-    cardClassName = cardClassName ? `${cardClassName} gold-bg-tint` : 'gold-bg-tint'
+    if (isGoldBorder) {
+      const goldPaddingLayer =
+        'linear-gradient(135deg, rgba(191,149,63,0.18) 0%, rgba(252,246,186,0.12) 50%, rgba(170,119,28,0.18) 100%), linear-gradient(var(--card), var(--card))'
+      cardBgStyle = { '--card-bg': goldPaddingLayer } as React.CSSProperties
+    } else {
+      cardClassName = cardClassName ? `${cardClassName} gold-bg-tint` : 'gold-bg-tint'
+    }
   } else if (bgObj && bgObj.value) {
-    cardBgStyle = { backgroundColor: bgObj.value }
+    if (isGoldBorder) {
+      const tintPaddingLayer = `linear-gradient(${bgObj.value}, ${bgObj.value}), linear-gradient(var(--card), var(--card))`
+      cardBgStyle = { '--card-bg': tintPaddingLayer } as React.CSSProperties
+    } else {
+      cardBgStyle = { backgroundColor: bgObj.value }
+    }
   } else if (cosmetics.bgColor) {
-    cardBgStyle = { backgroundColor: cosmetics.bgColor }
+    if (isGoldBorder) {
+      const tintPaddingLayer = `linear-gradient(${cosmetics.bgColor}, ${cosmetics.bgColor}), linear-gradient(var(--card), var(--card))`
+      cardBgStyle = { '--card-bg': tintPaddingLayer } as React.CSSProperties
+    } else {
+      cardBgStyle = { backgroundColor: cosmetics.bgColor }
+    }
   }
 
   // Card Border Color

@@ -954,21 +954,20 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
                                 return null;
                             })()}
                           </div>
-                          {activeTab === 'past' && session.date && (
-                              <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  className="h-6 text-xs px-2 mt-1"
-                                  onClick={(e) => {
-                                    e.stopPropagation(); // Prevent clicking the parent Link
-                                    e.preventDefault(); // Prevent any default action of the button or parent that might cause navigation
-                                    window.open(`https://void.tarragon.be/Session-Reports/${new Date(session.date!).toISOString().slice(0, 10)}-${session.worldName.replace(/\s+/g, '-')}`, '_blank');
-                                  }}
-                              >
-                                  <Book size={32} />
-                              </Button>
-                          )}
                         </Link>
+                        {activeTab === 'past' && session.date && (
+                          <Button 
+                            type="button"
+                            variant="outline" 
+                            size="sm" 
+                            className="h-8 text-xs px-2 shrink-0 self-center"
+                            onClick={() => {
+                              window.open(`https://void.tarragon.be/Session-Reports/${new Date(session.date!).toISOString().slice(0, 10)}-${session.worldName.replace(/\s+/g, '-')}`, '_blank');
+                            }}
+                          >
+                            <Book size={16} />
+                          </Button>
+                        )}
                       </motion.li>
                     )
                   })}
