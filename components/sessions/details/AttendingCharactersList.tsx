@@ -128,6 +128,7 @@ export default function AttendingCharactersList({
                   cosmetics={char.cosmetics}
                   profileRingClassName={cosmeticsStyles.profileRingClassName}
                   rankNumber={characterRanks?.[char._id]}
+                  streak={rel?.streak}
                   size="lg"
                 />
                 <div className="min-w-0">

@@ -67,14 +67,18 @@ export default function CharacterCosmeticsTab({
     const title = info?.title || opt.requiredAchievementId
     const label = isUnlocked
       ? ''
-      : isHidden
-        ? 'Locked (Secret Achievement)'
-        : `Requires achievement: ${title}`
+      : isAdmin
+        ? `Requires achievement: ${title}${isHidden ? ' (Secret)' : ''}`
+        : isHidden
+          ? 'Locked (Secret Achievement)'
+          : `Requires achievement: ${title}`
     const badgeLabel = isUnlocked
       ? ''
-      : isHidden
-        ? 'Locked'
-        : `Requires: ${title}`
+      : isAdmin
+        ? `Requires: ${title}${isHidden ? ' (Secret)' : ''}`
+        : isHidden
+          ? 'Locked'
+          : `Requires: ${title}`
 
     return { isUnlocked, isHidden, label, badgeLabel, title }
   }
@@ -89,7 +93,9 @@ export default function CharacterCosmeticsTab({
   function handleSelectOption(category: keyof CharacterCosmetics, opt: CosmeticOption) {
     const { isUnlocked, isHidden, title } = getOptionLockStatus(opt)
     if (!isUnlocked) {
-      if (isHidden) {
+      if (isAdmin) {
+        toast.error(`Locked cosmetic! Requires achievement: "${title}"${isHidden ? ' (Secret)' : ''}`)
+      } else if (isHidden) {
         toast.error('Locked cosmetic! Unlocked by a secret achievement.')
       } else {
         toast.error(`Locked cosmetic! Requires achievement: "${title}"`)
@@ -245,9 +251,11 @@ export default function CharacterCosmeticsTab({
               <option key={f.id} value={f.id} disabled={!isUnlocked}>
                 {isUnlocked
                   ? f.name
-                  : isHidden
-                    ? `🔒 ${f.name} (Secret Achievement)`
-                    : `🔒 ${f.name} (Requires: ${title})`}
+                  : isAdmin
+                    ? `🔒 ${f.name} (Requires: ${title}${isHidden ? ' - Secret' : ''})`
+                    : isHidden
+                      ? `🔒 ${f.name} (Secret Achievement)`
+                      : `🔒 ${f.name} (Requires: ${title})`}
               </option>
             )
           })}
@@ -274,9 +282,11 @@ export default function CharacterCosmeticsTab({
               <option key={f.id} value={f.id} disabled={!isUnlocked}>
                 {isUnlocked
                   ? f.name
-                  : isHidden
-                    ? `🔒 ${f.name} (Secret Achievement)`
-                    : `🔒 ${f.name} (Requires: ${title})`}
+                  : isAdmin
+                    ? `🔒 ${f.name} (Requires: ${title}${isHidden ? ' - Secret' : ''})`
+                    : isHidden
+                      ? `🔒 ${f.name} (Secret Achievement)`
+                      : `🔒 ${f.name} (Requires: ${title})`}
               </option>
             )
           })}
@@ -311,6 +321,7 @@ export default function CharacterCosmeticsTab({
           {BORDER_SHAPE_OPTIONS.filter(isOptionVisible).map((opt) => {
             const { isUnlocked, label, badgeLabel } = getOptionLockStatus(opt)
             const isSelected = cosmetics.borderShape === opt.id || cosmetics.borderShape === opt.value
+            const isSpecialBorder = opt.value.includes('-card-border') || opt.value.includes('rainbow-border')
 
             return (
               <button
@@ -320,12 +331,16 @@ export default function CharacterCosmeticsTab({
                 onClick={() => handleSelectOption('borderShape', opt)}
                 title={!isUnlocked ? label : opt.name}
                 className={cn(
-                  'w-full p-3 text-left text-xs transition-all flex items-center justify-between',
+                  'w-full p-3 text-left text-xs transition-all flex items-center justify-between relative rounded-lg',
                   opt.value,
                   isSelected
-                    ? 'bg-purple-500/25 dark:bg-purple-950/50 font-bold text-foreground'
+                    ? isSpecialBorder
+                      ? 'font-bold text-foreground'
+                      : 'bg-purple-500/25 dark:bg-purple-950/50 font-bold text-foreground border-purple-500/50'
                     : isUnlocked
-                      ? 'bg-card/80 hover:bg-muted/40 text-foreground'
+                      ? isSpecialBorder
+                        ? 'text-foreground'
+                        : 'bg-card/80 hover:bg-muted/40 text-foreground border-border/50'
                       : 'bg-muted/20 text-muted-foreground opacity-50 grayscale cursor-not-allowed'
                 )}
               >

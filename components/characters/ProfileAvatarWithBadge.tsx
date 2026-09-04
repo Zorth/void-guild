@@ -14,6 +14,7 @@ interface ProfileAvatarWithBadgeProps {
   } | null
   profileRingClassName?: string
   rankNumber?: number
+  streak?: number
   size?: 'sm' | 'md' | 'lg'
 }
 
@@ -23,6 +24,7 @@ export default function ProfileAvatarWithBadge({
   cosmetics,
   profileRingClassName,
   rankNumber,
+  streak,
   size = 'md',
 }: ProfileAvatarWithBadgeProps) {
   const profileBorderValue = cosmetics?.profileBorder
@@ -32,6 +34,8 @@ export default function ProfileAvatarWithBadge({
     : null
 
   const ringClass = profileRingClassName || profileBorderValue || 'border border-border'
+
+  const streakTier = typeof streak === 'number' && streak >= 10 ? '10' : typeof streak === 'number' && streak >= 5 ? '5' : typeof streak === 'number' && streak >= 3 ? '3' : '1'
 
   const isRankBadge =
     cosmetics?.profileBorder === 'leaderboard_rank' ||

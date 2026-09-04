@@ -213,11 +213,15 @@ export default function Characters({ filters }: { filters?: { pf: boolean; dnd: 
               <ul className="space-y-2">
                 {characters.map((character) => {
                   const cosmetics = resolveCosmeticsStyles(character.cosmetics)
+                  const isSpecialBorder =
+                    cosmetics.cardClassName.includes('-card-border') ||
+                    cosmetics.cardClassName.includes('rainbow-border')
                   return (
                     <li
                       key={character._id}
                       className={cn(
-                        'flex flex-col cursor-pointer hover:bg-muted/50 p-3 rounded-md transition-colors border border-transparent',
+                        'flex flex-col cursor-pointer p-3 rounded-md transition-all',
+                        isSpecialBorder ? 'hover:brightness-110' : 'hover:bg-muted/50 border border-transparent',
                         cosmetics.cardClassName
                       )}
                       style={cosmetics.cardStyle}

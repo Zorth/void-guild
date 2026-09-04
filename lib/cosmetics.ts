@@ -38,6 +38,7 @@ export const ACHIEVEMENT_INFO: Record<string, AchievementInfo> = {
   comm_clutch: { title: 'Clutch Performer', category: 'hidden' },
   comm_heroic: { title: 'Heroic Legend', category: 'hidden' },
   comm_jack_of_all_trades: { title: 'Jack of All Trades', category: 'hidden' },
+  character_streak_3: { title: 'In Sync', category: 'hidden' },
   system_polymath: { title: 'System Polymath', category: 'hidden' },
 }
 
@@ -321,10 +322,13 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
   // Card Background
   const bgObj = BG_COLOR_OPTIONS.find((b) => b.id === cosmetics.bgColor || b.value === cosmetics.bgColor)
   let cardBgStyle: React.CSSProperties = {}
-  const isMetallicBorder = cardClassName.includes('gold-card-border') || cardClassName.includes('silver-card-border')
+  const isGradientBorder =
+    cardClassName.includes('gold-card-border') ||
+    cardClassName.includes('silver-card-border') ||
+    cardClassName.includes('rainbow-border')
 
   if (bgObj?.value === 'gold-bg-tint' || cosmetics.bgColor === 'gold_tint' || cosmetics.bgColor === 'gold-bg-tint') {
-    if (isMetallicBorder) {
+    if (isGradientBorder) {
       const goldPaddingLayer =
         'linear-gradient(135deg, rgba(191,149,63,0.18) 0%, rgba(252,246,186,0.12) 50%, rgba(170,119,28,0.18) 100%), linear-gradient(var(--card), var(--card))'
       cardBgStyle = { '--card-bg': goldPaddingLayer } as React.CSSProperties
@@ -332,7 +336,7 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
       cardClassName = cardClassName ? `${cardClassName} gold-bg-tint` : 'gold-bg-tint'
     }
   } else if (bgObj?.value === 'silver-bg-tint' || cosmetics.bgColor === 'silver_tint' || cosmetics.bgColor === 'silver-bg-tint') {
-    if (isMetallicBorder) {
+    if (isGradientBorder) {
       const silverPaddingLayer =
         'linear-gradient(135deg, rgba(148,163,184,0.18) 0%, rgba(241,245,249,0.14) 50%, rgba(71,85,105,0.18) 100%), linear-gradient(var(--card), var(--card))'
       cardBgStyle = { '--card-bg': silverPaddingLayer } as React.CSSProperties
@@ -340,7 +344,7 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
       cardClassName = cardClassName ? `${cardClassName} silver-bg-tint` : 'silver-bg-tint'
     }
   } else if (bgObj?.value === 'cyan-particle-bg' || cosmetics.bgColor === 'cyan_particles' || cosmetics.bgColor === 'cyan-particle-bg') {
-    if (isMetallicBorder) {
+    if (isGradientBorder) {
       const cyanPaddingLayer =
         'radial-gradient(circle at 50% 20%, rgba(6, 182, 212, 0.22) 0%, rgba(8, 145, 178, 0.08) 50%, transparent 100%), linear-gradient(var(--card), var(--card))'
       cardBgStyle = { '--card-bg': cyanPaddingLayer } as React.CSSProperties
@@ -348,7 +352,7 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
       cardClassName = cardClassName ? `${cardClassName} cyan-particle-bg` : 'cyan-particle-bg'
     }
   } else if (bgObj?.value === 'crimson-particle-bg' || cosmetics.bgColor === 'crimson_particles' || cosmetics.bgColor === 'crimson-particle-bg') {
-    if (isMetallicBorder) {
+    if (isGradientBorder) {
       const crimsonPaddingLayer =
         'radial-gradient(circle at 50% 20%, rgba(220, 38, 38, 0.25) 0%, rgba(153, 27, 27, 0.1) 50%, transparent 100%), linear-gradient(var(--card), var(--card))'
       cardBgStyle = { '--card-bg': crimsonPaddingLayer } as React.CSSProperties
@@ -356,14 +360,14 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
       cardClassName = cardClassName ? `${cardClassName} crimson-particle-bg` : 'crimson-particle-bg'
     }
   } else if (bgObj && bgObj.value) {
-    if (isMetallicBorder) {
+    if (isGradientBorder) {
       const tintPaddingLayer = `linear-gradient(${bgObj.value}, ${bgObj.value}), linear-gradient(var(--card), var(--card))`
       cardBgStyle = { '--card-bg': tintPaddingLayer } as React.CSSProperties
     } else {
       cardBgStyle = { backgroundColor: bgObj.value }
     }
   } else if (cosmetics.bgColor) {
-    if (isMetallicBorder) {
+    if (isGradientBorder) {
       const tintPaddingLayer = `linear-gradient(${cosmetics.bgColor}, ${cosmetics.bgColor}), linear-gradient(var(--card), var(--card))`
       cardBgStyle = { '--card-bg': tintPaddingLayer } as React.CSSProperties
     } else {

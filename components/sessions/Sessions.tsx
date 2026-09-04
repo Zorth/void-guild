@@ -827,24 +827,24 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
                         initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: Math.min(i * 0.03, 0.2), duration: 0.2 }}
-                        className="border-b pb-2 last:border-0 flex justify-between items-start"
+                        className={cn(
+                          "p-2 rounded-md transition-colors relative flex justify-between items-center gap-2 border-b last:border-0",
+                          session.isOwner 
+                              ? "session-owner" 
+                              : isPlanning
+                                  ? "session-planning"
+                                  : isGM && hasJoined 
+                                      ? "session-admin-joined" 
+                                      : hasJoined 
+                                          ? "session-joined" 
+                                          : "session-default"
+                        )}
                       >
                         <Link
                           href={`/sessions/${session._id}`}
-                          className={cn(
-                              "flex-grow p-2 rounded-md transition-colors relative flex justify-between items-start",
-                              session.isOwner 
-                                  ? "session-owner" 
-                                  : isPlanning
-                                      ? "session-planning"
-                                      : isGM && hasJoined 
-                                          ? "session-admin-joined" 
-                                          : hasJoined 
-                                              ? "session-joined" 
-                                              : "session-default"
-                          )}
+                          className="flex-grow min-w-0 flex justify-between items-start"
                         >
-                          <div className="flex flex-col">
+                          <div className="flex flex-col min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <div className={cn("font-semibold", "session-world", "flex items-center gap-2 flex-wrap")}>
                                   <div className="flex items-center gap-2 whitespace-nowrap">
@@ -960,8 +960,9 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
                             type="button"
                             variant="outline" 
                             size="sm" 
-                            className="h-8 text-xs px-2 shrink-0 self-center"
-                            onClick={() => {
+                            className="h-8 text-xs px-2 shrink-0 self-center z-10"
+                            onClick={(e) => {
+                              e.stopPropagation();
                               window.open(`https://void.tarragon.be/Session-Reports/${new Date(session.date!).toISOString().slice(0, 10)}-${session.worldName.replace(/\s+/g, '-')}`, '_blank');
                             }}
                           >
