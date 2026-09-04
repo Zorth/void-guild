@@ -11,6 +11,7 @@ import {
   Circle,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useUser } from '@clerk/nextjs'
 import { getLevelBadgeStyle, CharacterRankIcon, cn } from '@/lib/utils'
 import {
   resolveCosmeticsStyles,
@@ -45,6 +46,9 @@ export default function CharacterCosmeticsTab({
   onChangeCosmetics,
   unlockedAchievementIds,
 }: CharacterCosmeticsTabProps) {
+  const { user } = useUser()
+  const profileImageUrl = user?.imageUrl
+
   function getOptionLockStatus(opt: CosmeticOption) {
     if (opt.unlockedByDefault) return { isUnlocked: true, label: '', badgeLabel: '', isHidden: false, title: '' }
     if (!opt.requiredAchievementId) return { isUnlocked: true, label: '', badgeLabel: '', isHidden: false, title: '' }
@@ -162,18 +166,29 @@ export default function CharacterCosmeticsTab({
           style={previewStyles.cardStyle}
         >
           <div className="flex items-center gap-3 min-w-0">
-            <div
-              className={cn(
-                'w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center font-bold text-xs shrink-0',
-                previewStyles.profileRingClassName
-              )}
-            >
-              {characterName ? characterName[0]?.toUpperCase() : 'C'}
-            </div>
+            {profileImageUrl ? (
+              <img
+                src={profileImageUrl}
+                alt={characterName || 'Character Avatar'}
+                className={cn('w-8 h-8 rounded-full shrink-0 object-cover', previewStyles.profileRingClassName)}
+              />
+            ) : (
+              <div
+                className={cn(
+                  'w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center font-bold text-xs shrink-0',
+                  previewStyles.profileRingClassName
+                )}
+              >
+                {characterName ? characterName[0]?.toUpperCase() : 'C'}
+              </div>
+            )}
             <div className="min-w-0">
               <div className="font-bold flex items-center gap-2">
                 <span className={cn('break-words', previewStyles.nameClassName)} style={previewStyles.nameStyle}>
                   {characterName || 'Character Name'}
+                </span>
+                <span className="text-[10px] bg-purple-200 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded-full uppercase tracking-wider font-bold shrink-0">
+                  You
                 </span>
               </div>
               <div className="text-[10px] text-muted-foreground mt-0.5">
@@ -311,56 +326,7 @@ export default function CharacterCosmeticsTab({
         </div>
       </div>
 
-      {/* 6. Profile Avatar Ring */}
-      <div className="flex flex-col gap-2">
-        <label className="text-xs font-semibold flex items-center gap-1.5">
-          <Circle className="h-4 w-4 text-emerald-500" />
-          Profile Avatar Ring
-        </label>
-        <div className="flex flex-col gap-2">
-          {PROFILE_BORDER_OPTIONS.map((opt) => {
-            const { isUnlocked, label, badgeLabel } = getOptionLockStatus(opt)
-            const isSelected = cosmetics.profileBorder === opt.id
-
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => handleSelectOption('profileBorder', opt)}
-                title={!isUnlocked ? label : opt.name}
-                className={cn(
-                  'w-full p-2.5 rounded-lg border text-left text-xs transition-all flex items-center justify-between',
-                  isSelected
-                    ? 'border-purple-500 bg-purple-500/10 font-bold ring-1 ring-purple-500'
-                    : isUnlocked
-                      ? 'border-border bg-card hover:bg-muted/40'
-                      : 'border-border/40 bg-muted/20 opacity-50 grayscale cursor-not-allowed'
-                )}
-              >
-                <div className="flex items-center gap-2.5">
-                  <div
-                    className={cn(
-                      'w-6 h-6 rounded-full bg-purple-500/20 flex items-center justify-center font-bold text-[10px]',
-                      opt.value
-                    )}
-                  >
-                    C
-                  </div>
-                  <span className="font-semibold">{opt.name}</span>
-                </div>
-                {!isUnlocked && (
-                  <span className="inline-flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 font-medium bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 shrink-0">
-                    <Lock className="h-3 w-3" />
-                    {badgeLabel}
-                  </span>
-                )}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* 7. Card Background Color / Tint */}
+      {/* 6. Card Background Color / Tint */}
       <div className="flex flex-col gap-2">
         <label className="text-xs font-semibold flex items-center gap-1.5">
           <Paintbrush className="h-4 w-4 text-blue-500" />
@@ -396,6 +362,60 @@ export default function CharacterCosmeticsTab({
                     {badgeLabel}
                   </span>
                 )}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* 7. Profile Avatar Ring */}
+      <div className="flex flex-col gap-2">
+        <label className="text-xs font-semibold flex items-center gap-1.5">
+          <Circle className="h-4 w-4 text-emerald-500" />
+          Profile Avatar Ring
+        </label>
+        <div className="flex flex-wrap gap-2.5 items-center">
+          {PROFILE_BORDER_OPTIONS.map((opt) => {
+            const { isUnlocked, label } = getOptionLockStatus(opt)
+            const isSelected =
+              cosmetics.profileBorder === opt.id ||
+              (opt.id === 'default' && (!cosmetics.profileBorder || cosmetics.profileBorder === 'default'))
+
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => handleSelectOption('profileBorder', opt)}
+                title={!isUnlocked ? label : opt.name}
+                className={cn(
+                  'p-2 rounded-xl border transition-all flex items-center justify-center relative shrink-0',
+                  isSelected
+                    ? 'bg-purple-500/25 dark:bg-purple-950/50 border-purple-500/60 shadow-sm'
+                    : isUnlocked
+                      ? 'border-transparent hover:bg-muted/40'
+                      : 'border-transparent opacity-40 grayscale cursor-not-allowed'
+                )}
+              >
+                {profileImageUrl ? (
+                  <img
+                    src={profileImageUrl}
+                    alt={opt.name}
+                    className={cn(
+                      'w-10 h-10 rounded-full object-cover shrink-0',
+                      opt.value
+                    )}
+                  />
+                ) : (
+                  <div
+                    className={cn(
+                      'w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center font-bold text-sm shrink-0',
+                      opt.value
+                    )}
+                  >
+                    {characterName ? characterName[0]?.toUpperCase() : 'C'}
+                  </div>
+                )}
+                {!isUnlocked && <Lock className="h-4 w-4 text-white drop-shadow absolute z-10" />}
               </button>
             )
           })}

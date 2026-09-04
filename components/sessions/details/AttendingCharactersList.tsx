@@ -109,25 +109,35 @@ export default function AttendingCharactersList({
         const hasGivenPlayerComm = !!myPlayerComm
         const hasGivenGmComm = !!myGmComm
         const cosmeticsStyles = resolveCosmeticsStyles(char.cosmetics)
+        const hasCustomBorderShape = char.cosmetics?.borderShape && char.cosmetics.borderShape !== 'default'
         
         return (
             <li 
                 key={char._id} 
                 className={cn(
                     "flex items-center justify-between p-4 rounded-lg border transition-colors gap-3",
-                    cosmeticsStyles.cardClassName || (isUserCharacter 
-                        ? "bg-[rgba(147,51,234,0.1)] border-2 border-[#D8B4FE] hover:border-[#E9D5FF] hover:bg-[rgba(147,51,234,0.2)] shadow-sm" 
-                        : "bg-muted/20")
+                    hasCustomBorderShape ? cosmeticsStyles.cardClassName : (
+                        isUserCharacter 
+                            ? "bg-[rgba(147,51,234,0.1)] border-2 border-[#D8B4FE] hover:border-[#E9D5FF] hover:bg-[rgba(147,51,234,0.2)] shadow-sm" 
+                            : "bg-muted/20"
+                    ),
+                    isUserCharacter && hasCustomBorderShape && "bg-purple-500/25"
                 )}
                 style={cosmeticsStyles.cardStyle}
             >
               <div className="flex items-center gap-3 min-w-0">
-                {metadata?.imageUrl && (
+                {metadata?.imageUrl ? (
                     <img 
                         src={metadata.imageUrl} 
                         alt={metadata.name} 
                         className={cn("w-8 h-8 rounded-full shrink-0 object-cover", cosmeticsStyles.profileRingClassName)}
                     />
+                ) : (
+                    <div 
+                        className={cn("w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center font-bold text-xs shrink-0", cosmeticsStyles.profileRingClassName)}
+                    >
+                        {char.name ? char.name[0]?.toUpperCase() : 'C'}
+                    </div>
                 )}
                 <div className="min-w-0">
                     <div className="font-bold flex items-center flex-wrap gap-2">
