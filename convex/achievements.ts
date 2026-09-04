@@ -166,7 +166,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     title: 'Party Favorite',
     description: 'Received your first character commendation from a party member.',
     category: 'hidden',
-    reward: '',
+    reward: 'Warm Amber Text Accent Cosmetic',
     checkEligibility: (data) => data.commendationCounts.total >= 1,
   },
   {

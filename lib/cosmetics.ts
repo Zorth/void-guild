@@ -83,6 +83,13 @@ export const COLOR_OPTIONS: CosmeticOption[] = [
     value: '#2DD4BF',
   },
   {
+    id: 'amber_text',
+    name: 'Warm Amber Accent',
+    unlockedByDefault: false,
+    requiredAchievementId: 'first_commendation',
+    value: '#FBBF24',
+  },
+  {
     id: 'gold_text',
     name: 'Guildmaster Gold Text',
     unlockedByDefault: false,
