@@ -3,6 +3,7 @@
 import React from 'react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import { PROFILE_BORDER_OPTIONS } from '@/lib/cosmetics'
 
 interface ProfileAvatarWithBadgeProps {
   imageUrl?: string | null
@@ -24,6 +25,14 @@ export default function ProfileAvatarWithBadge({
   rankNumber,
   size = 'md',
 }: ProfileAvatarWithBadgeProps) {
+  const profileBorderValue = cosmetics?.profileBorder
+    ? PROFILE_BORDER_OPTIONS.find(
+        (p) => p.id === cosmetics.profileBorder || p.value === cosmetics.profileBorder
+      )?.value
+    : null
+
+  const ringClass = profileRingClassName || profileBorderValue || 'border border-border'
+
   const isRankBadge =
     cosmetics?.profileBorder === 'leaderboard_rank' ||
     cosmetics?.profileBorder === 'leaderboard-rank-badge'
@@ -68,7 +77,7 @@ export default function ProfileAvatarWithBadge({
           className={cn(
             'rounded-full shrink-0 object-cover',
             sizeClasses[size],
-            profileRingClassName
+            ringClass
           )}
         />
       ) : (
@@ -76,7 +85,7 @@ export default function ProfileAvatarWithBadge({
           className={cn(
             'rounded-full bg-purple-500/20 flex items-center justify-center font-bold shrink-0',
             sizeClasses[size],
-            profileRingClassName
+            ringClass
           )}
         >
           {name ? name[0]?.toUpperCase() : 'C'}

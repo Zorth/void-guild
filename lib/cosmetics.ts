@@ -233,7 +233,7 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
   let cardClassName = shapeObj ? shapeObj.value : ''
 
   // Profile Border
-  const profileObj = PROFILE_BORDER_OPTIONS.find((p) => p.id === cosmetics.profileBorder)
+  const profileObj = PROFILE_BORDER_OPTIONS.find((p) => p.id === cosmetics.profileBorder || p.value === cosmetics.profileBorder)
   const profileRingClassName = profileObj ? profileObj.value : 'border border-border'
 
   // Card Background

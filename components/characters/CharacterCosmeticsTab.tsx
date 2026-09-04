@@ -402,6 +402,7 @@ export default function CharacterCosmeticsTab({
             const { isUnlocked, label } = getOptionLockStatus(opt)
             const isSelected =
               cosmetics.profileBorder === opt.id ||
+              cosmetics.profileBorder === opt.value ||
               (opt.id === 'default' && (!cosmetics.profileBorder || cosmetics.profileBorder === 'default'))
 
             return (
