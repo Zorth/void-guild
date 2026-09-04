@@ -51,13 +51,6 @@ export const FONT_OPTIONS: CosmeticOption[] = [
     value: 'font-sabon',
   },
   {
-    id: 'gin_bold',
-    name: 'Gin Bold',
-    unlockedByDefault: false,
-    requiredAchievementId: 'veteran_player_5',
-    value: 'font-gin',
-  },
-  {
     id: 'medieval_sharp',
     name: 'Medieval Sharp',
     unlockedByDefault: false,
@@ -70,13 +63,6 @@ export const FONT_OPTIONS: CosmeticOption[] = [
     unlockedByDefault: false,
     requiredAchievementId: 'master_player_10',
     value: 'font-taroca',
-  },
-  {
-    id: 'cinzel_decorative',
-    name: 'Cinzel Decorative',
-    unlockedByDefault: false,
-    requiredAchievementId: 'master_player_10',
-    value: 'font-cinzel-dec',
   },
 ]
 
