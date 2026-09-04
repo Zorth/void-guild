@@ -89,6 +89,31 @@ export default function AchievementsModal({ open, onOpenChange }: AchievementsMo
   const progressPercentage =
     data && data.totalCount > 0 ? Math.round((data.unlockedCount / data.totalCount) * 100) : 0
 
+  const renderReward = (item: Achievement, isSubItem = false) => {
+    const hasReward = Boolean(item.reward && item.reward.trim() !== '')
+    if (item.isUnlocked && hasReward) {
+      return (
+        <div className={cn(isSubItem ? 'pt-0.5' : 'pt-1')}>
+          <div className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-purple-500/15 text-purple-300 border border-purple-500/30">
+            <Gift className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+            <span>Reward: {item.reward}</span>
+          </div>
+        </div>
+      )
+    }
+    if (data?.isAdmin) {
+      return (
+        <div className={cn(isSubItem ? 'pt-0.5' : 'pt-1')}>
+          <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-muted/40 text-muted-foreground border border-border/40">
+            <Gift className="h-3 w-3 shrink-0 text-muted-foreground/70" />
+            <span>Reward: {hasReward ? item.reward : 'None'}</span>
+          </div>
+        </div>
+      )
+    }
+    return null
+  }
+
   const seenChains = new Set<string>()
 
   return (
@@ -270,14 +295,7 @@ export default function AchievementsModal({ open, onOpenChange }: AchievementsMo
                           {primaryItem.description}
                         </p>
 
-                        {primaryItem.isUnlocked && primaryItem.reward && (
-                          <div className="pt-1">
-                            <div className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-purple-500/15 text-purple-300 border border-purple-500/30">
-                              <Gift className="h-3.5 w-3.5 text-purple-400 shrink-0" />
-                              <span>Reward: {primaryItem.reward}</span>
-                            </div>
-                          </div>
-                        )}
+                        {renderReward(primaryItem)}
                       </div>
                     </div>
 
@@ -355,6 +373,8 @@ export default function AchievementsModal({ open, onOpenChange }: AchievementsMo
                                   <p className="text-[11px] text-muted-foreground leading-relaxed">
                                     {subItem.description}
                                   </p>
+
+                                  {renderReward(subItem, true)}
                                 </div>
                               </div>
                             ))}
@@ -427,14 +447,7 @@ export default function AchievementsModal({ open, onOpenChange }: AchievementsMo
                         {item.description}
                       </p>
 
-                      {item.isUnlocked && item.reward && (
-                        <div className="pt-1.5">
-                          <div className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-purple-500/15 text-purple-300 border border-purple-500/30">
-                            <Gift className="h-3.5 w-3.5 text-purple-400 shrink-0" />
-                            <span>Reward: {item.reward}</span>
-                          </div>
-                        </div>
-                      )}
+                      {renderReward(item)}
                     </div>
                   </div>
                 </div>
