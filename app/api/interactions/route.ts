@@ -259,34 +259,56 @@ export async function POST(req: Request) {
             ? `\n**Rank:** ${character.rank.charAt(0).toUpperCase() + character.rank.slice(1)}` 
             : '';
 
-          // Discord Interaction User Metadata
-          const user = interaction.member?.user || interaction.user;
-          const avatarUrl = user?.avatar 
-            ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`
-            : `https://cdn.discordapp.com/embed/avatars/0.png`;
+          // Use character owner's avatar URL instead of interaction caller's avatar URL
+          const authorIconUrl = character.ownerImageUrl || `${baseUrl}/favicon.ico`;
+
+          const fields: any[] = [
+            { name: 'Level', value: `\` ${character.lvl} \``, inline: true },
+            { name: 'System', value: `\` ${systemName} \``, inline: true },
+            { name: 'Sessions Played', value: `\` ${character.sessionCount} \``, inline: true },
+          ];
+
+          if (character.mostVisitedWorld) {
+            fields.push({
+              name: 'Most Visited World',
+              value: `**${character.mostVisitedWorld.name}** (${character.mostVisitedWorld.count} session${character.mostVisitedWorld.count > 1 ? 's' : ''})`,
+              inline: true
+            });
+          }
+
+          if (character.commendations && character.commendations.total > 0) {
+            const commParts: string[] = [];
+            if (character.commendations.gm > 0) commParts.push(`👑 GM: ${character.commendations.gm}`);
+            if (character.commendations.roleplay > 0) commParts.push(`🎭 Roleplay: ${character.commendations.roleplay}`);
+            if (character.commendations.tactics > 0) commParts.push(`⚔️ Tactics: ${character.commendations.tactics}`);
+            if (character.commendations.clutch > 0) commParts.push(`🛡️ Clutch: ${character.commendations.clutch}`);
+            if (character.commendations.heroic > 0) commParts.push(`🌟 Heroic: ${character.commendations.heroic}`);
+
+            fields.push({
+              name: `Commendations (${character.commendations.total})`,
+              value: commParts.join(' • '),
+              inline: false
+            });
+          }
+
+          if (character.websiteLink) {
+            fields.push({ name: 'External Sheet', value: `[Link](${character.websiteLink})`, inline: true });
+          }
 
           const embed = {
             author: {
-              name: `${character.name}`,
-              icon_url: avatarUrl,
+              name: `${character.name}` + (character.ownerName ? ` (Owner: ${character.ownerName})` : ''),
+              icon_url: authorIconUrl,
               url: character.websiteLink || undefined
             },
             title: `${systemEmoji} ${character.ancestry || 'Unknown'} ${character.class || 'Character'}`,
             description: `**Current Progress** \n\`${xpBar}\` \n**${character.xp}** / 1000 XP (*${xpNeeded} XP to level ${character.lvl + 1}*)${rankInfo}`,
             thumbnail: { url: systemLogo },
-            fields: [
-              { name: 'Level', value: `\` ${character.lvl} \``, inline: true },
-              { name: 'System', value: `\` ${systemName} \``, inline: true },
-              { name: 'Sessions Played', value: `\` ${character.sessionCount} \``, inline: true },
-            ],
+            fields: fields,
             color: character.system === 'PF' ? 0xde2e2e : 0xe81123,
             timestamp: new Date().toISOString(),
             footer: { text: "Void Guild Chronicles", icon_url: `${baseUrl}/favicon.ico` }
           };
-
-          if (character.websiteLink) {
-            embed.fields.push({ name: 'External Sheet', value: `[Link](${character.websiteLink})`, inline: true });
-          }
 
           return new Response(JSON.stringify({
             type: 4,

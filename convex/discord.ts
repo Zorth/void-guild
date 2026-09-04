@@ -525,19 +525,73 @@ export const getCharacterProfile = query({
 
     if (!character) return null;
 
+    // Fetch character owner's user info
+    const ownerUser = await ctx.db
+      .query("users")
+      .withIndex("by_userId", (q) => q.eq("userId", character.userId))
+      .first();
+
     // Count how many locked (completed) sessions this character participated in
     const sessions = await ctx.db
       .query("sessions")
-      .filter(q => q.and(
-        q.eq(q.field("locked"), true),
-      ))
+      .filter(q => q.eq(q.field("locked"), true))
       .collect();
 
-    const sessionCount = sessions.filter(s => s.characters.includes(character._id)).length;
+    const charSessions = sessions.filter(s => s.characters.includes(character._id));
+    const sessionCount = charSessions.length;
+
+    // Calculate most visited world
+    const worldCounts = new Map<string, number>();
+    for (const s of charSessions) {
+      if (s.world) {
+        const key = s.world.toString();
+        worldCounts.set(key, (worldCounts.get(key) || 0) + 1);
+      }
+    }
+
+    let mostVisitedWorld: { name: string; count: number } | null = null;
+    if (worldCounts.size > 0) {
+      let maxCount = 0;
+      let topWorldId: Id<"worlds"> | null = null;
+      for (const [wId, count] of worldCounts.entries()) {
+        if (count > maxCount) {
+          maxCount = count;
+          topWorldId = wId as Id<"worlds">;
+        }
+      }
+      if (topWorldId) {
+        const worldDoc = await ctx.db.get(topWorldId);
+        if (worldDoc) {
+          mostVisitedWorld = {
+            name: worldDoc.name,
+            count: maxCount,
+          };
+        }
+      }
+    }
+
+    // Fetch commendations received by this character
+    const comms = await ctx.db
+      .query("commendations")
+      .withIndex("by_toCharacter", (q) => q.eq("toCharacterId", character._id))
+      .collect();
+
+    const commendationSummary = {
+      total: comms.length,
+      roleplay: comms.filter(c => c.category === 'roleplay').length,
+      tactics: comms.filter(c => c.category === 'tactics').length,
+      clutch: comms.filter(c => c.category === 'clutch').length,
+      heroic: comms.filter(c => c.category === 'heroic').length,
+      gm: comms.filter(c => c.category === 'gm').length,
+    };
 
     return {
       ...character,
       sessionCount,
+      ownerImageUrl: ownerUser?.imageUrl || null,
+      ownerName: ownerUser?.name || ownerUser?.username || null,
+      mostVisitedWorld,
+      commendations: commendationSummary,
     };
   },
 });
