@@ -245,9 +245,6 @@ export async function POST(req: Request) {
 
           const systemEmoji = character.system === 'PF' ? '<:Pathfinder:1322734594864320522>' : '<:DnD:1322734981524754473>';
           const systemName = character.system === 'PF' ? 'Pathfinder 2e' : 'D&D 5e';
-          const systemLogo = character.system === 'PF' 
-            ? `${baseUrl}/PFVoid.svg`
-            : `${baseUrl}/DnDVoid.svg`;
           
           // XP Math
           const totalBars = 20;
@@ -258,9 +255,6 @@ export async function POST(req: Request) {
           const rankInfo = character.rank && character.rank !== 'none' 
             ? `\n**Rank:** ${character.rank.charAt(0).toUpperCase() + character.rank.slice(1)}` 
             : '';
-
-          // Use character owner's avatar URL instead of interaction caller's avatar URL
-          const authorIconUrl = character.ownerImageUrl || `${baseUrl}/favicon.ico`;
 
           const fields: any[] = [
             { name: 'Level', value: `\` ${character.lvl} \``, inline: true },
@@ -298,16 +292,14 @@ export async function POST(req: Request) {
           const embed = {
             author: {
               name: `${character.name}` + (character.ownerName ? ` (Owner: ${character.ownerName})` : ''),
-              icon_url: authorIconUrl,
               url: character.websiteLink || undefined
             },
             title: `${systemEmoji} ${character.ancestry || 'Unknown'} ${character.class || 'Character'}`,
             description: `**Current Progress** \n\`${xpBar}\` \n**${character.xp}** / 1000 XP (*${xpNeeded} XP to level ${character.lvl + 1}*)${rankInfo}`,
-            thumbnail: { url: systemLogo },
             fields: fields,
             color: character.system === 'PF' ? 0xde2e2e : 0xe81123,
             timestamp: new Date().toISOString(),
-            footer: { text: "Void Guild Chronicles", icon_url: `${baseUrl}/favicon.ico` }
+            footer: { text: "Void Guild Chronicles" }
           };
 
           return new Response(JSON.stringify({
