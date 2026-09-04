@@ -11,6 +11,7 @@ import { useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { toast } from 'sonner'
 import { resolveCosmeticsStyles } from '@/lib/cosmetics'
+import ProfileAvatarWithBadge from '@/components/characters/ProfileAvatarWithBadge'
 
 interface CharacterRelationship {
   count: number
@@ -61,6 +62,7 @@ export default function AttendingCharactersList({
     api.commendations.getSessionCommendations,
     sessionId ? { sessionId } : 'skip'
   )
+  const characterRanks = useQuery(api.characters.getCharacterLeaderboardRanks)
   const giveCommendation = useMutation(api.commendations.giveCommendation)
 
   const handleCommend = async (
@@ -120,19 +122,14 @@ export default function AttendingCharactersList({
                 style={cosmeticsStyles.cardStyle}
             >
               <div className="flex items-center gap-3 min-w-0">
-                {metadata?.imageUrl ? (
-                    <img 
-                        src={metadata.imageUrl} 
-                        alt={metadata.name} 
-                        className={cn("w-8 h-8 rounded-full shrink-0 object-cover", cosmeticsStyles.profileRingClassName)}
-                    />
-                ) : (
-                    <div 
-                        className={cn("w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center font-bold text-xs shrink-0", cosmeticsStyles.profileRingClassName)}
-                    >
-                        {char.name ? char.name[0]?.toUpperCase() : 'C'}
-                    </div>
-                )}
+                <ProfileAvatarWithBadge
+                  imageUrl={metadata?.imageUrl}
+                  name={char.name}
+                  cosmetics={char.cosmetics}
+                  profileRingClassName={cosmeticsStyles.profileRingClassName}
+                  rankNumber={characterRanks?.[char._id]}
+                  size="lg"
+                />
                 <div className="min-w-0">
                     <div className="font-bold flex items-center flex-wrap gap-2">
                         <span className={cn("break-words", cosmeticsStyles.nameClassName)} style={cosmeticsStyles.nameStyle}>{char.name}</span>

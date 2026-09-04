@@ -51,6 +51,19 @@ export const listAllCharactersPublic = query({
   },
 })
 
+export const getCharacterLeaderboardRanks = query({
+  args: {},
+  handler: async (ctx) => {
+    const characters = await ctx.db.query('characters').collect()
+    const sorted = [...characters].sort((a, b) => b.lvl - a.lvl || (b.xp ?? 0) - (a.xp ?? 0))
+    const ranks: Record<string, number> = {}
+    sorted.forEach((char, index) => {
+      ranks[char._id] = index + 1
+    })
+    return ranks
+  },
+})
+
 export const getCharactersByIds = query({
   args: { ids: v.array(v.id('characters')) },
   handler: async (ctx, args) => {

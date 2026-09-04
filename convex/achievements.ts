@@ -263,7 +263,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     title: 'Leaderboard Inspector',
     description: 'Visited the server leaderboard statistics page.',
     category: 'hidden',
-    reward: '',
+    reward: 'Leaderboard Rank Badge Profile Avatar Cosmetic',
     checkEligibility: (data) => Boolean(data.userDoc?.visitedLeaderboard),
   },
   {

@@ -12,7 +12,10 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useUser } from '@clerk/nextjs'
+import { useQuery } from 'convex/react'
+import { api } from '@/convex/_generated/api'
 import { getLevelBadgeStyle, CharacterRankIcon, cn } from '@/lib/utils'
+import ProfileAvatarWithBadge from '@/components/characters/ProfileAvatarWithBadge'
 import {
   resolveCosmeticsStyles,
   FONT_OPTIONS,
@@ -26,6 +29,7 @@ import {
 } from '@/lib/cosmetics'
 
 interface CharacterCosmeticsTabProps {
+  characterId?: string
   characterName: string
   ancestry: string
   characterClass: string
@@ -37,6 +41,7 @@ interface CharacterCosmeticsTabProps {
 }
 
 export default function CharacterCosmeticsTab({
+  characterId,
   characterName,
   ancestry,
   characterClass,
@@ -48,6 +53,8 @@ export default function CharacterCosmeticsTab({
 }: CharacterCosmeticsTabProps) {
   const { user } = useUser()
   const profileImageUrl = user?.imageUrl
+  const characterRanks = useQuery(api.characters.getCharacterLeaderboardRanks)
+  const rankNumber = (characterId ? characterRanks?.[characterId] : undefined) ?? 1
 
   function getOptionLockStatus(opt: CosmeticOption) {
     if (opt.unlockedByDefault) return { isUnlocked: true, label: '', badgeLabel: '', isHidden: false, title: '' }
@@ -166,22 +173,14 @@ export default function CharacterCosmeticsTab({
           style={previewStyles.cardStyle}
         >
           <div className="flex items-center gap-3 min-w-0">
-            {profileImageUrl ? (
-              <img
-                src={profileImageUrl}
-                alt={characterName || 'Character Avatar'}
-                className={cn('w-8 h-8 rounded-full shrink-0 object-cover', previewStyles.profileRingClassName)}
-              />
-            ) : (
-              <div
-                className={cn(
-                  'w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center font-bold text-xs shrink-0',
-                  previewStyles.profileRingClassName
-                )}
-              >
-                {characterName ? characterName[0]?.toUpperCase() : 'C'}
-              </div>
-            )}
+            <ProfileAvatarWithBadge
+              imageUrl={profileImageUrl}
+              name={characterName}
+              cosmetics={cosmetics}
+              profileRingClassName={previewStyles.profileRingClassName}
+              rankNumber={rankNumber}
+              size="lg"
+            />
             <div className="min-w-0">
               <div className="font-bold flex items-center gap-2">
                 <span className={cn('break-words', previewStyles.nameClassName)} style={previewStyles.nameStyle}>
@@ -399,25 +398,14 @@ export default function CharacterCosmeticsTab({
                       : 'border-transparent opacity-40 grayscale cursor-not-allowed'
                 )}
               >
-                {profileImageUrl ? (
-                  <img
-                    src={profileImageUrl}
-                    alt={opt.name}
-                    className={cn(
-                      'w-10 h-10 rounded-full object-cover shrink-0',
-                      opt.value
-                    )}
-                  />
-                ) : (
-                  <div
-                    className={cn(
-                      'w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center font-bold text-sm shrink-0',
-                      opt.value
-                    )}
-                  >
-                    {characterName ? characterName[0]?.toUpperCase() : 'C'}
-                  </div>
-                )}
+                <ProfileAvatarWithBadge
+                  imageUrl={profileImageUrl}
+                  name={characterName}
+                  cosmetics={{ profileBorder: opt.id }}
+                  profileRingClassName={opt.value}
+                  rankNumber={rankNumber}
+                  size="lg"
+                />
                 {!isUnlocked && <Lock className="h-4 w-4 text-white drop-shadow absolute z-10" />}
               </button>
             )

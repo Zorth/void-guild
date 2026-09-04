@@ -511,6 +511,7 @@ export default function Characters({ filters }: { filters?: { pf: boolean; dnd: 
                 </>
               ) : (
                 <CharacterCosmeticsTab
+                  characterId={selectedCharacter._id}
                   characterName={editedCharacterData.name}
                   ancestry={editedCharacterData.ancestry}
                   characterClass={editedCharacterData.class}

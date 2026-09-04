@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn, getLevelBadgeStyle, getDualLevelBadgeStyle, formatDate, formatTime, CharacterRankIcon } from '@/lib/utils'
 import './sessions.css'
 import type { Doc } from '@/convex/_generated/dataModel'
+import { UserItem } from './UserCharacterPreviewTooltip'
 import {
     Dialog,
     DialogContent,
@@ -68,47 +69,6 @@ function useWindowSize() {
   return windowSize;
 }
 
-function UserCharacterPreview({ userId }: { userId: string }) {
-    const characters = useQuery(api.characters.listCharactersByUserId, { userId });
-
-    return (
-        <div className="p-3 space-y-3 min-w-[180px]">
-            {characters === undefined ? (
-                <div className="space-y-2">
-                    <Skeleton className="h-5 w-full" />
-                    <Skeleton className="h-5 w-full" />
-                </div>
-            ) : characters.length === 0 ? (
-                <p className="text-sm text-muted-foreground italic">No characters found.</p>
-            ) : (
-                <ul className="space-y-2">
-                    {characters.map(char => (
-                        <li key={char._id} className="flex items-center justify-between gap-6 text-sm">
-                            <div className="flex items-center gap-2">
-                                <CharacterRankIcon rank={char.rank} className="w-4 h-4" />
-                                {char.system && (
-                                    <img 
-                                        src={char.system === 'PF' ? '/PFVoid.svg' : '/DnDVoid.svg'} 
-                                        alt={char.system} 
-                                        className="h-3 w-3 mx-0.5"
-                                    />
-                                )}
-                                <span className="font-medium text-foreground">{char.name}</span>
-                            </div>
-                            <span 
-                                className="inline-flex align-middle justify-center w-14 rounded-full px-2 py-0.5 text-xs font-bold whitespace-nowrap"
-                                style={getLevelBadgeStyle(char.lvl)}
-                            >
-                                Lvl {char.lvl}
-                            </span>
-                        </li>
-                    ))}
-                </ul>
-            )}
-        </div>
-    );
-}
-
 function AvailabilityDialog({ 
     date, 
     availability, 
@@ -137,19 +97,6 @@ function AvailabilityDialog({
 
     const sessionsRunning = daySessions.filter(s => s.isOwner);
     const sessionsJoined = daySessions.filter(s => !s.isOwner && s.characters.some(id => userCharacterIds.has(id)));
-
-    const UserItem = ({ a }: { a: Doc<'availability'> }) => (
-        <Tooltip delayDuration={0}>
-            <TooltipTrigger asChild>
-                <li key={a.userId} className="text-sm flex items-center gap-2 bg-muted/30 px-2 py-1 rounded-md cursor-help hover:bg-muted/50 transition-colors">
-                    <User className="h-3 w-3" /> {getDisplayName(a)}
-                </li>
-            </TooltipTrigger>
-            <TooltipContent side="right" className="p-0 border border-border bg-card text-card-foreground shadow-xl">
-                <UserCharacterPreview userId={a.userId} />
-            </TooltipContent>
-        </Tooltip>
-    );
 
     return (
         <DialogContent>
@@ -189,7 +136,7 @@ function AvailabilityDialog({
                         </h4>
                         {gms.length > 0 ? (
                             <ul className="space-y-1">
-                                {gms.map(a => <UserItem key={a.userId} a={a} />)}
+                                {gms.map(a => <UserItem key={a.userId} a={a} displayName={getDisplayName(a)} />)}
                             </ul>
                         ) : (
                             <p className="text-xs text-muted-foreground italic">No GMs available.</p>
@@ -201,7 +148,7 @@ function AvailabilityDialog({
                         </h4>
                         {players.length > 0 ? (
                             <ul className="space-y-1">
-                                {players.map(a => <UserItem key={a.userId} a={a} />)}
+                                {players.map(a => <UserItem key={a.userId} a={a} displayName={getDisplayName(a)} />)}
                             </ul>
                         ) : (
                             <p className="text-xs text-muted-foreground italic">No players available.</p>

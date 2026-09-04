@@ -28,6 +28,7 @@ export const ACHIEVEMENT_INFO: Record<string, AchievementInfo> = {
   first_commendation: { title: 'Party Favorite', category: 'normal' },
   tutorial_completed: { title: 'Tutorial Completed!', category: 'normal' },
   link_discord: { title: 'Discord Connected', category: 'normal' },
+  visit_leaderboard: { title: 'Leaderboard Inspector', category: 'hidden' },
   secret_logo_clicks: { title: 'Curious Clicker', category: 'hidden' },
   gm_favor: { title: "Master's Favor", category: 'hidden' },
   system_polymath: { title: 'System Polymath', category: 'hidden' },
@@ -79,6 +80,14 @@ export const BORDER_SHAPE_OPTIONS: CosmeticOption[] = [
 
 export const PROFILE_BORDER_OPTIONS: CosmeticOption[] = [
   { id: 'default', name: 'Default Ring', unlockedByDefault: true, value: 'border border-border' },
+  {
+    id: 'leaderboard_rank',
+    name: 'Leaderboard Rank Badge',
+    unlockedByDefault: false,
+    requiredAchievementId: 'visit_leaderboard',
+    value: 'leaderboard-rank-badge',
+    previewClass: 'leaderboard-rank-badge',
+  },
 ]
 
 export const BG_COLOR_OPTIONS: CosmeticOption[] = [
