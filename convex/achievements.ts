@@ -280,7 +280,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     id: 'link_discord',
     title: 'Discord Connected',
     description: 'Linked your Discord account to your Void Guild profile.',
-    category: 'hidden',
+    category: 'normal',
     reward: '',
     checkEligibility: (data) => Boolean(data.userDoc?.discordId),
   },
