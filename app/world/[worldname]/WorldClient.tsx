@@ -16,7 +16,8 @@ import { useState, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
 import { Id } from '@/convex/_generated/dataModel'
 import { UserMetadata } from '@/app/stats/actions'
-import { useAuth, UserButton } from '@clerk/nextjs'
+import { useAuth } from '@clerk/nextjs'
+import CustomUserButton from '@/components/CustomUserButton'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -380,7 +381,7 @@ export default function WorldClient() {
                 </Button>
             </div>
             <ThemeToggle />
-            <UserButton />
+            <CustomUserButton />
         </div>
       </div>
 

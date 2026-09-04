@@ -2,7 +2,8 @@
 
 import { Authenticated, Unauthenticated, AuthLoading, useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
-import { SignInButton, UserButton } from '@clerk/nextjs'
+import { SignInButton } from '@clerk/nextjs'
+import CustomUserButton from '@/components/CustomUserButton'
 import Characters from '@/components/characters/Characters'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -131,7 +132,7 @@ export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
               </Link>
             )}
             <ThemeToggle />
-            <UserButton />
+            <CustomUserButton />
           </div>
         </Authenticated>
         <AuthLoading>
