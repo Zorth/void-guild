@@ -10,7 +10,8 @@ export const giveCommendation = mutation({
       v.literal('roleplay'),
       v.literal('tactics'),
       v.literal('clutch'),
-      v.literal('heroic')
+      v.literal('heroic'),
+      v.literal('gm')
     ),
   },
   handler: async (ctx, args) => {
@@ -29,42 +30,90 @@ export const giveCommendation = mutation({
       throw new Error('Target character not found')
     }
 
+    if (!session.characters.includes(args.toCharacterId)) {
+      throw new Error('Character is not in this session')
+    }
+
     // Cannot commend own character
     if (targetChar.userId === user.subject) {
       throw new Error('Cannot commend your own character')
     }
 
-    // Check if user already commended someone in this session
-    const existing = await ctx.db
-      .query('commendations')
-      .withIndex('by_session_fromUser', (q) =>
-        q.eq('sessionId', args.sessionId).eq('fromUserId', user.subject)
-      )
-      .first()
+    const isGm = session.owner === user.subject
 
-    if (existing) {
-      if (existing.toCharacterId === args.toCharacterId && existing.category === args.category) {
-        // Toggle off if clicking exact same character and category
-        await ctx.db.delete(existing._id)
-        return { action: 'removed' }
+    if (args.category === 'gm') {
+      // ONLY the Gamemaster (session owner) can give GM commendation. NO ADMINS!
+      if (!isGm) {
+        throw new Error('Only the session Gamemaster can give a GM commendation')
       }
-      // Update existing commendation to the new target character & category
-      await ctx.db.patch(existing._id, {
+
+      const userCommendations = await ctx.db
+        .query('commendations')
+        .withIndex('by_session_fromUser', (q) =>
+          q.eq('sessionId', args.sessionId).eq('fromUserId', user.subject)
+        )
+        .collect()
+
+      const existingGm = userCommendations.find((c) => c.category === 'gm')
+
+      if (existingGm) {
+        if (existingGm.toCharacterId === args.toCharacterId) {
+          // Toggle off if clicking exact same character
+          await ctx.db.delete(existingGm._id)
+          return { action: 'removed' }
+        }
+        throw new Error('You must unselect your existing GM commendation first')
+      }
+
+      // Insert new GM commendation
+      await ctx.db.insert('commendations', {
+        sessionId: args.sessionId,
+        fromUserId: user.subject,
+        toCharacterId: args.toCharacterId,
+        category: 'gm',
+      })
+
+      return { action: 'created' }
+    } else {
+      // Player commendation
+      const userCharacters = await ctx.db
+        .query('characters')
+        .withIndex('by_userId', (q) => q.eq('userId', user.subject))
+        .collect()
+
+      const hasCharInSession = userCharacters.some((c) => session.characters.includes(c._id))
+      if (!hasCharInSession) {
+        throw new Error('Only participating players can give player commendations')
+      }
+
+      const userCommendations = await ctx.db
+        .query('commendations')
+        .withIndex('by_session_fromUser', (q) =>
+          q.eq('sessionId', args.sessionId).eq('fromUserId', user.subject)
+        )
+        .collect()
+
+      const existingPlayer = userCommendations.find((c) => c.category !== 'gm')
+
+      if (existingPlayer) {
+        if (existingPlayer.toCharacterId === args.toCharacterId && existingPlayer.category === args.category) {
+          // Toggle off if clicking exact same character and category
+          await ctx.db.delete(existingPlayer._id)
+          return { action: 'removed' }
+        }
+        throw new Error('You must unselect your existing commendation first')
+      }
+
+      // Insert new player commendation
+      await ctx.db.insert('commendations', {
+        sessionId: args.sessionId,
+        fromUserId: user.subject,
         toCharacterId: args.toCharacterId,
         category: args.category,
       })
-      return { action: 'updated' }
+
+      return { action: 'created' }
     }
-
-    // Insert new commendation
-    await ctx.db.insert('commendations', {
-      sessionId: args.sessionId,
-      fromUserId: user.subject,
-      toCharacterId: args.toCharacterId,
-      category: args.category,
-    })
-
-    return { action: 'created' }
   },
 })
 
@@ -84,20 +133,35 @@ export const getSessionCommendations = query({
       category: 'roleplay' | 'tactics' | 'clutch' | 'heroic'
     } | null = null
 
+    let myGmCommendation: {
+      _id: Id<'commendations'>
+      toCharacterId: Id<'characters'>
+      category: 'gm'
+    } | null = null
+
     const countsByCharacter: Record<string, {
       total: number
       roleplay: number
       tactics: number
       clutch: number
       heroic: number
+      gm: number
     }> = {}
 
     for (const comm of allInSession) {
       if (user && comm.fromUserId === user.subject) {
-        myCommendation = {
-          _id: comm._id,
-          toCharacterId: comm.toCharacterId,
-          category: comm.category,
+        if (comm.category === 'gm') {
+          myGmCommendation = {
+            _id: comm._id,
+            toCharacterId: comm.toCharacterId,
+            category: 'gm',
+          }
+        } else {
+          myCommendation = {
+            _id: comm._id,
+            toCharacterId: comm.toCharacterId,
+            category: comm.category as 'roleplay' | 'tactics' | 'clutch' | 'heroic',
+          }
         }
       }
 
@@ -108,6 +172,7 @@ export const getSessionCommendations = query({
           tactics: 0,
           clutch: 0,
           heroic: 0,
+          gm: 0,
         }
       }
 
@@ -117,6 +182,7 @@ export const getSessionCommendations = query({
 
     return {
       myCommendation,
+      myGmCommendation,
       countsByCharacter,
     }
   },
@@ -139,6 +205,7 @@ export const getUserCharactersCommendations = query({
       tactics: number
       clutch: number
       heroic: number
+      gm: number
     }> = {}
 
     for (const char of userCharacters) {
@@ -153,10 +220,13 @@ export const getUserCharactersCommendations = query({
         tactics: 0,
         clutch: 0,
         heroic: 0,
+        gm: 0,
       }
 
       for (const c of comms) {
-        summary[c.category] += 1
+        if (c.category in summary) {
+          summary[c.category as keyof typeof summary] += 1
+        }
       }
 
       result[char._id] = summary

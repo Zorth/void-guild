@@ -257,6 +257,11 @@ export default function Characters({ filters }: { filters?: { pf: boolean, dnd: 
                               🌟 Heroic: {comms.heroic}
                             </span>
                           )}
+                          {comms.gm > 0 && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-300 font-bold border border-amber-500/25">
+                              👑 GM: {comms.gm}
+                            </span>
+                          )}
                         </div>
                       )
                     })()}

@@ -121,7 +121,8 @@ export default defineSchema({
             v.literal('roleplay'),
             v.literal('tactics'),
             v.literal('clutch'),
-            v.literal('heroic')
+            v.literal('heroic'),
+            v.literal('gm')
         ),
     }).index('by_session_fromUser', ['sessionId', 'fromUserId'])
       .index('by_toCharacter', ['toCharacterId'])

@@ -871,6 +871,7 @@ export default function SessionClient() {
                     sessionLocked={session.locked}
                     sessionPlanning={session.planning}
                     isSessionOwner={isOwnerOrAdmin}
+                    isGM={session.isOwner}
                     onLeave={handleLeave}
                     userMetadata={userMetadata}
                     leavingCharacterId={leavingCharacterId}

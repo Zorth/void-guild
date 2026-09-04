@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Book, Trash2, Loader2, Sparkles, Flame, Trophy, Star, Users, ExternalLink, Globe, Medal } from 'lucide-react'
+import { Book, Trash2, Loader2, Sparkles, Flame, Trophy, Star, Users, ExternalLink, Globe, Medal, Crown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Doc, Id } from '@/convex/_generated/dataModel'
@@ -34,6 +34,7 @@ interface AttendingCharactersListProps {
   sessionLocked: boolean
   sessionPlanning?: boolean
   isSessionOwner: boolean
+  isGM?: boolean
   onLeave: (characterId: Id<'characters'>) => void
   userMetadata?: Record<string, UserMetadata>
   leavingCharacterId?: string | null
@@ -47,7 +48,8 @@ export default function AttendingCharactersList({
   userCharacterIds, 
   sessionLocked, 
   sessionPlanning,
-  isSessionOwner, 
+  isSessionOwner,
+  isGM,
   onLeave,
   userMetadata,
   leavingCharacterId,
@@ -62,18 +64,18 @@ export default function AttendingCharactersList({
 
   const handleCommend = async (
     toCharacterId: Id<'characters'>,
-    category: 'roleplay' | 'tactics' | 'clutch' | 'heroic',
+    category: 'roleplay' | 'tactics' | 'clutch' | 'heroic' | 'gm',
     charName: string
   ) => {
     if (!sessionId) return
     try {
       const res = await giveCommendation({ sessionId, toCharacterId, category })
       if (res.action === 'created') {
-        toast.success(`Commended ${charName}!`)
+        toast.success(category === 'gm' ? `Awarded GM Commendation to ${charName}!` : `Commended ${charName}!`)
       } else if (res.action === 'updated') {
         toast.success(`Updated commendation for ${charName}!`)
       } else if (res.action === 'removed') {
-        toast.info(`Removed commendation for ${charName}`)
+        toast.info(category === 'gm' ? `Removed GM Commendation for ${charName}` : `Removed commendation for ${charName}`)
       }
     } catch (err: any) {
       toast.error(err.message || 'Failed to give commendation')
@@ -90,6 +92,21 @@ export default function AttendingCharactersList({
         const canRemove = !sessionLocked && !sessionPlanning && (isSessionOwner || isUserCharacter)
         const metadata = userMetadata?.[char.userId]
         const rel = relationships?.[char._id]
+
+        const isGmUser = isGM ?? false
+        const canCommendAsPlayer = hasUserSignedUp && !isUserCharacter
+        const canCommendAsGm = isGmUser && !isUserCharacter
+        const canCommend = (canCommendAsPlayer || canCommendAsGm) && !!sessionId
+
+        const myPlayerComm = sessionCommendations?.myCommendation
+        const myGmComm = sessionCommendations?.myGmCommendation
+
+        const isPlayerCommendedByMe = myPlayerComm?.toCharacterId === char._id
+        const isGmCommendedByMe = myGmComm?.toCharacterId === char._id
+        const isAnyCommendedByMe = isPlayerCommendedByMe || isGmCommendedByMe
+
+        const hasGivenPlayerComm = !!myPlayerComm
+        const hasGivenGmComm = !!myGmComm
         
         return (
             <li 
@@ -338,26 +355,32 @@ export default function AttendingCharactersList({
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {!isUserCharacter && hasUserSignedUp && sessionId && (
+                {canCommend && (
                   <Popover>
                     <PopoverTrigger asChild>
                       <button
                         type="button"
                         className={cn(
                           "inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full border transition-all shrink-0 focus:outline-none",
-                          sessionCommendations?.myCommendation?.toCharacterId === char._id
+                          isAnyCommendedByMe
                             ? "bg-purple-500/20 text-purple-600 dark:text-purple-300 border-purple-500/40 hover:bg-purple-500/30 shadow-sm"
                             : "bg-muted/30 text-muted-foreground border-border/40 hover:bg-muted/60"
                         )}
                         title="Commend this character"
                       >
-                        <Medal className={cn("h-3 w-3", sessionCommendations?.myCommendation?.toCharacterId === char._id ? "text-purple-500 fill-purple-500" : "")} />
-                        {sessionCommendations?.myCommendation?.toCharacterId === char._id ? (
-                          <span>
-                            {sessionCommendations.myCommendation.category === 'roleplay' && '🎭 Roleplay'}
-                            {sessionCommendations.myCommendation.category === 'tactics' && '⚔️ Tactics'}
-                            {sessionCommendations.myCommendation.category === 'clutch' && '🛡️ Clutch'}
-                            {sessionCommendations.myCommendation.category === 'heroic' && '🌟 Heroic'}
+                        <Medal className={cn("h-3 w-3", isAnyCommendedByMe ? "text-purple-500 fill-purple-500" : "")} />
+                        {isAnyCommendedByMe ? (
+                          <span className="flex items-center gap-1">
+                            {isGmCommendedByMe && '👑 GM'}
+                            {isGmCommendedByMe && isPlayerCommendedByMe && ' & '}
+                            {isPlayerCommendedByMe && (
+                              <>
+                                {myPlayerComm?.category === 'roleplay' && '🎭 Roleplay'}
+                                {myPlayerComm?.category === 'tactics' && '⚔️ Tactics'}
+                                {myPlayerComm?.category === 'clutch' && '🛡️ Clutch'}
+                                {myPlayerComm?.category === 'heroic' && '🌟 Heroic'}
+                              </>
+                            )}
                           </span>
                         ) : (
                           <span>Commend</span>
@@ -369,64 +392,126 @@ export default function AttendingCharactersList({
                         )}
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-64 p-3 text-xs space-y-2">
-                      <div className="font-bold text-sm flex items-center gap-1.5">
+                    <PopoverContent className="w-72 p-3 text-xs space-y-3">
+                      <div className="font-bold text-sm flex items-center gap-1.5 border-b pb-2">
                         <Medal className="h-4 w-4 text-purple-500" />
                         <span>Commend {char.name}</span>
                       </div>
-                      <p className="text-[11px] text-muted-foreground">
-                        Award 1 commendation to a fellow party member for their contribution this session:
-                      </p>
-                      <div className="grid grid-cols-1 gap-1.5 pt-1">
-                        <Button
-                          size="sm"
-                          variant={sessionCommendations?.myCommendation?.toCharacterId === char._id && sessionCommendations?.myCommendation?.category === 'roleplay' ? 'default' : 'outline'}
-                          className="justify-start text-xs h-9 gap-2 font-normal"
-                          onClick={() => handleCommend(char._id, 'roleplay', char.name)}
-                        >
-                          <span className="text-base">🎭</span>
-                          <div className="flex flex-col items-start text-left">
-                            <span className="font-semibold text-[11px]">Roleplay MVP</span>
-                            <span className="text-[9px] opacity-70">Great story & in-character play</span>
+
+                      {canCommendAsPlayer && (
+                        <div className="space-y-2">
+                          {canCommendAsGm && (
+                            <div className="font-semibold text-[10px] text-muted-foreground uppercase tracking-wider">
+                              Player Commendation
+                            </div>
+                          )}
+                          <p className="text-[11px] text-muted-foreground">
+                            Award 1 commendation to a fellow party member:
+                          </p>
+
+                          {hasGivenPlayerComm && !isPlayerCommendedByMe ? (
+                            <div className="text-[11px] text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 p-2 rounded-md italic">
+                              You have already given your player commendation this session. Unselect it first to commend {char.name}.
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 gap-1.5">
+                              {(!hasGivenPlayerComm || (isPlayerCommendedByMe && myPlayerComm?.category === 'roleplay')) && (
+                                <Button
+                                  size="sm"
+                                  variant={isPlayerCommendedByMe && myPlayerComm?.category === 'roleplay' ? 'default' : 'outline'}
+                                  className="justify-start text-xs h-9 gap-2 font-normal"
+                                  onClick={() => handleCommend(char._id, 'roleplay', char.name)}
+                                >
+                                  <span className="text-base">🎭</span>
+                                  <div className="flex flex-col items-start text-left">
+                                    <span className="font-semibold text-[11px]">Roleplay MVP</span>
+                                    <span className="text-[9px] opacity-70">Great story & in-character play</span>
+                                  </div>
+                                </Button>
+                              )}
+
+                              {(!hasGivenPlayerComm || (isPlayerCommendedByMe && myPlayerComm?.category === 'tactics')) && (
+                                <Button
+                                  size="sm"
+                                  variant={isPlayerCommendedByMe && myPlayerComm?.category === 'tactics' ? 'default' : 'outline'}
+                                  className="justify-start text-xs h-9 gap-2 font-normal"
+                                  onClick={() => handleCommend(char._id, 'tactics', char.name)}
+                                >
+                                  <span className="text-base">⚔️</span>
+                                  <div className="flex flex-col items-start text-left">
+                                    <span className="font-semibold text-[11px]">Tactical Genius</span>
+                                    <span className="text-[9px] opacity-70">Smart combat & party strategies</span>
+                                  </div>
+                                </Button>
+                              )}
+
+                              {(!hasGivenPlayerComm || (isPlayerCommendedByMe && myPlayerComm?.category === 'clutch')) && (
+                                <Button
+                                  size="sm"
+                                  variant={isPlayerCommendedByMe && myPlayerComm?.category === 'clutch' ? 'default' : 'outline'}
+                                  className="justify-start text-xs h-9 gap-2 font-normal"
+                                  onClick={() => handleCommend(char._id, 'clutch', char.name)}
+                                >
+                                  <span className="text-base">🛡️</span>
+                                  <div className="flex flex-col items-start text-left">
+                                    <span className="font-semibold text-[11px]">Clutch Savior</span>
+                                    <span className="text-[9px] opacity-70">Saved the team in a tight spot</span>
+                                  </div>
+                                </Button>
+                              )}
+
+                              {(!hasGivenPlayerComm || (isPlayerCommendedByMe && myPlayerComm?.category === 'heroic')) && (
+                                <Button
+                                  size="sm"
+                                  variant={isPlayerCommendedByMe && myPlayerComm?.category === 'heroic' ? 'default' : 'outline'}
+                                  className="justify-start text-xs h-9 gap-2 font-normal"
+                                  onClick={() => handleCommend(char._id, 'heroic', char.name)}
+                                >
+                                  <span className="text-base">🌟</span>
+                                  <div className="flex flex-col items-start text-left">
+                                    <span className="font-semibold text-[11px]">Heroic MVP</span>
+                                    <span className="text-[9px] opacity-70">Overall outstanding performance</span>
+                                  </div>
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {canCommendAsGm && (
+                        <div className="space-y-2">
+                          {canCommendAsPlayer && <div className="border-t pt-2" />}
+                          <div className="font-semibold text-[10px] text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1">
+                            <Crown className="h-3.5 w-3.5" /> GM Commendation
                           </div>
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant={sessionCommendations?.myCommendation?.toCharacterId === char._id && sessionCommendations?.myCommendation?.category === 'tactics' ? 'default' : 'outline'}
-                          className="justify-start text-xs h-9 gap-2 font-normal"
-                          onClick={() => handleCommend(char._id, 'tactics', char.name)}
-                        >
-                          <span className="text-base">⚔️</span>
-                          <div className="flex flex-col items-start text-left">
-                            <span className="font-semibold text-[11px]">Tactical Genius</span>
-                            <span className="text-[9px] opacity-70">Smart combat & party strategies</span>
-                          </div>
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant={sessionCommendations?.myCommendation?.toCharacterId === char._id && sessionCommendations?.myCommendation?.category === 'clutch' ? 'default' : 'outline'}
-                          className="justify-start text-xs h-9 gap-2 font-normal"
-                          onClick={() => handleCommend(char._id, 'clutch', char.name)}
-                        >
-                          <span className="text-base">🛡️</span>
-                          <div className="flex flex-col items-start text-left">
-                            <span className="font-semibold text-[11px]">Clutch Savior</span>
-                            <span className="text-[9px] opacity-70">Saved the team in a tight spot</span>
-                          </div>
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant={sessionCommendations?.myCommendation?.toCharacterId === char._id && sessionCommendations?.myCommendation?.category === 'heroic' ? 'default' : 'outline'}
-                          className="justify-start text-xs h-9 gap-2 font-normal"
-                          onClick={() => handleCommend(char._id, 'heroic', char.name)}
-                        >
-                          <span className="text-base">🌟</span>
-                          <div className="flex flex-col items-start text-left">
-                            <span className="font-semibold text-[11px]">Heroic MVP</span>
-                            <span className="text-[9px] opacity-70">Overall outstanding performance</span>
-                          </div>
-                        </Button>
-                      </div>
+                          <p className="text-[11px] text-muted-foreground">
+                            Award 1 player with your Gamemaster commendation:
+                          </p>
+
+                          {hasGivenGmComm && !isGmCommendedByMe ? (
+                            <div className="text-[11px] text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 p-2 rounded-md italic">
+                              You have already given your GM commendation this session. Unselect it first to award it to {char.name}.
+                            </div>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant={isGmCommendedByMe ? 'default' : 'outline'}
+                              className={cn(
+                                "w-full justify-start text-xs h-9 gap-2 font-normal",
+                                isGmCommendedByMe ? "bg-amber-600 hover:bg-amber-700 text-white" : "border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+                              )}
+                              onClick={() => handleCommend(char._id, 'gm', char.name)}
+                            >
+                              <Crown className="h-4 w-4 shrink-0 text-amber-500" />
+                              <div className="flex flex-col items-start text-left">
+                                <span className="font-semibold text-[11px]">GM Commendation</span>
+                                <span className="text-[9px] opacity-80">Gamemaster's award for excellence</span>
+                              </div>
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </PopoverContent>
                   </Popover>
                 )}
