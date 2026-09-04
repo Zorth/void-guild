@@ -27,6 +27,7 @@ export const ACHIEVEMENT_INFO: Record<string, AchievementInfo> = {
   level_10_char: { title: 'Legendary Hero', category: 'normal' },
   first_commendation: { title: 'Party Favorite', category: 'normal' },
   tutorial_completed: { title: 'Tutorial Completed!', category: 'normal' },
+  link_discord: { title: 'Discord Connected', category: 'hidden' },
   secret_logo_clicks: { title: 'Curious Clicker', category: 'hidden' },
   gm_favor: { title: "Master's Favor", category: 'hidden' },
   system_polymath: { title: 'System Polymath', category: 'hidden' },
