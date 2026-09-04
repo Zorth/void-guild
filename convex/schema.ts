@@ -127,4 +127,10 @@ export default defineSchema({
     }).index('by_session_fromUser', ['sessionId', 'fromUserId'])
       .index('by_toCharacter', ['toCharacterId'])
       .index('by_session', ['sessionId']),
+    unlockedAchievements: defineTable({
+        userId: v.string(), // Clerk subject
+        achievementId: v.string(), // Hardcoded ID
+        unlockedAt: v.number(), // Timestamp
+    }).index('by_userId', ['userId'])
+      .index('by_userId_achievementId', ['userId', 'achievementId']),
 })

@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as achievements from "../achievements.js";
 import type * as activity from "../activity.js";
 import type * as characters from "../characters.js";
 import type * as commendations from "../commendations.js";
@@ -29,6 +30,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  achievements: typeof achievements;
   activity: typeof activity;
   characters: typeof characters;
   commendations: typeof commendations;
