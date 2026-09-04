@@ -253,6 +253,22 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                         <div className="text-2xl font-black text-primary">
                             {formatGP(calculations.userFinalShare)}
                         </div>
+
+                        {loot.filter(item => item.claimedBy && userCharacterIds.has(item.claimedBy)).length > 0 && (
+                            <div className="my-2.5 text-xs text-muted-foreground space-y-1">
+                                {loot
+                                    .filter(item => item.claimedBy && userCharacterIds.has(item.claimedBy))
+                                    .map((item) => {
+                                        const val = item.isGood ? item.valueGP : item.valueGP / 2
+                                        return (
+                                            <div key={item.id}>
+                                                - {item.name} (worth {formatGP(val)})
+                                            </div>
+                                        )
+                                    })}
+                            </div>
+                        )}
+
                         <div className="text-[10px] text-muted-foreground mt-2 italic">
                             Based on {formatGP(calculations.sharePerPlayer)} share minus {formatGP(calculations.userClaimedValue)} in claimed items.
                         </div>
