@@ -226,7 +226,7 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                                     <div className="flex items-center gap-2">
                                         <Checkbox id="isGood" checked={isGood} onCheckedChange={(val) => setIsGood(!!val)} />
                                         <label htmlFor="isGood" className="text-sm font-medium cursor-pointer">
-                                            Is &quot;Good&quot; (Full resale value)
+                                            Is &quot;Good&quot; (Trade good - unclaimable, full resale value)
                                         </label>
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -312,7 +312,11 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                                                     For EACH Character
                                                 </span>
                                             )}
-                                            {!item.isGood && (
+                                            {item.isGood ? (
+                                                <span className="text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded uppercase font-bold">
+                                                    Good (Unclaimable)
+                                                </span>
+                                            ) : (
                                                 <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded uppercase font-bold text-muted-foreground">Used</span>
                                             )}
                                         </div>
@@ -350,18 +354,16 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                                                     </button>
                                                 )}
                                             </div>
-                                        ) : (
-                                            userCharacterInSession && (
-                                                <Button 
-                                                    size="sm" 
-                                                    variant="outline" 
-                                                    className="h-7 text-[10px] font-bold px-2 gap-1"
-                                                    onClick={() => handleClaim(item.id, userCharacterInSession._id)}
-                                                >
-                                                    Claim
-                                                </Button>
-                                            )
-                                        )}
+                                        ) : !item.isGood && userCharacterInSession ? (
+                                            <Button 
+                                                size="sm" 
+                                                variant="outline" 
+                                                className="h-7 text-[10px] font-bold px-2 gap-1"
+                                                onClick={() => handleClaim(item.id, userCharacterInSession._id)}
+                                            >
+                                                Claim
+                                            </Button>
+                                        ) : null}
 
                                         {session.canManage && (
                                             <div className="flex items-center gap-1 border-l pl-2 border-border/40">
@@ -426,7 +428,7 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                                 <div className="flex items-center gap-2">
                                     <Checkbox id="isGoodEdit" checked={isGood} onCheckedChange={(val) => setIsGood(!!val)} />
                                     <label htmlFor="isGoodEdit" className="text-sm font-medium cursor-pointer">
-                                        Is &quot;Good&quot; (Full resale value)
+                                        Is &quot;Good&quot; (Trade good - unclaimable, full resale value)
                                     </label>
                                 </div>
                                 <div className="flex items-center gap-2">

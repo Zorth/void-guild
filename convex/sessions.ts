@@ -1105,6 +1105,9 @@ export const claimLoot = mutation({
 
     const loot = (session.loot || []).map((item) => {
       if (item.id === args.lootId) {
+        if (item.isGood) {
+          throw new Error('"Goods" cannot be claimed')
+        }
         if (item.claimedBy) {
           throw new Error('Item already claimed')
         }
