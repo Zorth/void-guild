@@ -80,6 +80,8 @@ export default function SessionClient() {
   const expressInterest = useMutation(api.sessions.expressInterest)
   const withdrawInterest = useMutation(api.sessions.withdrawInterest)
   const updateInGameDate = useMutation(api.sessions.updateInGameDate)
+  const recordWikiVisit = useMutation(api.users.recordWikiVisit)
+  const syncAndGetAchievements = useMutation(api.achievements.syncAndGetAchievements)
   const sendNotification = useAction(api.discord.sendSessionNotification)
 
   const isAdmin = useQuery(api.sessions.isAdminQuery)
@@ -647,7 +649,10 @@ export default function SessionClient() {
                                     target="_blank" 
                                     rel="noopener noreferrer"
                                     className="text-muted-foreground hover:text-purple-500 transition-colors"
-                                    onClick={() => track('session_report_viewed', { worldName: session.worldName })}
+                                    onClick={() => {
+                                        track('session_report_viewed', { worldName: session.worldName });
+                                        recordWikiVisit().then(() => syncAndGetAchievements()).catch(console.error);
+                                    }}
                                 >
                                     <Book size={20} />
                                 </a>

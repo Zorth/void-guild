@@ -35,6 +35,7 @@ export interface UserEvaluationData {
   availabilityDaysCount: number
   maxCharacterStreak: number
   maxWorldStreak: number
+  uniqueWorldsCount: number
   claimedLootCount: number
 }
 
@@ -196,7 +197,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     title: 'Guild Encourager',
     description: 'Gave 10 or more commendations to fellow party members.',
     category: 'hidden',
-    reward: '',
+    reward: 'Silver Laurel Wreath Avatar Ring Cosmetic',
     chainId: 'commendations_given',
     tier: 3,
     maxTier: 3,
@@ -255,7 +256,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     title: 'Scholar of the Void',
     description: 'Visited the campaign wiki via the wiki button.',
     category: 'hidden',
-    reward: '',
+    reward: 'Ancient Parchment Background Tint Cosmetic',
     checkEligibility: (data) => Boolean(data.userDoc?.visitedWiki),
   },
   {
@@ -281,7 +282,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     title: 'Discord Connected',
     description: 'Linked your Discord account to your Void Guild profile.',
     category: 'normal',
-    reward: '',
+    reward: 'Friendly Rounded Font Cosmetic',
     checkEligibility: (data) => Boolean(data.userDoc?.discordId),
   },
   {
@@ -373,11 +374,33 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     checkEligibility: (data) => data.maxWorldStreak >= 10,
   },
   {
+    id: 'worlds_played_3',
+    title: 'Dimensional Traveler',
+    description: 'Participated in completed sessions across 3 different campaign worlds.',
+    category: 'hidden',
+    reward: 'Compass Rose Avatar Ring Cosmetic',
+    chainId: 'unique_worlds',
+    tier: 1,
+    maxTier: 2,
+    checkEligibility: (data) => data.uniqueWorldsCount >= 3,
+  },
+  {
+    id: 'worlds_played_5',
+    title: 'Multiverse Wanderer',
+    description: 'Participated in completed sessions across 5 different campaign worlds.',
+    category: 'hidden',
+    reward: '',
+    chainId: 'unique_worlds',
+    tier: 2,
+    maxTier: 2,
+    checkEligibility: (data) => data.uniqueWorldsCount >= 5,
+  },
+  {
     id: 'loot_first',
     title: 'Treasure Seeker',
     description: 'Claimed your first piece of session loot.',
     category: 'normal',
-    reward: '',
+    reward: 'Treasure Seeker Bronze Border Cosmetic',
     chainId: 'session_loot',
     tier: 1,
     maxTier: 2,
@@ -388,7 +411,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     title: 'Hoarder',
     description: 'Claimed 5 or more pieces of session loot.',
     category: 'hidden',
-    reward: '',
+    reward: 'Ruby Red Text Accent Cosmetic',
     chainId: 'session_loot',
     tier: 2,
     maxTier: 2,
@@ -624,6 +647,17 @@ export const syncAndGetAchievements = mutation({
       }
     }
 
+    // Unique worlds played calculation
+    const uniqueWorldsSet = new Set<string>()
+    for (const s of allLockedSessions) {
+      const isPlayerInSession = s.characters && s.characters.some((id) => charIds.has(id))
+      const isGmInSession = s.owner === user.subject
+      if ((isPlayerInSession || isGmInSession) && s.world) {
+        uniqueWorldsSet.add(s.world.toString())
+      }
+    }
+    const uniqueWorldsCount = uniqueWorldsSet.size
+
     const evalData: UserEvaluationData = {
       userId: user.subject,
       userDoc,
@@ -636,6 +670,7 @@ export const syncAndGetAchievements = mutation({
       availabilityDaysCount,
       maxCharacterStreak,
       maxWorldStreak,
+      uniqueWorldsCount,
       claimedLootCount,
     }
 

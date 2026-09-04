@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { Geist, Geist_Mono, MedievalSharp, Cinzel_Decorative } from 'next/font/google'
+import { Geist, Geist_Mono, MedievalSharp, Cinzel_Decorative, Fredoka } from 'next/font/google'
 import localFont from 'next/font/local'
 import './globals.css'
 import { ClerkProvider } from '@clerk/nextjs'
@@ -33,6 +33,11 @@ const cinzelDec = Cinzel_Decorative({
   weight: ['400', '700'],
   subsets: ['latin'],
   variable: '--font-cinzel-dec',
+})
+
+const fredoka = Fredoka({
+  subsets: ['latin'],
+  variable: '--font-fredoka',
 })
 
 const oxProto = localFont({
@@ -152,7 +157,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className={`${geistSans.variable} ${geistMono.variable} ${oxProto.variable} ${taroca.variable} ${gin.variable} ${sabon.variable} ${medievalSharp.variable} ${cinzelDec.variable} antialiased font-sans`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} ${oxProto.variable} ${taroca.variable} ${gin.variable} ${sabon.variable} ${medievalSharp.variable} ${cinzelDec.variable} ${fredoka.variable} antialiased font-sans`}>
         <ClerkProvider>
           <ConvexClientProvider>
             <TooltipProvider>

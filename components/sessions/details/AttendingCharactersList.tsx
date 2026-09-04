@@ -64,6 +64,8 @@ export default function AttendingCharactersList({
   )
   const characterRanks = useQuery(api.characters.getCharacterLeaderboardRanks)
   const giveCommendation = useMutation(api.commendations.giveCommendation)
+  const recordWikiVisit = useMutation(api.users.recordWikiVisit)
+  const syncAndGetAchievements = useMutation(api.achievements.syncAndGetAchievements)
 
   const handleCommend = async (
     toCharacterId: Id<'characters'>,
@@ -140,6 +142,10 @@ export default function AttendingCharactersList({
                             href={`https://void.tarragon.be/Player-Characters/${char.name.replace(/\s+/g, '-')}`}
                             target="_blank"
                             rel="noopener noreferrer"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              recordWikiVisit().then(() => syncAndGetAchievements()).catch(console.error)
+                            }}
                             className="text-muted-foreground hover:text-purple-500 shrink-0"
                         >
                             <Book size={16} />

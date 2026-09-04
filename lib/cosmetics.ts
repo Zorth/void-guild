@@ -40,6 +40,13 @@ export const ACHIEVEMENT_INFO: Record<string, AchievementInfo> = {
   comm_jack_of_all_trades: { title: 'Jack of All Trades', category: 'hidden' },
   character_streak_3: { title: 'In Sync', category: 'hidden' },
   system_polymath: { title: 'System Polymath', category: 'hidden' },
+  loot_first: { title: 'Treasure Seeker', category: 'normal' },
+  loot_hoarder_5: { title: 'Hoarder', category: 'hidden' },
+  visit_world: { title: 'World Explorer', category: 'normal' },
+  visit_wiki: { title: 'Scholar of the Void', category: 'hidden' },
+  give_10_commendations: { title: 'Guild Encourager', category: 'hidden' },
+  worlds_played_3: { title: 'Dimensional Traveler', category: 'hidden' },
+  worlds_played_5: { title: 'Multiverse Wanderer', category: 'hidden' },
 }
 
 
@@ -65,6 +72,13 @@ export const FONT_OPTIONS: CosmeticOption[] = [
     unlockedByDefault: false,
     requiredAchievementId: 'master_player_10',
     value: 'font-taroca',
+  },
+  {
+    id: 'rounded_sans',
+    name: 'Friendly Rounded',
+    unlockedByDefault: false,
+    requiredAchievementId: 'link_discord',
+    value: 'font-rounded',
   },
 ]
 
@@ -92,6 +106,13 @@ export const COLOR_OPTIONS: CosmeticOption[] = [
     value: '#FBBF24',
   },
   {
+    id: 'ruby_text',
+    name: 'Ruby Red Accent',
+    unlockedByDefault: false,
+    requiredAchievementId: 'loot_hoarder_5',
+    value: '#EF4444',
+  },
+  {
     id: 'gold_text',
     name: 'Guildmaster Gold Text',
     unlockedByDefault: false,
@@ -111,6 +132,14 @@ export const COLOR_OPTIONS: CosmeticOption[] = [
 
 export const BORDER_SHAPE_OPTIONS: CosmeticOption[] = [
   { id: 'default', name: 'Default Solid', unlockedByDefault: true, value: 'rounded-lg border border-border' },
+  {
+    id: 'bronze_border',
+    name: 'Treasure Seeker Bronze Border',
+    unlockedByDefault: false,
+    requiredAchievementId: 'loot_first',
+    value: 'bronze-card-border',
+    previewClass: 'bronze-card-border rounded-lg p-1',
+  },
   {
     id: 'purple_border',
     name: 'Purple Highlight Border',
@@ -162,6 +191,22 @@ export const PROFILE_BORDER_OPTIONS: CosmeticOption[] = [
     requiredAchievementId: 'first_character',
     value: 'sprout-avatar-ring',
     previewClass: 'sprout-avatar-ring',
+  },
+  {
+    id: 'compass_ring',
+    name: 'Compass Rose Ring 🧭',
+    unlockedByDefault: false,
+    requiredAchievementId: 'worlds_played_3',
+    value: 'compass-avatar-ring',
+    previewClass: 'compass-avatar-ring',
+  },
+  {
+    id: 'laurel_ring',
+    name: 'Silver Laurel Wreath Ring 🌿',
+    unlockedByDefault: false,
+    requiredAchievementId: 'give_10_commendations',
+    value: 'laurel-avatar-ring',
+    previewClass: 'laurel-avatar-ring',
   },
   {
     id: 'silver_ring',
@@ -242,6 +287,13 @@ export const PROFILE_BORDER_OPTIONS: CosmeticOption[] = [
 
 export const BG_COLOR_OPTIONS: CosmeticOption[] = [
   { id: 'default', name: 'Default Tint', unlockedByDefault: true, value: '' },
+  {
+    id: 'parchment_bg',
+    name: 'Ancient Parchment Tint',
+    unlockedByDefault: false,
+    requiredAchievementId: 'visit_wiki',
+    value: 'parchment-bg-tint',
+  },
   {
     id: 'purple_tint',
     name: 'Purple Tint',
@@ -325,6 +377,7 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
   const isGradientBorder =
     cardClassName.includes('gold-card-border') ||
     cardClassName.includes('silver-card-border') ||
+    cardClassName.includes('bronze-card-border') ||
     cardClassName.includes('rainbow-border')
 
   if (bgObj?.value === 'gold-bg-tint' || cosmetics.bgColor === 'gold_tint' || cosmetics.bgColor === 'gold-bg-tint') {
@@ -358,6 +411,14 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
       cardBgStyle = { '--card-bg': crimsonPaddingLayer } as React.CSSProperties
     } else {
       cardClassName = cardClassName ? `${cardClassName} crimson-particle-bg` : 'crimson-particle-bg'
+    }
+  } else if (bgObj?.value === 'parchment-bg-tint' || cosmetics.bgColor === 'parchment_bg' || cosmetics.bgColor === 'parchment-bg-tint') {
+    if (isGradientBorder) {
+      const parchmentPaddingLayer =
+        'radial-gradient(circle at 50% 30%, rgba(217, 180, 130, 0.22) 0%, rgba(160, 120, 70, 0.1) 60%, transparent 100%), linear-gradient(var(--card), var(--card))'
+      cardBgStyle = { '--card-bg': parchmentPaddingLayer } as React.CSSProperties
+    } else {
+      cardClassName = cardClassName ? `${cardClassName} parchment-bg-tint` : 'parchment-bg-tint'
     }
   } else if (bgObj && bgObj.value) {
     if (isGradientBorder) {

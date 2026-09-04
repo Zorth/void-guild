@@ -166,6 +166,19 @@ export const recordWorldVisit = mutation({
         visitedWorld: true,
       })
     }
+
+    const existingUnlocked = await ctx.db
+      .query('unlockedAchievements')
+      .withIndex('by_userId', (q) => q.eq('userId', identity.subject))
+      .collect()
+
+    if (!existingUnlocked.some((a) => a.achievementId === 'visit_world')) {
+      await ctx.db.insert('unlockedAchievements', {
+        userId: identity.subject,
+        achievementId: 'visit_world',
+        unlockedAt: Date.now(),
+      })
+    }
   },
 })
 
@@ -198,6 +211,19 @@ export const recordWikiVisit = mutation({
         visitedWiki: true,
       })
     }
+
+    const existingUnlocked = await ctx.db
+      .query('unlockedAchievements')
+      .withIndex('by_userId', (q) => q.eq('userId', identity.subject))
+      .collect()
+
+    if (!existingUnlocked.some((a) => a.achievementId === 'visit_wiki')) {
+      await ctx.db.insert('unlockedAchievements', {
+        userId: identity.subject,
+        achievementId: 'visit_wiki',
+        unlockedAt: Date.now(),
+      })
+    }
   },
 })
 
@@ -228,6 +254,19 @@ export const recordLeaderboardVisit = mutation({
         isGM: false,
         name: identity.name,
         visitedLeaderboard: true,
+      })
+    }
+
+    const existingUnlocked = await ctx.db
+      .query('unlockedAchievements')
+      .withIndex('by_userId', (q) => q.eq('userId', identity.subject))
+      .collect()
+
+    if (!existingUnlocked.some((a) => a.achievementId === 'visit_leaderboard')) {
+      await ctx.db.insert('unlockedAchievements', {
+        userId: identity.subject,
+        achievementId: 'visit_leaderboard',
+        unlockedAt: Date.now(),
       })
     }
   },

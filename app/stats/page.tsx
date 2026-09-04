@@ -16,6 +16,8 @@ export default function StatsPage() {
     const characters = useQuery(api.characters.listAllCharactersPublic);
     const leaderboardStats = useQuery(api.users.getLeaderboardStats);
     const recordLeaderboardVisit = useMutation(api.users.recordLeaderboardVisit);
+    const recordWikiVisit = useMutation(api.users.recordWikiVisit);
+    const syncAndGetAchievements = useMutation(api.achievements.syncAndGetAchievements);
 
     useEffect(() => {
       if (userId) {
@@ -77,6 +79,9 @@ export default function StatsPage() {
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="text-muted-foreground hover:text-purple-500 shrink-0"
+                            onClick={() => {
+                              recordWikiVisit().then(() => syncAndGetAchievements()).catch(console.error);
+                            }}
                         >
                             <Book size={14} />
                         </a>

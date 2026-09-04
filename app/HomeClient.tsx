@@ -25,11 +25,14 @@ export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
 
   const incrementLogoClicks = useMutation(api.users.incrementLogoClicks)
   const recordWikiVisit = useMutation(api.users.recordWikiVisit)
+  const syncAndGetAchievements = useMutation(api.achievements.syncAndGetAchievements)
   const isGM = useQuery(api.sessions.isGameMasterQuery)
   const ownedWorld = useQuery(api.worlds.getWorldByOwner)
 
   const handleWikiClick = () => {
-    recordWikiVisit().catch(console.error)
+    recordWikiVisit()
+      .then(() => syncAndGetAchievements())
+      .catch(console.error)
   }
 
   const handleLogoClick = () => {

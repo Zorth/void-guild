@@ -218,6 +218,8 @@ export default function WorldCalendar({
 }: WorldCalendarProps) {
     const updateCalendar = useMutation(api.worlds.updateWorldCalendar)
     const toggleVisibility = useMutation(api.worlds.toggleCalendarVisibility)
+    const recordWikiVisit = useMutation(api.users.recordWikiVisit)
+    const syncAndGetAchievements = useMutation(api.achievements.syncAndGetAchievements)
 
     const [importText, setImportText] = useState('')
     const [isImportOpen, setIsImportOpen] = useState(false)
@@ -995,7 +997,10 @@ export default function WorldCalendar({
                                                                         target="_blank" 
                                                                         rel="noopener noreferrer"
                                                                         className="flex items-center gap-1 text-[9px] font-black uppercase tracking-tighter text-muted-foreground hover:text-purple-500 transition-colors py-1 px-2 bg-background/50 rounded-full border border-border/50"
-                                                                        onClick={(e) => e.stopPropagation()}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            recordWikiVisit().then(() => syncAndGetAchievements()).catch(console.error);
+                                                                        }}
                                                                     >
                                                                         <Book size={10} />
                                                                         Wiki Report

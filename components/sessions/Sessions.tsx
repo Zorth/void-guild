@@ -559,6 +559,8 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
   const userCharacters = useQuery(api.characters.listCharacters)
   const world = useQuery(api.worlds.getWorldByOwner) // Query for the user's world
   const userAvailability = useQuery(api.planning.getUserAvailability)
+  const recordWikiVisit = useMutation(api.users.recordWikiVisit)
+  const syncAndGetAchievements = useMutation(api.achievements.syncAndGetAchievements)
 
   const userCharacterIds = useMemo(() => new Set(userCharacters?.map(c => c._id) ?? []), [userCharacters])
   
@@ -963,6 +965,7 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
                             className="h-8 text-xs px-2 shrink-0 self-center z-10"
                             onClick={(e) => {
                               e.stopPropagation();
+                              recordWikiVisit().then(() => syncAndGetAchievements()).catch(console.error);
                               window.open(`https://void.tarragon.be/Session-Reports/${new Date(session.date!).toISOString().slice(0, 10)}-${session.worldName.replace(/\s+/g, '-')}`, '_blank');
                             }}
                           >

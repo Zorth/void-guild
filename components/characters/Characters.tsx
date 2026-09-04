@@ -54,6 +54,8 @@ export default function Characters({ filters }: { filters?: { pf: boolean; dnd: 
   const charactersRaw = useQuery(api.characters.listCharacters)
   const updateCharacter = useMutation(api.characters.updateCharacter)
   const deleteCharacter = useMutation(api.characters.deleteCharacter)
+  const recordWikiVisit = useMutation(api.users.recordWikiVisit)
+  const syncAndGetAchievements = useMutation(api.achievements.syncAndGetAchievements)
 
   const isAdmin = useQuery(api.sessions.isAdminQuery)
   const userCommendations = useQuery(api.commendations.getUserCharactersCommendations)
@@ -240,7 +242,10 @@ export default function Characters({ filters }: { filters?: { pf: boolean; dnd: 
                               href={`https://void.tarragon.be/Player-Characters/${character.name.replace(/\s+/g, '-')}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                recordWikiVisit().then(() => syncAndGetAchievements()).catch(console.error)
+                              }}
                               className="text-muted-foreground hover:text-purple-500"
                             >
                               <Book size={16} />
@@ -342,7 +347,9 @@ export default function Characters({ filters }: { filters?: { pf: boolean; dnd: 
                 href="https://void.tarragon.be/_META/_getting_started"
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={() => track('help_getting_started_clicked')}
+                onClick={() => {
+                  recordWikiVisit().then(() => syncAndGetAchievements()).catch(console.error)
+                }}
               >
                 <Button variant="outline" size="icon" className="h-9 w-9">
                   <CircleHelp className="h-5 w-5" />

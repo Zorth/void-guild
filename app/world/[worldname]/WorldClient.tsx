@@ -209,6 +209,8 @@ export default function WorldClient() {
   const renameWorld = useMutation(api.worlds.renameWorld)
   const updateSessionInGameDate = useMutation(api.sessions.updateInGameDate)
   const recordWorldVisit = useMutation(api.users.recordWorldVisit)
+  const recordWikiVisit = useMutation(api.users.recordWikiVisit)
+  const syncAndGetAchievements = useMutation(api.achievements.syncAndGetAchievements)
 
   useEffect(() => {
     if (userId) {
@@ -427,6 +429,9 @@ export default function WorldClient() {
                                     target="_blank" 
                                     rel="noopener noreferrer" 
                                     className="hover:text-primary transition-colors shrink-0"
+                                    onClick={() => {
+                                        recordWikiVisit().then(() => syncAndGetAchievements()).catch(console.error);
+                                    }}
                                 >
                                     <Book className="h-8 w-8" />
                                 </a>
