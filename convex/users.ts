@@ -7,8 +7,11 @@ import { isAdmin, extractClaim } from './roles'
  * This acts as a fallback and cache for roles in case JWT claims are missing or unreliable.
  */
 export const syncUser = mutation({
-  args: {},
-  handler: async (ctx) => {
+  args: {
+    discordId: v.optional(v.string()),
+    discordUsername: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity()
     if (!identity) return null
 
@@ -27,8 +30,8 @@ export const syncUser = mutation({
       name = familyName ? `${givenName} ${familyName.charAt(0).toUpperCase()}.` : givenName
     }
 
-    const discordId = extractClaim(identity, 'discord_id') || extractClaim(identity, 'discord_user_id') || extractClaim(identity, 'provider_user_id')
-    const discordUsername = extractClaim(identity, 'discord_username') || extractClaim(identity, 'discord_handle')
+    const effectiveDiscordId = args.discordId || extractClaim(identity, 'discord_id') || extractClaim(identity, 'discord_user_id') || extractClaim(identity, 'provider_user_id')
+    const effectiveDiscordUsername = args.discordUsername || extractClaim(identity, 'discord_username') || extractClaim(identity, 'discord_handle')
 
     const userData = {
       userId: identity.subject,
@@ -40,14 +43,16 @@ export const syncUser = mutation({
       imageUrl: identity.pictureUrl || extractClaim(identity, 'picture') || extractClaim(identity, 'pictureUrl'),
       extraSessionsPlayed,
       extraSessionsRan,
-      ...(discordId ? { discordId: String(discordId) } : {}),
-      ...(discordUsername ? { discordUsername: String(discordUsername) } : {}),
+      ...(effectiveDiscordId ? { discordId: String(effectiveDiscordId) } : {}),
+      ...(effectiveDiscordUsername ? { discordUsername: String(effectiveDiscordUsername) } : {}),
     }
 
     const existingUser = await ctx.db
       .query('users')
       .withIndex('by_userId', (q) => q.eq('userId', identity.subject))
       .first()
+
+    let userIdDocId = existingUser?._id
 
     if (existingUser) {
       // Only patch if something changed
@@ -66,10 +71,29 @@ export const syncUser = mutation({
       if (hasChanges) {
         await ctx.db.patch(existingUser._id, userData)
       }
-      return existingUser._id
     } else {
-      return await ctx.db.insert('users', userData)
+      userIdDocId = await ctx.db.insert('users', userData)
     }
+
+    // If user has a Discord ID (synced now or previously), auto-grant link_discord achievement
+    const finalDiscordId = userData.discordId || existingUser?.discordId
+    if (finalDiscordId) {
+      const existingUnlock = await ctx.db
+        .query('unlockedAchievements')
+        .withIndex('by_userId', (q) => q.eq('userId', identity.subject))
+        .filter((q) => q.eq(q.field('achievementId'), 'link_discord'))
+        .first()
+
+      if (!existingUnlock) {
+        await ctx.db.insert('unlockedAchievements', {
+          userId: identity.subject,
+          achievementId: 'link_discord',
+          unlockedAt: Date.now(),
+        })
+      }
+    }
+
+    return userIdDocId
   },
 })
 
