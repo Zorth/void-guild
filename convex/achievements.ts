@@ -223,7 +223,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     title: "Master's Favor",
     description: 'Awarded a GM Commendation by a Voidmaster.',
     category: 'hidden',
-    reward: '',
+    reward: 'GM Favor Commendation Avatar Ring Cosmetic',
     checkEligibility: (data) => data.commendationCounts.gm >= 1,
   },
   {
@@ -399,7 +399,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     title: 'Roleplay Maestro',
     description: 'Received a Roleplay commendation for your character.',
     category: 'hidden',
-    reward: '',
+    reward: 'Roleplay Commendation Avatar Ring Cosmetic',
     checkEligibility: (data) => data.commendationCounts.roleplay >= 1,
   },
   {
@@ -407,7 +407,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     title: 'Tactical Mastermind',
     description: 'Received a Tactics commendation for your character.',
     category: 'hidden',
-    reward: '',
+    reward: 'Tactics Commendation Avatar Ring Cosmetic',
     checkEligibility: (data) => data.commendationCounts.tactics >= 1,
   },
   {
@@ -415,7 +415,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     title: 'Clutch Performer',
     description: 'Received a Clutch commendation for your character.',
     category: 'hidden',
-    reward: '',
+    reward: 'Clutch Commendation Avatar Ring Cosmetic',
     checkEligibility: (data) => data.commendationCounts.clutch >= 1,
   },
   {
@@ -423,7 +423,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     title: 'Heroic Legend',
     description: 'Received a Heroic commendation for your character.',
     category: 'hidden',
-    reward: '',
+    reward: 'Heroic Commendation Avatar Ring Cosmetic',
     checkEligibility: (data) => data.commendationCounts.heroic >= 1,
   },
   {

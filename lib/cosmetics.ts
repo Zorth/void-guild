@@ -31,6 +31,10 @@ export const ACHIEVEMENT_INFO: Record<string, AchievementInfo> = {
   visit_leaderboard: { title: 'Leaderboard Inspector', category: 'hidden' },
   secret_logo_clicks: { title: 'Curious Clicker', category: 'hidden' },
   gm_favor: { title: "Master's Favor", category: 'hidden' },
+  comm_roleplay: { title: 'Roleplay Maestro', category: 'hidden' },
+  comm_tactics: { title: 'Tactical Mastermind', category: 'hidden' },
+  comm_clutch: { title: 'Clutch Performer', category: 'hidden' },
+  comm_heroic: { title: 'Heroic Legend', category: 'hidden' },
   system_polymath: { title: 'System Polymath', category: 'hidden' },
 }
 
@@ -87,6 +91,41 @@ export const PROFILE_BORDER_OPTIONS: CosmeticOption[] = [
     requiredAchievementId: 'visit_leaderboard',
     value: 'leaderboard-rank-badge',
     previewClass: 'leaderboard-rank-badge',
+  },
+  {
+    id: 'comm_roleplay',
+    name: 'Roleplay Badge (🎭)',
+    unlockedByDefault: false,
+    requiredAchievementId: 'comm_roleplay',
+    value: 'comm-roleplay-badge',
+  },
+  {
+    id: 'comm_tactics',
+    name: 'Tactics Badge (⚔️)',
+    unlockedByDefault: false,
+    requiredAchievementId: 'comm_tactics',
+    value: 'comm-tactics-badge',
+  },
+  {
+    id: 'comm_clutch',
+    name: 'Clutch Badge (🛡️)',
+    unlockedByDefault: false,
+    requiredAchievementId: 'comm_clutch',
+    value: 'comm-clutch-badge',
+  },
+  {
+    id: 'comm_heroic',
+    name: 'Heroic Badge (🌟)',
+    unlockedByDefault: false,
+    requiredAchievementId: 'comm_heroic',
+    value: 'comm-heroic-badge',
+  },
+  {
+    id: 'gm_favor',
+    name: 'GM Favor Badge (👑)',
+    unlockedByDefault: false,
+    requiredAchievementId: 'gm_favor',
+    value: 'comm-gm-badge',
   },
 ]
 

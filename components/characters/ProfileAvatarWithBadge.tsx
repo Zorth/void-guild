@@ -28,6 +28,16 @@ export default function ProfileAvatarWithBadge({
     cosmetics?.profileBorder === 'leaderboard_rank' ||
     cosmetics?.profileBorder === 'leaderboard-rank-badge'
 
+  const COMMENDATION_BADGES: Record<string, { emoji: string; label: string }> = {
+    comm_roleplay: { emoji: '🎭', label: 'Roleplay Commendation' },
+    comm_tactics: { emoji: '⚔️', label: 'Tactics Commendation' },
+    comm_clutch: { emoji: '🛡️', label: 'Clutch Commendation' },
+    comm_heroic: { emoji: '🌟', label: 'Heroic Commendation' },
+    gm_favor: { emoji: '👑', label: 'GM Favor Commendation' },
+  }
+
+  const activeCommendation = cosmetics?.profileBorder ? COMMENDATION_BADGES[cosmetics.profileBorder] : null
+
   const sizeClasses = {
     sm: 'w-8 h-8 text-xs',
     md: 'w-10 h-10 text-sm',
@@ -40,6 +50,13 @@ export default function ProfileAvatarWithBadge({
     md: '-bottom-2 px-1.5 py-0.5 text-xs',
     lg: '-bottom-2.5 px-2 py-0.5 text-xs font-black',
     xl: '-bottom-3 px-2.5 py-1 text-sm',
+  }
+
+  const commBadgeSizeClasses = {
+    sm: 'w-4 h-4 text-[9px] -bottom-1 -left-1',
+    md: 'w-5 h-5 text-xs -bottom-1 -left-1',
+    lg: 'w-6 h-6 text-sm -bottom-1 -left-1',
+    xl: 'w-8 h-8 text-base -bottom-1.5 -left-1.5',
   }
 
   return (
@@ -64,6 +81,26 @@ export default function ProfileAvatarWithBadge({
         >
           {name ? name[0]?.toUpperCase() : 'C'}
         </div>
+      )}
+
+      {activeCommendation && (
+        <TooltipProvider delayDuration={0}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div
+                className={cn(
+                  'absolute rounded-full bg-slate-900/95 text-white border border-purple-400/60 shadow-md shadow-purple-950/60 z-10 select-none flex items-center justify-center cursor-pointer transition-transform hover:scale-110 active:scale-95',
+                  commBadgeSizeClasses[size]
+                )}
+              >
+                <span className="leading-none">{activeCommendation.emoji}</span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs font-semibold px-2.5 py-1 z-50">
+              {activeCommendation.label}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       )}
 
       {isRankBadge && typeof rankNumber === 'number' && rankNumber > 0 && (
