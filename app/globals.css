@@ -417,3 +417,27 @@
   background: linear-gradient(#341556, #341556) padding-box,
               linear-gradient(to bottom right, #94A3B8, #F1F5F9, #475569) border-box !important;
 }
+
+/* Jack of All Trades Red Wax Seal & Ribbon */
+.jack-seal-ring {
+  position: relative !important;
+  box-shadow: 0 0 0 3px #dc2626, 0 0 0 4.5px #7f1d1d, 0 0 12px rgba(220, 38, 38, 0.65) !important;
+}
+
+.jack-seal-ring::after {
+  content: '' !important;
+  position: absolute !important;
+  bottom: -32% !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: 56% !important;
+  height: 36% !important;
+  background: linear-gradient(180deg, #dc2626 0%, #991b1b 100%) !important;
+  clip-path: polygon(
+    0 0, 100% 0,
+    100% 100%, 75% 75%, 50% 100%, 25% 75%, 0 100%
+  ) !important;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6)) !important;
+  z-index: 10 !important;
+  pointer-events: none !important;
+}

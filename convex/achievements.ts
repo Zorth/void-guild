@@ -431,7 +431,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     title: 'Jack of All Trades',
     description: 'Received at least 1 commendation in every category (Roleplay, Tactics, Clutch, Heroic).',
     category: 'hidden',
-    reward: '',
+    reward: 'Red Wax Seal & Ribbon Avatar Ring Cosmetic',
     checkEligibility: (data) =>
       data.commendationCounts.roleplay >= 1 &&
       data.commendationCounts.tactics >= 1 &&

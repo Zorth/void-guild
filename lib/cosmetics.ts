@@ -37,6 +37,7 @@ export const ACHIEVEMENT_INFO: Record<string, AchievementInfo> = {
   comm_tactics: { title: 'Tactical Mastermind', category: 'hidden' },
   comm_clutch: { title: 'Clutch Performer', category: 'hidden' },
   comm_heroic: { title: 'Heroic Legend', category: 'hidden' },
+  comm_jack_of_all_trades: { title: 'Jack of All Trades', category: 'hidden' },
   system_polymath: { title: 'System Polymath', category: 'hidden' },
 }
 
@@ -176,6 +177,14 @@ export const PROFILE_BORDER_OPTIONS: CosmeticOption[] = [
     requiredAchievementId: 'veteran_gm_5',
     value: 'void-avatar-ring',
     previewClass: 'void-avatar-ring',
+  },
+  {
+    id: 'jack_of_all_trades',
+    name: 'Red Wax Seal & Ribbon',
+    unlockedByDefault: false,
+    requiredAchievementId: 'comm_jack_of_all_trades',
+    value: 'jack-seal-ring',
+    previewClass: 'jack-seal-ring',
   },
   {
     id: 'leaderboard_rank',
