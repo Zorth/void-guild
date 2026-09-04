@@ -29,6 +29,7 @@ export const ACHIEVEMENT_INFO: Record<string, AchievementInfo> = {
   tutorial_completed: { title: 'Tutorial Completed!', category: 'normal' },
   link_discord: { title: 'Discord Connected', category: 'normal' },
   visit_leaderboard: { title: 'Leaderboard Inspector', category: 'hidden' },
+  rank_journeyman: { title: 'Journeyman Adventurer', category: 'normal' },
   rank_guildmaster: { title: "Guildmaster's Pinnacle", category: 'normal' },
   secret_logo_clicks: { title: 'Curious Clicker', category: 'hidden' },
   gm_favor: { title: "Master's Favor", category: 'hidden' },
@@ -82,6 +83,14 @@ export const BORDER_SHAPE_OPTIONS: CosmeticOption[] = [
     previewClass: 'rounded-lg border-2 border-[#D8B4FE] bg-[rgba(147,51,234,0.1)] p-1',
   },
   {
+    id: 'silver_border',
+    name: 'Journeyman Silver Border',
+    unlockedByDefault: false,
+    requiredAchievementId: 'rank_journeyman',
+    value: 'silver-card-border',
+    previewClass: 'silver-card-border rounded-lg p-1',
+  },
+  {
     id: 'gold_border',
     name: 'Guildmaster Gold Border',
     unlockedByDefault: false,
@@ -101,6 +110,14 @@ export const BORDER_SHAPE_OPTIONS: CosmeticOption[] = [
 
 export const PROFILE_BORDER_OPTIONS: CosmeticOption[] = [
   { id: 'default', name: 'Default Ring', unlockedByDefault: true, value: 'border border-border' },
+  {
+    id: 'silver_ring',
+    name: 'Journeyman Silver Ring',
+    unlockedByDefault: false,
+    requiredAchievementId: 'rank_journeyman',
+    value: 'silver-avatar-ring',
+    previewClass: 'silver-avatar-ring',
+  },
   {
     id: 'gold_ring',
     name: 'Guildmaster Gold Ring',
@@ -164,6 +181,13 @@ export const BG_COLOR_OPTIONS: CosmeticOption[] = [
     value: 'rgba(147, 51, 234, 0.15)',
   },
   {
+    id: 'silver_tint',
+    name: 'Journeyman Silver Tint',
+    unlockedByDefault: false,
+    requiredAchievementId: 'rank_journeyman',
+    value: 'silver-bg-tint',
+  },
+  {
     id: 'gold_tint',
     name: 'Guildmaster Gold Tint',
     unlockedByDefault: false,
@@ -215,25 +239,33 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
   // Card Background
   const bgObj = BG_COLOR_OPTIONS.find((b) => b.id === cosmetics.bgColor || b.value === cosmetics.bgColor)
   let cardBgStyle: React.CSSProperties = {}
-  const isGoldBorder = cardClassName.includes('gold-card-border')
+  const isMetallicBorder = cardClassName.includes('gold-card-border') || cardClassName.includes('silver-card-border')
 
   if (bgObj?.value === 'gold-bg-tint' || cosmetics.bgColor === 'gold_tint' || cosmetics.bgColor === 'gold-bg-tint') {
-    if (isGoldBorder) {
+    if (isMetallicBorder) {
       const goldPaddingLayer =
         'linear-gradient(135deg, rgba(191,149,63,0.18) 0%, rgba(252,246,186,0.12) 50%, rgba(170,119,28,0.18) 100%), linear-gradient(var(--card), var(--card))'
       cardBgStyle = { '--card-bg': goldPaddingLayer } as React.CSSProperties
     } else {
       cardClassName = cardClassName ? `${cardClassName} gold-bg-tint` : 'gold-bg-tint'
     }
+  } else if (bgObj?.value === 'silver-bg-tint' || cosmetics.bgColor === 'silver_tint' || cosmetics.bgColor === 'silver-bg-tint') {
+    if (isMetallicBorder) {
+      const silverPaddingLayer =
+        'linear-gradient(135deg, rgba(148,163,184,0.18) 0%, rgba(241,245,249,0.14) 50%, rgba(71,85,105,0.18) 100%), linear-gradient(var(--card), var(--card))'
+      cardBgStyle = { '--card-bg': silverPaddingLayer } as React.CSSProperties
+    } else {
+      cardClassName = cardClassName ? `${cardClassName} silver-bg-tint` : 'silver-bg-tint'
+    }
   } else if (bgObj && bgObj.value) {
-    if (isGoldBorder) {
+    if (isMetallicBorder) {
       const tintPaddingLayer = `linear-gradient(${bgObj.value}, ${bgObj.value}), linear-gradient(var(--card), var(--card))`
       cardBgStyle = { '--card-bg': tintPaddingLayer } as React.CSSProperties
     } else {
       cardBgStyle = { backgroundColor: bgObj.value }
     }
   } else if (cosmetics.bgColor) {
-    if (isGoldBorder) {
+    if (isMetallicBorder) {
       const tintPaddingLayer = `linear-gradient(${cosmetics.bgColor}, ${cosmetics.bgColor}), linear-gradient(var(--card), var(--card))`
       cardBgStyle = { '--card-bg': tintPaddingLayer } as React.CSSProperties
     } else {

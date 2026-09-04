@@ -356,7 +356,7 @@ export default function CharacterCosmeticsTab({
               cosmetics.bgColor === opt.value ||
               (opt.id === 'default' && (!cosmetics.bgColor || cosmetics.bgColor === 'default'))
 
-            const isGoldTint = opt.value === 'gold-bg-tint'
+            const isClassTint = typeof opt.value === 'string' && opt.value.endsWith('-bg-tint')
 
             return (
               <button
@@ -367,7 +367,7 @@ export default function CharacterCosmeticsTab({
                 title={!isUnlocked ? label : opt.name}
                 className={cn(
                   'w-full p-3 rounded-lg text-left text-xs transition-all flex items-center justify-between border',
-                  isGoldTint && 'gold-bg-tint',
+                  isClassTint && opt.value,
                   isSelected
                     ? 'border-2 border-purple-500 ring-2 ring-purple-500 font-bold text-foreground'
                     : isUnlocked
@@ -375,7 +375,7 @@ export default function CharacterCosmeticsTab({
                       : 'border-border/40 opacity-50 grayscale cursor-not-allowed'
                 )}
                 style={{
-                  backgroundColor: !isGoldTint && opt.value ? opt.value : undefined,
+                  backgroundColor: !isClassTint && opt.value ? opt.value : undefined,
                 }}
               >
                 <span className="font-semibold">{opt.name}</span>

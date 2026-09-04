@@ -291,11 +291,35 @@
   box-shadow: 0 0 10px rgba(212, 175, 55, 0.6) !important;
 }
 
+.silver-avatar-ring {
+  border: 3px solid transparent !important;
+  background: linear-gradient(var(--card), var(--card)) padding-box,
+              linear-gradient(to bottom right, #94A3B8, #F1F5F9, #475569) border-box !important;
+  box-shadow: 0 0 10px rgba(226, 232, 240, 0.6) !important;
+}
+
 .gold-bg-tint {
   background: linear-gradient(135deg, rgba(191,149,63,0.18) 0%, rgba(252,246,186,0.12) 50%, rgba(170,119,28,0.18) 100%) !important;
+}
+
+.silver-bg-tint {
+  background: linear-gradient(135deg, rgba(148,163,184,0.18) 0%, rgba(241,245,249,0.14) 50%, rgba(71,85,105,0.18) 100%) !important;
+}
+
+.silver-card-border {
+  border-radius: 0.5rem !important;
+  border: 2px solid transparent !important;
+  background: var(--card-bg, linear-gradient(var(--card), var(--card))) padding-box,
+              linear-gradient(to bottom right, #94A3B8, #F1F5F9, #475569) border-box !important;
+  box-shadow: 0 0 12px rgba(226, 232, 240, 0.35) !important;
 }
 
 .gold-card-border[data-selected="true"] {
   background: linear-gradient(#341556, #341556) padding-box,
               linear-gradient(to bottom right, #BF953F, #FCF6BA, #AA771C) border-box !important;
+}
+
+.silver-card-border[data-selected="true"] {
+  background: linear-gradient(#341556, #341556) padding-box,
+              linear-gradient(to bottom right, #94A3B8, #F1F5F9, #475569) border-box !important;
 }
