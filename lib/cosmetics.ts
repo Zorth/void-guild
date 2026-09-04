@@ -29,6 +29,7 @@ export const ACHIEVEMENT_INFO: Record<string, AchievementInfo> = {
   tutorial_completed: { title: 'Tutorial Completed!', category: 'normal' },
   link_discord: { title: 'Discord Connected', category: 'normal' },
   visit_leaderboard: { title: 'Leaderboard Inspector', category: 'hidden' },
+  rank_guildmaster: { title: "Guildmaster's Pinnacle", category: 'normal' },
   secret_logo_clicks: { title: 'Curious Clicker', category: 'hidden' },
   gm_favor: { title: "Master's Favor", category: 'hidden' },
   comm_roleplay: { title: 'Roleplay Maestro', category: 'hidden' },
@@ -53,6 +54,14 @@ export const COLOR_OPTIONS: CosmeticOption[] = [
     value: '#D8B4FE',
   },
   {
+    id: 'gold_text',
+    name: 'Guildmaster Gold Text',
+    unlockedByDefault: false,
+    requiredAchievementId: 'rank_guildmaster',
+    value: 'gold-text',
+    previewClass: 'gold-text font-extrabold',
+  },
+  {
     id: 'rainbow',
     name: 'Moving Rainbow (RGB)',
     unlockedByDefault: false,
@@ -73,6 +82,14 @@ export const BORDER_SHAPE_OPTIONS: CosmeticOption[] = [
     previewClass: 'rounded-lg border-2 border-[#D8B4FE] bg-[rgba(147,51,234,0.1)] p-1',
   },
   {
+    id: 'gold_border',
+    name: 'Guildmaster Gold Border',
+    unlockedByDefault: false,
+    requiredAchievementId: 'rank_guildmaster',
+    value: 'gold-card-border',
+    previewClass: 'gold-card-border rounded-lg p-1',
+  },
+  {
     id: 'rainbow_border',
     name: 'Moving Rainbow Border',
     unlockedByDefault: false,
@@ -84,6 +101,14 @@ export const BORDER_SHAPE_OPTIONS: CosmeticOption[] = [
 
 export const PROFILE_BORDER_OPTIONS: CosmeticOption[] = [
   { id: 'default', name: 'Default Ring', unlockedByDefault: true, value: 'border border-border' },
+  {
+    id: 'gold_ring',
+    name: 'Guildmaster Gold Ring',
+    unlockedByDefault: false,
+    requiredAchievementId: 'rank_guildmaster',
+    value: 'gold-avatar-ring',
+    previewClass: 'gold-avatar-ring',
+  },
   {
     id: 'leaderboard_rank',
     name: 'Leaderboard Rank Badge',
@@ -138,6 +163,13 @@ export const BG_COLOR_OPTIONS: CosmeticOption[] = [
     requiredAchievementId: 'tutorial_completed',
     value: 'rgba(147, 51, 234, 0.15)',
   },
+  {
+    id: 'gold_tint',
+    name: 'Guildmaster Gold Tint',
+    unlockedByDefault: false,
+    requiredAchievementId: 'rank_guildmaster',
+    value: 'gold-bg-tint',
+  },
 ]
 
 export interface CharacterCosmetics {
@@ -181,8 +213,15 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
   const profileRingClassName = profileObj ? profileObj.value : 'border border-border'
 
   // Card Background
-  const bgObj = BG_COLOR_OPTIONS.find((b) => b.id === cosmetics.bgColor)
-  const cardBgStyle = bgObj && bgObj.value ? { backgroundColor: bgObj.value } : cosmetics.bgColor ? { backgroundColor: cosmetics.bgColor } : {}
+  const bgObj = BG_COLOR_OPTIONS.find((b) => b.id === cosmetics.bgColor || b.value === cosmetics.bgColor)
+  let cardBgStyle: React.CSSProperties = {}
+  if (bgObj?.value === 'gold-bg-tint' || cosmetics.bgColor === 'gold_tint' || cosmetics.bgColor === 'gold-bg-tint') {
+    cardClassName = cardClassName ? `${cardClassName} gold-bg-tint` : 'gold-bg-tint'
+  } else if (bgObj && bgObj.value) {
+    cardBgStyle = { backgroundColor: bgObj.value }
+  } else if (cosmetics.bgColor) {
+    cardBgStyle = { backgroundColor: cosmetics.bgColor }
+  }
 
   // Card Border Color
   let cardBorderStyle: React.CSSProperties = {}
@@ -200,7 +239,10 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
   let nameClassName = nameFontVal
   let nameStyle: React.CSSProperties = {}
 
-  if (colorObj?.value === 'rainbow-text' || cosmetics.nameColor === 'rainbow' || cosmetics.nameColor === 'rainbow-text') {
+  if (colorObj?.value === 'gold-text' || cosmetics.nameColor === 'gold_text' || cosmetics.nameColor === 'gold-text') {
+    nameClassName = nameClassName ? `${nameClassName} gold-text font-extrabold` : 'gold-text font-extrabold'
+    nameStyle = {}
+  } else if (colorObj?.value === 'rainbow-text' || cosmetics.nameColor === 'rainbow' || cosmetics.nameColor === 'rainbow-text') {
     nameClassName = `${nameClassName} rainbow-text font-bold`
     nameStyle = {}
   } else if (colorObj?.value) {
@@ -214,7 +256,10 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
   let subtitleClassName = `${subFontVal} font-normal opacity-80`
   let subtitleStyle: React.CSSProperties = { opacity: 0.8 }
 
-  if (subColorObj?.value === 'rainbow-text' || cosmetics.subtitleColor === 'rainbow' || cosmetics.subtitleColor === 'rainbow-text') {
+  if (subColorObj?.value === 'gold-text' || cosmetics.subtitleColor === 'gold_text' || cosmetics.subtitleColor === 'gold-text') {
+    subtitleClassName = `${subtitleClassName} gold-text`
+    subtitleStyle = {}
+  } else if (subColorObj?.value === 'rainbow-text' || cosmetics.subtitleColor === 'rainbow' || cosmetics.subtitleColor === 'rainbow-text') {
     subtitleClassName = `${subtitleClassName} rainbow-text`
   } else if (subColorObj?.value) {
     subtitleStyle = { color: subColorObj.value, opacity: 0.8 }

@@ -520,6 +520,7 @@ export default function Characters({ filters }: { filters?: { pf: boolean; dnd: 
                   cosmetics={editedCosmetics}
                   onChangeCosmetics={setEditedCosmetics}
                   unlockedAchievementIds={unlockedAchievementIds}
+                  isAdmin={Boolean(isAdmin)}
                 />
               )}
 

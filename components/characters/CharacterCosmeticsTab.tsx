@@ -38,6 +38,7 @@ interface CharacterCosmeticsTabProps {
   cosmetics: CharacterCosmetics
   onChangeCosmetics: (updater: (prev: CharacterCosmetics) => CharacterCosmetics) => void
   unlockedAchievementIds: string[]
+  isAdmin?: boolean
 }
 
 export default function CharacterCosmeticsTab({
@@ -50,6 +51,7 @@ export default function CharacterCosmeticsTab({
   cosmetics,
   onChangeCosmetics,
   unlockedAchievementIds,
+  isAdmin = false,
 }: CharacterCosmeticsTabProps) {
   const { user } = useUser()
   const profileImageUrl = user?.imageUrl
@@ -75,6 +77,13 @@ export default function CharacterCosmeticsTab({
         : `Requires: ${title}`
 
     return { isUnlocked, isHidden, label, badgeLabel, title }
+  }
+
+  function isOptionVisible(opt: CosmeticOption) {
+    const { isUnlocked, isHidden } = getOptionLockStatus(opt)
+    if (isUnlocked) return true
+    if (isHidden && !isAdmin) return false
+    return true
   }
 
   function handleSelectOption(category: keyof CharacterCosmetics, opt: CosmeticOption) {
@@ -114,10 +123,11 @@ export default function CharacterCosmeticsTab({
         />
 
         {/* Preset Color Swatches */}
-        {COLOR_OPTIONS.filter((c) => c.id !== 'default').map((opt) => {
+        {COLOR_OPTIONS.filter((c) => c.id !== 'default' && isOptionVisible(c)).map((opt) => {
           const { isUnlocked, label } = getOptionLockStatus(opt)
           const isSelected = cosmetics[colorKey] === opt.value || cosmetics[colorKey] === opt.id
           const isRainbowOpt = opt.value === 'rainbow-text' || opt.id === 'rainbow'
+          const isGoldOpt = opt.value === 'gold-text' || opt.id === 'gold_text'
 
           return (
             <button
@@ -128,17 +138,23 @@ export default function CharacterCosmeticsTab({
               className={cn(
                 'w-8 h-8 rounded-full transition-all flex items-center justify-center relative border overflow-hidden shrink-0',
                 isRainbowOpt && 'bg-gradient-to-r from-red-500 via-green-500 to-purple-500',
+                isGoldOpt && 'bg-gradient-to-br from-[#BF953F] via-[#FCF6BA] to-[#AA771C]',
                 isSelected
                   ? 'ring-2 ring-purple-500 ring-offset-2 ring-offset-background scale-110 border-white dark:border-slate-900'
                   : isUnlocked
                     ? 'border-transparent hover:scale-105 shadow-sm'
                     : 'opacity-40 grayscale cursor-not-allowed border-border/40'
               )}
-              style={!isRainbowOpt ? { backgroundColor: opt.value } : {}}
+              style={!isRainbowOpt && !isGoldOpt ? { backgroundColor: opt.value } : {}}
             >
               {isRainbowOpt && (
                 <span className="text-[9px] font-black text-white drop-shadow tracking-tighter">
                   RGB
+                </span>
+              )}
+              {isGoldOpt && (
+                <span className="text-[9px] font-black text-amber-950 drop-shadow-sm tracking-tighter">
+                  AU
                 </span>
               )}
               {!isUnlocked && <Lock className="h-3 w-3 text-white drop-shadow z-10" />}
@@ -223,7 +239,7 @@ export default function CharacterCosmeticsTab({
             if (opt) handleSelectOption('nameFont', opt)
           }}
         >
-          {FONT_OPTIONS.map((f) => {
+          {FONT_OPTIONS.filter(isOptionVisible).map((f) => {
             const { isUnlocked, isHidden, title } = getOptionLockStatus(f)
             return (
               <option key={f.id} value={f.id} disabled={!isUnlocked}>
@@ -252,7 +268,7 @@ export default function CharacterCosmeticsTab({
             if (opt) handleSelectOption('subtitleFont', opt)
           }}
         >
-          {FONT_OPTIONS.map((f) => {
+          {FONT_OPTIONS.filter(isOptionVisible).map((f) => {
             const { isUnlocked, isHidden, title } = getOptionLockStatus(f)
             return (
               <option key={f.id} value={f.id} disabled={!isUnlocked}>
@@ -292,7 +308,7 @@ export default function CharacterCosmeticsTab({
           Card Border Effect & Shape
         </label>
         <div className="flex flex-col gap-2">
-          {BORDER_SHAPE_OPTIONS.map((opt) => {
+          {BORDER_SHAPE_OPTIONS.filter(isOptionVisible).map((opt) => {
             const { isUnlocked, label, badgeLabel } = getOptionLockStatus(opt)
             const isSelected = cosmetics.borderShape === opt.id || cosmetics.borderShape === opt.value
 
@@ -332,7 +348,7 @@ export default function CharacterCosmeticsTab({
           Card Background Tint
         </label>
         <div className="flex flex-col gap-2">
-          {BG_COLOR_OPTIONS.map((opt) => {
+          {BG_COLOR_OPTIONS.filter(isOptionVisible).map((opt) => {
             const { isUnlocked, label, badgeLabel } = getOptionLockStatus(opt)
             const isSelected =
               cosmetics.bgColor === opt.id ||
@@ -377,7 +393,7 @@ export default function CharacterCosmeticsTab({
           Profile Avatar Ring
         </label>
         <div className="flex flex-wrap gap-2.5 items-center">
-          {PROFILE_BORDER_OPTIONS.map((opt) => {
+          {PROFILE_BORDER_OPTIONS.filter(isOptionVisible).map((opt) => {
             const { isUnlocked, label } = getOptionLockStatus(opt)
             const isSelected =
               cosmetics.profileBorder === opt.id ||

@@ -264,3 +264,33 @@
   83% { filter: drop-shadow(0 0 15px #8800ff) brightness(1.2); }
   100% { filter: drop-shadow(0 0 15px #ff0000) brightness(1.2); }
 }
+
+/* Guildmaster Metallic Gold Cosmetics */
+.gold-text {
+  background: linear-gradient(135deg, #BF953F 0%, #FCF6BA 45%, #AA771C 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  color: transparent !important;
+  font-weight: 800 !important;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)) !important;
+}
+
+.gold-card-border {
+  border-radius: 0.5rem !important;
+  border: 2px solid transparent !important;
+  background: linear-gradient(var(--card), var(--card)) padding-box,
+              linear-gradient(to bottom right, #BF953F, #FCF6BA, #AA771C) border-box !important;
+  box-shadow: 0 0 12px rgba(212, 175, 55, 0.3) !important;
+}
+
+.gold-avatar-ring {
+  border: 3px solid transparent !important;
+  background: linear-gradient(var(--card), var(--card)) padding-box,
+              linear-gradient(to bottom right, #BF953F, #FCF6BA, #AA771C) border-box !important;
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.6) !important;
+}
+
+.gold-bg-tint {
+  background: linear-gradient(135deg, rgba(191,149,63,0.15) 0%, rgba(252,246,186,0.12) 50%, rgba(170,119,28,0.15) 100%) !important;
+}
