@@ -30,8 +30,17 @@ export const syncUser = mutation({
       name = familyName ? `${givenName} ${familyName.charAt(0).toUpperCase()}.` : givenName
     }
 
-    const effectiveDiscordId = args.discordId || extractClaim(identity, 'discord_id') || extractClaim(identity, 'discord_user_id') || extractClaim(identity, 'provider_user_id')
-    const effectiveDiscordUsername = args.discordUsername || extractClaim(identity, 'discord_username') || extractClaim(identity, 'discord_handle')
+    const effectiveDiscordId =
+      args.discordId ||
+      extractClaim(identity, 'discord_id') ||
+      extractClaim(identity, 'discord_user_id') ||
+      extractClaim(identity, 'provider_user_id') ||
+      extractClaim(identity, 'discord_account_id') ||
+      extractClaim(identity, 'external_id')
+    const effectiveDiscordUsername =
+      args.discordUsername ||
+      extractClaim(identity, 'discord_username') ||
+      extractClaim(identity, 'discord_handle')
 
     const userData = {
       userId: identity.subject,

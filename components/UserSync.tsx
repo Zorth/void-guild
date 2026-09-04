@@ -15,27 +15,42 @@ export default function UserSync() {
 
   useEffect(() => {
     if (isLoaded && isSignedIn && user) {
-      const discordAccount = user.externalAccounts?.find((acc) => {
-        const providerStr = String(acc.provider || '').toLowerCase()
-        return providerStr.includes('discord')
-      })
+      const doSync = async () => {
+        try {
+          // Force Clerk SDK to refresh external accounts from Clerk backend
+          if (typeof user.reload === 'function') {
+            await user.reload()
+          }
+        } catch (e) {
+          // Ignore reload network errors
+        }
 
-      const discordId =
-        (discordAccount as any)?.providerUserId ||
-        (discordAccount as any)?.externalId ||
-        discordAccount?.id
+        const discordAccount = user.externalAccounts?.find((acc) => {
+          const providerStr = String(acc.provider || '').toLowerCase()
+          const strategyStr = String((acc as any)?.verification?.strategy || '').toLowerCase()
+          return providerStr.includes('discord') || strategyStr.includes('discord')
+        })
 
-      const discordUsername =
-        discordAccount?.username ||
-        (discordAccount as any)?.emailAddress ||
-        (discordAccount as any)?.label
+        const discordId =
+          (discordAccount as any)?.providerUserId ||
+          (discordAccount as any)?.externalId ||
+          (discordAccount as any)?.provider_user_id ||
+          discordAccount?.id
 
-      syncUser({
-        discordId: discordId ? String(discordId) : undefined,
-        discordUsername: discordUsername ? String(discordUsername) : undefined,
-      }).catch(console.error)
+        const discordUsername =
+          discordAccount?.username ||
+          (discordAccount as any)?.emailAddress ||
+          (discordAccount as any)?.label
+
+        await syncUser({
+          discordId: discordId ? String(discordId) : undefined,
+          discordUsername: discordUsername ? String(discordUsername) : undefined,
+        })
+      }
+
+      doSync().catch(console.error)
     }
-  }, [isLoaded, isSignedIn, user, user?.externalAccounts, syncUser])
+  }, [isLoaded, isSignedIn, user, syncUser])
 
   return null
 }
