@@ -1,5 +1,5 @@
 import { mutation, query } from './_generated/server'
-import { Doc } from './_generated/dataModel'
+import { Doc, Id } from './_generated/dataModel'
 
 export interface AchievementDefinition {
   id: string
@@ -33,6 +33,8 @@ export interface UserEvaluationData {
   }
   isInterestedCount: number
   availabilityDaysCount: number
+  maxCharacterStreak: number
+  maxWorldStreak: number
 }
 
 export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
@@ -151,7 +153,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     id: 'rank_guildmaster',
     title: "Guildmaster's Pinnacle",
     description: 'Promoted to Guildmaster rank with any character.',
-    category: 'normal',
+    category: 'hidden',
     reward: '',
     chainId: 'guild_rank',
     tier: 2,
@@ -273,6 +275,91 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
       data.characters.some((c) => c.system === 'PF') &&
       data.characters.some((c) => c.system === 'DnD'),
   },
+  {
+    id: 'link_discord',
+    title: 'Discord Connected',
+    description: 'Linked your Discord account to your Void Guild profile.',
+    category: 'normal',
+    reward: '',
+    checkEligibility: (data) => Boolean(data.userDoc?.discordId),
+  },
+  {
+    id: 'tutorial_completed',
+    title: 'Tutorial Completed!',
+    description: 'Unlocked every normal achievement in the Void Guild.',
+    category: 'hidden',
+    reward: '',
+    checkEligibility: (data) => {
+      const normalDefs = ACHIEVEMENTS_REGISTRY.filter((a) => a.category === 'normal')
+      return normalDefs.length > 0 && normalDefs.every((def) => def.checkEligibility(data))
+    },
+  },
+  {
+    id: 'character_streak_3',
+    title: 'In Sync',
+    description: 'Achieved a character streak of 3 consecutive sessions.',
+    category: 'hidden',
+    reward: '',
+    chainId: 'character_streak',
+    tier: 1,
+    maxTier: 3,
+    checkEligibility: (data) => data.maxCharacterStreak >= 3,
+  },
+  {
+    id: 'character_streak_5',
+    title: 'Unbreakable Bond',
+    description: 'Achieved a character streak of 5 consecutive sessions.',
+    category: 'hidden',
+    reward: '',
+    chainId: 'character_streak',
+    tier: 2,
+    maxTier: 3,
+    checkEligibility: (data) => data.maxCharacterStreak >= 5,
+  },
+  {
+    id: 'character_streak_10',
+    title: 'Inseparable Adventurers',
+    description: 'Achieved a character streak of 10 consecutive sessions.',
+    category: 'hidden',
+    reward: '',
+    chainId: 'character_streak',
+    tier: 3,
+    maxTier: 3,
+    checkEligibility: (data) => data.maxCharacterStreak >= 10,
+  },
+  {
+    id: 'world_streak_3',
+    title: 'Local Legend',
+    description: 'Achieved a world streak of 3 consecutive sessions in the same world.',
+    category: 'hidden',
+    reward: '',
+    chainId: 'world_streak',
+    tier: 1,
+    maxTier: 3,
+    checkEligibility: (data) => data.maxWorldStreak >= 3,
+  },
+  {
+    id: 'world_streak_5',
+    title: 'Domain Champion',
+    description: 'Achieved a world streak of 5 consecutive sessions in the same world.',
+    category: 'hidden',
+    reward: '',
+    chainId: 'world_streak',
+    tier: 2,
+    maxTier: 3,
+    checkEligibility: (data) => data.maxWorldStreak >= 5,
+  },
+  {
+    id: 'world_streak_10',
+    title: 'Master of the Realm',
+    description: 'Achieved a world streak of 10 consecutive sessions in the same world.',
+    category: 'hidden',
+    reward: '',
+    chainId: 'world_streak',
+    tier: 3,
+    maxTier: 3,
+    checkEligibility: (data) => data.maxWorldStreak >= 10,
+  },
 ]
 
 export const syncAndGetAchievements = mutation({
@@ -365,6 +452,88 @@ export const syncAndGetAchievements = mutation({
 
     const availabilityDaysCount = new Set(userAvailabilityDocs.map((a) => a.date)).size
 
+    // Streak calculations
+    const sortedLockedSessions = [...allLockedSessions].sort((a, b) => {
+      if (a.date && b.date) return a.date - b.date
+      if (a.date) return -1
+      if (b.date) return 1
+      return a._creationTime - b._creationTime
+    })
+
+    let maxWorldStreak = 0
+    let maxCharacterStreak = 0
+
+    const isAttendingSession = (charId: Id<'characters'>, s: typeof sortedLockedSessions[0]) => {
+      return (s.characters && s.characters.includes(charId)) || s.gmCharacter === charId
+    }
+
+    for (const char of characters) {
+      const charSessions = sortedLockedSessions.filter((s) => isAttendingSession(char._id, s))
+
+      // World Streak per character
+      let currentWorld: string | null = null
+      let currentWorldStreak = 0
+      for (const s of charSessions) {
+        const wId = s.world ? s.world.toString() : null
+        if (wId && wId === currentWorld) {
+          currentWorldStreak++
+        } else {
+          currentWorld = wId
+          currentWorldStreak = wId ? 1 : 0
+        }
+        if (currentWorldStreak > maxWorldStreak) {
+          maxWorldStreak = currentWorldStreak
+        }
+      }
+
+      // Single character session streak
+      let singleCharStreak = 0
+      for (const s of sortedLockedSessions) {
+        if (isAttendingSession(char._id, s)) {
+          singleCharStreak++
+          if (singleCharStreak > maxCharacterStreak) {
+            maxCharacterStreak = singleCharStreak
+          }
+        } else {
+          singleCharStreak = 0
+        }
+      }
+
+      // Mutual character streak with companion characters
+      const companionIds = new Set<Id<'characters'>>()
+      for (const s of charSessions) {
+        if (s.characters) {
+          for (const cId of s.characters) {
+            if (cId !== char._id) {
+              companionIds.add(cId)
+            }
+          }
+        }
+        if (s.gmCharacter && s.gmCharacter !== char._id) {
+          companionIds.add(s.gmCharacter)
+        }
+      }
+
+      for (const compId of companionIds) {
+        const relevantSessions = sortedLockedSessions.filter(
+          (s) => isAttendingSession(char._id, s) || isAttendingSession(compId, s)
+        )
+        let mutualStreak = 0
+        for (const s of relevantSessions) {
+          const hasChar = isAttendingSession(char._id, s)
+          const hasComp = isAttendingSession(compId, s)
+          if (hasChar && hasComp) {
+            mutualStreak++
+            if (mutualStreak > maxCharacterStreak) {
+              maxCharacterStreak = mutualStreak
+            }
+          } else {
+            mutualStreak = 0
+          }
+        }
+      }
+    }
+
     const evalData: UserEvaluationData = {
       userId: user.subject,
       userDoc,
@@ -375,6 +544,8 @@ export const syncAndGetAchievements = mutation({
       givenCommendationCounts,
       isInterestedCount,
       availabilityDaysCount,
+      maxCharacterStreak,
+      maxWorldStreak,
     }
 
     // Existing unlocked records in database
