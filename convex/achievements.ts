@@ -35,6 +35,7 @@ export interface UserEvaluationData {
   availabilityDaysCount: number
   maxCharacterStreak: number
   maxWorldStreak: number
+  claimedLootCount: number
 }
 
 export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
@@ -153,7 +154,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     id: 'rank_guildmaster',
     title: "Guildmaster's Pinnacle",
     description: 'Promoted to Guildmaster rank with any character.',
-    category: 'hidden',
+    category: 'normal',
     reward: '',
     chainId: 'guild_rank',
     tier: 2,
@@ -172,7 +173,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     id: 'give_1_commendation',
     title: 'Generous Spirit',
     description: 'Gave your first commendation to a fellow party member.',
-    category: 'hidden',
+    category: 'normal',
     reward: '',
     chainId: 'commendations_given',
     tier: 1,
@@ -286,12 +287,24 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
   {
     id: 'tutorial_completed',
     title: 'Tutorial Completed!',
-    description: 'Unlocked every normal achievement in the Void Guild.',
-    category: 'hidden',
+    description: 'Completed all basic adventuring milestones in the Void Guild.',
+    category: 'normal',
     reward: '',
     checkEligibility: (data) => {
-      const normalDefs = ACHIEVEMENTS_REGISTRY.filter((a) => a.category === 'normal')
-      return normalDefs.length > 0 && normalDefs.every((def) => def.checkEligibility(data))
+      const requiredIds = [
+        'first_character',
+        'first_session',
+        'level_5_char',
+        'express_interest',
+        'availability_5_days',
+        'visit_world',
+        'link_discord',
+        'loot_first',
+      ]
+      return requiredIds.every((id) => {
+        const def = ACHIEVEMENTS_REGISTRY.find((a) => a.id === id)
+        return def ? def.checkEligibility(data) : false
+      })
     },
   },
   {
@@ -359,6 +372,72 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     tier: 3,
     maxTier: 3,
     checkEligibility: (data) => data.maxWorldStreak >= 10,
+  },
+  {
+    id: 'loot_first',
+    title: 'Treasure Seeker',
+    description: 'Claimed your first piece of session loot.',
+    category: 'normal',
+    reward: '',
+    chainId: 'session_loot',
+    tier: 1,
+    maxTier: 2,
+    checkEligibility: (data) => data.claimedLootCount >= 1,
+  },
+  {
+    id: 'loot_hoarder_5',
+    title: 'Hoarder',
+    description: 'Claimed 5 or more pieces of session loot.',
+    category: 'hidden',
+    reward: '',
+    chainId: 'session_loot',
+    tier: 2,
+    maxTier: 2,
+    checkEligibility: (data) => data.claimedLootCount >= 5,
+  },
+  {
+    id: 'comm_roleplay',
+    title: 'Roleplay Maestro',
+    description: 'Received a Roleplay commendation for your character.',
+    category: 'hidden',
+    reward: '',
+    checkEligibility: (data) => data.commendationCounts.roleplay >= 1,
+  },
+  {
+    id: 'comm_tactics',
+    title: 'Tactical Mastermind',
+    description: 'Received a Tactics commendation for your character.',
+    category: 'hidden',
+    reward: '',
+    checkEligibility: (data) => data.commendationCounts.tactics >= 1,
+  },
+  {
+    id: 'comm_clutch',
+    title: 'Clutch Performer',
+    description: 'Received a Clutch commendation for your character.',
+    category: 'hidden',
+    reward: '',
+    checkEligibility: (data) => data.commendationCounts.clutch >= 1,
+  },
+  {
+    id: 'comm_heroic',
+    title: 'Heroic Legend',
+    description: 'Received a Heroic commendation for your character.',
+    category: 'hidden',
+    reward: '',
+    checkEligibility: (data) => data.commendationCounts.heroic >= 1,
+  },
+  {
+    id: 'comm_jack_of_all_trades',
+    title: 'Jack of All Trades',
+    description: 'Received at least 1 commendation in every category (Roleplay, Tactics, Clutch, Heroic).',
+    category: 'hidden',
+    reward: '',
+    checkEligibility: (data) =>
+      data.commendationCounts.roleplay >= 1 &&
+      data.commendationCounts.tactics >= 1 &&
+      data.commendationCounts.clutch >= 1 &&
+      data.commendationCounts.heroic >= 1,
   },
 ]
 
@@ -534,6 +613,18 @@ export const syncAndGetAchievements = mutation({
       }
     }
 
+    // Loot calculation
+    let claimedLootCount = 0
+    for (const s of allSessionsForInterest) {
+      if (s.loot) {
+        for (const item of s.loot) {
+          if (item.claimedBy && charIds.has(item.claimedBy)) {
+            claimedLootCount += 1
+          }
+        }
+      }
+    }
+
     const evalData: UserEvaluationData = {
       userId: user.subject,
       userDoc,
@@ -546,6 +637,7 @@ export const syncAndGetAchievements = mutation({
       availabilityDaysCount,
       maxCharacterStreak,
       maxWorldStreak,
+      claimedLootCount,
     }
 
     // Existing unlocked records in database
