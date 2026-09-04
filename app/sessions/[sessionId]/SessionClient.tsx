@@ -865,6 +865,7 @@ export default function SessionClient() {
                     )}
                   </h3>
                   <AttendingCharactersList 
+                    sessionId={session._id}
                     characters={session.attendingCharacters || []}
                     userCharacterIds={userCharacterIds}
                     sessionLocked={session.locked}

@@ -10,6 +10,7 @@
 
 import type * as activity from "../activity.js";
 import type * as characters from "../characters.js";
+import type * as commendations from "../commendations.js";
 import type * as crons from "../crons.js";
 import type * as discord from "../discord.js";
 import type * as http from "../http.js";
@@ -30,6 +31,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   activity: typeof activity;
   characters: typeof characters;
+  commendations: typeof commendations;
   crons: typeof crons;
   discord: typeof discord;
   http: typeof http;

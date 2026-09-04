@@ -113,4 +113,17 @@ export default defineSchema({
         extraSessionsRan: v.optional(v.number()),
         logoClicks: v.optional(v.number()),
     }).index('by_userId', ['userId']),
+    commendations: defineTable({
+        sessionId: v.id('sessions'),
+        fromUserId: v.string(), // Clerk subject of the giver
+        toCharacterId: v.id('characters'), // Character receiving the commendation
+        category: v.union(
+            v.literal('roleplay'),
+            v.literal('tactics'),
+            v.literal('clutch'),
+            v.literal('heroic')
+        ),
+    }).index('by_session_fromUser', ['sessionId', 'fromUserId'])
+      .index('by_toCharacter', ['toCharacterId'])
+      .index('by_session', ['sessionId']),
 })

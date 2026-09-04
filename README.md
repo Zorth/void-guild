@@ -14,7 +14,7 @@
 *   **System-Aware Quest Levels:** Dual-system quests automatically evaluate and display system-matched levels (`PF` vs `DnD`).
 *   **Character Relationships & Mutual Streaks:** Attending character lists display mutual session streaks (`🔥 3+ streak`), first-time co-adventurer badges (`NEW`), and total shared sessions (`5x`, `10x`).
 *   **World Visit & Streak Tracking:** Badges highlight a character's first visit to a world (`NEW WORLD`), world visit counts, and consecutive world streaks. GM bonus characters are excluded from attendance counts and never break streaks.
-*   **Visual Cues:** Sessions are highlighted with a gold border if owned by the current user and a purple background if one of the user's characters has joined.
+*   **Character Commendation System:** Players can award 1 commendation per session to a party member across 4 categories (🎭 *Roleplay MVP*, ⚔️ *Tactical Genius*, 🛡️ *Clutch Savior*, 🌟 *Heroic MVP*). Earned commendations are displayed per category on character cards on the homepage.
 *   **7-Day Overview:** A calendar-like view of upcoming sessions for the next seven days, with visual cues for owned and joined sessions.
 *   **Character Website Links:** Characters can have an associated website link, editable by the owner and visible to all in session details.
 *   **Session Locking:** Game Masters can lock sessions to finalize attendance and XP awards.

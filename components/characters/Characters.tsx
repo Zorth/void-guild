@@ -5,7 +5,7 @@ import { api } from '@/convex/_generated/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Book, CircleHelp, Globe, Shield, Handshake } from 'lucide-react'
+import { Book, CircleHelp, Globe, Shield, Handshake, Medal } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -44,6 +44,7 @@ export default function Characters({ filters }: { filters?: { pf: boolean, dnd: 
   const deleteCharacter = useMutation(api.characters.deleteCharacter)
 
   const isAdmin = useQuery(api.sessions.isAdminQuery)
+  const userCommendations = useQuery(api.commendations.getUserCharactersCommendations)
 
   const characters = useMemo(() => {
     if (!charactersRaw) return charactersRaw;
@@ -228,6 +229,37 @@ export default function Characters({ filters }: { filters?: { pf: boolean, dnd: 
                             style={getXPBarStyles(character.lvl, character.xp)}
                         />
                     </div>
+                    {(() => {
+                      const comms = userCommendations?.[character._id]
+                      if (!comms || comms.total === 0) return null
+                      return (
+                        <div className="flex items-center gap-1.5 flex-wrap text-[10px] mt-2 pt-1.5 border-t border-border/30">
+                          <span className="text-muted-foreground font-semibold flex items-center gap-1">
+                            <Medal className="h-3 w-3 text-amber-500 shrink-0" /> Commendations ({comms.total}):
+                          </span>
+                          {comms.roleplay > 0 && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-300 font-bold border border-purple-500/25">
+                              🎭 Roleplay: {comms.roleplay}
+                            </span>
+                          )}
+                          {comms.tactics > 0 && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-300 font-bold border border-blue-500/25">
+                              ⚔️ Tactics: {comms.tactics}
+                            </span>
+                          )}
+                          {comms.clutch > 0 && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 font-bold border border-emerald-500/25">
+                              🛡️ Clutch: {comms.clutch}
+                            </span>
+                          )}
+                          {comms.heroic > 0 && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-300 font-bold border border-amber-500/25">
+                              🌟 Heroic: {comms.heroic}
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </li>
                 ))}
               </ul>
