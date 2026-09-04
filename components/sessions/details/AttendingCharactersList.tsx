@@ -109,19 +109,13 @@ export default function AttendingCharactersList({
         const hasGivenPlayerComm = !!myPlayerComm
         const hasGivenGmComm = !!myGmComm
         const cosmeticsStyles = resolveCosmeticsStyles(char.cosmetics)
-        const hasCustomBorderShape = char.cosmetics?.borderShape && char.cosmetics.borderShape !== 'default'
         
         return (
             <li 
                 key={char._id} 
                 className={cn(
                     "flex items-center justify-between p-4 rounded-lg border transition-colors gap-3",
-                    hasCustomBorderShape ? cosmeticsStyles.cardClassName : (
-                        isUserCharacter 
-                            ? "bg-[rgba(147,51,234,0.1)] border-2 border-[#D8B4FE] hover:border-[#E9D5FF] hover:bg-[rgba(147,51,234,0.2)] shadow-sm" 
-                            : "bg-muted/20"
-                    ),
-                    isUserCharacter && hasCustomBorderShape && "bg-purple-500/25"
+                    cosmeticsStyles.cardClassName || "bg-muted/20"
                 )}
                 style={cosmeticsStyles.cardStyle}
             >

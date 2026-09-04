@@ -289,7 +289,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     title: 'Tutorial Completed!',
     description: 'Completed all basic adventuring milestones in the Void Guild.',
     category: 'normal',
-    reward: '',
+    reward: 'Purple Card Border & Purple Name Color Cosmetics',
     checkEligibility: (data) => {
       const requiredIds = [
         'first_character',

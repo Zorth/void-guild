@@ -26,6 +26,7 @@ export const ACHIEVEMENT_INFO: Record<string, AchievementInfo> = {
   level_5_char: { title: 'Rising Power', category: 'normal' },
   level_10_char: { title: 'Legendary Hero', category: 'normal' },
   first_commendation: { title: 'Party Favorite', category: 'normal' },
+  tutorial_completed: { title: 'Tutorial Completed!', category: 'normal' },
   secret_logo_clicks: { title: 'Curious Clicker', category: 'hidden' },
   gm_favor: { title: "Master's Favor", category: 'hidden' },
   system_polymath: { title: 'System Polymath', category: 'hidden' },
@@ -39,6 +40,13 @@ export const FONT_OPTIONS: CosmeticOption[] = [
 export const COLOR_OPTIONS: CosmeticOption[] = [
   { id: 'default', name: 'Default Theme', unlockedByDefault: true, value: '' },
   {
+    id: 'purple_text',
+    name: 'Purple Accent',
+    unlockedByDefault: false,
+    requiredAchievementId: 'tutorial_completed',
+    value: '#D8B4FE',
+  },
+  {
     id: 'rainbow',
     name: 'Moving Rainbow (RGB)',
     unlockedByDefault: false,
@@ -50,6 +58,14 @@ export const COLOR_OPTIONS: CosmeticOption[] = [
 
 export const BORDER_SHAPE_OPTIONS: CosmeticOption[] = [
   { id: 'default', name: 'Default Solid', unlockedByDefault: true, value: 'rounded-lg border border-border' },
+  {
+    id: 'purple_border',
+    name: 'Purple Highlight Border',
+    unlockedByDefault: false,
+    requiredAchievementId: 'tutorial_completed',
+    value: 'rounded-lg border-2 border-[#D8B4FE] bg-[rgba(147,51,234,0.1)]',
+    previewClass: 'rounded-lg border-2 border-[#D8B4FE] bg-[rgba(147,51,234,0.1)] p-1',
+  },
   {
     id: 'rainbow_border',
     name: 'Moving Rainbow Border',
@@ -66,6 +82,13 @@ export const PROFILE_BORDER_OPTIONS: CosmeticOption[] = [
 
 export const BG_COLOR_OPTIONS: CosmeticOption[] = [
   { id: 'default', name: 'Default Tint', unlockedByDefault: true, value: '' },
+  {
+    id: 'purple_tint',
+    name: 'Purple Tint',
+    unlockedByDefault: false,
+    requiredAchievementId: 'tutorial_completed',
+    value: 'rgba(147, 51, 234, 0.15)',
+  },
 ]
 
 export interface CharacterCosmetics {

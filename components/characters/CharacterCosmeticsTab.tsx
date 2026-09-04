@@ -335,7 +335,10 @@ export default function CharacterCosmeticsTab({
         <div className="flex flex-col gap-2">
           {BG_COLOR_OPTIONS.map((opt) => {
             const { isUnlocked, label, badgeLabel } = getOptionLockStatus(opt)
-            const isSelected = cosmetics.bgColor === opt.id
+            const isSelected =
+              cosmetics.bgColor === opt.id ||
+              cosmetics.bgColor === opt.value ||
+              (opt.id === 'default' && (!cosmetics.bgColor || cosmetics.bgColor === 'default'))
 
             return (
               <button
