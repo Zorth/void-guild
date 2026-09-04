@@ -155,6 +155,14 @@ export const BORDER_SHAPE_OPTIONS: CosmeticOption[] = [
 export const PROFILE_BORDER_OPTIONS: CosmeticOption[] = [
   { id: 'default', name: 'Default Ring', unlockedByDefault: true, value: 'border border-border' },
   {
+    id: 'sprout_ring',
+    name: 'Newbie Sprout Ring 🌱',
+    unlockedByDefault: false,
+    requiredAchievementId: 'first_character',
+    value: 'sprout-avatar-ring',
+    previewClass: 'sprout-avatar-ring',
+  },
+  {
     id: 'silver_ring',
     name: 'Journeyman Silver Ring',
     unlockedByDefault: false,
@@ -241,6 +249,20 @@ export const BG_COLOR_OPTIONS: CosmeticOption[] = [
     value: 'rgba(147, 51, 234, 0.15)',
   },
   {
+    id: 'cyan_particles',
+    name: 'Cyan Particle Tint (Lvl 5)',
+    unlockedByDefault: false,
+    requiredAchievementId: 'level_5_char',
+    value: 'cyan-particle-bg',
+  },
+  {
+    id: 'crimson_particles',
+    name: 'Crimson Flame Particle Tint (Lvl 10)',
+    unlockedByDefault: false,
+    requiredAchievementId: 'level_10_char',
+    value: 'crimson-particle-bg',
+  },
+  {
     id: 'silver_tint',
     name: 'Journeyman Silver Tint',
     unlockedByDefault: false,
@@ -316,6 +338,22 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
       cardBgStyle = { '--card-bg': silverPaddingLayer } as React.CSSProperties
     } else {
       cardClassName = cardClassName ? `${cardClassName} silver-bg-tint` : 'silver-bg-tint'
+    }
+  } else if (bgObj?.value === 'cyan-particle-bg' || cosmetics.bgColor === 'cyan_particles' || cosmetics.bgColor === 'cyan-particle-bg') {
+    if (isMetallicBorder) {
+      const cyanPaddingLayer =
+        'radial-gradient(circle at 50% 20%, rgba(6, 182, 212, 0.22) 0%, rgba(8, 145, 178, 0.08) 50%, transparent 100%), linear-gradient(var(--card), var(--card))'
+      cardBgStyle = { '--card-bg': cyanPaddingLayer } as React.CSSProperties
+    } else {
+      cardClassName = cardClassName ? `${cardClassName} cyan-particle-bg` : 'cyan-particle-bg'
+    }
+  } else if (bgObj?.value === 'crimson-particle-bg' || cosmetics.bgColor === 'crimson_particles' || cosmetics.bgColor === 'crimson-particle-bg') {
+    if (isMetallicBorder) {
+      const crimsonPaddingLayer =
+        'radial-gradient(circle at 50% 20%, rgba(220, 38, 38, 0.25) 0%, rgba(153, 27, 27, 0.1) 50%, transparent 100%), linear-gradient(var(--card), var(--card))'
+      cardBgStyle = { '--card-bg': crimsonPaddingLayer } as React.CSSProperties
+    } else {
+      cardClassName = cardClassName ? `${cardClassName} crimson-particle-bg` : 'crimson-particle-bg'
     }
   } else if (bgObj && bgObj.value) {
     if (isMetallicBorder) {

@@ -356,7 +356,7 @@ export default function CharacterCosmeticsTab({
               cosmetics.bgColor === opt.value ||
               (opt.id === 'default' && (!cosmetics.bgColor || cosmetics.bgColor === 'default'))
 
-            const isClassTint = typeof opt.value === 'string' && opt.value.endsWith('-bg-tint')
+            const isClassTint = typeof opt.value === 'string' && (opt.value.endsWith('-bg-tint') || opt.value.endsWith('-bg'))
 
             return (
               <button
