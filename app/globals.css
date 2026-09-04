@@ -442,25 +442,26 @@
   pointer-events: none !important;
 }
 
-/* FFXIV Style Sprout Avatar Ring */
+/* FFXIV Style Sprout Avatar Cosmetic (No ring border, bigger symmetrical 🌱 sprout) */
 .sprout-avatar-ring {
   position: relative !important;
-  box-shadow: 0 0 0 2px #16a34a, 0 0 0 3.5px #4ade80, 0 0 10px rgba(74, 222, 128, 0.6) !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
 }
 
 .sprout-avatar-ring::before {
   content: '' !important;
   position: absolute !important;
-  top: -36% !important;
+  top: -46% !important;
   left: 50% !important;
   transform: translateX(-50%) !important;
-  width: 48% !important;
-  height: 40% !important;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M12 22C12 16 11 12 12 7' stroke='%2316a34a' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpath d='M12 13C8 11 5 13 6 8C9 8 11 11 12 13Z' fill='%234ade80' stroke='%2315803d' stroke-width='1'/%3E%3Cpath d='M12 11C16 9 19 11 18 6C15 6 13 9 12 11Z' fill='%2322c55e' stroke='%2315803d' stroke-width='1'/%3E%3C/svg%3E") !important;
+  width: 68% !important;
+  height: 52% !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='none'%3E%3Cpath d='M16 30C16 22 16 16 16 10' stroke='%2315803d' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M16 18C10 18 3 14 4 6C11 6 15 12 16 18Z' fill='%234ade80' stroke='%2316a34a' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M16 18C22 18 29 14 28 6C21 6 17 12 16 18Z' fill='%2322c55e' stroke='%2316a34a' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M16 18C13 14 9 10 7 8' stroke='%23166534' stroke-width='1' stroke-linecap='round' opacity='0.6'/%3E%3Cpath d='M16 18C19 14 23 10 25 8' stroke='%23166534' stroke-width='1' stroke-linecap='round' opacity='0.6'/%3E%3C/svg%3E") !important;
   background-size: contain !important;
   background-repeat: no-repeat !important;
   background-position: center bottom !important;
-  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6)) !important;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7)) !important;
   z-index: 10 !important;
   pointer-events: none !important;
 }
