@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Trophy, Book, Globe, Sparkles } from 'lucide-react'
 import ActivityFeed from '@/components/ActivityFeed'
-import { ThemeToggle } from '@/components/ThemeToggle'
 import { useState, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
@@ -131,7 +130,6 @@ export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
                 </Button>
               </Link>
             )}
-            <ThemeToggle />
             <CustomUserButton />
           </div>
         </Authenticated>

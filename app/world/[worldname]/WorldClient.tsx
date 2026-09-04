@@ -23,7 +23,6 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { ThemeToggle } from '@/components/ThemeToggle'
 import '@/components/sessions/sessions.css'
 import QuestList from '@/components/quests/QuestList'
 import ReputationSystem from '@/components/world/ReputationSystem'
@@ -380,7 +379,6 @@ export default function WorldClient() {
                     <img src="/DnDVoid.svg" alt="D&D" className="h-6 w-6" />
                 </Button>
             </div>
-            <ThemeToggle />
             <CustomUserButton />
         </div>
       </div>

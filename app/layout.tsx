@@ -11,7 +11,6 @@ import LevelUpListener from '@/components/LevelUpListener'
 import SessionClosedListener from '@/components/SessionClosedListener'
 import UserSync from '@/components/UserSync'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { ThemeToggle } from '@/components/ThemeToggle'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -139,21 +138,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  const savedTheme = localStorage.getItem('theme') || 'dark';
-                  document.documentElement.classList.add(savedTheme);
-                } catch (e) {}
-              })()
-            `,
-          }}
-        />
-      </head>
+    <html lang="en" className="dark">
       <body className={`${geistSans.variable} ${geistMono.variable} ${oxProto.variable} ${taroca.variable} ${gin.variable} ${sabon.variable} antialiased font-sans`}>
         <ClerkProvider>
           <ConvexClientProvider>
