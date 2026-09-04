@@ -735,19 +735,20 @@ export default function SessionClient() {
 
                 {session.quest && (() => {
                     const q = session.quest;
-                    const levelPF = q.levelPF ?? (q.levelDnD === undefined ? q.level : undefined);
-                    const levelDnD = q.levelDnD;
+                    const levelPF = q.levelPF ?? q.level;
+                    const levelDnD = q.levelDnD ?? q.level;
+                    const numLevel = typeof session.level === 'number' ? session.level : undefined;
                     
                     const isDual = levelPF !== undefined && levelDnD !== undefined && levelPF !== levelDnD;
                     let displayLevel: number | 'V' | '?' = '?';
                     let badgeStyle: React.CSSProperties = {};
 
                     if (session.system === 'PF') {
-                        const l = levelPF ?? session.level;
+                        const l = levelPF ?? numLevel;
                         displayLevel = (l ?? 0) > 0 ? l! : '?';
                         if (typeof displayLevel === 'number') badgeStyle = getLevelBadgeStyle(displayLevel);
                     } else if (session.system === 'DnD') {
-                        const l = levelDnD ?? (q.levelPF === undefined ? q.level : undefined) ?? session.level;
+                        const l = levelDnD ?? numLevel;
                         displayLevel = (l ?? 0) > 0 ? l! : '?';
                         if (typeof displayLevel === 'number') badgeStyle = getLevelBadgeStyle(displayLevel);
                     } else {
@@ -755,7 +756,7 @@ export default function SessionClient() {
                             displayLevel = 'V';
                             badgeStyle = getDualLevelBadgeStyle(levelPF, levelDnD);
                         } else {
-                            const l = levelPF ?? levelDnD ?? session.level;
+                            const l = levelPF ?? levelDnD ?? numLevel;
                             displayLevel = (l ?? 0) > 0 ? l! : '?';
                             if (typeof displayLevel === 'number') badgeStyle = getLevelBadgeStyle(displayLevel);
                         }

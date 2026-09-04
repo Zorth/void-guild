@@ -902,32 +902,33 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
                               <div className={cn("font-semibold", "session-world", "flex items-center gap-2 flex-wrap")}>
                                   <div className="flex items-center gap-2 whitespace-nowrap">
                                       {(() => {
-                                          const q = session.quest;
-                                          const levelPF = q?.levelPF ?? (q?.levelDnD === undefined ? q?.level : undefined);
-                                          const levelDnD = q?.levelDnD;
-                                          
-                                          let displayLevel: number | 'V' | 'TBD' = 'TBD';
-                                          let badgeStyle: React.CSSProperties = {};
+                                           const q = session.quest;
+                                           const levelPF = q?.levelPF ?? q?.level;
+                                           const levelDnD = q?.levelDnD ?? q?.level;
+                                           const numLevel = typeof session.level === 'number' ? session.level : undefined;
+                                           
+                                           let displayLevel: number | 'V' | 'TBD' = 'TBD';
+                                           let badgeStyle: React.CSSProperties = {};
 
-                                          if (session.system === 'PF') {
-                                              const l = levelPF ?? session.level;
-                                              displayLevel = l ?? 'TBD';
-                                              if (typeof displayLevel === 'number') badgeStyle = getLevelBadgeStyle(displayLevel);
-                                          } else if (session.system === 'DnD') {
-                                              const l = levelDnD ?? (q?.levelPF === undefined ? q?.level : undefined) ?? session.level;
-                                              displayLevel = l ?? 'TBD';
-                                              if (typeof displayLevel === 'number') badgeStyle = getLevelBadgeStyle(displayLevel);
-                                          } else {
-                                              const isDual = levelPF !== undefined && levelDnD !== undefined && levelPF !== levelDnD;
-                                              if (isDual) {
-                                                  displayLevel = 'V';
-                                                  badgeStyle = getDualLevelBadgeStyle(levelPF, levelDnD);
-                                              } else {
-                                                  const l = levelPF ?? levelDnD ?? session.level;
-                                                  displayLevel = l ?? 'TBD';
-                                                  if (typeof displayLevel === 'number') badgeStyle = getLevelBadgeStyle(displayLevel);
-                                              }
-                                          }
+                                           if (session.system === 'PF') {
+                                               const l = levelPF ?? numLevel;
+                                               displayLevel = l ?? 'TBD';
+                                               if (typeof displayLevel === 'number') badgeStyle = getLevelBadgeStyle(displayLevel);
+                                           } else if (session.system === 'DnD') {
+                                               const l = levelDnD ?? numLevel;
+                                               displayLevel = l ?? 'TBD';
+                                               if (typeof displayLevel === 'number') badgeStyle = getLevelBadgeStyle(displayLevel);
+                                           } else {
+                                               const isDual = levelPF !== undefined && levelDnD !== undefined && levelPF !== levelDnD;
+                                               if (isDual) {
+                                                   displayLevel = 'V';
+                                                   badgeStyle = getDualLevelBadgeStyle(levelPF, levelDnD);
+                                               } else {
+                                                   const l = levelPF ?? levelDnD ?? numLevel;
+                                                   displayLevel = l ?? 'TBD';
+                                                   if (typeof displayLevel === 'number') badgeStyle = getLevelBadgeStyle(displayLevel);
+                                               }
+                                           }
 
                                           return (
                                               <span 

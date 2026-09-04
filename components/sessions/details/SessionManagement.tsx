@@ -158,18 +158,19 @@ export default function SessionManagement({
                                     <div className="flex flex-col items-start gap-1">
                                         <div className="flex items-center gap-2 font-bold text-sm">
                                             {(() => {
-                                                const levelPF = quest.levelPF ?? (quest.levelDnD === undefined ? quest.level : undefined);
-                                                const levelDnD = quest.levelDnD;
+                                                const levelPF = quest.levelPF ?? quest.level;
+                                                const levelDnD = quest.levelDnD ?? quest.level;
+                                                const numLevel = typeof session.level === 'number' ? session.level : undefined;
                                                 
                                                 let displayLevel: number | 'V' | '?' = '?';
                                                 let badgeStyle: React.CSSProperties = {};
 
                                                 if (session.system === 'PF') {
-                                                    const l = levelPF ?? quest.level;
+                                                    const l = levelPF ?? numLevel;
                                                     displayLevel = (l ?? 0) > 0 ? l! : '?';
                                                     if (typeof displayLevel === 'number') badgeStyle = getLevelBadgeStyle(displayLevel);
                                                 } else if (session.system === 'DnD') {
-                                                    const l = levelDnD ?? (quest.levelPF === undefined ? quest.level : undefined) ?? quest.level;
+                                                    const l = levelDnD ?? numLevel;
                                                     displayLevel = (l ?? 0) > 0 ? l! : '?';
                                                     if (typeof displayLevel === 'number') badgeStyle = getLevelBadgeStyle(displayLevel);
                                                 } else {
@@ -178,7 +179,7 @@ export default function SessionManagement({
                                                         displayLevel = 'V';
                                                         badgeStyle = getDualLevelBadgeStyle(levelPF, levelDnD);
                                                     } else {
-                                                        const l = levelPF ?? levelDnD ?? quest.level;
+                                                        const l = levelPF ?? levelDnD ?? numLevel;
                                                         displayLevel = (l ?? 0) > 0 ? l! : '?';
                                                         if (typeof displayLevel === 'number') badgeStyle = getLevelBadgeStyle(displayLevel);
                                                     }

@@ -61,19 +61,21 @@ export const isAdminQuery = query({
 })
 
 export function computeEffectiveLevel(session: Doc<'sessions'>, quest: Doc<'quests'> | null): number | undefined {
-  if (!quest) return session.level
-  const levelPF = quest.levelPF ?? (quest.levelDnD === undefined ? quest.level : undefined)
-  const levelDnD = quest.levelDnD
+  const numericSessionLevel = typeof session.level === 'number' ? session.level : undefined
+  if (!quest) return numericSessionLevel
+  const levelPF = quest.levelPF ?? quest.level
+  const levelDnD = quest.levelDnD ?? quest.level
+
   if (session.system === 'PF') {
-    return levelPF ?? session.level
+    return levelPF ?? numericSessionLevel
   }
   if (session.system === 'DnD') {
-    return levelDnD ?? (quest.levelPF === undefined ? quest.level : undefined) ?? session.level
+    return levelDnD ?? numericSessionLevel
   }
   if (levelPF !== undefined && levelDnD === undefined) return levelPF
   if (levelDnD !== undefined && levelPF === undefined) return levelDnD
   if (levelPF !== undefined && levelDnD !== undefined && levelPF === levelDnD) return levelPF
-  return session.level
+  return numericSessionLevel
 }
 
 export const listSessions = query({
