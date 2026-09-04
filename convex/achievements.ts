@@ -1,4 +1,4 @@
-import { mutation } from './_generated/server'
+import { mutation, query } from './_generated/server'
 import { v } from 'convex/values'
 import { Doc } from './_generated/dataModel'
 
@@ -35,7 +35,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     description: 'Created your first player character in the Void Guild.',
     category: 'normal',
     icon: '⚔️',
-    reward: 'Title: Novice Adventurer',
+    reward: '',
     checkEligibility: (data) => data.characters.length >= 1,
   },
   {
@@ -44,7 +44,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     description: 'Created 3 or more player characters.',
     category: 'normal',
     icon: '👥',
-    reward: 'Title: Veteran Guildmaster',
+    reward: '',
     checkEligibility: (data) => data.characters.length >= 3,
   },
   {
@@ -53,7 +53,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     description: 'Participated in your first completed session.',
     category: 'normal',
     icon: '🌌',
-    reward: 'Badge: Void Initiate',
+    reward: '',
     checkEligibility: (data) => data.sessionsPlayedCount >= 1,
   },
   {
@@ -62,7 +62,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     description: 'Played in 5 or more completed sessions.',
     category: 'normal',
     icon: '🛡️',
-    reward: 'Badge: Seasoned Adventurer',
+    reward: '',
     checkEligibility: (data) => data.sessionsPlayedCount >= 5,
   },
   {
@@ -71,7 +71,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     description: 'Played in 10 or more completed sessions.',
     category: 'normal',
     icon: '🏆',
-    reward: 'Title: Champion of the Void',
+    reward: '',
     checkEligibility: (data) => data.sessionsPlayedCount >= 10,
   },
   {
@@ -80,7 +80,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     description: 'Ran your first session as a Gamemaster/Voidmaster.',
     category: 'normal',
     icon: '📜',
-    reward: 'Title: Apprentice Voidmaster',
+    reward: '',
     checkEligibility: (data) => data.sessionsRanCount >= 1,
   },
   {
@@ -89,7 +89,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     description: 'Ran 5 or more sessions as a Gamemaster/Voidmaster.',
     category: 'normal',
     icon: '👑',
-    reward: 'Title: Grand Voidmaster',
+    reward: '',
     checkEligibility: (data) => data.sessionsRanCount >= 5,
   },
   {
@@ -98,7 +98,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     description: 'Reach Level 5 or higher with any character.',
     category: 'normal',
     icon: '✨',
-    reward: 'Aura: Heroic Glow',
+    reward: '',
     checkEligibility: (data) => data.characters.some((c) => c.lvl >= 5),
   },
   {
@@ -107,7 +107,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     description: 'Reach Level 10 or higher with any character.',
     category: 'normal',
     icon: '🔥',
-    reward: 'Title: Legendary Hero',
+    reward: '',
     checkEligibility: (data) => data.characters.some((c) => c.lvl >= 10),
   },
   {
@@ -116,7 +116,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     description: 'Received your first character commendation from a party member.',
     category: 'normal',
     icon: '🌟',
-    reward: 'Badge: Commended Hero',
+    reward: '',
     checkEligibility: (data) => data.commendationCounts.total >= 1,
   },
   {
@@ -125,7 +125,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     description: 'Discovered the secret logo clicker easter egg.',
     category: 'hidden',
     icon: '🔍',
-    reward: 'Title: Easter Egg Explorer',
+    reward: '',
     checkEligibility: (data) => (data.userDoc?.logoClicks || 0) >= 10,
   },
   {
@@ -134,7 +134,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     description: 'Awarded a GM Commendation by a Voidmaster.',
     category: 'hidden',
     icon: '👑',
-    reward: 'Title: Favorite Player',
+    reward: '',
     checkEligibility: (data) => data.commendationCounts.gm >= 1,
   },
   {
@@ -143,7 +143,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     description: 'Own characters in both Pathfinder 2e and D&D 5e.',
     category: 'hidden',
     icon: '🎲',
-    reward: 'Title: System Scholar',
+    reward: '',
     checkEligibility: (data) =>
       data.characters.some((c) => c.system === 'PF') &&
       data.characters.some((c) => c.system === 'DnD'),
@@ -306,3 +306,17 @@ export const syncAndGetAchievements = mutation({
     }
   },
 })
+
+export const getUserUnlockedAchievementIds = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) return []
+    const unlockedDocs = await ctx.db
+      .query('unlockedAchievements')
+      .withIndex('by_userId', (q) => q.eq('userId', user.subject))
+      .collect()
+    return unlockedDocs.map((u) => u.achievementId)
+  },
+})
+

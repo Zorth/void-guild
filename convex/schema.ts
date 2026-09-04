@@ -12,6 +12,16 @@ export default defineSchema({
         websiteLink: v.optional(v.string()),
         rank: v.optional(v.string()), // none, journeyman, guildmaster
         system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
+        cosmetics: v.optional(v.object({
+            nameFont: v.optional(v.string()),
+            subtitleFont: v.optional(v.string()),
+            nameColor: v.optional(v.string()),
+            subtitleColor: v.optional(v.string()),
+            borderShape: v.optional(v.string()),
+            borderColor: v.optional(v.string()),
+            profileBorder: v.optional(v.string()),
+            bgColor: v.optional(v.string()),
+        })),
     }).index('by_userId', ['userId']),
     sessions: defineTable({
         date: v.optional(v.number()),

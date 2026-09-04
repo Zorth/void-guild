@@ -10,6 +10,7 @@ import { UserMetadata } from '@/app/stats/actions'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { toast } from 'sonner'
+import { resolveCosmeticsStyles } from '@/lib/cosmetics'
 
 interface CharacterRelationship {
   count: number
@@ -107,28 +108,30 @@ export default function AttendingCharactersList({
 
         const hasGivenPlayerComm = !!myPlayerComm
         const hasGivenGmComm = !!myGmComm
+        const cosmeticsStyles = resolveCosmeticsStyles(char.cosmetics)
         
         return (
             <li 
                 key={char._id} 
                 className={cn(
                     "flex items-center justify-between p-4 rounded-lg border transition-colors gap-3",
-                    isUserCharacter 
+                    cosmeticsStyles.cardClassName || (isUserCharacter 
                         ? "bg-[rgba(147,51,234,0.1)] border-2 border-[#D8B4FE] hover:border-[#E9D5FF] hover:bg-[rgba(147,51,234,0.2)] shadow-sm" 
-                        : "bg-muted/20"
+                        : "bg-muted/20")
                 )}
+                style={cosmeticsStyles.cardStyle}
             >
               <div className="flex items-center gap-3 min-w-0">
                 {metadata?.imageUrl && (
                     <img 
                         src={metadata.imageUrl} 
                         alt={metadata.name} 
-                        className="w-8 h-8 rounded-full border border-border shrink-0"
+                        className={cn("w-8 h-8 rounded-full shrink-0 object-cover", cosmeticsStyles.profileRingClassName)}
                     />
                 )}
                 <div className="min-w-0">
                     <div className="font-bold flex items-center flex-wrap gap-2">
-                        <span className="break-words">{char.name}</span>
+                        <span className={cn("break-words", cosmeticsStyles.nameClassName)} style={cosmeticsStyles.nameStyle}>{char.name}</span>
                         {isUserCharacter && <span className="text-[10px] bg-purple-200 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded-full uppercase tracking-wider font-bold shrink-0">You</span>}
                         {/* Book Icon */}
                         <a
@@ -141,7 +144,7 @@ export default function AttendingCharactersList({
                         </a>
                     </div>
                     <div className="text-[10px] text-muted-foreground mt-1 whitespace-normal flex items-center flex-wrap gap-1.5">
-                      <span>{char.ancestry} {char.class}</span>
+                      <span className={cosmeticsStyles.subtitleClassName} style={cosmeticsStyles.subtitleStyle}>{char.ancestry} {char.class}</span>
 
                       {hasUserSignedUp && rel && (
                         isUserCharacter ? (

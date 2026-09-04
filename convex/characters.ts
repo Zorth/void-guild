@@ -103,6 +103,16 @@ export const updateCharacter = mutation({
     class: v.optional(v.string()),
     websiteLink: v.optional(v.string()),
     system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
+    cosmetics: v.optional(v.object({
+      nameFont: v.optional(v.string()),
+      subtitleFont: v.optional(v.string()),
+      nameColor: v.optional(v.string()),
+      subtitleColor: v.optional(v.string()),
+      borderShape: v.optional(v.string()),
+      borderColor: v.optional(v.string()),
+      profileBorder: v.optional(v.string()),
+      bgColor: v.optional(v.string()),
+    })),
   },
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
@@ -119,6 +129,7 @@ export const updateCharacter = mutation({
       class: args.class,
       websiteLink: args.websiteLink,
       system: args.system,
+      cosmetics: args.cosmetics,
     })
   },
 })
