@@ -1,5 +1,4 @@
 import { mutation, query } from './_generated/server'
-import { v } from 'convex/values'
 import { Doc } from './_generated/dataModel'
 
 export interface AchievementDefinition {
@@ -7,8 +6,10 @@ export interface AchievementDefinition {
   title: string
   description: string
   category: 'normal' | 'hidden'
-  icon: string
   reward: string
+  chainId?: string
+  tier?: number
+  maxTier?: number
   checkEligibility: (data: UserEvaluationData) => boolean
 }
 
@@ -26,6 +27,12 @@ export interface UserEvaluationData {
     heroic: number
     gm: number
   }
+  givenCommendationCounts: {
+    total: number
+    gm: number
+  }
+  isInterestedCount: number
+  availabilityDaysCount: number
 }
 
 export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
@@ -34,17 +41,21 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     title: 'First Steps',
     description: 'Created your first player character in the Void Guild.',
     category: 'normal',
-    icon: '⚔️',
     reward: '',
+    chainId: 'character_roster',
+    tier: 1,
+    maxTier: 2,
     checkEligibility: (data) => data.characters.length >= 1,
   },
   {
     id: 'character_trio',
     title: 'Roster of Heroes',
     description: 'Created 3 or more player characters.',
-    category: 'normal',
-    icon: '👥',
+    category: 'hidden',
     reward: '',
+    chainId: 'character_roster',
+    tier: 2,
+    maxTier: 2,
     checkEligibility: (data) => data.characters.length >= 3,
   },
   {
@@ -52,26 +63,32 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     title: 'Into the Void',
     description: 'Participated in your first completed session.',
     category: 'normal',
-    icon: '🌌',
     reward: '',
+    chainId: 'sessions_played',
+    tier: 1,
+    maxTier: 3,
     checkEligibility: (data) => data.sessionsPlayedCount >= 1,
   },
   {
     id: 'veteran_player_5',
     title: 'Seasoned Adventurer',
     description: 'Played in 5 or more completed sessions.',
-    category: 'normal',
-    icon: '🛡️',
+    category: 'hidden',
     reward: '',
+    chainId: 'sessions_played',
+    tier: 2,
+    maxTier: 3,
     checkEligibility: (data) => data.sessionsPlayedCount >= 5,
   },
   {
     id: 'master_player_10',
     title: 'Guild Champion',
     description: 'Played in 10 or more completed sessions.',
-    category: 'normal',
-    icon: '🏆',
+    category: 'hidden',
     reward: '',
+    chainId: 'sessions_played',
+    tier: 3,
+    maxTier: 3,
     checkEligibility: (data) => data.sessionsPlayedCount >= 10,
   },
   {
@@ -79,17 +96,21 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     title: 'Behind the Screen',
     description: 'Ran your first session as a Gamemaster/Voidmaster.',
     category: 'normal',
-    icon: '📜',
     reward: '',
+    chainId: 'sessions_ran',
+    tier: 1,
+    maxTier: 2,
     checkEligibility: (data) => data.sessionsRanCount >= 1,
   },
   {
     id: 'veteran_gm_5',
     title: 'Master Storyteller',
     description: 'Ran 5 or more sessions as a Gamemaster/Voidmaster.',
-    category: 'normal',
-    icon: '👑',
+    category: 'hidden',
     reward: '',
+    chainId: 'sessions_ran',
+    tier: 2,
+    maxTier: 2,
     checkEligibility: (data) => data.sessionsRanCount >= 5,
   },
   {
@@ -97,34 +118,100 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     title: 'Rising Power',
     description: 'Reach Level 5 or higher with any character.',
     category: 'normal',
-    icon: '✨',
     reward: '',
+    chainId: 'character_level',
+    tier: 1,
+    maxTier: 2,
     checkEligibility: (data) => data.characters.some((c) => c.lvl >= 5),
   },
   {
     id: 'level_10_char',
     title: 'Legendary Hero',
     description: 'Reach Level 10 or higher with any character.',
-    category: 'normal',
-    icon: '🔥',
+    category: 'hidden',
     reward: '',
+    chainId: 'character_level',
+    tier: 2,
+    maxTier: 2,
     checkEligibility: (data) => data.characters.some((c) => c.lvl >= 10),
+  },
+  {
+    id: 'rank_journeyman',
+    title: 'Journeyman Adventurer',
+    description: 'Promoted to Journeyman rank with any character.',
+    category: 'normal',
+    reward: '',
+    chainId: 'guild_rank',
+    tier: 1,
+    maxTier: 2,
+    checkEligibility: (data) =>
+      data.characters.some((c) => c.rank === 'journeyman' || c.rank === 'guildmaster'),
+  },
+  {
+    id: 'rank_guildmaster',
+    title: "Guildmaster's Pinnacle",
+    description: 'Promoted to Guildmaster rank with any character.',
+    category: 'normal',
+    reward: '',
+    chainId: 'guild_rank',
+    tier: 2,
+    maxTier: 2,
+    checkEligibility: (data) => data.characters.some((c) => c.rank === 'guildmaster'),
   },
   {
     id: 'first_commendation',
     title: 'Party Favorite',
     description: 'Received your first character commendation from a party member.',
-    category: 'normal',
-    icon: '🌟',
+    category: 'hidden',
     reward: '',
     checkEligibility: (data) => data.commendationCounts.total >= 1,
+  },
+  {
+    id: 'give_1_commendation',
+    title: 'Generous Spirit',
+    description: 'Gave your first commendation to a fellow party member.',
+    category: 'hidden',
+    reward: '',
+    chainId: 'commendations_given',
+    tier: 1,
+    maxTier: 3,
+    checkEligibility: (data) => data.givenCommendationCounts.total >= 1,
+  },
+  {
+    id: 'give_5_commendations',
+    title: 'Patron of Valor',
+    description: 'Gave 5 or more commendations to fellow party members.',
+    category: 'hidden',
+    reward: '',
+    chainId: 'commendations_given',
+    tier: 2,
+    maxTier: 3,
+    checkEligibility: (data) => data.givenCommendationCounts.total >= 5,
+  },
+  {
+    id: 'give_10_commendations',
+    title: 'Guild Encourager',
+    description: 'Gave 10 or more commendations to fellow party members.',
+    category: 'hidden',
+    reward: '',
+    chainId: 'commendations_given',
+    tier: 3,
+    maxTier: 3,
+    checkEligibility: (data) => data.givenCommendationCounts.total >= 10,
+  },
+  {
+    id: 'give_gm_commendation',
+    title: "Voidmaster's Reward",
+    description: 'Awarded a GM Commendation to a player as a Voidmaster.',
+    category: 'hidden',
+    reward: '',
+    checkEligibility: (data) => data.givenCommendationCounts.gm >= 1,
   },
   {
     id: 'secret_logo_clicks',
     title: 'Curious Clicker',
     description: 'Discovered the secret logo clicker easter egg.',
     category: 'hidden',
-    icon: '🔍',
     reward: '',
     checkEligibility: (data) => (data.userDoc?.logoClicks || 0) >= 10,
   },
@@ -133,16 +220,54 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     title: "Master's Favor",
     description: 'Awarded a GM Commendation by a Voidmaster.',
     category: 'hidden',
-    icon: '👑',
     reward: '',
     checkEligibility: (data) => data.commendationCounts.gm >= 1,
+  },
+  {
+    id: 'express_interest',
+    title: 'Eager Adventurer',
+    description: 'Marked yourself as interested in an upcoming session.',
+    category: 'normal',
+    reward: '',
+    checkEligibility: (data) => data.isInterestedCount >= 1,
+  },
+  {
+    id: 'availability_5_days',
+    title: 'Duty Calls',
+    description: 'Marked yourself as available for at least 5 days on the planning tool.',
+    category: 'normal',
+    reward: '',
+    checkEligibility: (data) => data.availabilityDaysCount >= 5,
+  },
+  {
+    id: 'visit_world',
+    title: 'World Explorer',
+    description: 'Visited a campaign world page.',
+    category: 'normal',
+    reward: '',
+    checkEligibility: (data) => Boolean(data.userDoc?.visitedWorld),
+  },
+  {
+    id: 'visit_wiki',
+    title: 'Scholar of the Void',
+    description: 'Visited the campaign wiki via the wiki button.',
+    category: 'hidden',
+    reward: '',
+    checkEligibility: (data) => Boolean(data.userDoc?.visitedWiki),
+  },
+  {
+    id: 'visit_leaderboard',
+    title: 'Leaderboard Inspector',
+    description: 'Visited the server leaderboard statistics page.',
+    category: 'hidden',
+    reward: '',
+    checkEligibility: (data) => Boolean(data.userDoc?.visitedLeaderboard),
   },
   {
     id: 'system_polymath',
     title: 'System Polymath',
     description: 'Own characters in both Pathfinder 2e and D&D 5e.',
     category: 'hidden',
-    icon: '🎲',
     reward: '',
     checkEligibility: (data) =>
       data.characters.some((c) => c.system === 'PF') &&
@@ -188,7 +313,7 @@ export const syncAndGetAchievements = mutation({
       }
     }
 
-    // Commendations calculation
+    // Received Commendations calculation
     const commendationCounts = {
       total: 0,
       roleplay: 0,
@@ -212,6 +337,34 @@ export const syncAndGetAchievements = mutation({
       }
     }
 
+    // Given Commendations calculation
+    const givenCommendationsDocs = await ctx.db
+      .query('commendations')
+      .withIndex('by_fromUserId', (q) => q.eq('fromUserId', user.subject))
+      .collect()
+
+    const givenCommendationCounts = {
+      total: givenCommendationsDocs.length,
+      gm: givenCommendationsDocs.filter((c) => c.category === 'gm').length,
+    }
+
+    // Interested sessions calculation
+    const allSessionsForInterest = await ctx.db.query('sessions').collect()
+    let isInterestedCount = 0
+    for (const s of allSessionsForInterest) {
+      if (s.interestedPlayers && s.interestedPlayers.some((p) => p.userId === user.subject)) {
+        isInterestedCount += 1
+      }
+    }
+
+    // Availability calculation
+    const userAvailabilityDocs = await ctx.db
+      .query('availability')
+      .withIndex('by_user_date', (q) => q.eq('userId', user.subject))
+      .collect()
+
+    const availabilityDaysCount = new Set(userAvailabilityDocs.map((a) => a.date)).size
+
     const evalData: UserEvaluationData = {
       userId: user.subject,
       userDoc,
@@ -219,6 +372,9 @@ export const syncAndGetAchievements = mutation({
       sessionsPlayedCount,
       sessionsRanCount,
       commendationCounts,
+      givenCommendationCounts,
+      isInterestedCount,
+      availabilityDaysCount,
     }
 
     // Existing unlocked records in database
@@ -261,11 +417,13 @@ export const syncAndGetAchievements = mutation({
           title: def.title,
           description: def.description,
           category: def.category,
-          icon: def.icon,
           reward: def.reward,
           isUnlocked,
           unlockedAt: unlockedAt || null,
           isHidden: false,
+          chainId: def.chainId,
+          tier: def.tier,
+          maxTier: def.maxTier,
         })
       } else if (def.category === 'hidden') {
         if (isUnlocked) {
@@ -275,11 +433,13 @@ export const syncAndGetAchievements = mutation({
             title: def.title,
             description: def.description,
             category: def.category,
-            icon: def.icon,
             reward: def.reward,
             isUnlocked: true,
             unlockedAt: unlockedAt!,
             isHidden: true,
+            chainId: def.chainId,
+            tier: def.tier,
+            maxTier: def.maxTier,
           })
         } else if (isAdmin) {
           // Locked hidden achievement: visible to admin marked as hidden
@@ -288,21 +448,26 @@ export const syncAndGetAchievements = mutation({
             title: def.title,
             description: def.description,
             category: def.category,
-            icon: def.icon,
             reward: def.reward,
             isUnlocked: false,
             unlockedAt: null,
             isHidden: true,
+            chainId: def.chainId,
+            tier: def.tier,
+            maxTier: def.maxTier,
           })
         }
       }
     }
 
+    const normalDefs = ACHIEVEMENTS_REGISTRY.filter((a) => a.category === 'normal')
+    const unlockedNormalCount = normalDefs.filter((a) => unlockedMap.has(a.id)).length
+
     return {
       achievements: result,
       isAdmin,
-      unlockedCount: result.filter((a) => a.isUnlocked).length,
-      totalCount: result.length,
+      unlockedCount: unlockedNormalCount,
+      totalCount: normalDefs.length,
     }
   },
 })
@@ -319,4 +484,3 @@ export const getUserUnlockedAchievementIds = query({
     return unlockedDocs.map((u) => u.achievementId)
   },
 })
-

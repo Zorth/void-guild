@@ -1,12 +1,12 @@
 'use client'
 
-import { useQuery } from 'convex/react'
+import { useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { ChevronLeft, Crown, Shield, Swords, Book } from 'lucide-react'
-import { useMemo } from 'react'
+import { useMemo, useEffect } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@clerk/nextjs'
 import { cn } from '@/lib/utils'
@@ -15,6 +15,13 @@ export default function StatsPage() {
     const { userId } = useAuth();
     const characters = useQuery(api.characters.listAllCharactersPublic);
     const leaderboardStats = useQuery(api.users.getLeaderboardStats);
+    const recordLeaderboardVisit = useMutation(api.users.recordLeaderboardVisit);
+
+    useEffect(() => {
+      if (userId) {
+        recordLeaderboardVisit().catch(() => {});
+      }
+    }, [userId, recordLeaderboardVisit]);
 
     const sortedCharacters = useMemo(() => {
       if (!characters) return [];

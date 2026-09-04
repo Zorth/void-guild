@@ -122,6 +122,9 @@ export default defineSchema({
         extraSessionsPlayed: v.optional(v.number()),
         extraSessionsRan: v.optional(v.number()),
         logoClicks: v.optional(v.number()),
+        visitedWorld: v.optional(v.boolean()),
+        visitedWiki: v.optional(v.boolean()),
+        visitedLeaderboard: v.optional(v.boolean()),
     }).index('by_userId', ['userId']),
     commendations: defineTable({
         sessionId: v.id('sessions'),
@@ -136,6 +139,7 @@ export default defineSchema({
         ),
     }).index('by_session_fromUser', ['sessionId', 'fromUserId'])
       .index('by_toCharacter', ['toCharacterId'])
+      .index('by_fromUserId', ['fromUserId'])
       .index('by_session', ['sessionId']),
     unlockedAchievements: defineTable({
         userId: v.string(), // Clerk subject

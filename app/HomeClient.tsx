@@ -24,8 +24,13 @@ export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
   const [hasReachedRainbow, setHasReachedRainbow] = useState(false)
 
   const incrementLogoClicks = useMutation(api.users.incrementLogoClicks)
+  const recordWikiVisit = useMutation(api.users.recordWikiVisit)
   const isGM = useQuery(api.sessions.isGameMasterQuery)
   const ownedWorld = useQuery(api.worlds.getWorldByOwner)
+
+  const handleWikiClick = () => {
+    recordWikiVisit().catch(console.error)
+  }
 
   const handleLogoClick = () => {
     // Balanced boost to allow building momentum
@@ -107,7 +112,7 @@ export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
                     <img src="/DnDVoid.svg" alt="D&D" className="h-6 w-6" />
                 </Button>
             </div>
-            <a href="https://void.tarragon.be/" target="_blank" rel="noopener noreferrer">
+            <a href="https://void.tarragon.be/" target="_blank" rel="noopener noreferrer" onClick={handleWikiClick}>
               <Button variant="outline" size="sm" className="flex items-center gap-2 h-9 w-9 sm:w-auto sm:px-3 p-0">
                 <Book className="h-4 w-4" />
                 <span className="hidden sm:inline">Wiki</span>

@@ -208,6 +208,13 @@ export default function WorldClient() {
   const userCharacters = useQuery(api.characters.listCharacters)
   const renameWorld = useMutation(api.worlds.renameWorld)
   const updateSessionInGameDate = useMutation(api.sessions.updateInGameDate)
+  const recordWorldVisit = useMutation(api.users.recordWorldVisit)
+
+  useEffect(() => {
+    if (userId) {
+      recordWorldVisit().catch(() => {})
+    }
+  }, [userId, recordWorldVisit])
   
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming')
   const [pfFilter, setPfFilter] = useState(true)

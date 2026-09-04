@@ -98,6 +98,102 @@ export const incrementLogoClicks = mutation({
 })
 
 /**
+ * Records that the current user has visited a world page.
+ */
+export const recordWorldVisit = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) return null
+
+    const userRecord = await ctx.db
+      .query('users')
+      .withIndex('by_userId', (q) => q.eq('userId', identity.subject))
+      .first()
+
+    if (userRecord) {
+      if (!userRecord.visitedWorld) {
+        await ctx.db.patch(userRecord._id, {
+          visitedWorld: true,
+        })
+      }
+    } else {
+      await ctx.db.insert('users', {
+        userId: identity.subject,
+        isAdmin: false,
+        isGM: false,
+        name: identity.name,
+        visitedWorld: true,
+      })
+    }
+  },
+})
+
+/**
+ * Records that the current user clicked the wiki link.
+ */
+export const recordWikiVisit = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) return null
+
+    const userRecord = await ctx.db
+      .query('users')
+      .withIndex('by_userId', (q) => q.eq('userId', identity.subject))
+      .first()
+
+    if (userRecord) {
+      if (!userRecord.visitedWiki) {
+        await ctx.db.patch(userRecord._id, {
+          visitedWiki: true,
+        })
+      }
+    } else {
+      await ctx.db.insert('users', {
+        userId: identity.subject,
+        isAdmin: false,
+        isGM: false,
+        name: identity.name,
+        visitedWiki: true,
+      })
+    }
+  },
+})
+
+/**
+ * Records that the current user visited the leaderboard stats page.
+ */
+export const recordLeaderboardVisit = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) return null
+
+    const userRecord = await ctx.db
+      .query('users')
+      .withIndex('by_userId', (q) => q.eq('userId', identity.subject))
+      .first()
+
+    if (userRecord) {
+      if (!userRecord.visitedLeaderboard) {
+        await ctx.db.patch(userRecord._id, {
+          visitedLeaderboard: true,
+        })
+      }
+    } else {
+      await ctx.db.insert('users', {
+        userId: identity.subject,
+        isAdmin: false,
+        isGM: false,
+        name: identity.name,
+        visitedLeaderboard: true,
+      })
+    }
+  },
+})
+
+/**
  * Gets multiple users by their Clerk userIds.
  */
 export const getUsersByIds = query({
