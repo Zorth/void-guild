@@ -12,6 +12,8 @@
   --font-gin: var(--font-gin);
   --font-taroca: var(--font-taroca);
   --font-sabon: var(--font-sabon);
+  --font-medieval: var(--font-medieval-sharp);
+  --font-cinzel-dec: var(--font-cinzel-dec);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -121,6 +123,26 @@
 
 .dark h1 {
   font-family: var(--font-taroca), serif !important;
+}
+
+.font-sabon {
+  font-family: var(--font-sabon), Georgia, serif !important;
+}
+
+.font-gin {
+  font-family: var(--font-gin), 'Times New Roman', serif !important;
+}
+
+.font-taroca {
+  font-family: var(--font-taroca), fantasy, serif !important;
+}
+
+.font-medieval {
+  font-family: var(--font-medieval-sharp), cursive, serif !important;
+}
+
+.font-cinzel-dec {
+  font-family: var(--font-cinzel-dec), fantasy, serif !important;
 }
 
 @layer base {
@@ -263,6 +285,84 @@
   67% { filter: drop-shadow(0 0 15px #0000ff) brightness(1.2); }
   83% { filter: drop-shadow(0 0 15px #8800ff) brightness(1.2); }
   100% { filter: drop-shadow(0 0 15px #ff0000) brightness(1.2); }
+}
+
+/* Rotating Void Border (Black - Purple - White) */
+@property --void-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.void-rotating-border {
+  position: relative !important;
+  border-color: transparent !important;
+}
+
+.void-rotating-border::before {
+  content: '' !important;
+  position: absolute !important;
+  inset: -2.5px !important;
+  border-radius: inherit !important;
+  padding: 2.5px !important;
+  background: conic-gradient(
+    from var(--void-angle, 0deg),
+    #05000a 0%,
+    #2e044d 20%,
+    #9333ea 40%,
+    #ffffff 50%,
+    #9333ea 60%,
+    #2e044d 80%,
+    #05000a 100%
+  ) !important;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0) !important;
+  -webkit-mask-composite: xor !important;
+  mask-composite: exclude !important;
+  animation: void-rotate 7s linear infinite !important;
+  will-change: --void-angle !important;
+  pointer-events: none !important;
+  z-index: 10 !important;
+  filter: drop-shadow(0 0 8px rgba(147, 51, 234, 0.4)) !important;
+}
+
+.void-avatar-ring {
+  position: relative !important;
+  border-color: transparent !important;
+}
+
+.void-avatar-ring::before {
+  content: '' !important;
+  position: absolute !important;
+  inset: -3.5px !important;
+  border-radius: 9999px !important;
+  padding: 3.5px !important;
+  background: conic-gradient(
+    from var(--void-angle, 0deg),
+    #05000a 0%,
+    #2e044d 20%,
+    #9333ea 40%,
+    #ffffff 50%,
+    #9333ea 60%,
+    #2e044d 80%,
+    #05000a 100%
+  ) !important;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0) !important;
+  -webkit-mask-composite: xor !important;
+  mask-composite: exclude !important;
+  animation: void-rotate 7s linear infinite !important;
+  will-change: --void-angle !important;
+  pointer-events: none !important;
+  z-index: 10 !important;
+  filter: drop-shadow(0 0 8px rgba(147, 51, 234, 0.6)) !important;
+}
+
+@keyframes void-rotate {
+  0% {
+    --void-angle: 0deg;
+  }
+  100% {
+    --void-angle: 360deg;
+  }
 }
 
 /* Guildmaster Metallic Gold Cosmetics */

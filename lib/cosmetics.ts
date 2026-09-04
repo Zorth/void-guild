@@ -17,7 +17,7 @@ export interface AchievementInfo {
 
 export const ACHIEVEMENT_INFO: Record<string, AchievementInfo> = {
   first_character: { title: 'First Steps', category: 'normal' },
-  character_trio: { title: 'Roster of Heroes', category: 'normal' },
+  character_trio: { title: 'Roster of Heroes', category: 'hidden' },
   first_session: { title: 'Into the Void', category: 'normal' },
   veteran_player_5: { title: 'Seasoned Adventurer', category: 'normal' },
   master_player_10: { title: 'Guild Champion', category: 'normal' },
@@ -43,6 +43,41 @@ export const ACHIEVEMENT_INFO: Record<string, AchievementInfo> = {
 
 export const FONT_OPTIONS: CosmeticOption[] = [
   { id: 'default', name: 'Default (Sans)', unlockedByDefault: true, value: 'font-sans' },
+  {
+    id: 'sabon_serif',
+    name: 'Sabon Serif',
+    unlockedByDefault: false,
+    requiredAchievementId: 'first_session',
+    value: 'font-sabon',
+  },
+  {
+    id: 'gin_bold',
+    name: 'Gin Bold',
+    unlockedByDefault: false,
+    requiredAchievementId: 'veteran_player_5',
+    value: 'font-gin',
+  },
+  {
+    id: 'medieval_sharp',
+    name: 'Medieval Sharp',
+    unlockedByDefault: false,
+    requiredAchievementId: 'veteran_player_5',
+    value: 'font-medieval',
+  },
+  {
+    id: 'taroca_fantasy',
+    name: 'Taroca Calligraphic',
+    unlockedByDefault: false,
+    requiredAchievementId: 'master_player_10',
+    value: 'font-taroca',
+  },
+  {
+    id: 'cinzel_decorative',
+    name: 'Cinzel Decorative',
+    unlockedByDefault: false,
+    requiredAchievementId: 'master_player_10',
+    value: 'font-cinzel-dec',
+  },
 ]
 
 export const COLOR_OPTIONS: CosmeticOption[] = [
@@ -53,6 +88,13 @@ export const COLOR_OPTIONS: CosmeticOption[] = [
     unlockedByDefault: false,
     requiredAchievementId: 'tutorial_completed',
     value: '#D8B4FE',
+  },
+  {
+    id: 'teal_text',
+    name: 'Teal Accent',
+    unlockedByDefault: false,
+    requiredAchievementId: 'character_trio',
+    value: '#2DD4BF',
   },
   {
     id: 'gold_text',
@@ -99,6 +141,14 @@ export const BORDER_SHAPE_OPTIONS: CosmeticOption[] = [
     previewClass: 'gold-card-border rounded-lg p-1',
   },
   {
+    id: 'void_border',
+    name: 'Rotating Void Border',
+    unlockedByDefault: false,
+    requiredAchievementId: 'first_gm_session',
+    value: 'rounded-lg void-rotating-border',
+    previewClass: 'void-rotating-border rounded-lg p-1',
+  },
+  {
     id: 'rainbow_border',
     name: 'Moving Rainbow Border',
     unlockedByDefault: false,
@@ -125,6 +175,14 @@ export const PROFILE_BORDER_OPTIONS: CosmeticOption[] = [
     requiredAchievementId: 'rank_guildmaster',
     value: 'gold-avatar-ring',
     previewClass: 'gold-avatar-ring',
+  },
+  {
+    id: 'void_ring',
+    name: 'Rotating Void Ring',
+    unlockedByDefault: false,
+    requiredAchievementId: 'veteran_gm_5',
+    value: 'void-avatar-ring',
+    previewClass: 'void-avatar-ring',
   },
   {
     id: 'leaderboard_rank',
