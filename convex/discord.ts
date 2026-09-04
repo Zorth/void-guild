@@ -227,11 +227,17 @@ export const syncSessionToDiscord = internalAction({
 
     // Format the list of signed-up characters and interested players for the embed fields
     const signupList = session.attendingCharacters.length > 0
-      ? session.attendingCharacters.map(c => `• **${c.name}** (Lvl ${c.lvl} ${c.class})`).join("\n")
+      ? session.attendingCharacters.map(c => {
+          const ping = c.discordId ? ` (<@${c.discordId}>)` : "";
+          return `• **${c.name}** (Lvl ${c.lvl} ${c.class})${ping}`;
+        }).join("\n")
       : (isPlanning ? "_Signups not yet open._" : "_No characters signed up yet._");
     
     const interestList = (session.interestedPlayers && session.interestedPlayers.length > 0)
-      ? session.interestedPlayers.map(p => `• **${p.username}**`).join("\n")
+      ? session.interestedPlayers.map(p => {
+          const ping = p.discordId ? ` (<@${p.discordId}>)` : "";
+          return `• **${p.username}**${ping}`;
+        }).join("\n")
       : "_No interest expressed yet._";
 
     const embed = {
@@ -728,8 +734,34 @@ export const getInternalSessionDetails = internalQuery({
 
     const world = await ctx.db.get(session.world);
     const attendingCharacters = await Promise.all(
-      session.characters.map((id) => ctx.db.get(id))
+      session.characters.map(async (id) => {
+        const c = await ctx.db.get(id);
+        if (!c) return null;
+        const ownerUser = await ctx.db
+          .query("users")
+          .withIndex("by_userId", (q) => q.eq("userId", c.userId))
+          .first();
+        return {
+          ...c,
+          discordId: ownerUser?.discordId || null,
+        };
+      })
     );
+
+    const interestedPlayers = session.interestedPlayers
+      ? await Promise.all(
+          session.interestedPlayers.map(async (p) => {
+            const userDoc = await ctx.db
+              .query("users")
+              .withIndex("by_userId", (q) => q.eq("userId", p.userId))
+              .first();
+            return {
+              ...p,
+              discordId: userDoc?.discordId || null,
+            };
+          })
+        )
+      : [];
 
     const gmCharacter = session.gmCharacter ? await ctx.db.get(session.gmCharacter) : null;
 
@@ -753,6 +785,7 @@ export const getInternalSessionDetails = internalQuery({
       worldName: world?.name || "Unknown World",
       worldCalendar: world?.calendar || null,
       attendingCharacters: attendingCharacters.filter((c): c is any => c !== null),
+      interestedPlayers,
       gmCharacterName: gmCharacter?.name || null,
       quests: [...quests, ...worldlessQuests],
       selectedQuest,

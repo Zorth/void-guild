@@ -27,6 +27,9 @@ export const syncUser = mutation({
       name = familyName ? `${givenName} ${familyName.charAt(0).toUpperCase()}.` : givenName
     }
 
+    const discordId = extractClaim(identity, 'discord_id') || extractClaim(identity, 'discord_user_id') || extractClaim(identity, 'provider_user_id')
+    const discordUsername = extractClaim(identity, 'discord_username') || extractClaim(identity, 'discord_handle')
+
     const userData = {
       userId: identity.subject,
       isAdmin: isAdminUser,
@@ -37,6 +40,8 @@ export const syncUser = mutation({
       imageUrl: identity.pictureUrl || extractClaim(identity, 'picture') || extractClaim(identity, 'pictureUrl'),
       extraSessionsPlayed,
       extraSessionsRan,
+      ...(discordId ? { discordId: String(discordId) } : {}),
+      ...(discordUsername ? { discordUsername: String(discordUsername) } : {}),
     }
 
     const existingUser = await ctx.db
@@ -54,7 +59,9 @@ export const syncUser = mutation({
         existingUser.email !== userData.email ||
         existingUser.imageUrl !== userData.imageUrl ||
         existingUser.extraSessionsPlayed !== userData.extraSessionsPlayed ||
-        existingUser.extraSessionsRan !== userData.extraSessionsRan
+        existingUser.extraSessionsRan !== userData.extraSessionsRan ||
+        (userData.discordId && existingUser.discordId !== userData.discordId) ||
+        (userData.discordUsername && existingUser.discordUsername !== userData.discordUsername)
 
       if (hasChanges) {
         await ctx.db.patch(existingUser._id, userData)
@@ -362,5 +369,18 @@ export const updateRole = mutation({
     const isAdminUser = await isAdmin(ctx)
     if (!isAdminUser) throw new Error('Unauthorized')
     return await updateUserData(ctx, args)
+  },
+})
+
+/**
+ * Gets a user document by their linked Discord Snowflake User ID.
+ */
+export const getUserByDiscordId = query({
+  args: { discordId: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query('users')
+      .withIndex('by_discordId', (q) => q.eq('discordId', args.discordId))
+      .first()
   },
 })

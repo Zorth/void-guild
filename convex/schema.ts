@@ -125,7 +125,10 @@ export default defineSchema({
         visitedWorld: v.optional(v.boolean()),
         visitedWiki: v.optional(v.boolean()),
         visitedLeaderboard: v.optional(v.boolean()),
-    }).index('by_userId', ['userId']),
+        discordId: v.optional(v.string()),
+        discordUsername: v.optional(v.string()),
+    }).index('by_userId', ['userId'])
+      .index('by_discordId', ['discordId']),
     commendations: defineTable({
         sessionId: v.id('sessions'),
         fromUserId: v.string(), // Clerk subject of the giver
