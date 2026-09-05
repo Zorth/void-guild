@@ -6,26 +6,47 @@
 
 ## Key Features
 
-*   **Character Management:** Create, edit, and delete your game characters.
-*   **Character Ranks:** Admins can assign ranks (`Journeyman`, `Guildmaster`) to characters, displayed with special icons.
-*   **Session Scheduling:** Game Masters can create and manage upcoming and past sessions.
-*   **Session Participation:** Players can join and leave sessions with their characters.
-*   **XP Tracking:** Sessions award experience points to participating characters.
-*   **System-Aware Quest Levels:** Dual-system quests automatically evaluate and display system-matched levels (`PF` vs `DnD`).
-*   **Character Relationships & Mutual Streaks:** Attending character lists display mutual session streaks (`🔥 3+ streak`), first-time co-adventurer badges (`NEW`), and total shared sessions (`5x`, `10x`).
-*   **World Visit & Streak Tracking:** Badges highlight a character's first visit to a world (`NEW WORLD`), world visit counts, and consecutive world streaks. GM bonus characters are excluded from attendance counts and never break streaks.
-*   **Character Commendation System:** Players can award 1 commendation per session to a party member across 4 categories (🎭 *Roleplay MVP*, ⚔️ *Tactical Genius*, 🛡️ *Clutch Savior*, 🌟 *Heroic MVP*). Earned commendations are displayed per category on character cards on the homepage.
-*   **7-Day Overview:** A calendar-like view of upcoming sessions for the next seven days, with visual cues for owned and joined sessions.
-*   **Character Website Links:** Characters can have an associated website link, editable by the owner and visible to all in session details.
-*   **Session Locking:** Game Masters can lock sessions to finalize attendance and XP awards.
+* **Character Management:** Create, edit, and delete your game characters.
+* **Character Ranks:** Admins can assign ranks (`Journeyman`, `Guildmaster`) to characters, displayed with special icons.
+* **Session Scheduling:** Game Masters can create and manage upcoming and past sessions.
+* **Session Participation:** Players can join and leave sessions with their characters.
+* **XP Tracking:** Sessions award experience points to participating characters.
+* **System-Aware Quest Levels:** Dual-system quests automatically evaluate and display system-matched levels (`PF` vs `DnD`).
+* **Character Relationships & Mutual Streaks:** Attending character lists display mutual session streaks (`🔥 3+ streak`), first-time co-adventurer badges (`NEW`), and total shared sessions (`5x`, `10x`).
+* **World Visit & Streak Tracking:** Badges highlight a character's first visit to a world (`NEW WORLD`), world visit counts, and consecutive world streaks. GM bonus characters are excluded from attendance counts and never break streaks.
+* **Character Commendation System:** Players can award 1 commendation per session to a party member across 4 categories (🎭 *Roleplay MVP*, ⚔️ *Tactical Genius*, 🛡️ *Clutch Savior*, 🌟 *Heroic MVP*). Earned commendations are displayed per category on character cards on the homepage.
+* **Event-Driven Achievements:** Achievements auto-unlock and toast upon completion of real-world actions (e.g. giving commendations, viewing leaderboards, visiting world pages) without background polling.
+* **7-Day Overview:** A calendar-like view of upcoming sessions for the next seven days, with visual cues for owned and joined sessions.
+* **Character Website Links:** Characters can have an associated website link, editable by the owner and visible to all in session details.
+* **Session Locking:** Game Masters can lock sessions to finalize attendance and XP awards.
 
 ## Technologies Used
 
-*   **Next.js:** React framework for building server-rendered and static web applications.
-*   **React:** Frontend library for building user interfaces.
-*   **Tailwind CSS:** A utility-first CSS framework for rapid UI development.
-*   **Convex:** Full-stack development platform providing a real-time database and serverless functions.
-*   **Clerk:** User authentication and management solution.
+* **Next.js:** React framework for building server-rendered and static web applications.
+* **React:** Frontend library for building user interfaces.
+* **Tailwind CSS:** Utility-first CSS framework for rapid UI development.
+* **Convex:** Full-stack real-time database and serverless function backend.
+* **Clerk:** User authentication and identity management.
+
+---
+
+## Performance & Platform Resource Limits
+
+To ensure scalable, cost-effective database usage and zero-latency real-time updates, all frontend and backend code must observe Convex and Clerk resource constraints:
+
+### Convex Database Limits & Rules
+- **Document Size Cap**: Maximum 1 MB (UTF-8) per document. Child collections are stored in dedicated tables via `v.id("table")` foreign keys rather than growing `v.array()` attributes inside parent documents.
+- **Transaction Read/Write Limits**: Max 32,768 read documents (16 MB) and 8,192 written documents (16 MB) per transaction.
+- **Mandatory Indexing**: Queries must use `.withIndex(...)` composite indexes (e.g. `by_userId_achievementId`). Full collection scans (`.collect()`) on unindexed queries are forbidden.
+- **Event-Driven Architecture**: Continuous background `setInterval` polling loops are completely removed. Achievements and user syncs are evaluated strictly on login and triggered immediately upon user interactions.
+- **Client-Side Throttling**: Heavy user sync functions (`users.syncUser`) are throttled using a 5-minute `sessionStorage` guard (`void_user_synced_<userId>`) to eliminate redundant calls during SPA route changes.
+
+### Clerk Authentication Limits & Rules
+- **Rate Limit**: Clerk REST APIs enforce a limit of 20 requests/second per IP/instance.
+- **Server Identity Verification**: Authorization derives exclusively from `ctx.auth.getUserIdentity()`. Client-supplied user IDs are never trusted as authorization parameters.
+- **Stable Token Identifier**: User records and security scope checks utilize `identity.tokenIdentifier`.
+
+---
 
 ## Getting Started
 
@@ -33,20 +54,20 @@ Follow these instructions to set up and run the project locally.
 
 ### Prerequisites
 
-*   Node.js (LTS version recommended)
-*   npm, yarn, pnpm, or bun (your preferred package manager)
-*   A Convex account and project set up.
-*   A Clerk account and application set up.
+* Node.js (LTS version recommended)
+* npm, yarn, pnpm, or bun (your preferred package manager)
+* A Convex account and project set up.
+* A Clerk account and application set up.
 
 ### Installation
 
-1.  **Clone the repository:**
+1. **Clone the repository:**
     ```bash
     git clone https://github.com/your-username/void-guild.git
     cd void-guild
     ```
 
-2.  **Install dependencies:**
+2. **Install dependencies:**
     ```bash
     npm install
     # or
@@ -57,26 +78,26 @@ Follow these instructions to set up and run the project locally.
     bun install
     ```
 
-3.  **Convex Setup:**
-    *   Obtain your `CONVEX_URL` from your Convex project dashboard.
-    *   Add it to your `.env.local` file:
-        ```
+3. **Convex Setup:**
+    * Obtain your `CONVEX_URL` from your Convex project dashboard.
+    * Add it to your `.env.local` file:
+        ```env
         CONVEX_URL=https://<your-project-name>.convex.cloud
         ```
-    *   Ensure your Convex authentication is configured with Clerk as per Convex documentation.
+    * Ensure your Convex authentication is configured with Clerk as per Convex documentation.
 
-4.  **Clerk Setup:**
-    *   Follow the Clerk documentation to create an application and get your API keys.
-    *   Add the following environment variables to your `.env.local` file:
-        ```
+4. **Clerk Setup:**
+    * Follow the Clerk documentation to create an application and get your API keys.
+    * Add the following environment variables to your `.env.local` file:
+        ```env
         NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_your_publishable_key
         CLERK_SECRET_KEY=sk_your_secret_key
         ```
-    *   Ensure your Convex authentication is configured with Clerk as per Convex documentation.
+    * Ensure your Convex authentication is configured with Clerk as per Convex documentation.
 
-5.  **Discord Setup (Optional):**
-    *   To enable Discord notifications, add the following environment variables to your Convex dashboard:
-        ```
+5. **Discord Setup (Optional):**
+    * To enable Discord notifications, add the following environment variables to your Convex dashboard:
+        ```env
         DISCORD_BOT_TOKEN=your_bot_token
         DISCORD_FORUM_CHANNEL_ID=your_forum_channel_id
         DISCORD_CHANNEL_ID=your_activity_channel_id
@@ -101,21 +122,12 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Developer Guidelines
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+For detailed subagent rules, coding standards, and Convex AI function guidelines, refer to:
+* [`AGENTS.md`](./AGENTS.md)
+* [`CLAUDE.md`](./CLAUDE.md)
+* [`convex/README.md`](./convex/README.md)
+* [`convex/_generated/ai/guidelines.md`](./convex/_generated/ai/guidelines.md)
