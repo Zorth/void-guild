@@ -40,7 +40,9 @@ function fireAchievementConfetti() {
 export default function AchievementListener() {
   const { isAuthenticated, isLoading } = useConvexAuth()
   const syncAndGetAchievements = useMutation(api.achievements.syncAndGetAchievements)
+  const markAchievementsNotified = useMutation(api.achievements.markAchievementsNotified)
   const isCheckingRef = useRef(false)
+  const notifiedInSessionRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     if (isLoading || !isAuthenticated) return
@@ -52,17 +54,17 @@ export default function AchievementListener() {
         const res = await syncAndGetAchievements()
         if (!res?.achievements) return
 
-        const notified = getNotifiedAchievements()
-        let updated = false
-
-        const newlyUnlocked = res.achievements.filter(
-          (a) => a.isUnlocked && !notified.has(a.id)
+        // Unnotified unlocked achievements that haven't been toasted in this browser session
+        const unnotifiedUnlocked = res.achievements.filter(
+          (a) => a.isUnlocked && !a.isNotified && !notifiedInSessionRef.current.has(a.id)
         )
 
-        if (newlyUnlocked.length > 0) {
-          newlyUnlocked.forEach((achievement, index) => {
-            notified.add(achievement.id)
-            updated = true
+        if (unnotifiedUnlocked.length > 0) {
+          const idsToMark: string[] = []
+
+          unnotifiedUnlocked.forEach((achievement, index) => {
+            notifiedInSessionRef.current.add(achievement.id)
+            idsToMark.push(achievement.id)
 
             setTimeout(() => {
               toast(
@@ -75,9 +77,14 @@ export default function AchievementListener() {
                 {
                   description: achievement.description,
                   icon: <Trophy className="h-5 w-5 text-purple-400 shrink-0" />,
+                  style: {
+                    backgroundColor: '#1e1b4b',
+                    borderColor: 'rgba(147, 51, 234, 0.5)',
+                    color: '#f8fafc',
+                  },
                   className:
-                    'bg-purple-950/95 border border-purple-500/40 text-foreground font-sans shadow-xl backdrop-blur-md rounded-xl p-4',
-                  descriptionClassName: 'text-xs text-purple-200/80 mt-1',
+                    '!bg-purple-950 !border-purple-500/50 !text-slate-100 font-sans shadow-2xl backdrop-blur-md rounded-xl p-4',
+                  descriptionClassName: '!text-purple-200/90 !text-xs mt-1',
                   duration: 6000,
                 }
               )
@@ -85,9 +92,8 @@ export default function AchievementListener() {
             }, index * 800)
           })
 
-          if (updated) {
-            saveNotifiedAchievements(notified)
-          }
+          // Mark as notified in Convex DB so secondary devices won't re-toast
+          markAchievementsNotified({ achievementIds: idsToMark }).catch(console.error)
         }
       } catch (err) {
         console.error('Failed to check achievement notifications:', err)
@@ -101,7 +107,7 @@ export default function AchievementListener() {
     const interval = setInterval(checkAndNotify, 30000)
 
     return () => clearInterval(interval)
-  }, [isAuthenticated, isLoading, syncAndGetAchievements])
+  }, [isAuthenticated, isLoading, syncAndGetAchievements, markAchievementsNotified])
 
   return null
 }

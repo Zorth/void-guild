@@ -41,8 +41,9 @@ export default function LevelUpListener() {
                 duration: 5000,
                 description: `Achievement Unlocked: Level ${char.lvl}`,
                 icon: '✨',
-                className: 'achievement-toast',
-                descriptionClassName: 'achievement-description'
+                style: { backgroundColor: '#1e1b4b', borderColor: 'rgba(147, 51, 234, 0.5)', color: '#f8fafc' },
+                className: '!bg-purple-950 !border-purple-500/50 !text-slate-100 shadow-2xl rounded-xl p-4',
+                descriptionClassName: '!text-purple-200/90 !text-xs mt-1'
             })
             fireJoinParticles(window.innerWidth / 2, window.innerHeight / 2)
         }, 500);
@@ -59,8 +60,9 @@ export default function LevelUpListener() {
                     ? "A legendary achievement in the Void!" 
                     : "A significant step in your journey!",
                 icon: char.rank === 'guildmaster' ? '👑' : '🎖️',
-                className: 'rank-toast',
-                descriptionClassName: 'rank-description'
+                style: { backgroundColor: '#1e1b4b', borderColor: 'rgba(147, 51, 234, 0.5)', color: '#f8fafc' },
+                className: '!bg-purple-950 !border-purple-500/50 !text-slate-100 shadow-2xl rounded-xl p-4',
+                descriptionClassName: '!text-purple-200/90 !text-xs mt-1'
               })
               fireJoinParticles(window.innerWidth / 2, window.innerHeight / 2)
           }, 1000);

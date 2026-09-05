@@ -148,6 +148,7 @@ export default defineSchema({
         userId: v.string(), // Clerk subject
         achievementId: v.string(), // Hardcoded ID
         unlockedAt: v.number(), // Timestamp
+        notifiedAt: v.optional(v.number()), // Timestamp when toast was shown
     }).index('by_userId', ['userId'])
       .index('by_userId_achievementId', ['userId', 'achievementId']),
 })

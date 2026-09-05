@@ -181,7 +181,17 @@ export default function RootLayout({
                     </div>
                   </footer>
                 </div>
-                <Toaster position="bottom-right" />
+                <Toaster 
+                  theme="dark" 
+                  position="bottom-right" 
+                  toastOptions={{
+                    style: {
+                      background: '#0f172a',
+                      color: '#f8fafc',
+                      borderColor: '#334155',
+                    },
+                  }}
+                />
                 <LevelUpListener />
                 <SessionClosedListener />
                 <AchievementListener />

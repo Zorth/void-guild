@@ -1,5 +1,6 @@
 import { mutation, query } from './_generated/server'
 import { Doc, Id } from './_generated/dataModel'
+import { v } from 'convex/values'
 
 export interface AchievementDefinition {
   id: string
@@ -680,9 +681,9 @@ export const syncAndGetAchievements = mutation({
       .withIndex('by_userId', (q) => q.eq('userId', user.subject))
       .collect()
 
-    const unlockedMap = new Map<string, number>()
+    const unlockedMap = new Map<string, { unlockedAt: number; notifiedAt?: number }>()
     for (const u of existingUnlockedDocs) {
-      unlockedMap.set(u.achievementId, u.unlockedAt)
+      unlockedMap.set(u.achievementId, { unlockedAt: u.unlockedAt, notifiedAt: u.notifiedAt })
     }
 
     const now = Date.now()
@@ -696,7 +697,7 @@ export const syncAndGetAchievements = mutation({
             achievementId: def.id,
             unlockedAt: now,
           })
-          unlockedMap.set(def.id, now)
+          unlockedMap.set(def.id, { unlockedAt: now })
         }
       }
     }
@@ -705,8 +706,9 @@ export const syncAndGetAchievements = mutation({
     const result = []
 
     for (const def of ACHIEVEMENTS_REGISTRY) {
-      const unlockedAt = unlockedMap.get(def.id)
-      const isUnlocked = unlockedAt !== undefined
+      const unlockedInfo = unlockedMap.get(def.id)
+      const isUnlocked = unlockedInfo !== undefined
+      const isNotified = Boolean(unlockedInfo?.notifiedAt)
 
       if (def.category === 'normal') {
         result.push({
@@ -716,7 +718,8 @@ export const syncAndGetAchievements = mutation({
           category: def.category,
           reward: def.reward,
           isUnlocked,
-          unlockedAt: unlockedAt || null,
+          isNotified,
+          unlockedAt: unlockedInfo?.unlockedAt || null,
           isHidden: false,
           chainId: def.chainId,
           tier: def.tier,
@@ -732,7 +735,8 @@ export const syncAndGetAchievements = mutation({
             category: def.category,
             reward: def.reward,
             isUnlocked: true,
-            unlockedAt: unlockedAt!,
+            isNotified,
+            unlockedAt: unlockedInfo!.unlockedAt,
             isHidden: true,
             chainId: def.chainId,
             tier: def.tier,
@@ -747,6 +751,7 @@ export const syncAndGetAchievements = mutation({
             category: def.category,
             reward: def.reward,
             isUnlocked: false,
+            isNotified: false,
             unlockedAt: null,
             isHidden: true,
             chainId: def.chainId,
@@ -765,6 +770,28 @@ export const syncAndGetAchievements = mutation({
       isAdmin,
       unlockedCount: unlockedNormalCount,
       totalCount: normalDefs.length,
+    }
+  },
+})
+
+export const markAchievementsNotified = mutation({
+  args: { achievementIds: v.array(v.string()) },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) return
+
+    const now = Date.now()
+    for (const achievementId of args.achievementIds) {
+      const doc = await ctx.db
+        .query('unlockedAchievements')
+        .withIndex('by_userId_achievementId', (q) =>
+          q.eq('userId', user.subject).eq('achievementId', achievementId)
+        )
+        .first()
+
+      if (doc && !doc.notifiedAt) {
+        await ctx.db.patch(doc._id, { notifiedAt: now })
+      }
     }
   },
 })
