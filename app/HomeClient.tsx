@@ -8,8 +8,10 @@ import Characters from '@/components/characters/Characters'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Trophy, Book, Globe, Sparkles, Coins } from 'lucide-react'
+import { Trophy, Book, Globe, Sparkles, Coins, Key } from 'lucide-react'
 import ActivityFeed from '@/components/ActivityFeed'
+import { ThemeToggle } from '@/components/ThemeToggle'
+import { ApiKeyDialog } from '@/components/ApiKeyDialog'
 import { useState, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
@@ -22,6 +24,7 @@ export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
   const rotation = useMotionValue(0)
   const velocityRef = useRef(0)
   const [hasReachedRainbow, setHasReachedRainbow] = useState(false)
+  const [isApiDialogOpen, setIsApiDialogOpen] = useState(false)
 
   const incrementLogoClicks = useMutation(api.users.incrementLogoClicks)
   const recordWikiVisit = useMutation(api.users.recordWikiVisit)
@@ -148,7 +151,9 @@ export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
                 </Button>
               </Link>
             )}
+            <ThemeToggle />
             <CustomUserButton />
+            <ApiKeyDialog open={isApiDialogOpen} onOpenChange={setIsApiDialogOpen} />
           </div>
         </Authenticated>
         <AuthLoading>

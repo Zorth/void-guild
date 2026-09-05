@@ -80,6 +80,10 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
     const updateInGameDate = useMutation(api.sessions.updateInGameDate)
     const updateWorldCalendar = useMutation(api.worlds.updateWorldCalendar)
 
+    // Live state from Convex
+    const liveState = useQuery(api.sessions.getSessionState, { sessionId })
+    const updateState = useMutation(api.sessions.updateSessionState)
+
     const calendarConfig = useMemo(() => {
         if (!world?.calendar) return null
         try {
@@ -110,6 +114,25 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
     const [timeSeconds, setTimeSeconds] = useState(9 * 3600) // Default to 09:00:00 (32400 seconds)
     const [isClockRunning, setIsClockRunning] = useState(false)
     const [multiplier, setMultiplier] = useState(1)
+
+    // Sync from Convex to local state
+    useEffect(() => {
+        if (liveState) {
+            if (liveState.initiative) setItems(liveState.initiative)
+            if (liveState.currentIndex !== undefined) setCurrentIndex(liveState.currentIndex)
+            if (liveState.round !== undefined) setRound(liveState.round)
+            if (liveState.timeSeconds !== undefined) setTimeSeconds(liveState.timeSeconds)
+            if (liveState.isClockRunning !== undefined) setIsClockRunning(liveState.isClockRunning)
+            if (liveState.multiplier !== undefined) setMultiplier(liveState.multiplier)
+        }
+    }, [liveState])
+
+    // Helper to push updates
+    const pushState = useCallback((patch: any) => {
+        if (!isAdmin && world?.owner !== session?.owner) return
+        updateState({ sessionId, ...patch }).catch(console.error)
+    }, [sessionId, updateState, isAdmin, world?.owner, session?.owner])
+
     const [adjustmentAmount, setAdjustmentAmount] = useState(1)
     const [adjustmentUnit, setAdjustmentUnit] = useState<'s' | 'm' | 'h'>('h')
     const [isEditingTime, setIsEditingTime] = useState(false)
@@ -181,23 +204,25 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
         const dayLength = sunset - sunrise;
         const nightLength = 86400 - sunset + sunrise;
 
+        let nextSeconds = 0;
         if (sunMoonInfo.type === 'sun') {
-            setTimeSeconds(sunrise + (progress * dayLength));
+            nextSeconds = sunrise + (progress * dayLength);
         } else {
             const nightSeconds = progress * nightLength;
             if (nightSeconds <= (86400 - sunset)) {
-                setTimeSeconds(sunset + nightSeconds);
+                nextSeconds = sunset + nightSeconds;
             } else {
-                setTimeSeconds(nightSeconds - (86400 - sunset));
+                nextSeconds = nightSeconds - (86400 - sunset);
             }
         }
+        pushState({ timeSeconds: nextSeconds })
     };
 
     const jumpToTime = (targetSeconds: number) => {
         if (timeSeconds >= targetSeconds) {
             incrementDay()
         }
-        setTimeSeconds(targetSeconds)
+        pushState({ timeSeconds: targetSeconds })
         toast.info(`Time jumped to ${formatTime(targetSeconds)}`)
     }
 
@@ -211,39 +236,10 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
         }
     }, [calendarConfig])
 
-    // Load states on mount
+    // On mount
     useEffect(() => {
-        const savedInitiative = localStorage.getItem(storageKey)
-        if (savedInitiative) {
-            try {
-                const { items: savedItems, currentIndex: savedIndex, round: savedRound } = JSON.parse(savedInitiative)
-                setItems(savedItems)
-                setCurrentIndex(savedIndex)
-                setRound(savedRound)
-            } catch (e) { console.error('Failed to load initiative', e) }
-        }
-
-        const savedTime = localStorage.getItem(timeStorageKey)
-        if (savedTime) {
-            try {
-                const { seconds, multiplier: savedMult } = JSON.parse(savedTime)
-                setTimeSeconds(seconds)
-                setMultiplier(savedMult || 1)
-            } catch (e) { console.error('Failed to load time', e) }
-        }
         setIsMounted(true)
-    }, [storageKey, timeStorageKey])
-
-    // Save states
-    useEffect(() => {
-        if (!isMounted) return
-        localStorage.setItem(storageKey, JSON.stringify({ items, currentIndex, round }))
-    }, [items, currentIndex, round, storageKey, isMounted])
-
-    useEffect(() => {
-        if (!isMounted) return
-        localStorage.setItem(timeStorageKey, JSON.stringify({ seconds: timeSeconds, multiplier }))
-    }, [timeSeconds, multiplier, timeStorageKey, isMounted])
+    }, [])
 
     const saveDateToWorld = useCallback(async (year: number, month: number, day: number) => {
         if (!calendarConfig) return
@@ -364,7 +360,15 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
             return
         }
 
+        // Only the owner/admin should tick the clock on the server to avoid multiple tickers
+        // Wait, since we are doing local RAF, everyone's clock will tick locally.
+        // We only want ONE person (the GM) to push the updates to the server.
+        const canTick = isAdmin || world?.owner === session?.owner
+        if (!canTick) return
+
         let rafId: number
+        let accumulatedDelta = 0
+
         const tick = (now: number) => {
             if (lastTickRef.current === null) {
                 lastTickRef.current = now
@@ -372,44 +376,54 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
                 const delta = (now - lastTickRef.current) / 1000 // seconds passed
                 lastTickRef.current = now
                 
-                const prev = timeRef.current
-                const step = delta * multiplier
-                let next = prev + step
+                accumulatedDelta += delta
                 
-                if (next >= 86400) {
-                    incrementDay()
-                    next -= 86400
-                } else if (next < 0) {
-                    decrementDay()
-                    next += 86400
+                // Only push to server every 1 second to avoid overwhelming Convex
+                if (accumulatedDelta >= 1) {
+                    const prev = timeRef.current
+                    const step = accumulatedDelta * multiplier
+                    let next = prev + step
+                    
+                    if (next >= 86400) {
+                        incrementDay()
+                        next -= 86400
+                    } else if (next < 0) {
+                        decrementDay()
+                        next += 86400
+                    }
+                    pushState({ timeSeconds: next })
+                    accumulatedDelta = 0
                 }
-                setTimeSeconds(next)
             }
             rafId = requestAnimationFrame(tick)
         }
 
         rafId = requestAnimationFrame(tick)
         return () => cancelAnimationFrame(rafId)
-    }, [isClockRunning, multiplier, incrementDay, decrementDay])
+    }, [isClockRunning, multiplier, incrementDay, decrementDay, isAdmin, world?.owner, session?.owner, pushState])
 
     const updateCounter = (id: string, delta: number) => {
-        setItems(prev => prev.map(item => 
+        const newItems = items.map(item => 
             item.id === id ? { ...item, counter: (item.counter || 0) + delta } : item
-        ))
+        )
+        pushState({ initiative: newItems })
     }
 
-    // Sync initiative characters
+    // Sync initiative characters (Only GM should do this)
     useEffect(() => {
-        if (!isMounted) return
-        setItems(prevItems => {
-            const existingIds = new Set(prevItems.map(item => item.id))
-            const newChars = characters
-                .filter(char => !existingIds.has(char.id))
-                .map(char => ({ ...char, counter: 0 }))
-            if (newChars.length === 0) return prevItems
-            return [...prevItems, ...newChars]
-        })
-    }, [characters, isMounted])
+        if (!isMounted || !characters.length) return
+        const canUpdate = isAdmin || world?.owner === session?.owner
+        if (!canUpdate) return
+
+        const existingIds = new Set(items.map(item => item.id))
+        const newChars = characters
+            .filter(char => !existingIds.has(char.id))
+            .map(char => ({ ...char, counter: 0 }))
+        
+        if (newChars.length > 0) {
+            pushState({ initiative: [...items, ...newChars] })
+        }
+    }, [characters, isMounted, isAdmin, world?.owner, session?.owner, pushState, items])
 
     const formatTime = (totalSeconds: number) => {
         const s = Math.floor(totalSeconds % 60)
@@ -421,20 +435,19 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
     const adjustTime = (amount: number, unit?: 's' | 'm' | 'h') => {
         const activeUnit = unit || adjustmentUnit
         const factor = activeUnit === 's' ? 1 : activeUnit === 'm' ? 60 : 3600
-        setTimeSeconds(prev => {
-            let next = prev + (amount * factor)
-            
-            // Handle day transitions for manual adjustment
-            while (next >= 86400) {
-                incrementDay()
-                next -= 86400
-            }
-            while (next < 0) {
-                decrementDay()
-                next += 86400
-            }
-            return next
-        })
+        
+        let next = timeSeconds + (amount * factor)
+        
+        // Handle day transitions for manual adjustment
+        while (next >= 86400) {
+            incrementDay()
+            next -= 86400
+        }
+        while (next < 0) {
+            decrementDay()
+            next += 86400
+        }
+        pushState({ timeSeconds: next })
     }
 
     const handleSaveTime = () => {
@@ -446,51 +459,56 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
         h = Math.max(0, Math.min(23, h))
         m = Math.max(0, Math.min(59, m))
         s = Math.max(0, Math.min(59, s))
-        setTimeSeconds((h * 3600) + (m * 60) + s)
+        pushState({ timeSeconds: (h * 3600) + (m * 60) + s })
         setIsEditingTime(false)
     }
 
     const handleNext = useCallback(() => {
         if (items.length === 0) return
         if (currentIndex >= items.length - 1) {
-            setCurrentIndex(0)
-            setRound(r => r + 1)
-            // Add 6 seconds per round if clock is paused
-            if (!isClockRunning) {
-                adjustTime(6, 's')
-            }
+            pushState({
+                currentIndex: 0,
+                round: round + 1,
+                // Add 6 seconds per round if clock is paused
+                timeSeconds: !isClockRunning ? timeSeconds + 6 : timeSeconds
+            })
         } else {
-            setCurrentIndex(i => i + 1)
+            pushState({ currentIndex: currentIndex + 1 })
         }
-    }, [items.length, currentIndex, isClockRunning, calendarConfig])
+    }, [items.length, currentIndex, isClockRunning, round, timeSeconds, pushState])
 
     const handlePrev = useCallback(() => {
         if (items.length === 0) return
         if (currentIndex <= 0) {
             if (round > 1) {
-                setCurrentIndex(items.length - 1)
-                setRound(r => r - 1)
+                pushState({
+                    currentIndex: items.length - 1,
+                    round: round - 1
+                })
             }
         } else {
-            setCurrentIndex(i => i - 1)
+            pushState({ currentIndex: currentIndex - 1 })
         }
-    }, [items.length, currentIndex, round])
+    }, [items.length, currentIndex, round, pushState])
 
     const handleReset = () => {
         const sessionCharacterIds = new Set(characters.map(c => c.id))
         const resetItems = items
             .filter(item => sessionCharacterIds.has(item.id))
             .map(item => ({ ...item, counter: 0 }))
-        setItems(resetItems)
-        setCurrentIndex(0)
-        setRound(1)
+        
+        pushState({
+            initiative: resetItems,
+            currentIndex: 0,
+            round: 1
+        })
         toast.info("Initiative reset to session players")
     }
 
     const addItem = () => {
         if (!newName.trim()) return
         const newItem = { id: `custom-${Date.now()}`, name: newName.trim(), counter: 0 }
-        setItems([...items, newItem])
+        pushState({ initiative: [...items, newItem] })
         setNewName('')
         setIsAdding(false)
     }
@@ -499,12 +517,14 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
         const indexToRemove = items.findIndex(item => item.id === id)
         if (indexToRemove === -1) return
         const newItems = items.filter(item => item.id !== id)
-        setItems(newItems)
+        
+        const nextPatch: any = { initiative: newItems }
         if (indexToRemove < currentIndex) {
-            setCurrentIndex(currentIndex - 1)
+            nextPatch.currentIndex = currentIndex - 1
         } else if (indexToRemove === currentIndex && currentIndex >= newItems.length && newItems.length > 0) {
-            setCurrentIndex(0)
+            nextPatch.currentIndex = 0
         }
+        pushState(nextPatch)
     }
 
     // --- Calendar Tool Helpers ---
@@ -842,7 +862,7 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
                                         variant={isClockRunning ? "destructive" : "default"} 
                                         size="icon" 
                                         className="h-10 w-10 shrink-0"
-                                        onClick={() => setIsClockRunning(!isClockRunning)}
+                                        onClick={() => pushState({ isClockRunning: !isClockRunning })}
                                     >
                                         {isClockRunning ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5 ml-0.5" />}
                                     </Button>
@@ -854,7 +874,7 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
                                                 step="0.1"
                                                 className="w-full bg-transparent border-none text-xs font-bold text-center focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                 value={multiplier}
-                                                onChange={(e) => setMultiplier(Number(e.target.value))}
+                                                onChange={(e) => pushState({ multiplier: Number(e.target.value) })}
                                             />
                                             <span className="text-[10px] font-bold text-muted-foreground ml-1">X</span>
                                         </div>

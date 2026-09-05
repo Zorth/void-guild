@@ -116,6 +116,19 @@ export default defineSchema({
         completedAt: v.optional(v.number()),
     }).index('by_worldId', ['worldId'])
       .index('by_characterId', ['characterId']),
+    sessionStates: defineTable({
+        sessionId: v.id('sessions'),
+        initiative: v.optional(v.array(v.object({
+            id: v.string(),
+            name: v.string(),
+            counter: v.optional(v.number()),
+        }))),
+        currentIndex: v.optional(v.number()),
+        round: v.optional(v.number()),
+        timeSeconds: v.optional(v.number()),
+        isClockRunning: v.optional(v.boolean()),
+        multiplier: v.optional(v.number()),
+    }).index('by_sessionId', ['sessionId']),
     users: defineTable({
         userId: v.string(), // Clerk subject
         isAdmin: v.boolean(),
@@ -132,8 +145,11 @@ export default defineSchema({
         visitedLeaderboard: v.optional(v.boolean()),
         discordId: v.optional(v.string()),
         discordUsername: v.optional(v.string()),
+        apiKey: v.optional(v.string()),
+        apiKeyLastUsed: v.optional(v.number()),
     }).index('by_userId', ['userId'])
-      .index('by_discordId', ['discordId']),
+      .index('by_discordId', ['discordId'])
+      .index('by_apiKey', ['apiKey']),
     commendations: defineTable({
         sessionId: v.id('sessions'),
         fromUserId: v.string(), // Clerk subject of the giver
