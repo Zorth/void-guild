@@ -214,9 +214,9 @@ export default function WorldClient() {
 
   useEffect(() => {
     if (userId) {
-      recordWorldVisit().catch(() => {})
+      recordWorldVisit().then(() => syncAndGetAchievements()).catch(() => {})
     }
-  }, [userId, recordWorldVisit])
+  }, [userId, recordWorldVisit, syncAndGetAchievements])
   
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming')
   const [pfFilter, setPfFilter] = useState(true)

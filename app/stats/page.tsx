@@ -21,9 +21,9 @@ export default function StatsPage() {
 
     useEffect(() => {
       if (userId) {
-        recordLeaderboardVisit().catch(() => {});
+        recordLeaderboardVisit().then(() => syncAndGetAchievements()).catch(() => {});
       }
-    }, [userId, recordLeaderboardVisit]);
+    }, [userId, recordLeaderboardVisit, syncAndGetAchievements]);
 
     const sortedCharacters = useMemo(() => {
       if (!characters) return [];

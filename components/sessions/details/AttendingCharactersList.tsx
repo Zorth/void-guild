@@ -75,6 +75,7 @@ export default function AttendingCharactersList({
     if (!sessionId) return
     try {
       const res = await giveCommendation({ sessionId, toCharacterId, category })
+      await syncAndGetAchievements().catch(() => {})
       if (res.action === 'created') {
         toast.success(category === 'gm' ? `Awarded GM Commendation to ${charName}!` : `Commended ${charName}!`)
       } else if (res.action === 'updated') {

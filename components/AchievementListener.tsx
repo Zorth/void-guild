@@ -103,10 +103,6 @@ export default function AchievementListener() {
     }
 
     checkAndNotify()
-
-    const interval = setInterval(checkAndNotify, 30000)
-
-    return () => clearInterval(interval)
   }, [isAuthenticated, isLoading, syncAndGetAchievements, markAchievementsNotified])
 
   return null

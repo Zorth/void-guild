@@ -64,18 +64,21 @@ export const syncUser = mutation({
     let userIdDocId = existingUser?._id
 
     if (existingUser) {
-      // Only patch if something changed
-      const hasChanges = 
-        existingUser.isAdmin !== userData.isAdmin || 
-        existingUser.isGM !== userData.isGM || 
-        existingUser.name !== userData.name || 
-        existingUser.username !== userData.username ||
-        existingUser.email !== userData.email ||
-        existingUser.imageUrl !== userData.imageUrl ||
-        existingUser.extraSessionsPlayed !== userData.extraSessionsPlayed ||
-        existingUser.extraSessionsRan !== userData.extraSessionsRan ||
-        (userData.discordId && existingUser.discordId !== userData.discordId) ||
-        (userData.discordUsername && existingUser.discordUsername !== userData.discordUsername)
+      // Only patch if something actually changed
+      const isDiff = (newVal: any, oldVal: any) =>
+        newVal !== undefined && newVal !== oldVal
+
+      const hasChanges =
+        isDiff(userData.isAdmin, existingUser.isAdmin) ||
+        isDiff(userData.isGM, existingUser.isGM) ||
+        isDiff(userData.name, existingUser.name) ||
+        isDiff(userData.username, existingUser.username) ||
+        isDiff(userData.email, existingUser.email) ||
+        isDiff(userData.imageUrl, existingUser.imageUrl) ||
+        isDiff(userData.extraSessionsPlayed, existingUser.extraSessionsPlayed) ||
+        isDiff(userData.extraSessionsRan, existingUser.extraSessionsRan) ||
+        isDiff(userData.discordId, existingUser.discordId) ||
+        isDiff(userData.discordUsername, existingUser.discordUsername)
 
       if (hasChanges) {
         await ctx.db.patch(existingUser._id, userData)
@@ -89,8 +92,9 @@ export const syncUser = mutation({
     if (finalDiscordId) {
       const existingUnlock = await ctx.db
         .query('unlockedAchievements')
-        .withIndex('by_userId', (q) => q.eq('userId', identity.subject))
-        .filter((q) => q.eq(q.field('achievementId'), 'link_discord'))
+        .withIndex('by_userId_achievementId', (q) =>
+          q.eq('userId', identity.subject).eq('achievementId', 'link_discord')
+        )
         .first()
 
       if (!existingUnlock) {
@@ -167,12 +171,14 @@ export const recordWorldVisit = mutation({
       })
     }
 
-    const existingUnlocked = await ctx.db
+    const existingUnlock = await ctx.db
       .query('unlockedAchievements')
-      .withIndex('by_userId', (q) => q.eq('userId', identity.subject))
-      .collect()
+      .withIndex('by_userId_achievementId', (q) =>
+        q.eq('userId', identity.subject).eq('achievementId', 'visit_world')
+      )
+      .first()
 
-    if (!existingUnlocked.some((a) => a.achievementId === 'visit_world')) {
+    if (!existingUnlock) {
       await ctx.db.insert('unlockedAchievements', {
         userId: identity.subject,
         achievementId: 'visit_world',
@@ -212,12 +218,14 @@ export const recordWikiVisit = mutation({
       })
     }
 
-    const existingUnlocked = await ctx.db
+    const existingUnlock = await ctx.db
       .query('unlockedAchievements')
-      .withIndex('by_userId', (q) => q.eq('userId', identity.subject))
-      .collect()
+      .withIndex('by_userId_achievementId', (q) =>
+        q.eq('userId', identity.subject).eq('achievementId', 'visit_wiki')
+      )
+      .first()
 
-    if (!existingUnlocked.some((a) => a.achievementId === 'visit_wiki')) {
+    if (!existingUnlock) {
       await ctx.db.insert('unlockedAchievements', {
         userId: identity.subject,
         achievementId: 'visit_wiki',
@@ -257,12 +265,14 @@ export const recordLeaderboardVisit = mutation({
       })
     }
 
-    const existingUnlocked = await ctx.db
+    const existingUnlock = await ctx.db
       .query('unlockedAchievements')
-      .withIndex('by_userId', (q) => q.eq('userId', identity.subject))
-      .collect()
+      .withIndex('by_userId_achievementId', (q) =>
+        q.eq('userId', identity.subject).eq('achievementId', 'visit_leaderboard')
+      )
+      .first()
 
-    if (!existingUnlocked.some((a) => a.achievementId === 'visit_leaderboard')) {
+    if (!existingUnlock) {
       await ctx.db.insert('unlockedAchievements', {
         userId: identity.subject,
         achievementId: 'visit_leaderboard',

@@ -484,11 +484,9 @@ export const syncAndGetAchievements = mutation({
 
     const charIds = new Set(characters.map((c) => c._id))
 
-    // Sessions calculation
-    const allLockedSessions = await ctx.db
-      .query('sessions')
-      .withIndex('by_locked', (q) => q.eq('locked', true))
-      .collect()
+    // Single query for sessions table to compute all session-related metrics
+    const allSessions = await ctx.db.query('sessions').collect()
+    const allLockedSessions = allSessions.filter((s) => s.locked)
 
     let sessionsPlayedCount = (userDoc?.extraSessionsPlayed || 0)
     let sessionsRanCount = (userDoc?.extraSessionsRan || 0)
@@ -538,9 +536,8 @@ export const syncAndGetAchievements = mutation({
     }
 
     // Interested sessions calculation
-    const allSessionsForInterest = await ctx.db.query('sessions').collect()
     let isInterestedCount = 0
-    for (const s of allSessionsForInterest) {
+    for (const s of allSessions) {
       if (s.interestedPlayers && s.interestedPlayers.some((p) => p.userId === user.subject)) {
         isInterestedCount += 1
       }
@@ -638,7 +635,7 @@ export const syncAndGetAchievements = mutation({
 
     // Loot calculation
     let claimedLootCount = 0
-    for (const s of allSessionsForInterest) {
+    for (const s of allSessions) {
       if (s.loot) {
         for (const item of s.loot) {
           if (item.claimedBy && charIds.has(item.claimedBy)) {
