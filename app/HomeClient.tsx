@@ -8,7 +8,7 @@ import Characters from '@/components/characters/Characters'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Trophy, Book, Globe, Sparkles } from 'lucide-react'
+import { Trophy, Book, Globe, Sparkles, Coins } from 'lucide-react'
 import ActivityFeed from '@/components/ActivityFeed'
 import { useState, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
@@ -129,6 +129,12 @@ export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
               <Button variant="outline" size="sm" className="flex items-center gap-2 h-9 w-9 sm:w-auto sm:px-3 p-0">
                 <Trophy className="h-4 w-4" />
                 <span className="hidden sm:inline">Stats</span>
+              </Button>
+            </Link>
+            <Link href="/black-void">
+              <Button variant="outline" size="sm" className="flex items-center gap-2 h-9 w-9 sm:w-auto sm:px-3 p-0 border-purple-500/40 text-purple-400 hover:bg-purple-500/10">
+                <Coins className="h-4 w-4 text-purple-400" />
+                <span className="hidden sm:inline">The Black Void</span>
               </Button>
             </Link>
             {(isGM || ownedWorld) && (

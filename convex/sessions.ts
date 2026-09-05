@@ -877,6 +877,14 @@ export const lockSession = mutation({
         }
       }
   
+      if (session.questId) {
+        await ctx.db.patch(session.questId, {
+          isCompleted: true,
+          completedSessionId: session._id,
+          completedAt: Date.now(),
+        })
+      }
+
       await ctx.db.patch(args.sessionId, { locked: true, xpGains })
     }
 })
@@ -905,6 +913,14 @@ export const unlockSession = mutation({
         }
       }
   
+      if (session.questId) {
+        await ctx.db.patch(session.questId, {
+          isCompleted: false,
+          completedSessionId: undefined,
+          completedAt: undefined,
+        })
+      }
+
       await ctx.db.patch(args.sessionId, { locked: false, xpGains: [] })
     }
 })
@@ -923,6 +939,14 @@ export const forceLockSession = mutation({
   
       if (session.locked) return
   
+      if (session.questId) {
+        await ctx.db.patch(session.questId, {
+          isCompleted: true,
+          completedSessionId: session._id,
+          completedAt: Date.now(),
+        })
+      }
+
       await ctx.db.patch(args.sessionId, { locked: true, xpGains: [] })
     }
 })
@@ -941,6 +965,14 @@ export const forceUnlockSession = mutation({
   
       if (!session.locked) return
   
+      if (session.questId) {
+        await ctx.db.patch(session.questId, {
+          isCompleted: false,
+          completedSessionId: undefined,
+          completedAt: undefined,
+        })
+      }
+
       await ctx.db.patch(args.sessionId, { locked: false, xpGains: [] })
     }
 })

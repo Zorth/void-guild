@@ -1,0 +1,243 @@
+'use client'
+
+import { useQuery, useMutation } from 'convex/react'
+import { api } from '@/convex/_generated/api'
+import { Id } from '@/convex/_generated/dataModel'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Coins, CheckCircle2, PackageCheck, Receipt, Hammer, AlertCircle } from 'lucide-react'
+import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
+
+interface CharacterSheetLogProps {
+  characterId: Id<'characters'> | null
+}
+
+export default function CharacterSheetLog({ characterId }: CharacterSheetLogProps) {
+  const transactions = useQuery(api.blackVoid.getCharacterTransactions, { characterId: characterId || undefined })
+  const toggleSellerClaimed = useMutation(api.blackVoid.toggleSellerClaimed)
+  const toggleBuyerClaimed = useMutation(api.blackVoid.toggleBuyerClaimed)
+
+  if (!characterId) {
+    return (
+      <Card className="border-purple-500/20 bg-card/50 text-center py-12">
+        <CardContent className="space-y-3">
+          <AlertCircle className="h-8 w-8 text-purple-400 mx-auto" />
+          <p className="text-muted-foreground text-sm font-medium">
+            Please select an active character above to view financial logs & character sheet checkmarks.
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (transactions === undefined) {
+    return <div className="p-8 text-center text-muted-foreground animate-pulse">Loading transaction logs...</div>
+  }
+
+  const { createdItems = [], wonItems = [], servicesOffered = [] } = transactions || {}
+
+  const handleToggleSellerClaimed = async (listingId: Id<'blackVoidListings'>) => {
+    try {
+      await toggleSellerClaimed({ listingId, characterId })
+      toast.success('Updated character sheet log state!')
+    } catch (error) {
+      toast.error('Failed to update character sheet status')
+    }
+  }
+
+  const handleToggleBuyerClaimed = async (listingId: Id<'blackVoidListings'>) => {
+    try {
+      await toggleBuyerClaimed({ listingId, characterId })
+      toast.success('Updated character sheet log state!')
+    } catch (error) {
+      toast.error('Failed to update character sheet status')
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* 1. Items Sold & Earnings */}
+      <Card className="border-purple-500/30 bg-card/60">
+        <CardHeader className="pb-3 border-b border-border/20">
+          <CardTitle className="text-base font-bold flex items-center justify-between text-purple-300">
+            <span className="flex items-center gap-2">
+              <Coins className="h-5 w-5 text-amber-400" />
+              Listings Sold & Revenue Earned
+            </span>
+            <span className="text-xs font-mono text-muted-foreground font-normal">
+              0% Black Market Tax Applied
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-4">
+          {createdItems.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-4 text-center">
+              No item listings created by this character yet.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {createdItems.map((item) => {
+                const isSold = item.status === 'completed' && item.winningAmount
+                const isClaimed = !!item.sellerClaimed
+
+                return (
+                  <div
+                    key={item._id}
+                    className={cn(
+                      "p-3 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all",
+                      isClaimed
+                        ? "bg-emerald-950/20 border-emerald-500/30"
+                        : "bg-muted/20 border-border/30"
+                    )}
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm text-foreground">{item.name}</span>
+                        <span
+                          className={cn(
+                            "text-[10px] uppercase font-bold px-2 py-0.5 rounded",
+                            isSold
+                              ? "bg-emerald-500/20 text-emerald-300"
+                              : item.status === 'active'
+                              ? "bg-purple-500/20 text-purple-300"
+                              : "bg-muted text-muted-foreground"
+                          )}
+                        >
+                          {isSold ? 'Sold' : item.status}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {isSold ? (
+                          <span>
+                            Sold to <strong className="text-purple-300">{item.winningBidderName}</strong> for{' '}
+                            <strong className="text-amber-400 font-mono">{item.winningAmount} GP</strong>
+                          </span>
+                        ) : (
+                          <span>
+                            Start Bid: {item.startingBid || 'N/A'} GP | Buyout: {item.buyoutPrice || 'N/A'} GP
+                          </span>
+                        )}
+                      </p>
+                    </div>
+
+                    {isSold && (
+                      <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                        <label className="flex items-center gap-2 cursor-pointer bg-background/60 hover:bg-background px-3 py-1.5 rounded-md border border-purple-500/30 text-xs">
+                          <Checkbox
+                            checked={isClaimed}
+                            onCheckedChange={() => handleToggleSellerClaimed(item._id)}
+                            className="border-purple-400 data-[state=checked]:bg-emerald-600"
+                          />
+                          <span className={cn("font-medium", isClaimed ? "text-emerald-300" : "text-muted-foreground")}>
+                            {isClaimed ? 'Added to Character Sheet ✓' : 'Add to Character Sheet'}
+                          </span>
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 2. Items Won & Expenses Paid */}
+      <Card className="border-purple-500/30 bg-card/60">
+        <CardHeader className="pb-3 border-b border-border/20">
+          <CardTitle className="text-base font-bold flex items-center justify-between text-purple-300">
+            <span className="flex items-center gap-2">
+              <Receipt className="h-5 w-5 text-emerald-400" />
+              Auctions Won & Expenses Paid
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-4">
+          {wonItems.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-4 text-center">
+              No won auctions or items purchased by this character yet.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {wonItems.map((item) => {
+                const isClaimed = !!item.buyerClaimed
+
+                return (
+                  <div
+                    key={item._id}
+                    className={cn(
+                      "p-3 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all",
+                      isClaimed
+                        ? "bg-emerald-950/20 border-emerald-500/30"
+                        : "bg-muted/20 border-border/30"
+                    )}
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm text-foreground">{item.name}</span>
+                        <span className="text-[10px] uppercase font-bold bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded">
+                          Won ({item.winningType || 'Auction'})
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Seller: <strong className="text-purple-300">{item.sellerName}</strong> | Amount Paid:{' '}
+                        <strong className="text-amber-400 font-mono">{item.winningAmount} GP</strong>
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                      <label className="flex items-center gap-2 cursor-pointer bg-background/60 hover:bg-background px-3 py-1.5 rounded-md border border-purple-500/30 text-xs">
+                        <Checkbox
+                          checked={isClaimed}
+                          onCheckedChange={() => handleToggleBuyerClaimed(item._id)}
+                          className="border-purple-400 data-[state=checked]:bg-emerald-600"
+                        />
+                        <span className={cn("font-medium", isClaimed ? "text-emerald-300" : "text-muted-foreground")}>
+                          {isClaimed ? 'Added to Character Sheet ✓' : 'Add to Character Sheet'}
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 3. Crafting Services Offered */}
+      {servicesOffered.length > 0 && (
+        <Card className="border-amber-500/30 bg-card/60">
+          <CardHeader className="pb-3 border-b border-border/20">
+            <CardTitle className="text-base font-bold flex items-center gap-2 text-amber-300">
+              <Hammer className="h-5 w-5 text-amber-400" />
+              Offered Crafting & Services
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="space-y-3">
+              {servicesOffered.map((svc) => (
+                <div
+                  key={svc._id}
+                  className="p-3 rounded-lg border bg-muted/20 border-border/30 flex items-center justify-between gap-3"
+                >
+                  <div>
+                    <h4 className="font-bold text-sm text-foreground">{svc.name}</h4>
+                    <p className="text-xs text-amber-300/80 font-mono mt-0.5">
+                      Price: {svc.priceDetails || 'Custom'} | Max Level: Level {svc.maxLevel}
+                    </p>
+                  </div>
+                  <span className="text-[10px] uppercase font-bold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded">
+                    {svc.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}

@@ -110,7 +110,12 @@ export default defineSchema({
         reward: v.optional(v.string()),
         tags: v.optional(v.array(v.string())),
         owner: v.string(), // Clerk userId of the creator
-    }).index('by_worldId', ['worldId']),
+        characterId: v.optional(v.id("characters")), // Character owner for character quests
+        isCompleted: v.optional(v.boolean()),
+        completedSessionId: v.optional(v.id("sessions")),
+        completedAt: v.optional(v.number()),
+    }).index('by_worldId', ['worldId'])
+      .index('by_characterId', ['characterId']),
     users: defineTable({
         userId: v.string(), // Clerk subject
         isAdmin: v.boolean(),
@@ -151,4 +156,42 @@ export default defineSchema({
         notifiedAt: v.optional(v.number()), // Timestamp when toast was shown
     }).index('by_userId', ['userId'])
       .index('by_userId_achievementId', ['userId', 'achievementId']),
+    blackVoidListings: defineTable({
+        characterId: v.id('characters'), // Listing owner character
+        type: v.union(v.literal('item'), v.literal('service')),
+        name: v.string(),
+        description: v.optional(v.string()),
+        nethysUrl: v.optional(v.string()),
+        // Item specific fields
+        startingBid: v.optional(v.number()),
+        buyoutPrice: v.optional(v.number()),
+        durationDays: v.optional(v.number()), // min 1, max 30
+        expiresAt: v.optional(v.number()),
+        // Service specific fields
+        priceType: v.optional(v.union(v.literal('percentage'), v.literal('flat'), v.literal('custom'))),
+        percentage: v.optional(v.number()),
+        markupGp: v.optional(v.number()),
+        priceDetails: v.optional(v.string()),
+        maxLevel: v.optional(v.number()),
+        // Status and transactions
+        status: v.union(v.literal('active'), v.literal('completed'), v.literal('cancelled')),
+        winningBidderCharacterId: v.optional(v.id('characters')),
+        winningAmount: v.optional(v.number()),
+        winningType: v.optional(v.union(v.literal('bid'), v.literal('buyout'))),
+        sellerClaimed: v.optional(v.boolean()), // Checkmark for seller adding earnings to character sheet
+        buyerClaimed: v.optional(v.boolean()), // Checkmark for buyer adding item/expense to character sheet
+    }).index('by_characterId', ['characterId'])
+      .index('by_status', ['status'])
+      .index('by_type_status', ['type', 'status'])
+      .index('by_winningBidderCharacterId', ['winningBidderCharacterId']),
+    blackVoidBids: defineTable({
+        listingId: v.id('blackVoidListings'),
+        characterId: v.id('characters'),
+        amount: v.number(),
+        isBuyout: v.boolean(),
+        createdAt: v.number(),
+        buyerClaimed: v.optional(v.boolean()),
+    }).index('by_listingId', ['listingId'])
+      .index('by_characterId', ['characterId']),
 })
+

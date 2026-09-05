@@ -11,11 +11,22 @@ export const createQuest = mutation({
     questgiver: v.optional(v.string()),
     reward: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
+    characterId: v.optional(v.id('characters')),
   },
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
     if (!user) {
       throw new Error('Not authenticated')
+    }
+
+    if (args.characterId) {
+      const character = await ctx.db.get(args.characterId)
+      if (!character || character.userId !== user.subject) {
+        throw new Error('You do not own this character')
+      }
+      if (!args.worldId) {
+        throw new Error('Character quests require selecting a world.')
+      }
     }
 
     const { levelPF, levelDnD, ...otherFields } = args
@@ -25,6 +36,7 @@ export const createQuest = mutation({
       levelPF: levelPF === null ? undefined : levelPF,
       levelDnD: levelDnD === null ? undefined : levelDnD,
       owner: user.subject,
+      isCompleted: false,
     })
 
     return questId
@@ -42,6 +54,7 @@ export const updateQuest = mutation({
     questgiver: v.optional(v.string()),
     reward: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
+    characterId: v.optional(v.id('characters')),
   },
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
@@ -123,9 +136,9 @@ export const getQuestsByWorld = query({
         .withIndex('by_worldId', (q) => q.eq('worldId', undefined))
         .collect()
 
-    const all = [...worldQuests, ...worldlessQuests];
+    const activeQuests = [...worldQuests, ...worldlessQuests].filter(q => !q.isCompleted)
     
-    return all.sort((a, b) => {
+    return activeQuests.sort((a, b) => {
         const aLvl = a.levelPF ?? a.levelDnD ?? a.level ?? 0;
         const bLvl = b.levelPF ?? b.levelDnD ?? b.level ?? 0;
 
@@ -139,6 +152,66 @@ export const getQuestsByWorld = query({
 export const listAllQuests = query({
   args: {},
   handler: async (ctx) => {
-    return await ctx.db.query('quests').collect()
+    const all = await ctx.db.query('quests').collect()
+    return all.filter(q => !q.isCompleted)
   },
 })
+
+export const getCharacterQuests = query({
+  args: { characterId: v.optional(v.id('characters')) },
+  handler: async (ctx, args) => {
+    if (args.characterId) {
+      const quests = await ctx.db
+        .query('quests')
+        .withIndex('by_characterId', (q) => q.eq('characterId', args.characterId))
+        .collect()
+
+      const decoratedQuests = await Promise.all(
+        quests.map(async (q) => {
+          let worldName = 'The Void'
+          if (q.worldId) {
+            const w = await ctx.db.get(q.worldId)
+            if (w) worldName = w.name
+          }
+          let charName = ''
+          if (q.characterId) {
+            const c = await ctx.db.get(q.characterId)
+            if (c) charName = c.name
+          }
+          return {
+            ...q,
+            worldName,
+            characterName: charName,
+          }
+        })
+      )
+
+      return decoratedQuests
+    }
+
+    // Return all character quests
+    const allQuests = await ctx.db.query('quests').collect()
+    const charQuests = allQuests.filter(q => q.characterId !== undefined)
+
+    return await Promise.all(
+      charQuests.map(async (q) => {
+        let worldName = 'The Void'
+        if (q.worldId) {
+          const w = await ctx.db.get(q.worldId)
+          if (w) worldName = w.name
+        }
+        let charName = ''
+        if (q.characterId) {
+          const c = await ctx.db.get(q.characterId)
+          if (c) charName = c.name
+        }
+        return {
+          ...q,
+          worldName,
+          characterName: charName,
+        }
+      })
+    )
+  },
+})
+
