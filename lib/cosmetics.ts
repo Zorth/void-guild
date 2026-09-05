@@ -24,7 +24,7 @@ export const ACHIEVEMENT_INFO: Record<string, AchievementInfo> = {
   first_gm_session: { title: 'Behind the Screen', category: 'normal' },
   veteran_gm_5: { title: 'Master Storyteller', category: 'normal' },
   level_5_char: { title: 'Rising Power', category: 'normal' },
-  level_10_char: { title: 'Legendary Hero', category: 'normal' },
+  level_10_char: { title: 'Legendary Hero', category: 'hidden' },
   first_commendation: { title: 'Party Favorite', category: 'normal' },
   tutorial_completed: { title: 'Tutorial Completed!', category: 'normal' },
   link_discord: { title: 'Discord Connected', category: 'normal' },

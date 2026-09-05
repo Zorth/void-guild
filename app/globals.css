@@ -446,26 +446,25 @@
   pointer-events: none !important;
 }
 
-/* FFXIV Style Sprout Avatar Cosmetic (No ring border, bigger symmetrical 🌱 sprout) */
+/* Newbie Sprout Avatar Ring Cosmetic (Glowing Green Ring + Vibrant 🌱 Sprout on top) */
 .sprout-avatar-ring {
   position: relative !important;
-  box-shadow: none !important;
-  border-color: transparent !important;
+  box-shadow: 0 0 0 2.5px #22c55e, 0 0 0 4px #15803d, 0 0 12px rgba(34, 197, 94, 0.7) !important;
 }
 
 .sprout-avatar-ring::before {
   content: '' !important;
   position: absolute !important;
-  top: -46% !important;
+  top: -44% !important;
   left: 50% !important;
   transform: translateX(-50%) !important;
-  width: 68% !important;
-  height: 52% !important;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='none'%3E%3Cpath d='M16 30C16 22 16 16 16 10' stroke='%2315803d' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M16 18C10 18 3 14 4 6C11 6 15 12 16 18Z' fill='%234ade80' stroke='%2316a34a' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M16 18C22 18 29 14 28 6C21 6 17 12 16 18Z' fill='%2322c55e' stroke='%2316a34a' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M16 18C13 14 9 10 7 8' stroke='%23166534' stroke-width='1' stroke-linecap='round' opacity='0.6'/%3E%3Cpath d='M16 18C19 14 23 10 25 8' stroke='%23166534' stroke-width='1' stroke-linecap='round' opacity='0.6'/%3E%3C/svg%3E") !important;
+  width: 72% !important;
+  height: 54% !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='none'%3E%3Cdefs%3E%3ClinearGradient id='lg' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%2386efac'/%3E%3Cstop offset='100%25' stop-color='%2322c55e'/%3E%3C/linearGradient%3E%3ClinearGradient id='rg' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%234ade80'/%3E%3Cstop offset='100%25' stop-color='%2316a34a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M16 30 C16 22 16 16 16 10' stroke='%2314532d' stroke-width='3.5' stroke-linecap='round'/%3E%3Cpath d='M16 30 C16 22 16 16 16 10' stroke='%2386efac' stroke-width='1.5' stroke-linecap='round'/%3E%3Cpath d='M16 18 C9 18 2 13 3 5 C 10 5 15 11 16 18 Z' fill='url(%23lg)' stroke='%2314532d' stroke-width='1.2' stroke-linejoin='round'/%3E%3Cpath d='M16 18 C23 18 30 13 29 5 C 22 5 17 11 16 18 Z' fill='url(%23rg)' stroke='%2314532d' stroke-width='1.2' stroke-linejoin='round'/%3E%3Cpath d='M16 18 C13 14 9 10 7 8' stroke='%2315803d' stroke-width='1' stroke-linecap='round' opacity='0.7'/%3E%3Cpath d='M16 18 C19 14 23 10 25 8' stroke='%2315803d' stroke-width='1' stroke-linecap='round' opacity='0.7'/%3E%3C/svg%3E") !important;
   background-size: contain !important;
   background-repeat: no-repeat !important;
   background-position: center bottom !important;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7)) !important;
+  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.8)) !important;
   z-index: 10 !important;
   pointer-events: none !important;
 }

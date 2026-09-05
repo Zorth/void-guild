@@ -91,6 +91,7 @@ export default function AchievementsModal({ open, onOpenChange }: AchievementsMo
 
   const renderReward = (item: Achievement, isSubItem = false) => {
     const hasReward = Boolean(item.reward && item.reward.trim() !== '')
+
     if (item.isUnlocked && hasReward) {
       return (
         <div className={cn(isSubItem ? 'pt-0.5' : 'pt-1')}>
@@ -101,6 +102,7 @@ export default function AchievementsModal({ open, onOpenChange }: AchievementsMo
         </div>
       )
     }
+
     if (data?.isAdmin) {
       return (
         <div className={cn(isSubItem ? 'pt-0.5' : 'pt-1')}>
@@ -111,6 +113,7 @@ export default function AchievementsModal({ open, onOpenChange }: AchievementsMo
         </div>
       )
     }
+
     return null
   }
 
