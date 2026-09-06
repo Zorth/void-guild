@@ -38,6 +38,7 @@ export interface UserEvaluationData {
   maxWorldStreak: number
   uniqueWorldsCount: number
   claimedLootCount: number
+  unlockedAchievementIds?: Set<string>
 }
 
 export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
@@ -303,6 +304,9 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
         'loot_first',
       ]
       return requiredIds.every((id) => {
+        if (data.unlockedAchievementIds?.has(id)) {
+          return true
+        }
         const def = ACHIEVEMENTS_REGISTRY.find((a) => a.id === id)
         return def ? def.checkEligibility(data) : false
       })
@@ -679,22 +683,32 @@ export const syncAndGetAchievements = mutation({
       .collect()
 
     const unlockedMap = new Map<string, { unlockedAt: number; notifiedAt?: number }>()
+    const unlockedAchievementIds = new Set<string>()
     for (const u of existingUnlockedDocs) {
       unlockedMap.set(u.achievementId, { unlockedAt: u.unlockedAt, notifiedAt: u.notifiedAt })
+      unlockedAchievementIds.add(u.achievementId)
     }
+
+    evalData.unlockedAchievementIds = unlockedAchievementIds
 
     const now = Date.now()
 
-    // Auto-grant eligible achievements in database if not already persisted
-    for (const def of ACHIEVEMENTS_REGISTRY) {
-      if (!unlockedMap.has(def.id)) {
-        if (def.checkEligibility(evalData)) {
-          await ctx.db.insert('unlockedAchievements', {
-            userId: user.subject,
-            achievementId: def.id,
-            unlockedAt: now,
-          })
-          unlockedMap.set(def.id, { unlockedAt: now })
+    // Auto-grant eligible achievements in database if not already persisted (multi-pass evaluation)
+    let newlyUnlocked = true
+    while (newlyUnlocked) {
+      newlyUnlocked = false
+      for (const def of ACHIEVEMENTS_REGISTRY) {
+        if (!unlockedMap.has(def.id)) {
+          if (def.checkEligibility(evalData)) {
+            await ctx.db.insert('unlockedAchievements', {
+              userId: user.subject,
+              achievementId: def.id,
+              unlockedAt: now,
+            })
+            unlockedMap.set(def.id, { unlockedAt: now })
+            unlockedAchievementIds.add(def.id)
+            newlyUnlocked = true
+          }
         }
       }
     }
