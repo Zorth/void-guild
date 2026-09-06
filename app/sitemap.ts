@@ -7,6 +7,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     '',
     '/stats',
     '/world',
+    '/black-void',
   ];
 
   return paths.map((path) => ({

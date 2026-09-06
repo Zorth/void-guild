@@ -1,10 +1,10 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 
-const isPublicRoute = createRouteMatcher(['/api/interactions']);
+const isPublicRoute = createRouteMatcher(['/api/interactions', '/api/external(.*)']);
 
 export default clerkMiddleware(async (auth, request) => {
   if (isPublicRoute(request)) {
-    return; // Completely bypass Clerk for Discord
+    return; // Completely bypass Clerk for Discord and external API routes
   }
 });
 
