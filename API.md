@@ -2,15 +2,19 @@
 
 This API allows external tools to interact with your "Guild of The Void" data using an API key generated on your account.
 
-## Authentication
+## Authentication & Permissions
 
-All requests must include your API key in the `Authorization` header as a Bearer token.
+* **GET Requests (Public)**: All `GET` endpoints are public and **do not require an API key or token**.
+* **POST / PATCH Requests (Authenticated)**: All mutation operations strictly require an API key, either via the `Authorization` header (`Bearer vg_your_api_key_here`) or `apiKey` parameter. Mutations verify resource ownership (e.g. you can only create listings or update characters owned by your account).
+* **Security Guarantees**:
+  * Character **XP** (`xp`) and **Level** (`lvl`) values **CANNOT** be modified via the API by anyone.
+  * Character **deletion** is completely disabled over the API.
 
 ```http
 Authorization: Bearer vg_your_api_key_here
 ```
 
-To generate a key, click on your **User Profile** on the home page and select **API Access**.
+To generate an API key, click on your **User Profile** avatar in the top right menu and select **API Access**.
 
 ## Base URL
 
