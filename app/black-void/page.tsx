@@ -84,33 +84,28 @@ export default function BlackVoidPage() {
   )
 
   return (
-    <div className="min-h-screen bg-background text-foreground py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-8">
-      {/* Header Banner */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-950 via-purple-950 to-slate-950 border border-purple-500/30 p-6 sm:p-8 shadow-2xl">
-        <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-          <div className="space-y-2 max-w-2xl">
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white flex items-center gap-3">
-                <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-300 via-amber-200 to-purple-400">
-                  The Black Void
-                </span>
-              </h1>
-              <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wide flex items-center gap-1.5">
-                <Coins className="h-3.5 w-3.5 text-amber-400" />
-                0% Market Tax
-              </span>
-            </div>
-            <p className="text-sm sm:text-base text-purple-200/80">
-              The tax-free contraband auction house & market of the Void. Trade rare items, offer crafting services, or issue character quests.
-            </p>
-          </div>
-
-          <ActiveCharacterSelector
-            selectedCharacterId={selectedCharacterId}
-            onSelectCharacter={handleSelectCharacter}
-          />
+    <div className="min-h-screen bg-background text-foreground py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-6">
+      {/* Compact Header */}
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-slate-950 via-purple-950/60 to-slate-950 border border-purple-500/20 px-4 py-3.5 sm:px-5 sm:py-4 shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2.5">
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-300 via-amber-200 to-purple-400">
+              The Black Void
+            </span>
+          </h1>
+          <span className="bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-md uppercase tracking-wider flex items-center gap-1">
+            <Coins className="h-3 w-3 text-amber-400" />
+            0% Tax
+          </span>
+          <span className="text-xs text-muted-foreground hidden lg:inline border-l border-border/40 pl-3">
+            Tax-free contraband auction house & crafting market of the Void.
+          </span>
         </div>
+
+        <ActiveCharacterSelector
+          selectedCharacterId={selectedCharacterId}
+          onSelectCharacter={handleSelectCharacter}
+        />
       </div>
 
       {/* Navigation Tabs */}
