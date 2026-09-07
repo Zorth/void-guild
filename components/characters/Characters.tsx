@@ -13,6 +13,7 @@ import {
   Handshake,
   Medal,
   Sparkles,
+  Coins,
 } from 'lucide-react'
 import {
   Dialog,
@@ -359,17 +360,28 @@ export default function Characters({ filters }: { filters?: { pf: boolean; dnd: 
           </CardContent>
         </Card>
 
-        {/* World Management Actions */}
+        {/* World & Market Management Actions */}
         <div className="flex flex-col gap-3 mt-6 w-full">
-          <Link href="/world" className="w-full">
-            <Button
-              variant="default"
-              className="w-full flex items-center justify-center gap-3 h-12 text-md font-bold shadow-md hover:shadow-lg transition-all rounded-xl"
-            >
-              <Globe className="h-5 w-5" />
-              Browse Worlds
-            </Button>
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-3 w-full">
+            <Link href="/world" className="w-full sm:w-1/2">
+              <Button
+                variant="default"
+                className="w-full flex items-center justify-center gap-3 h-12 text-md font-bold shadow-md hover:shadow-lg transition-all rounded-xl"
+              >
+                <Globe className="h-5 w-5" />
+                Browse Worlds
+              </Button>
+            </Link>
+            <Link href="/black-void" className="w-full sm:w-1/2">
+              <Button
+                variant="outline"
+                className="w-full flex items-center justify-center gap-3 h-12 text-md font-bold border-2 border-purple-500/50 text-purple-300 hover:bg-purple-500/10 hover:border-purple-500 shadow-md hover:shadow-lg transition-all rounded-xl"
+              >
+                <Coins className="h-5 w-5 text-purple-400" />
+                The Black Void
+              </Button>
+            </Link>
+          </div>
 
           {isGM && (
             <div className="w-full">
