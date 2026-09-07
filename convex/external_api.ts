@@ -3,12 +3,9 @@ import { query, mutation } from './_generated/server'
 import { Id } from './_generated/dataModel'
 import { roundToTwoSigFigs, getNextValidBid } from './blackVoid'
 
-/**
- * Validates an API key and returns the user record if valid.
- */
-async function validateKey(ctx: any, apiKey: string) {
+async function validateKey(ctx: any, apiKey?: string) {
     if (!apiKey || apiKey.trim() === "") {
-        throw new Error('API key is required')
+        return null
     }
 
     const user = await ctx.db
@@ -16,8 +13,16 @@ async function validateKey(ctx: any, apiKey: string) {
         .withIndex('by_apiKey', (q: any) => q.eq('apiKey', apiKey))
         .first()
     
+    return user || null
+}
+
+async function requireUser(ctx: any, apiKey?: string) {
+    if (!apiKey || apiKey.trim() === "") {
+        throw new Error('Unauthorized: API key is required for this action')
+    }
+    const user = await validateKey(ctx, apiKey)
     if (!user) {
-        throw new Error('Invalid API key')
+        throw new Error('Unauthorized: Invalid API key')
     }
     return user
 }
@@ -26,7 +31,7 @@ async function validateKey(ctx: any, apiKey: string) {
 
 export const getSessionCharacters = query({
     args: {
-        apiKey: v.string(),
+        apiKey: v.optional(v.string()),
         sessionId: v.string(),
     },
     handler: async (ctx, args) => {
@@ -57,7 +62,7 @@ export const getSessionCharacters = query({
 
 export const listSessions = query({
     args: {
-        apiKey: v.string(),
+        apiKey: v.optional(v.string()),
         past: v.optional(v.boolean()),
         worldId: v.optional(v.string()),
         system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
@@ -83,7 +88,7 @@ export const listSessions = query({
 
 export const getSessionDetails = query({
     args: {
-        apiKey: v.string(),
+        apiKey: v.optional(v.string()),
         sessionId: v.string(),
     },
     handler: async (ctx, args) => {
@@ -121,7 +126,7 @@ export const createSession = mutation({
         worldId: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
-        const user = await validateKey(ctx, args.apiKey)
+        const user = await requireUser(ctx, args.apiKey)
         if (!user.isGM && !user.isAdmin) throw new Error('Only GMs can create sessions')
 
         let targetWorldId: Id<'worlds'> | null = null
@@ -162,7 +167,7 @@ export const addSessionLoot = mutation({
         quantity: v.optional(v.number()),
     },
     handler: async (ctx, args) => {
-        const user = await validateKey(ctx, args.apiKey)
+        const user = await requireUser(ctx, args.apiKey)
         const sId = ctx.db.normalizeId('sessions', args.sessionId)
         if (!sId) throw new Error('Invalid session ID')
 
@@ -204,7 +209,7 @@ export const updateSession = mutation({
         planning: v.optional(v.boolean()),
     },
     handler: async (ctx, args) => {
-        const user = await validateKey(ctx, args.apiKey)
+        const user = await requireUser(ctx, args.apiKey)
         const sId = ctx.db.normalizeId('sessions', args.sessionId)
         if (!sId) throw new Error('Invalid session ID')
 
@@ -223,7 +228,7 @@ export const updateSession = mutation({
 // --- WORLD ENDPOINTS ---
 
 export const listWorlds = query({
-    args: { apiKey: v.string() },
+    args: { apiKey: v.optional(v.string()) },
     handler: async (ctx, args) => {
         await validateKey(ctx, args.apiKey)
         return await ctx.db.query('worlds').collect()
@@ -231,7 +236,7 @@ export const listWorlds = query({
 })
 
 export const getWorld = query({
-    args: { apiKey: v.string(), worldId: v.string() },
+    args: { apiKey: v.optional(v.string()), worldId: v.string() },
     handler: async (ctx, args) => {
         await validateKey(ctx, args.apiKey)
         const wId = ctx.db.normalizeId('worlds', args.worldId)
@@ -242,7 +247,7 @@ export const getWorld = query({
 
 export const getWorldCalendar = query({
     args: {
-        apiKey: v.string(),
+        apiKey: v.optional(v.string()),
         worldId: v.string(),
     },
     handler: async (ctx, args) => {
@@ -270,7 +275,7 @@ export const updateWorldDate = mutation({
         day: v.number(),
     },
     handler: async (ctx, args) => {
-        const user = await validateKey(ctx, args.apiKey)
+        const user = await requireUser(ctx, args.apiKey)
         
         const worldId = ctx.db.normalizeId('worlds', args.worldId)
         if (!worldId) throw new Error('Invalid world ID')
@@ -308,7 +313,7 @@ export const updateWorldDate = mutation({
 // --- QUEST ENDPOINTS ---
 
 export const listQuests = query({
-    args: { apiKey: v.string(), worldId: v.optional(v.string()) },
+    args: { apiKey: v.optional(v.string()), worldId: v.optional(v.string()) },
     handler: async (ctx, args) => {
         await validateKey(ctx, args.apiKey)
         if (args.worldId) {
@@ -338,7 +343,7 @@ export const createQuest = mutation({
         characterId: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
-        const user = await validateKey(ctx, args.apiKey)
+        const user = await requireUser(ctx, args.apiKey)
         
         let wId: Id<'worlds'> | undefined = undefined
         if (args.worldId) {
@@ -381,7 +386,7 @@ export const updateQuest = mutation({
         reward: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
-        const user = await validateKey(ctx, args.apiKey)
+        const user = await requireUser(ctx, args.apiKey)
         const qId = ctx.db.normalizeId('quests', args.questId)
         if (!qId) throw new Error('Invalid quest ID')
 
@@ -405,20 +410,23 @@ export const updateQuest = mutation({
 // --- CHARACTER ENDPOINTS ---
 
 export const listCharacters = query({
-    args: { apiKey: v.string(), userId: v.optional(v.string()) },
+    args: { apiKey: v.optional(v.string()), userId: v.optional(v.string()) },
     handler: async (ctx, args) => {
         const user = await validateKey(ctx, args.apiKey)
-        const targetUserId = args.userId || user.userId
+        const targetUserId = args.userId || user?.userId
         
-        return await ctx.db
-            .query('characters')
-            .withIndex('by_userId', (q) => q.eq('userId', targetUserId))
-            .collect()
+        if (targetUserId) {
+            return await ctx.db
+                .query('characters')
+                .withIndex('by_userId', (q) => q.eq('userId', targetUserId))
+                .collect()
+        }
+        return await ctx.db.query('characters').collect()
     }
 })
 
 export const getCharacter = query({
-    args: { apiKey: v.string(), characterId: v.string() },
+    args: { apiKey: v.optional(v.string()), characterId: v.string() },
     handler: async (ctx, args) => {
         await validateKey(ctx, args.apiKey)
         const charId = ctx.db.normalizeId('characters', args.characterId)
@@ -437,7 +445,7 @@ export const createCharacter = mutation({
         websiteLink: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
-        const user = await validateKey(ctx, args.apiKey)
+        const user = await requireUser(ctx, args.apiKey)
         const { apiKey, ...charData } = args
 
         return await ctx.db.insert('characters', {
@@ -460,7 +468,7 @@ export const updateCharacter = mutation({
         websiteLink: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
-        const user = await validateKey(ctx, args.apiKey)
+        const user = await requireUser(ctx, args.apiKey)
         const cId = ctx.db.normalizeId('characters', args.characterId)
         if (!cId) throw new Error('Invalid character ID')
 
@@ -480,7 +488,7 @@ export const updateCharacter = mutation({
 // --- REPUTATION ENDPOINTS ---
 
 export const getReputations = query({
-    args: { apiKey: v.string(), worldId: v.string() },
+    args: { apiKey: v.optional(v.string()), worldId: v.string() },
     handler: async (ctx, args) => {
         await validateKey(ctx, args.apiKey)
         const wId = ctx.db.normalizeId('worlds', args.worldId)
@@ -502,7 +510,7 @@ export const updateReputation = mutation({
         delta: v.number(),
     },
     handler: async (ctx, args) => {
-        const user = await validateKey(ctx, args.apiKey)
+        const user = await requireUser(ctx, args.apiKey)
         const wId = ctx.db.normalizeId('worlds', args.worldId)
         const cId = ctx.db.normalizeId('characters', args.characterId)
         if (!wId || !cId) throw new Error('Invalid world or character ID')
@@ -533,7 +541,7 @@ export const updateReputation = mutation({
 // --- INITIATIVE & STATE ENDPOINTS ---
 
 export const getSessionState = query({
-    args: { apiKey: v.string(), sessionId: v.string() },
+    args: { apiKey: v.optional(v.string()), sessionId: v.string() },
     handler: async (ctx, args) => {
         await validateKey(ctx, args.apiKey)
         const sId = ctx.db.normalizeId('sessions', args.sessionId)
@@ -562,7 +570,7 @@ export const updateSessionState = mutation({
         multiplier: v.optional(v.number()),
     },
     handler: async (ctx, args) => {
-        const user = await validateKey(ctx, args.apiKey)
+        const user = await requireUser(ctx, args.apiKey)
         const sId = ctx.db.normalizeId('sessions', args.sessionId)
         if (!sId) throw new Error('Invalid session ID')
 
@@ -587,7 +595,7 @@ export const updateSessionState = mutation({
 // --- DISCOVERY & SEARCH ---
 
 export const search = query({
-    args: { apiKey: v.string(), query: v.string() },
+    args: { apiKey: v.optional(v.string()), query: v.string() },
     handler: async (ctx, args) => {
         await validateKey(ctx, args.apiKey)
         const worlds = await ctx.db.query('worlds').collect()
@@ -602,7 +610,7 @@ export const search = query({
 })
 
 export const getActivity = query({
-    args: { apiKey: v.string(), limit: v.optional(v.number()) },
+    args: { apiKey: v.optional(v.string()), limit: v.optional(v.number()) },
     handler: async (ctx, args) => {
         await validateKey(ctx, args.apiKey)
         return await ctx.db.query('activity').order('desc').take(args.limit || 10)
@@ -613,7 +621,7 @@ export const getActivity = query({
 
 export const getBlackVoidListings = query({
     args: {
-        apiKey: v.string(),
+        apiKey: v.optional(v.string()),
         type: v.optional(v.union(v.literal('item'), v.literal('service'))),
         status: v.optional(v.union(v.literal('active'), v.literal('completed'), v.literal('cancelled'))),
     },
@@ -656,7 +664,7 @@ export const getBlackVoidListings = query({
 
 export const getBlackVoidTransactions = query({
     args: {
-        apiKey: v.string(),
+        apiKey: v.optional(v.string()),
         characterId: v.string(),
     },
     handler: async (ctx, args) => {
@@ -693,7 +701,7 @@ export const createBlackVoidItemListing = mutation({
         durationDays: v.number(),
     },
     handler: async (ctx, args) => {
-        const user = await validateKey(ctx, args.apiKey)
+        const user = await requireUser(ctx, args.apiKey)
         const cId = ctx.db.normalizeId('characters', args.characterId)
         if (!cId) throw new Error('Invalid character ID')
 
@@ -736,7 +744,7 @@ export const createBlackVoidServiceListing = mutation({
         priceDetails: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
-        const user = await validateKey(ctx, args.apiKey)
+        const user = await requireUser(ctx, args.apiKey)
         const cId = ctx.db.normalizeId('characters', args.characterId)
         if (!cId) throw new Error('Invalid character ID')
 
@@ -773,7 +781,7 @@ export const placeBlackVoidBid = mutation({
         isBuyout: v.boolean(),
     },
     handler: async (ctx, args) => {
-        const user = await validateKey(ctx, args.apiKey)
+        const user = await requireUser(ctx, args.apiKey)
         const cId = ctx.db.normalizeId('characters', args.characterId)
         const lId = ctx.db.normalizeId('blackVoidListings', args.listingId)
         if (!cId || !lId) throw new Error('Invalid character or listing ID')
@@ -988,7 +996,7 @@ export const placeBlackVoidBid = mutation({
 
 export const getAvailability = query({
     args: {
-        apiKey: v.string(),
+        apiKey: v.optional(v.string()),
         startDate: v.optional(v.number()),
         endDate: v.optional(v.number()),
     },
@@ -1012,7 +1020,7 @@ export const setAvailability = mutation({
         isGM: v.boolean(),
     },
     handler: async (ctx, args) => {
-        const user = await validateKey(ctx, args.apiKey)
+        const user = await requireUser(ctx, args.apiKey)
         const username = user.username || user.name || 'Unknown Player'
 
         const existing = await ctx.db
@@ -1039,7 +1047,7 @@ export const setAvailability = mutation({
 
 export const listCommendations = query({
     args: {
-        apiKey: v.string(),
+        apiKey: v.optional(v.string()),
         sessionId: v.optional(v.string()),
         characterId: v.optional(v.string()),
     },
@@ -1081,7 +1089,7 @@ export const addCommendation = mutation({
         ),
     },
     handler: async (ctx, args) => {
-        const user = await validateKey(ctx, args.apiKey)
+        const user = await requireUser(ctx, args.apiKey)
         const sId = ctx.db.normalizeId('sessions', args.sessionId)
         const cId = ctx.db.normalizeId('characters', args.toCharacterId)
         if (!sId || !cId) throw new Error('Invalid session or character ID')
@@ -1096,9 +1104,10 @@ export const addCommendation = mutation({
 })
 
 export const getUnlockedAchievements = query({
-    args: { apiKey: v.string() },
+    args: { apiKey: v.optional(v.string()) },
     handler: async (ctx, args) => {
         const user = await validateKey(ctx, args.apiKey)
+        if (!user) return []
         return await ctx.db
             .query('unlockedAchievements')
             .withIndex('by_userId', (q) => q.eq('userId', user.userId))
@@ -1108,7 +1117,7 @@ export const getUnlockedAchievements = query({
 
 export const getCharacterQuests = query({
     args: {
-        apiKey: v.string(),
+        apiKey: v.optional(v.string()),
         characterId: v.optional(v.string()),
     },
     handler: async (ctx, args) => {

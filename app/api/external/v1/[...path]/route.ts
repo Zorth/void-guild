@@ -28,8 +28,7 @@ export async function GET(
     { params }: { params: Promise<{ path: string[] }> }
 ) {
     const { path } = await params;
-    const apiKey = req.headers.get('Authorization')?.replace('Bearer ', '');
-    if (!apiKey) return NextResponse.json({ error: 'Missing API key' }, { status: 401 });
+    const apiKey = req.headers.get('Authorization')?.replace('Bearer ', '') || undefined;
 
     const convex = getConvexClient();
     const [resource, id, subresource] = path;
