@@ -151,6 +151,16 @@ export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
                 </Button>
               </Link>
             )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsApiDialogOpen(true)}
+              className="flex items-center gap-2 h-9 w-9 sm:w-auto sm:px-3 p-0 border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
+              title="API Access Key"
+            >
+              <Key className="h-4 w-4 text-amber-400" />
+              <span className="hidden sm:inline">API Access</span>
+            </Button>
             <ThemeToggle />
             <CustomUserButton />
             <ApiKeyDialog open={isApiDialogOpen} onOpenChange={setIsApiDialogOpen} />
