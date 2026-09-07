@@ -431,8 +431,6 @@ export const createCharacter = mutation({
     args: {
         apiKey: v.string(),
         name: v.string(),
-        lvl: v.number(),
-        xp: v.number(),
         ancestry: v.optional(v.string()),
         class: v.optional(v.string()),
         system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
@@ -444,6 +442,8 @@ export const createCharacter = mutation({
 
         return await ctx.db.insert('characters', {
             ...charData,
+            lvl: 1,
+            xp: 0,
             userId: user.userId,
             rank: 'none',
         })
@@ -455,8 +455,6 @@ export const updateCharacter = mutation({
         apiKey: v.string(),
         characterId: v.string(),
         name: v.optional(v.string()),
-        lvl: v.optional(v.number()),
-        xp: v.optional(v.number()),
         ancestry: v.optional(v.string()),
         class: v.optional(v.string()),
         websiteLink: v.optional(v.string()),

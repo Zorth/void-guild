@@ -36,8 +36,8 @@ https://guild.tarragon.be/api/external/v1
 ### Characters
 *   **GET** `/characters?userId=...` - List characters owned by a user.
 *   **GET** `/character/:characterId` - Get full character details.
-*   **POST** `/character` - Create a new character for your account. Body: `{ name, lvl, xp, ancestry?, class?, system?, websiteLink? }`.
-*   **PATCH** `/character/:characterId` - Update character stats or details (Owner/Admin). Body: `{ name?, lvl?, xp?, ancestry?, class?, websiteLink? }`.
+*   **POST** `/character` - Create a new character for your account (starts at level 1, 0 XP). Body: `{ name, ancestry?, class?, system?, websiteLink? }`.
+*   **PATCH** `/character/:characterId` - Update character details (Owner/Admin only; XP and Level cannot be modified via API). Body: `{ name?, ancestry?, class?, websiteLink? }`.
 
 ### Worlds & Quests
 *   **GET** `/worlds` - List all campaign worlds.
