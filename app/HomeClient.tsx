@@ -11,7 +11,6 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Trophy, Book, Globe, Sparkles, Coins, Key } from 'lucide-react'
 import ActivityFeed from '@/components/ActivityFeed'
 import { ThemeToggle } from '@/components/ThemeToggle'
-import { ApiKeyDialog } from '@/components/ApiKeyDialog'
 import { useState, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
@@ -24,7 +23,6 @@ export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
   const rotation = useMotionValue(0)
   const velocityRef = useRef(0)
   const [hasReachedRainbow, setHasReachedRainbow] = useState(false)
-  const [isApiDialogOpen, setIsApiDialogOpen] = useState(false)
 
   const incrementLogoClicks = useMutation(api.users.incrementLogoClicks)
   const recordWikiVisit = useMutation(api.users.recordWikiVisit)
@@ -134,12 +132,6 @@ export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
                 <span className="hidden sm:inline">Stats</span>
               </Button>
             </Link>
-            <Link href="/black-void">
-              <Button variant="outline" size="sm" className="flex items-center gap-2 h-9 w-9 sm:w-auto sm:px-3 p-0 border-purple-500/40 text-purple-400 hover:bg-purple-500/10">
-                <Coins className="h-4 w-4 text-purple-400" />
-                <span className="hidden sm:inline">The Black Void</span>
-              </Button>
-            </Link>
             {(isGM || ownedWorld) && (
               <Link href={ownedWorld ? `/world/${encodeURIComponent(ownedWorld.name)}` : "/world"}>
                 <Button variant="outline" size="sm" className={cn(
@@ -151,19 +143,8 @@ export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
                 </Button>
               </Link>
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsApiDialogOpen(true)}
-              className="flex items-center gap-2 h-9 w-9 sm:w-auto sm:px-3 p-0 border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
-              title="API Access Key"
-            >
-              <Key className="h-4 w-4 text-amber-400" />
-              <span className="hidden sm:inline">API Access</span>
-            </Button>
             <ThemeToggle />
             <CustomUserButton />
-            <ApiKeyDialog open={isApiDialogOpen} onOpenChange={setIsApiDialogOpen} />
           </div>
         </Authenticated>
         <AuthLoading>
