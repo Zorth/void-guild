@@ -239,17 +239,8 @@ export default function BlackVoidPage() {
               <CardContent className="space-y-3">
                 <Coins className="h-10 w-10 text-muted-foreground/50 mx-auto" />
                 <p className="text-muted-foreground text-sm">
-                  No active item listings matching your filter. Be the first to list an item!
+                  No active item listings matching your filter.
                 </p>
-                <Button
-                  onClick={() => setIsItemModalOpen(true)}
-                  disabled={!selectedCharacterId}
-                  size="sm"
-                  className="bg-purple-600 hover:bg-purple-700 text-xs"
-                >
-                  <Plus className="h-3.5 w-3.5 mr-1" />
-                  List Item on The Black Void
-                </Button>
               </CardContent>
             </Card>
           ) : (
@@ -348,15 +339,6 @@ export default function BlackVoidPage() {
                 <p className="text-muted-foreground text-sm">
                   No active crafting or service listings matching your search.
                 </p>
-                <Button
-                  onClick={() => setIsServiceModalOpen(true)}
-                  disabled={!selectedCharacterId}
-                  size="sm"
-                  className="bg-amber-600 hover:bg-amber-700 text-xs"
-                >
-                  <Plus className="h-3.5 w-3.5 mr-1" />
-                  Offer Crafting / Service
-                </Button>
               </CardContent>
             </Card>
           ) : (
@@ -420,21 +402,10 @@ export default function BlackVoidPage() {
       {/* TAB 3: CHARACTER QUESTS */}
       {activeTab === 'quests' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold text-blue-300 flex items-center gap-2">
-              <Scroll className="h-5 w-5 text-blue-400" />
-              Character Issued Quests
-            </h2>
-            <Button
-              onClick={() => setIsQuestModalOpen(true)}
-              disabled={!selectedCharacterId}
-              size="sm"
-              className="bg-blue-600 hover:bg-blue-700 text-xs font-semibold"
-            >
-              <Plus className="h-3.5 w-3.5 mr-1" />
-              Issue Character Quest
-            </Button>
-          </div>
+          <h2 className="text-lg font-bold text-blue-300 flex items-center gap-2">
+            <Scroll className="h-5 w-5 text-blue-400" />
+            Character Issued Quests
+          </h2>
 
           {characterQuests === undefined ? (
             <div className="p-8 text-center text-muted-foreground animate-pulse">Loading quests...</div>
