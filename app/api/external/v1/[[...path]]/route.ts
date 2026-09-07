@@ -23,11 +23,76 @@ async function handleResponse(promise: Promise<any>) {
     }
 }
 
+function getApiDocsResponse() {
+    return NextResponse.json({
+        name: "Guild of The Void External API",
+        version: "v1",
+        documentationUrl: "https://github.com/Zorth/void-guild/blob/main/API.md",
+        baseUrl: "https://guild.tarragon.be/api/external/v1",
+        authentication: {
+            getRequests: "Public (No API key required)",
+            mutationRequests: "Requires Bearer token in Authorization header or apiKey parameter",
+            keyGeneration: "User Profile -> API Access in top navigation menu",
+            restrictions: [
+                "XP and Level cannot be edited via API",
+                "Character deletion is disabled via API",
+                "Mutations verify resource ownership"
+            ]
+        },
+        endpoints: [
+            { method: "GET", path: "/sessions", description: "List sessions with filters", queryParams: ["past=true|false", "worldId=string", "system=PF|DnD"] },
+            { method: "GET", path: "/session/:id", description: "Get detailed session info" },
+            { method: "GET", path: "/session/:id/characters", description: "List attending characters in a session" },
+            { method: "GET", path: "/session/:id/state", description: "Get live initiative and clock state" },
+            { method: "POST", path: "/session", description: "Create a session (GM/Admin)" },
+            { method: "POST", path: "/session/:id/loot", description: "Add loot item to session" },
+            { method: "POST", path: "/session/:id/commendation", description: "Submit character commendation" },
+            { method: "PATCH", path: "/session/:id", description: "Update session metadata" },
+            { method: "PATCH", path: "/session/:id/state", description: "Update initiative & clock" },
+
+            { method: "GET", path: "/characters", description: "List user characters", queryParams: ["userId=string"] },
+            { method: "GET", path: "/character/:id", description: "Get full character details" },
+            { method: "POST", path: "/character", description: "Create a new character (starts at Lvl 1, 0 XP)" },
+            { method: "PATCH", path: "/character/:id", description: "Update character details (XP/Lvl protected)" },
+
+            { method: "GET", path: "/worlds", description: "List all campaign worlds" },
+            { method: "GET", path: "/world/:id", description: "Get details for a specific world" },
+            { method: "GET", path: "/world/:id/calendar", description: "Get world calendar config & current date" },
+            { method: "GET", path: "/world/:id/quests", description: "List all quests in a specific world" },
+            { method: "GET", path: "/quests", description: "List all quests (global + world)" },
+            { method: "GET", path: "/character-quests", description: "List character-issued quests", queryParams: ["characterId=string"] },
+            { method: "POST", path: "/quest", description: "Create a new quest" },
+            { method: "PATCH", path: "/world/:id/calendar", description: "Update world calendar date" },
+            { method: "PATCH", path: "/quest/:id", description: "Update quest status or details" },
+
+            { method: "GET", path: "/black-void/listings", description: "List items & services on The Black Void market", queryParams: ["type=item|service", "status=active|completed"] },
+            { method: "GET", path: "/black-void/character/:id/transactions", description: "Get sold items and won auctions for a character" },
+            { method: "POST", path: "/black-void/item", description: "Post an item listing" },
+            { method: "POST", path: "/black-void/service", description: "Post a crafting/service listing" },
+            { method: "POST", path: "/black-void/bid", description: "Place bid, 2-sig-fig auto-bid cap, or buyout on item" },
+
+            { method: "GET", path: "/world/:id/reputation", description: "Get character faction reputation scores" },
+            { method: "PATCH", path: "/reputation", description: "Update character faction reputation" },
+
+            { method: "GET", path: "/availability", description: "Get player availability calendar entries", queryParams: ["startDate=number", "endDate=number"] },
+            { method: "POST", path: "/availability", description: "Toggle availability entry" },
+
+            { method: "GET", path: "/commendations", description: "List player commendations", queryParams: ["sessionId=string", "characterId=string"] },
+            { method: "GET", path: "/achievements", description: "List unlocked achievements" },
+            { method: "GET", path: "/search", description: "Search worlds & characters by name", queryParams: ["q=string"] },
+            { method: "GET", path: "/activity", description: "Get recent activity feed", queryParams: ["limit=number"] }
+        ]
+    });
+}
+
 export async function GET(
     req: NextRequest,
-    { params }: { params: Promise<{ path: string[] }> }
+    { params }: { params: Promise<{ path?: string[] }> }
 ) {
     const { path } = await params;
+    if (!path || path.length === 0 || ['docs', 'help', 'spec', 'openapi.json'].includes(path[0])) {
+        return getApiDocsResponse();
+    }
     const apiKey = req.headers.get('Authorization')?.replace('Bearer ', '') || undefined;
 
     const convex = getConvexClient();
@@ -111,9 +176,10 @@ export async function GET(
 
 export async function POST(
     req: NextRequest,
-    { params }: { params: Promise<{ path: string[] }> }
+    { params }: { params: Promise<{ path?: string[] }> }
 ) {
     const { path } = await params;
+    if (!path || path.length === 0) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     const apiKey = req.headers.get('Authorization')?.replace('Bearer ', '');
     if (!apiKey) return NextResponse.json({ error: 'Missing API key' }, { status: 401 });
 
@@ -154,9 +220,10 @@ export async function POST(
 
 export async function PATCH(
     req: NextRequest,
-    { params }: { params: Promise<{ path: string[] }> }
+    { params }: { params: Promise<{ path?: string[] }> }
 ) {
     const { path } = await params;
+    if (!path || path.length === 0) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     const apiKey = req.headers.get('Authorization')?.replace('Bearer ', '');
     if (!apiKey) return NextResponse.json({ error: 'Missing API key' }, { status: 401 });
 
