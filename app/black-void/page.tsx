@@ -305,6 +305,17 @@ export default function BlackVoidPage() {
                           </span>
                         </div>
                       </div>
+
+                      {selectedCharacterId && item.winningBidderCharacterId === selectedCharacterId && (
+                        <div className="text-[11px] font-semibold text-purple-300 bg-purple-500/10 px-2.5 py-1 rounded border border-purple-500/30 flex items-center justify-between">
+                          <span>You are Top Bidder</span>
+                          {item.maxAutoBid && (
+                            <span className="font-mono text-purple-400 text-[10px]">
+                              Auto-Cap: {item.maxAutoBid} GP
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div className="p-3 bg-muted/30 border-t border-border/20 flex items-center justify-between text-xs">

@@ -146,11 +146,31 @@ export const createServiceListing = mutation({
   },
 })
 
+export function roundToTwoSigFigs(n: number): number {
+  if (n <= 0) return 0
+  const intVal = Math.round(n)
+  if (intVal < 100) return intVal
+  const digits = Math.floor(Math.log10(intVal)) + 1
+  const scale = Math.pow(10, digits - 2)
+  return Math.round(intVal / scale) * scale
+}
+
+export function getNextValidBid(currentBid: number): number {
+  if (currentBid <= 0) return 1
+  if (currentBid < 99) return currentBid + 1
+  if (currentBid < 100) return 100
+  const digits = Math.floor(Math.log10(currentBid)) + 1
+  const step = Math.pow(10, digits - 2)
+  const target = currentBid + step
+  return roundToTwoSigFigs(target)
+}
+
 export const placeBid = mutation({
   args: {
     listingId: v.id('blackVoidListings'),
     characterId: v.id('characters'),
     amount: v.number(),
+    maxAutoBid: v.optional(v.number()),
     isBuyout: v.boolean(),
   },
   handler: async (ctx, args) => {
@@ -179,16 +199,27 @@ export const placeBid = mutation({
       throw new Error('This listing has expired.')
     }
 
+    // 1. Enforce positive integers and 2-sig-fig rounding
+    const rawAmount = Math.max(1, Math.round(args.amount))
+    const amount = roundToTwoSigFigs(rawAmount)
+
+    const rawMax = args.maxAutoBid ? Math.max(amount, Math.round(args.maxAutoBid)) : amount
+    const maxAutoBid = roundToTwoSigFigs(rawMax)
+
+    // 2. Buyout trigger check
     const isBuyoutTriggered =
-      args.isBuyout || (listing.buyoutPrice !== undefined && args.amount >= listing.buyoutPrice)
+      args.isBuyout ||
+      (listing.buyoutPrice !== undefined &&
+        (amount >= listing.buyoutPrice || maxAutoBid >= listing.buyoutPrice))
 
     if (isBuyoutTriggered) {
-      const finalAmount = listing.buyoutPrice || args.amount
+      const finalAmount = listing.buyoutPrice ? roundToTwoSigFigs(listing.buyoutPrice) : amount
 
       await ctx.db.insert('blackVoidBids', {
         listingId: args.listingId,
         characterId: args.characterId,
         amount: finalAmount,
+        maxAutoBid: maxAutoBid,
         isBuyout: true,
         createdAt: now,
         buyerClaimed: false,
@@ -202,20 +233,27 @@ export const placeBid = mutation({
       })
 
       return { success: true, isBuyout: true, amount: finalAmount }
-    } else {
-      // Check minimum bid
-      const currentHighest = listing.winningAmount || 0
-      const startingBid = listing.startingBid || 0
-      const minRequired = currentHighest > 0 ? currentHighest + 1 : startingBid
+    }
 
-      if (args.amount < minRequired) {
-        throw new Error(`Bid must be at least ${minRequired} GP.`)
+    // 3. Multi-person Auto-Bidding Logic
+    const startingBid = listing.startingBid ? roundToTwoSigFigs(listing.startingBid) : 1
+    const currentWinnerId = listing.winningBidderCharacterId
+    const currentWinningAmount = listing.winningAmount || 0
+    const oldMaxAuto = listing.maxAutoBid || currentWinningAmount
+
+    // Case A: First bid on listing
+    if (!currentWinnerId) {
+      if (maxAutoBid < startingBid) {
+        throw new Error(`Bid must be at least ${startingBid} GP.`)
       }
+
+      const initialBid = roundToTwoSigFigs(Math.max(startingBid, amount))
 
       await ctx.db.insert('blackVoidBids', {
         listingId: args.listingId,
         characterId: args.characterId,
-        amount: args.amount,
+        amount: initialBid,
+        maxAutoBid: maxAutoBid,
         isBuyout: false,
         createdAt: now,
         buyerClaimed: false,
@@ -223,11 +261,183 @@ export const placeBid = mutation({
 
       await ctx.db.patch(args.listingId, {
         winningBidderCharacterId: args.characterId,
-        winningAmount: args.amount,
+        winningAmount: initialBid,
+        maxAutoBid: maxAutoBid,
         winningType: 'bid',
       })
 
-      return { success: true, isBuyout: false, amount: args.amount }
+      return { success: true, isBuyout: false, amount: initialBid, isTopBidder: true }
+    }
+
+    // Case B: Current top bidder updating their auto-bid cap
+    if (currentWinnerId === args.characterId) {
+      if (maxAutoBid < currentWinningAmount) {
+        throw new Error(
+          `Your auto-bid cap cannot be lower than your current winning bid of ${currentWinningAmount} GP.`
+        )
+      }
+
+      await ctx.db.insert('blackVoidBids', {
+        listingId: args.listingId,
+        characterId: args.characterId,
+        amount: currentWinningAmount,
+        maxAutoBid: maxAutoBid,
+        isBuyout: false,
+        createdAt: now,
+        buyerClaimed: false,
+      })
+
+      await ctx.db.patch(args.listingId, {
+        maxAutoBid: maxAutoBid,
+      })
+
+      return {
+        success: true,
+        isBuyout: false,
+        amount: currentWinningAmount,
+        isTopBidder: true,
+        message: `Updated maximum auto-bid cap to ${maxAutoBid} GP!`,
+      }
+    }
+
+    // Case C: New bidder competing against current top bidder
+    const minRequired = getNextValidBid(currentWinningAmount)
+
+    if (maxAutoBid < minRequired) {
+      throw new Error(`Your bid/auto-bid cap must be at least ${minRequired} GP.`)
+    }
+
+    const newMaxAuto = maxAutoBid
+
+    if (newMaxAuto > oldMaxAuto) {
+      // New bidder outbids old top bidder
+      let newWinningAmount = getNextValidBid(oldMaxAuto)
+
+      if (newWinningAmount > newMaxAuto) {
+        newWinningAmount = newMaxAuto
+      }
+
+      if (listing.buyoutPrice !== undefined && newWinningAmount >= listing.buyoutPrice) {
+        const buyoutAmt = roundToTwoSigFigs(listing.buyoutPrice)
+        await ctx.db.insert('blackVoidBids', {
+          listingId: args.listingId,
+          characterId: args.characterId,
+          amount: buyoutAmt,
+          maxAutoBid: newMaxAuto,
+          isBuyout: true,
+          createdAt: now,
+          buyerClaimed: false,
+        })
+        await ctx.db.patch(args.listingId, {
+          status: 'completed',
+          winningBidderCharacterId: args.characterId,
+          winningAmount: buyoutAmt,
+          winningType: 'buyout',
+        })
+        return { success: true, isBuyout: true, amount: buyoutAmt }
+      }
+
+      if (oldMaxAuto > currentWinningAmount) {
+        await ctx.db.insert('blackVoidBids', {
+          listingId: args.listingId,
+          characterId: currentWinnerId,
+          amount: oldMaxAuto,
+          isBuyout: false,
+          createdAt: now,
+          buyerClaimed: false,
+        })
+      }
+
+      await ctx.db.insert('blackVoidBids', {
+        listingId: args.listingId,
+        characterId: args.characterId,
+        amount: newWinningAmount,
+        maxAutoBid: newMaxAuto,
+        isBuyout: false,
+        createdAt: now,
+        buyerClaimed: false,
+      })
+
+      await ctx.db.patch(args.listingId, {
+        winningBidderCharacterId: args.characterId,
+        winningAmount: newWinningAmount,
+        maxAutoBid: newMaxAuto,
+        winningType: 'bid',
+      })
+
+      return {
+        success: true,
+        isBuyout: false,
+        amount: newWinningAmount,
+        isTopBidder: true,
+        message: `You are now the top bidder at ${newWinningAmount} GP!`,
+      }
+    } else {
+      // Old bidder stays top bidder, automatically outbidding new bidder
+      let newWinningAmount = getNextValidBid(newMaxAuto)
+
+      if (newWinningAmount > oldMaxAuto) {
+        newWinningAmount = oldMaxAuto
+      }
+
+      if (listing.buyoutPrice !== undefined && newWinningAmount >= listing.buyoutPrice) {
+        const buyoutAmt = roundToTwoSigFigs(listing.buyoutPrice)
+        await ctx.db.insert('blackVoidBids', {
+          listingId: args.listingId,
+          characterId: currentWinnerId,
+          amount: buyoutAmt,
+          maxAutoBid: oldMaxAuto,
+          isBuyout: true,
+          createdAt: now,
+          buyerClaimed: false,
+        })
+        await ctx.db.patch(args.listingId, {
+          status: 'completed',
+          winningBidderCharacterId: currentWinnerId,
+          winningAmount: buyoutAmt,
+          winningType: 'buyout',
+        })
+        return {
+          success: false,
+          isBuyout: false,
+          amount: newWinningAmount,
+          isTopBidder: false,
+          message: `The item has been bought out by the previous top bidder!`,
+        }
+      }
+
+      await ctx.db.insert('blackVoidBids', {
+        listingId: args.listingId,
+        characterId: args.characterId,
+        amount: newMaxAuto,
+        maxAutoBid: newMaxAuto,
+        isBuyout: false,
+        createdAt: now,
+        buyerClaimed: false,
+      })
+
+      await ctx.db.insert('blackVoidBids', {
+        listingId: args.listingId,
+        characterId: currentWinnerId,
+        amount: newWinningAmount,
+        maxAutoBid: oldMaxAuto,
+        isBuyout: false,
+        createdAt: now,
+        buyerClaimed: false,
+      })
+
+      await ctx.db.patch(args.listingId, {
+        winningAmount: newWinningAmount,
+        winningType: 'bid',
+      })
+
+      return {
+        success: false,
+        isBuyout: false,
+        amount: newWinningAmount,
+        isTopBidder: false,
+        message: `You were immediately outbid by an existing auto-bid! Current bid is now ${newWinningAmount} GP.`,
+      }
     }
   },
 })

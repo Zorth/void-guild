@@ -194,6 +194,7 @@ export default defineSchema({
         winningBidderCharacterId: v.optional(v.id('characters')),
         winningAmount: v.optional(v.number()),
         winningType: v.optional(v.union(v.literal('bid'), v.literal('buyout'))),
+        maxAutoBid: v.optional(v.number()),
         sellerClaimed: v.optional(v.boolean()), // Checkmark for seller adding earnings to character sheet
         buyerClaimed: v.optional(v.boolean()), // Checkmark for buyer adding item/expense to character sheet
     }).index('by_characterId', ['characterId'])
@@ -204,6 +205,7 @@ export default defineSchema({
         listingId: v.id('blackVoidListings'),
         characterId: v.id('characters'),
         amount: v.number(),
+        maxAutoBid: v.optional(v.number()),
         isBuyout: v.boolean(),
         createdAt: v.number(),
         buyerClaimed: v.optional(v.boolean()),

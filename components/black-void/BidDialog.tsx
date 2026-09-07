@@ -14,7 +14,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
-import { Coins, Zap, ExternalLink, ShieldCheck, User } from 'lucide-react'
+import { Coins, Zap, ExternalLink, User, Bot, HelpCircle } from 'lucide-react'
+import { roundToTwoSigFigs, getNextValidBid } from '@/lib/blackVoidUtils'
 
 interface BidDialogProps {
   isOpen: boolean
@@ -30,6 +31,8 @@ export default function BidDialog({
   characterId,
 }: BidDialogProps) {
   const [bidAmount, setBidAmount] = useState<string>('')
+  const [enableAutoBid, setEnableAutoBid] = useState<boolean>(false)
+  const [maxAutoBidAmount, setMaxAutoBidAmount] = useState<string>('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const placeBid = useMutation(api.blackVoid.placeBid)
@@ -38,7 +41,13 @@ export default function BidDialog({
 
   const currentHighest = listing.winningAmount || 0
   const startingBid = listing.startingBid || 0
-  const minRequired = currentHighest > 0 ? currentHighest + 1 : startingBid || 1
+  const minRequired = currentHighest > 0 ? getNextValidBid(currentHighest) : startingBid || 1
+
+  const parsedBid = parseFloat(bidAmount)
+  const roundedBidPreview = !isNaN(parsedBid) && parsedBid > 0 ? roundToTwoSigFigs(parsedBid) : null
+
+  const parsedMax = parseFloat(maxAutoBidAmount)
+  const roundedMaxPreview = !isNaN(parsedMax) && parsedMax > 0 ? roundToTwoSigFigs(parsedMax) : null
 
   const handlePlaceBid = async (isBuyout: boolean) => {
     if (!characterId) {
@@ -53,21 +62,36 @@ export default function BidDialog({
       return
     }
 
+    let autoBidCap: number | undefined = undefined
+    if (!isBuyout && enableAutoBid) {
+      const maxVal = parseFloat(maxAutoBidAmount)
+      if (!maxVal || maxVal < (amount || minRequired)) {
+        toast.error(`Auto-bid cap must be at least your current bid (${amount || minRequired} GP).`)
+        return
+      }
+      autoBidCap = maxVal
+    }
+
     setIsSubmitting(true)
     try {
       const res = await placeBid({
         listingId: listing._id,
         characterId,
         amount: amount || 0,
+        maxAutoBid: autoBidCap,
         isBuyout,
       })
 
       if (res.isBuyout) {
         toast.success(`Purchased ${listing.name} via Buyout for ${res.amount} GP!`)
+      } else if (res.isTopBidder) {
+        toast.success(res.message || `Placed winning bid of ${res.amount} GP on ${listing.name}!`)
       } else {
-        toast.success(`Placed bid of ${res.amount} GP on ${listing.name}!`)
+        toast.warning(res.message || `Outbid on ${listing.name}. Current bid is ${res.amount} GP.`)
       }
       setBidAmount('')
+      setMaxAutoBidAmount('')
+      setEnableAutoBid(false)
       onClose()
     } catch (error) {
       console.error(error)
@@ -79,15 +103,16 @@ export default function BidDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[460px] border-purple-500/40 bg-card/95 backdrop-blur-md">
+      <DialogContent className="sm:max-w-[500px] border-purple-500/40 bg-card/95 backdrop-blur-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-lg font-bold text-purple-300">
             <Coins className="h-5 w-5 text-amber-400" />
-            Place Bid / Buyout
+            Place Bid / Auto-Bid
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
+          {/* Listing Summary */}
           <div className="p-3 rounded-lg bg-muted/20 border border-border/30 space-y-2">
             <div className="flex justify-between items-start">
               <div>
@@ -115,10 +140,11 @@ export default function BidDialog({
             )}
           </div>
 
+          {/* Current Stats Grid */}
           <div className="grid grid-cols-2 gap-3">
             <div className="p-3 rounded-md bg-purple-950/30 border border-purple-500/20 text-center">
               <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider block">
-                Current Bid
+                Current Winning Bid
               </span>
               <span className="text-xl font-bold text-amber-400 font-mono">
                 {currentHighest > 0 ? `${currentHighest} GP` : startingBid > 0 ? `${startingBid} GP (Start)` : 'No bids'}
@@ -143,31 +169,100 @@ export default function BidDialog({
             </div>
           </div>
 
-          <div className="space-y-2 pt-2 border-t border-border/20">
-            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Your Bid (Minimum {minRequired} GP)
-            </label>
-            <div className="flex gap-2">
-              <Input
-                type="number"
-                min={minRequired}
-                step="any"
-                value={bidAmount}
-                onChange={(e) => setBidAmount(e.target.value)}
-                placeholder={`Min ${minRequired} GP`}
-                className="bg-muted/30 font-mono"
-              />
-              <Button
-                type="button"
-                onClick={() => handlePlaceBid(false)}
-                disabled={isSubmitting || !characterId || listing.characterId === characterId}
-                className="bg-purple-600 hover:bg-purple-700 font-semibold text-xs px-4"
-              >
-                Place Bid
-              </Button>
+          {/* Explanation Banner */}
+          <div className="p-3 rounded-lg bg-purple-950/40 border border-purple-500/30 space-y-1.5 text-xs">
+            <div className="flex items-center gap-1.5 font-bold text-purple-300">
+              <Bot className="h-4 w-4 text-purple-400 shrink-0" />
+              Auto-Bidding & 2-Significant-Digit Rounding
+            </div>
+            <p className="text-[11px] text-purple-200/90 leading-relaxed">
+              Auto-bidding automatically increases your bid up to your maximum cap whenever another player bids on this item.
+            </p>
+            <div className="text-[10px] text-purple-300/80 border-t border-purple-500/20 pt-1.5 flex items-start gap-1">
+              <HelpCircle className="h-3 w-3 text-purple-400 shrink-0 mt-0.5" />
+              <span>
+                All bids use whole GP numbers rounded to <strong>2 significant figures</strong> (e.g., 1–99 GP in 1 GP steps; 100–990 GP in 10 GP steps; 1,000+ GP in 100 GP steps). Amounts like 101 or 1,010 GP are rounded to 100 or 1,000 GP.
+              </span>
             </div>
           </div>
 
+          {/* Bid Form */}
+          <div className="space-y-3 pt-2 border-t border-border/20">
+            <div className="space-y-1">
+              <div className="flex justify-between items-center text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                <span>Initial Bid (Min {minRequired} GP)</span>
+                {roundedBidPreview !== null && (
+                  <span className="text-amber-400 font-mono text-[11px] normal-case">
+                    Rounded: <strong>{roundedBidPreview} GP</strong>
+                  </span>
+                )}
+              </div>
+              <Input
+                type="number"
+                min={minRequired}
+                step="1"
+                value={bidAmount}
+                onChange={(e) => setBidAmount(e.target.value)}
+                placeholder={`Min ${minRequired} GP`}
+                className="bg-muted/30 font-mono text-sm"
+              />
+            </div>
+
+            {/* Auto-Bid Toggle & Cap Input */}
+            <div className="p-3 rounded-lg bg-muted/20 border border-purple-500/20 space-y-2">
+              <label className="flex items-center gap-2 text-xs font-bold text-purple-200 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={enableAutoBid}
+                  onChange={(e) => {
+                    setEnableAutoBid(e.target.checked)
+                    if (e.target.checked && !maxAutoBidAmount && bidAmount) {
+                      setMaxAutoBidAmount(bidAmount)
+                    }
+                  }}
+                  className="rounded border-purple-500 text-purple-600 focus:ring-purple-500 h-4 w-4"
+                />
+                Enable Maximum Auto-Bid Cap
+              </label>
+
+              {enableAutoBid && (
+                <div className="space-y-1 pt-1">
+                  <div className="flex justify-between items-center text-xs text-muted-foreground">
+                    <span className="font-semibold text-purple-300">Max Cap You Are Willing To Pay</span>
+                    {roundedMaxPreview !== null && (
+                      <span className="text-purple-300 font-mono text-[11px]">
+                        Rounded: <strong>{roundedMaxPreview} GP</strong>
+                      </span>
+                    )}
+                  </div>
+                  <Input
+                    type="number"
+                    min={parsedBid || minRequired}
+                    step="1"
+                    value={maxAutoBidAmount}
+                    onChange={(e) => setMaxAutoBidAmount(e.target.value)}
+                    placeholder={`Max Cap (e.g. ${Math.max(100, (parsedBid || minRequired) * 2)} GP)`}
+                    className="bg-purple-950/30 border-purple-500/40 font-mono text-sm"
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    The system will automatically bid the minimum necessary amount up to this cap.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <Button
+              type="button"
+              onClick={() => handlePlaceBid(false)}
+              disabled={isSubmitting || !characterId || listing.characterId === characterId}
+              className="w-full bg-purple-600 hover:bg-purple-700 font-bold text-xs h-10 gap-2 shadow-md"
+            >
+              <Coins className="h-4 w-4" />
+              {enableAutoBid ? 'Place Auto-Bid' : 'Place Bid'}
+            </Button>
+          </div>
+
+          {/* Buyout Button */}
           {listing.buyoutPrice && (
             <div className="pt-2">
               <Button
