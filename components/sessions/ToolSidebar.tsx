@@ -411,19 +411,41 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
 
     // Sync initiative characters (Only GM should do this)
     useEffect(() => {
-        if (!isMounted || !characters.length) return
+        if (!isMounted) return
         const canUpdate = isAdmin || world?.owner === session?.owner
         if (!canUpdate) return
 
-        const existingIds = new Set(items.map(item => item.id))
+        const validCharacterIds = new Set(characters.map(c => c.id))
+
+        // 1. Remove characters no longer in session (except custom entries starting with 'custom-')
+        const filteredItems = items.filter(
+            item => item.id.startsWith('custom-') || validCharacterIds.has(item.id)
+        )
+
+        // 2. Add any new characters joining the session
+        const existingIds = new Set(filteredItems.map(item => item.id))
         const newChars = characters
             .filter(char => !existingIds.has(char.id))
             .map(char => ({ ...char, counter: 0 }))
-        
-        if (newChars.length > 0) {
-            pushState({ initiative: [...items, ...newChars] })
+
+        const nextItems = [...filteredItems, ...newChars]
+
+        // Compare nextItems with items to avoid redundant updates
+        const hasChanged =
+            nextItems.length !== items.length ||
+            nextItems.some((item, idx) => item.id !== items[idx]?.id)
+
+        if (hasChanged) {
+            let nextIndex = currentIndex
+            if (nextIndex >= nextItems.length) {
+                nextIndex = Math.max(0, nextItems.length - 1)
+            }
+            pushState({
+                initiative: nextItems,
+                currentIndex: nextIndex,
+            })
         }
-    }, [characters, isMounted, isAdmin, world?.owner, session?.owner, pushState, items])
+    }, [characters, isMounted, isAdmin, world?.owner, session?.owner, pushState, items, currentIndex])
 
     const formatTime = (totalSeconds: number) => {
         const s = Math.floor(totalSeconds % 60)

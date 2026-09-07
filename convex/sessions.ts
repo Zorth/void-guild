@@ -749,6 +749,28 @@ export const leaveSession = mutation({
       characters: session.characters.filter(id => id !== args.characterId),
     })
 
+    // Also remove character from session initiative tracker state if present
+    const sessionState = await ctx.db
+      .query('sessionStates')
+      .withIndex('by_sessionId', (q) => q.eq('sessionId', args.sessionId))
+      .first()
+
+    if (sessionState && sessionState.initiative) {
+      const updatedInitiative = sessionState.initiative.filter(
+        (item) => item.id !== args.characterId && item.id !== String(args.characterId)
+      )
+      if (updatedInitiative.length !== sessionState.initiative.length) {
+        let newIndex = sessionState.currentIndex || 0
+        if (newIndex >= updatedInitiative.length) {
+          newIndex = Math.max(0, updatedInitiative.length - 1)
+        }
+        await ctx.db.patch(sessionState._id, {
+          initiative: updatedInitiative,
+          currentIndex: newIndex,
+        })
+      }
+    }
+
     await ctx.scheduler.runAfter(0, internal.discord.syncSessionToDiscord, {
         sessionId: args.sessionId
     })
