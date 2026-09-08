@@ -53,15 +53,15 @@ function ReputationCell({
   )
 
   if (!isOwner) {
-    return <div className="h-7 flex items-center">{numberDisplay}</div>
+    return <div className="h-7 flex items-center justify-center">{numberDisplay}</div>
   }
 
   return (
-    <div className="flex items-center gap-1 group/cell h-7">
+    <div className="flex items-center justify-center gap-1 group/cell h-7">
       <Button 
         variant="ghost" 
         size="icon" 
-        className="h-5 w-5 hover:bg-red-500/10 hover:text-red-600 opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0"
+        className="h-5 w-5 hover:bg-red-500/15 hover:text-red-500 text-muted-foreground/70 shrink-0"
         onClick={() => updateReputation({ worldId, characterId: charId, factionName: faction, delta: -1 })}
       >
         <Minus className="h-3 w-3" />
@@ -91,7 +91,7 @@ function ReputationCell({
       <Button 
         variant="ghost" 
         size="icon" 
-        className="h-5 w-5 hover:bg-green-500/10 hover:text-green-600 opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0"
+        className="h-5 w-5 hover:bg-green-500/15 hover:text-green-500 text-muted-foreground/70 shrink-0"
         onClick={() => updateReputation({ worldId, characterId: charId, factionName: faction, delta: 1 })}
       >
         <Plus className="h-3 w-3" />
@@ -205,12 +205,12 @@ export default function ReputationSystem({
                 </div>
 
                 <div className="overflow-auto custom-scrollbar max-h-[400px]">
-                    <table className="w-full text-left border-collapse min-w-[600px] relative">
+                    <table className="w-full text-left border-collapse min-w-max relative">
                         <thead className="sticky top-0 z-30 shadow-sm">
                             <tr className="border-b border-border/40 bg-muted">
-                                <th className="px-6 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground sticky left-0 bg-muted z-40 backdrop-blur-sm border-r border-border/40 w-[140px] min-w-[140px]">Character</th>
+                                <th className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground sticky left-0 bg-muted z-40 backdrop-blur-sm border-r border-border/40 w-[160px] min-w-[140px]">Character</th>
                                 {displayedFactions.map(faction => (
-                                    <th key={faction} className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground min-w-[120px] bg-muted">
+                                    <th key={faction} className="px-2 py-2 text-[10px] font-black uppercase tracking-wider text-muted-foreground text-center min-w-[90px] max-w-[140px] truncate bg-muted">
                                         {faction}
                                     </th>
                                 ))}
@@ -220,7 +220,7 @@ export default function ReputationSystem({
                             {sortedCharacters.length > 0 ? (
                                 sortedCharacters.map(char => (
                                     <tr key={char._id} className="border-b border-border/30 hover:bg-primary/5 transition-colors">
-                                        <td className="px-6 py-3 sticky left-0 bg-card z-20 backdrop-blur-sm border-r border-border/40 w-[140px] min-w-[140px]">
+                                        <td className="px-4 py-2.5 sticky left-0 bg-card z-20 backdrop-blur-sm border-r border-border/40 w-[160px] min-w-[140px]">
                                             <div className="flex flex-col gap-0.5 min-w-0">
                                                 <div className="flex items-center flex-wrap gap-2 min-w-0">
                                                     <span className="font-bold text-sm tracking-tight break-words">{char.name}</span>
@@ -238,7 +238,7 @@ export default function ReputationSystem({
                                             </div>
                                         </td>
                                         {displayedFactions.map(faction => (
-                                            <td key={faction} className="px-4 py-3 align-middle bg-card/50">
+                                            <td key={faction} className="px-2 py-2.5 align-middle bg-card/50 text-center">
                                                 <ReputationCell
                                                     charId={char._id}
                                                     faction={faction}
