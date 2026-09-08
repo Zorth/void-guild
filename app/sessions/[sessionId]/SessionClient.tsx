@@ -281,10 +281,8 @@ export default function SessionClient() {
             duration: 8000,
             icon: '🏆'
         });
-        // If there's an active void objective, prompt Voidmaster for contribution
-        if (currentObjective) {
-          setIsObjectiveContributeOpen(true)
-        }
+        // Prompt Voidmaster for contribution to this month's objective
+        setIsObjectiveContributeOpen(true)
     }
     catch (e) { alert(e instanceof Error ? e.message : 'Failed to lock session') }
   }
@@ -303,6 +301,8 @@ export default function SessionClient() {
             duration: 8000,
             icon: '🏆'
         });
+        // Prompt Voidmaster for contribution to this month's objective
+        setIsObjectiveContributeOpen(true)
     }
     catch (e) { alert(e instanceof Error ? e.message : 'Failed to force close session') }
   }

@@ -36,13 +36,8 @@ export default function VoidObjectiveContributeModal({
   const [amount, setAmount] = useState<number>(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  if (!currentObjective && currentObjective !== undefined) {
-    // If there's no objective configured for this month, close or return null
-    return null
-  }
-
-  const goalMax = currentObjective ? currentObjective.tier3Goal : 50
-  const currentProgress = currentObjective?.currentProgress || 0
+  const goalMax = currentObjective?.tier3Goal ?? 50
+  const currentProgress = currentObjective?.currentProgress ?? 0
   const remainingNeeded = Math.max(0, goalMax - currentProgress)
   const unit = currentObjective?.unit || 'progress'
   const title = currentObjective?.title || 'Void Objective'
