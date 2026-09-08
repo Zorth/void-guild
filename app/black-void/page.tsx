@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useQuery } from 'convex/react'
+import { useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Id } from '@/convex/_generated/dataModel'
+import { toast } from 'sonner'
 import ActiveCharacterSelector from '@/components/black-void/ActiveCharacterSelector'
 import ItemListingDialog from '@/components/black-void/ItemListingDialog'
 import ServiceListingDialog from '@/components/black-void/ServiceListingDialog'
@@ -31,6 +32,8 @@ import {
   Filter,
   X,
   ChevronLeft,
+  Edit2,
+  Trash2,
 } from 'lucide-react'
 import Link from 'next/link'
 import { cn, CharacterRankIcon } from '@/lib/utils'
@@ -45,8 +48,12 @@ export default function BlackVoidPage() {
   // Dialog states
   const [isItemModalOpen, setIsItemModalOpen] = useState(false)
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false)
+  const [editingService, setEditingService] = useState<any | null>(null)
   const [isQuestModalOpen, setIsQuestModalOpen] = useState(false)
   const [biddingListing, setBiddingListing] = useState<any>(null)
+
+  // Mutations
+  const deleteServiceListing = useMutation(api.blackVoid.deleteServiceListing)
 
   // Queries
   const userCharacters = useQuery(api.blackVoid.getUserCharacters)
@@ -448,13 +455,50 @@ export default function BlackVoidPage() {
                     )}
                   </div>
 
-                  <div className="p-3 bg-muted/30 border-t border-border/20 flex items-center justify-between text-xs">
+                  <div className="p-3 bg-muted/30 border-t border-border/20 flex items-center justify-between text-xs gap-2">
                     <span className="text-muted-foreground">
                       Service Level:{' '}
                       <strong className="text-amber-300">
                         {svc.minLevel ? `Lvl ${svc.minLevel} - ${svc.maxLevel ?? 'Any'}` : `Up to Lvl ${svc.maxLevel ?? 'Any'}`}
                       </strong>
                     </span>
+
+                    {userCharacters?.some((c: any) => c._id === svc.characterId) && (
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs text-amber-300 hover:text-amber-200 hover:bg-amber-500/20 border border-amber-500/30 gap-1"
+                          onClick={() => {
+                            setEditingService(svc)
+                            setIsServiceModalOpen(true)
+                          }}
+                        >
+                          <Edit2 className="h-3 w-3" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/20 border border-red-500/30 gap-1"
+                          onClick={async () => {
+                            if (!window.confirm(`Are you sure you want to delete "${svc.name}"?`)) return
+                            try {
+                              await deleteServiceListing({
+                                listingId: svc._id,
+                                characterId: svc.characterId,
+                              })
+                              toast.success('Service listing deleted.')
+                            } catch (err: any) {
+                              toast.error(err.message || 'Failed to delete service listing.')
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          Delete
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </Card>
               ))}
@@ -592,9 +636,13 @@ export default function BlackVoidPage() {
 
       <ServiceListingDialog
         isOpen={isServiceModalOpen}
-        onClose={() => setIsServiceModalOpen(false)}
-        characterId={selectedCharacterId}
+        onClose={() => {
+          setIsServiceModalOpen(false)
+          setEditingService(null)
+        }}
+        characterId={editingService?.characterId || selectedCharacterId}
         characterLevel={selectedChar?.lvl || 1}
+        editingService={editingService}
       />
 
       <BidDialog

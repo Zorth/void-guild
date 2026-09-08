@@ -16,12 +16,14 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import { Hammer, Percent, AlertTriangle, ExternalLink, ShieldAlert } from 'lucide-react'
+import { useEffect } from 'react'
 
 interface ServiceListingDialogProps {
   isOpen: boolean
   onClose: () => void
   characterId: Id<'characters'> | null
   characterLevel?: number
+  editingService?: any | null
 }
 
 export default function ServiceListingDialog({
@@ -29,7 +31,9 @@ export default function ServiceListingDialog({
   onClose,
   characterId,
   characterLevel = 1,
+  editingService = null,
 }: ServiceListingDialogProps) {
+  const isEditing = !!editingService
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [nethysUrl, setNethysUrl] = useState('')
@@ -42,6 +46,31 @@ export default function ServiceListingDialog({
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const createServiceListing = useMutation(api.blackVoid.createServiceListing)
+  const updateServiceListing = useMutation(api.blackVoid.updateServiceListing)
+
+  useEffect(() => {
+    if (editingService) {
+      setName(editingService.name || '')
+      setDescription(editingService.description || '')
+      setNethysUrl(editingService.nethysUrl || '')
+      setPriceType(editingService.priceType || 'percentage')
+      setPercentage(editingService.percentage !== undefined ? String(editingService.percentage) : '55')
+      setMarkupGp(editingService.markupGp !== undefined ? String(editingService.markupGp) : '0')
+      setCustomPriceDetails(editingService.priceDetails || '')
+      setMinLevel(editingService.minLevel !== undefined ? String(editingService.minLevel) : '')
+      setMaxLevel(editingService.maxLevel !== undefined ? String(editingService.maxLevel) : String(characterLevel || 1))
+    } else {
+      setName('')
+      setDescription('')
+      setNethysUrl('')
+      setPriceType('percentage')
+      setPercentage('55')
+      setMarkupGp('3')
+      setCustomPriceDetails('')
+      setMinLevel('')
+      setMaxLevel(String(characterLevel || 1))
+    }
+  }, [editingService, characterLevel, isOpen])
 
   const pctValue = parseFloat(percentage) || 0
   const isBelowBaseCraftingCost = priceType === 'percentage' && pctValue < 50
@@ -95,31 +124,40 @@ export default function ServiceListingDialog({
 
     setIsSubmitting(true)
     try {
-      await createServiceListing({
-        characterId,
-        name,
-        description: description || undefined,
-        nethysUrl: nethysUrl || undefined,
-        priceType,
-        percentage: priceType === 'percentage' ? parseFloat(percentage) : undefined,
-        markupGp: parseFloat(markupGp) || undefined,
-        priceDetails: priceDetailsStr,
-        minLevel: minLvlNum,
-        maxLevel: maxLvlNum,
-      })
-      toast.success('Crafting/Service listing posted!')
-      setName('')
-      setDescription('')
-      setNethysUrl('')
-      setPercentage('55')
-      setMarkupGp('3')
-      setCustomPriceDetails('')
-      setMinLevel('')
-      setMaxLevel(String(characterLevel || 1))
+      if (isEditing && editingService) {
+        await updateServiceListing({
+          listingId: editingService._id,
+          characterId: editingService.characterId,
+          name,
+          description: description || undefined,
+          nethysUrl: nethysUrl || undefined,
+          priceType,
+          percentage: priceType === 'percentage' ? parseFloat(percentage) : undefined,
+          markupGp: parseFloat(markupGp) || undefined,
+          priceDetails: priceDetailsStr,
+          minLevel: minLvlNum,
+          maxLevel: maxLvlNum,
+        })
+        toast.success('Crafting/Service listing updated!')
+      } else {
+        await createServiceListing({
+          characterId,
+          name,
+          description: description || undefined,
+          nethysUrl: nethysUrl || undefined,
+          priceType,
+          percentage: priceType === 'percentage' ? parseFloat(percentage) : undefined,
+          markupGp: parseFloat(markupGp) || undefined,
+          priceDetails: priceDetailsStr,
+          minLevel: minLvlNum,
+          maxLevel: maxLvlNum,
+        })
+        toast.success('Crafting/Service listing posted!')
+      }
       onClose()
     } catch (error) {
       console.error(error)
-      toast.error(error instanceof Error ? error.message : 'Failed to post service')
+      toast.error(error instanceof Error ? error.message : (isEditing ? 'Failed to update service' : 'Failed to post service'))
     } finally {
       setIsSubmitting(false)
     }
@@ -131,7 +169,7 @@ export default function ServiceListingDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl font-bold text-amber-300">
             <Hammer className="h-5 w-5 text-amber-400" />
-            Offer Crafting / Service
+            {isEditing ? 'Edit Crafting / Service' : 'Offer Crafting / Service'}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 py-3">
@@ -335,7 +373,7 @@ export default function ServiceListingDialog({
               disabled={isSubmitting || !characterId}
               className="bg-amber-600 hover:bg-amber-700 text-white font-semibold"
             >
-              {isSubmitting ? 'Posting...' : 'Post Service Listing'}
+              {isSubmitting ? (isEditing ? 'Saving...' : 'Posting...') : (isEditing ? 'Save Changes' : 'Post Service Listing')}
             </Button>
           </DialogFooter>
         </form>

@@ -165,6 +165,70 @@ export const createServiceListing = mutation({
   },
 })
 
+export const updateServiceListing = mutation({
+  args: {
+    listingId: v.id('blackVoidListings'),
+    characterId: v.id('characters'),
+    name: v.string(),
+    description: v.optional(v.string()),
+    nethysUrl: v.optional(v.string()),
+    priceType: v.union(v.literal('percentage'), v.literal('flat'), v.literal('custom')),
+    percentage: v.optional(v.number()),
+    markupGp: v.optional(v.number()),
+    priceDetails: v.optional(v.string()),
+    minLevel: v.optional(v.number()),
+    maxLevel: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) {
+      throw new Error('Not authenticated')
+    }
+
+    const listing = await ctx.db.get(args.listingId)
+    if (!listing || listing.type !== 'service') {
+      throw new Error('Service listing not found.')
+    }
+
+    const character = await ctx.db.get(args.characterId)
+    if (!character || character.userId !== user.subject || listing.characterId !== args.characterId) {
+      throw new Error('You do not own this service listing.')
+    }
+
+    if (!args.name.trim()) {
+      throw new Error('Service name is required.')
+    }
+
+    const minLvl = args.minLevel !== undefined && args.minLevel >= 1
+      ? Math.min(20, Math.max(1, Math.floor(args.minLevel)))
+      : undefined
+
+    let maxLvl = args.maxLevel !== undefined && args.maxLevel >= 1
+      ? Math.min(20, Math.max(1, Math.floor(args.maxLevel)))
+      : character.lvl
+
+    if (maxLvl > character.lvl) {
+      maxLvl = character.lvl
+    }
+
+    if (minLvl !== undefined && maxLvl !== undefined && minLvl > maxLvl) {
+      throw new Error('Minimum level cannot exceed maximum level.')
+    }
+
+    await ctx.db.patch(args.listingId, {
+      name: args.name.trim(),
+      description: args.description?.trim(),
+      nethysUrl: args.nethysUrl?.trim(),
+      priceType: args.priceType,
+      percentage: args.percentage,
+      markupGp: args.markupGp,
+      priceDetails: args.priceDetails?.trim(),
+      minLevel: minLvl,
+      maxLevel: maxLvl,
+    })
+  },
+})
+
 export function roundToTwoSigFigs(n: number): number {
   if (n <= 0) return 0
   const intVal = Math.round(n)
@@ -483,6 +547,29 @@ export const cancelListing = mutation({
     }
 
     await ctx.db.patch(args.listingId, { status: 'cancelled' })
+  },
+})
+
+export const deleteServiceListing = mutation({
+  args: {
+    listingId: v.id('blackVoidListings'),
+    characterId: v.id('characters'),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    const listing = await ctx.db.get(args.listingId)
+    if (!listing || listing.type !== 'service') {
+      throw new Error('Service listing not found')
+    }
+
+    const character = await ctx.db.get(args.characterId)
+    if (!character || character.userId !== user.subject || listing.characterId !== args.characterId) {
+      throw new Error('You do not own this service listing.')
+    }
+
+    await ctx.db.delete(args.listingId)
   },
 })
 

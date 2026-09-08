@@ -118,8 +118,8 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
     // Sync from Convex to local state
     useEffect(() => {
         if (liveState) {
-            if (liveState.initiative) setItems(liveState.initiative)
-            if (liveState.currentIndex !== undefined) setCurrentIndex(liveState.currentIndex)
+            if (liveState.initiative && !isDraggingRef.current) setItems(liveState.initiative)
+            if (liveState.currentIndex !== undefined && !isDraggingRef.current) setCurrentIndex(liveState.currentIndex)
             if (liveState.round !== undefined) setRound(liveState.round)
             if (liveState.timeSeconds !== undefined) setTimeSeconds(liveState.timeSeconds)
             if (liveState.isClockRunning !== undefined) setIsClockRunning(liveState.isClockRunning)
@@ -402,20 +402,51 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
         return () => cancelAnimationFrame(rafId)
     }, [isClockRunning, multiplier, incrementDay, decrementDay, isAdmin, world?.owner, session?.owner, pushState])
 
+    const isDraggingRef = useRef(false)
+
     const updateCounter = (id: string, delta: number) => {
         const newItems = items.map(item => 
             item.id === id ? { ...item, counter: (item.counter || 0) + delta } : item
         )
+        setItems(newItems)
         pushState({ initiative: newItems })
     }
 
-    // Sync initiative characters (Only GM should do this)
+    const handleReorder = (newItems: InitiativeItem[]) => {
+        setItems(newItems)
+        // Keep currentIndex tracking the same character across reorders if possible
+        const activeItemId = items[currentIndex]?.id
+        let nextIndex = currentIndex
+        if (activeItemId) {
+            const foundIdx = newItems.findIndex(i => i.id === activeItemId)
+            if (foundIdx !== -1) nextIndex = foundIdx
+        }
+        if (nextIndex >= newItems.length) {
+            nextIndex = Math.max(0, newItems.length - 1)
+        }
+        setCurrentIndex(nextIndex)
+        pushState({ initiative: newItems, currentIndex: nextIndex })
+    }
+
+    // Sync initiative characters (Only GM should do this when characters actually join/leave)
     useEffect(() => {
-        if (!isMounted) return
+        if (!isMounted || isDraggingRef.current) return
         const canUpdate = isAdmin || world?.owner === session?.owner
         if (!canUpdate) return
 
         const validCharacterIds = new Set(characters.map(c => c.id))
+
+        // Check if any non-custom item is no longer in validCharacterIds
+        const hasRemoved = items.some(item => !item.id.startsWith('custom-') && !validCharacterIds.has(item.id))
+
+        // Check if any character is missing from items
+        const existingIds = new Set(items.map(item => item.id))
+        const missingChars = characters.filter(char => !existingIds.has(char.id))
+
+        if (!hasRemoved && missingChars.length === 0) {
+            // No character additions or removals needed
+            return
+        }
 
         // 1. Remove characters no longer in session (except custom entries starting with 'custom-')
         const filteredItems = items.filter(
@@ -423,29 +454,20 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
         )
 
         // 2. Add any new characters joining the session
-        const existingIds = new Set(filteredItems.map(item => item.id))
-        const newChars = characters
-            .filter(char => !existingIds.has(char.id))
-            .map(char => ({ ...char, counter: 0 }))
-
+        const newChars = missingChars.map(char => ({ ...char, counter: 0 }))
         const nextItems = [...filteredItems, ...newChars]
 
-        // Compare nextItems with items to avoid redundant updates
-        const hasChanged =
-            nextItems.length !== items.length ||
-            nextItems.some((item, idx) => item.id !== items[idx]?.id)
-
-        if (hasChanged) {
-            let nextIndex = currentIndex
-            if (nextIndex >= nextItems.length) {
-                nextIndex = Math.max(0, nextItems.length - 1)
-            }
-            pushState({
-                initiative: nextItems,
-                currentIndex: nextIndex,
-            })
+        let nextIndex = currentIndex
+        if (nextIndex >= nextItems.length) {
+            nextIndex = Math.max(0, nextItems.length - 1)
         }
-    }, [characters, isMounted, isAdmin, world?.owner, session?.owner, pushState, items, currentIndex])
+        setItems(nextItems)
+        setCurrentIndex(nextIndex)
+        pushState({
+            initiative: nextItems,
+            currentIndex: nextIndex,
+        })
+    }, [characters, isMounted, isAdmin, world?.owner, session?.owner, pushState])
 
     const formatTime = (totalSeconds: number) => {
         const s = Math.floor(totalSeconds % 60)
@@ -660,13 +682,17 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
                             </div>
                         </div>
 
-                        <Reorder.Group axis="y" values={items} onReorder={setItems} className="flex flex-col gap-2 min-h-[50px]">
+                        <Reorder.Group axis="y" values={items} onReorder={handleReorder} className="flex flex-col gap-2 min-h-[50px]">
                             <AnimatePresence initial={false}>
                                 {items.map((item, index) => (
                                     <Reorder.Item
                                         key={item.id}
                                         value={item}
                                         layout
+                                        onDragStart={() => { isDraggingRef.current = true }}
+                                        onDragEnd={() => { 
+                                            isDraggingRef.current = false 
+                                        }}
                                         initial={{ opacity: 0, y: -10 }}
                                         animate={{ 
                                             opacity: 1, 

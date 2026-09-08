@@ -6,21 +6,25 @@ import { Id } from '@/convex/_generated/dataModel'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Coins, CheckCircle2, PackageCheck, Receipt, Hammer, AlertCircle, Sparkles, Crown, Scroll } from 'lucide-react'
+import { Coins, CheckCircle2, PackageCheck, Receipt, Hammer, AlertCircle, Sparkles, Crown, Scroll, Edit2, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import ServiceListingDialog from '@/components/black-void/ServiceListingDialog'
+import { useState } from 'react'
 
 interface CharacterSheetLogProps {
   characterId: Id<'characters'> | null
 }
 
 export default function CharacterSheetLog({ characterId }: CharacterSheetLogProps) {
+  const [editingService, setEditingService] = useState<any | null>(null)
   const transactions = useQuery(api.blackVoid.getCharacterTransactions, { characterId: characterId || undefined })
   const toggleSellerClaimed = useMutation(api.blackVoid.toggleSellerClaimed)
   const toggleBuyerClaimed = useMutation(api.blackVoid.toggleBuyerClaimed)
   const toggleQuestClaimed = useMutation(api.quests.toggleQuestReimbursementClaimed)
   const togglePaymentClaimed = useMutation(api.quests.toggleQuestPaymentClaimed)
   const toggleSessionCutClaimed = useMutation(api.sessions.toggleGuildmasterCutClaimed)
+  const deleteServiceListing = useMutation(api.blackVoid.deleteServiceListing)
 
   if (!characterId) {
     return (
@@ -490,22 +494,65 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
               {servicesOffered.map((svc: any) => (
                 <div
                   key={svc._id}
-                  className="p-3 rounded-lg border bg-muted/20 border-border/30 flex items-center justify-between gap-3"
+                  className="p-3 rounded-lg border bg-muted/20 border-border/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                 >
                   <div>
-                    <h4 className="font-bold text-sm text-foreground">{svc.name}</h4>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-bold text-sm text-foreground">{svc.name}</h4>
+                      <span className="text-[10px] uppercase font-bold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded">
+                        {svc.status}
+                      </span>
+                    </div>
                     <p className="text-xs text-amber-300/80 font-mono mt-0.5">
                       Price: {svc.priceDetails || 'Custom'} | Level: {svc.minLevel ? `Lvl ${svc.minLevel} - ${svc.maxLevel ?? 'Any'}` : `Up to Lvl ${svc.maxLevel ?? 'Any'}`}
                     </p>
                   </div>
-                  <span className="text-[10px] uppercase font-bold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded">
-                    {svc.status}
-                  </span>
+                  <div className="flex items-center gap-1.5 self-end sm:self-auto shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs text-amber-300 hover:text-amber-200 hover:bg-amber-500/20 border border-amber-500/30 gap-1"
+                      onClick={() => setEditingService(svc)}
+                    >
+                      <Edit2 className="h-3 w-3" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/20 border border-red-500/30 gap-1"
+                      onClick={async () => {
+                        if (!window.confirm(`Are you sure you want to delete "${svc.name}"?`)) return
+                        try {
+                          await deleteServiceListing({
+                            listingId: svc._id,
+                            characterId,
+                          })
+                          toast.success('Service listing deleted.')
+                        } catch (err: any) {
+                          toast.error(err.message || 'Failed to delete service listing.')
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Delete
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {editingService && (
+        <ServiceListingDialog
+          isOpen={!!editingService}
+          onClose={() => setEditingService(null)}
+          characterId={characterId}
+          characterLevel={editingService.maxLevel || 20}
+          editingService={editingService}
+        />
       )}
     </div>
   )
