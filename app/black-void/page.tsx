@@ -30,7 +30,9 @@ import {
   Sparkles,
   Filter,
   X,
+  ChevronLeft,
 } from 'lucide-react'
+import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 
@@ -106,6 +108,12 @@ export default function BlackVoidPage() {
       {/* Compact Header */}
       <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-slate-950 via-purple-950/60 to-slate-950 border border-purple-500/20 px-4 py-3.5 sm:px-5 sm:py-4 shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div className="flex items-center gap-3 flex-wrap">
+          <Button variant="ghost" size="sm" className="h-8 px-2 sm:px-3 text-xs text-muted-foreground hover:text-white hover:bg-purple-900/30 border border-purple-500/20" asChild>
+            <Link href="/">
+              <ChevronLeft className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline">Back</span>
+            </Link>
+          </Button>
           <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2.5">
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-300 via-amber-200 to-purple-400">
               The Black Void
