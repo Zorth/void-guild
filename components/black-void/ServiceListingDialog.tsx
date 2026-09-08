@@ -37,6 +37,8 @@ export default function ServiceListingDialog({
   const [percentage, setPercentage] = useState<string>('55')
   const [markupGp, setMarkupGp] = useState<string>('3')
   const [customPriceDetails, setCustomPriceDetails] = useState<string>('')
+  const [minLevel, setMinLevel] = useState<string>('')
+  const [maxLevel, setMaxLevel] = useState<string>(String(characterLevel || 1))
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const createServiceListing = useMutation(api.blackVoid.createServiceListing)
@@ -53,6 +55,29 @@ export default function ServiceListingDialog({
 
     if (!name.trim()) {
       toast.error('Service name is required.')
+      return
+    }
+
+    const minLvlNum = minLevel.trim() ? parseInt(minLevel, 10) : undefined
+    const maxLvlNum = maxLevel.trim() ? parseInt(maxLevel, 10) : characterLevel
+
+    if (minLvlNum !== undefined && (isNaN(minLvlNum) || minLvlNum < 1 || minLvlNum > 20)) {
+      toast.error('Minimum level must be between 1 and 20.')
+      return
+    }
+
+    if (maxLvlNum !== undefined && (isNaN(maxLvlNum) || maxLvlNum < 1 || maxLvlNum > 20)) {
+      toast.error('Maximum level must be between 1 and 20.')
+      return
+    }
+
+    if (maxLvlNum !== undefined && maxLvlNum > characterLevel) {
+      toast.error(`Maximum service level cannot exceed your character's level (${characterLevel}).`)
+      return
+    }
+
+    if (minLvlNum !== undefined && maxLvlNum !== undefined && minLvlNum > maxLvlNum) {
+      toast.error('Minimum level cannot be greater than maximum level.')
       return
     }
 
@@ -79,6 +104,8 @@ export default function ServiceListingDialog({
         percentage: priceType === 'percentage' ? parseFloat(percentage) : undefined,
         markupGp: parseFloat(markupGp) || undefined,
         priceDetails: priceDetailsStr,
+        minLevel: minLvlNum,
+        maxLevel: maxLvlNum,
       })
       toast.success('Crafting/Service listing posted!')
       setName('')
@@ -87,6 +114,8 @@ export default function ServiceListingDialog({
       setPercentage('55')
       setMarkupGp('3')
       setCustomPriceDetails('')
+      setMinLevel('')
+      setMaxLevel(String(characterLevel || 1))
       onClose()
     } catch (error) {
       console.error(error)
@@ -119,11 +148,43 @@ export default function ServiceListingDialog({
             />
           </div>
 
-          <div className="flex items-center justify-between bg-amber-500/10 border border-amber-500/30 px-3 py-2 rounded-md text-xs">
-            <span className="text-muted-foreground font-medium">Max Service / Item Level:</span>
-            <span className="font-bold text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded font-mono">
-              Level {characterLevel} (Equal to your Level)
-            </span>
+          <div className="space-y-1.5 bg-amber-500/10 border border-amber-500/30 p-2.5 rounded-md">
+            <div className="flex items-center justify-between text-xs mb-1">
+              <span className="text-muted-foreground font-medium">Service Level Range:</span>
+              <span className="text-[10px] text-amber-400/80">
+                Max available: Level {characterLevel}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <label className="text-[10px] font-semibold text-muted-foreground uppercase">
+                  Min Level (Optional)
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={Math.min(20, characterLevel)}
+                  value={minLevel}
+                  onChange={(e) => setMinLevel(e.target.value)}
+                  placeholder="e.g. 1"
+                  className="bg-background/80 h-8 text-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-semibold text-muted-foreground uppercase">
+                  Max Level
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={Math.min(20, characterLevel)}
+                  value={maxLevel}
+                  onChange={(e) => setMaxLevel(e.target.value)}
+                  placeholder={String(characterLevel)}
+                  className="bg-background/80 h-8 text-xs"
+                />
+              </div>
+            </div>
           </div>
 
           <div className="space-y-1.5">

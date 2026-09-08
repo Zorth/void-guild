@@ -226,7 +226,7 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
                   <div>
                     <h4 className="font-bold text-sm text-foreground">{svc.name}</h4>
                     <p className="text-xs text-amber-300/80 font-mono mt-0.5">
-                      Price: {svc.priceDetails || 'Custom'} | Max Level: Level {svc.maxLevel}
+                      Price: {svc.priceDetails || 'Custom'} | Level: {svc.minLevel ? `Lvl ${svc.minLevel} - ${svc.maxLevel ?? 'Any'}` : `Up to Lvl ${svc.maxLevel ?? 'Any'}`}
                     </p>
                   </div>
                   <span className="text-[10px] uppercase font-bold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded">

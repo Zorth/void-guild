@@ -189,6 +189,7 @@ export default defineSchema({
         percentage: v.optional(v.number()),
         markupGp: v.optional(v.number()),
         priceDetails: v.optional(v.string()),
+        minLevel: v.optional(v.number()),
         maxLevel: v.optional(v.number()),
         // Status and transactions
         status: v.union(v.literal('active'), v.literal('completed'), v.literal('cancelled')),

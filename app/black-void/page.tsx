@@ -28,6 +28,8 @@ import {
   CheckCircle2,
   ShieldAlert,
   Sparkles,
+  Filter,
+  X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
@@ -36,6 +38,7 @@ export default function BlackVoidPage() {
   const [activeTab, setActiveTab] = useState<'items' | 'services' | 'quests' | 'log'>('items')
   const [selectedCharacterId, setSelectedCharacterId] = useState<Id<'characters'> | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [serviceLevelFilter, setServiceLevelFilter] = useState<string>('')
 
   // Dialog states
   const [isItemModalOpen, setIsItemModalOpen] = useState(false)
@@ -77,11 +80,26 @@ export default function BlackVoidPage() {
   )
 
   // Filter services
-  const filteredServices = (activeServiceListings || []).filter((s: any) =>
-    s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (s.priceDetails && s.priceDetails.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (s.sellerName && s.sellerName.toLowerCase().includes(searchQuery.toLowerCase()))
-  )
+  const targetLevel = serviceLevelFilter.trim() !== '' ? parseInt(serviceLevelFilter, 10) : undefined
+
+  const filteredServices = (activeServiceListings || []).filter((s: any) => {
+    const matchesSearch =
+      s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (s.priceDetails && s.priceDetails.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (s.sellerName && s.sellerName.toLowerCase().includes(searchQuery.toLowerCase()))
+    if (!matchesSearch) return false
+
+    if (targetLevel !== undefined && !isNaN(targetLevel)) {
+      const minLvl = s.minLevel !== undefined ? s.minLevel : 1
+      const maxLvl = s.maxLevel !== undefined ? s.maxLevel : 20
+      // Inclusive range check: does the service range contain targetLevel?
+      if (targetLevel < minLvl || targetLevel > maxLvl) {
+        return false
+      }
+    }
+
+    return true
+  })
 
   return (
     <div className="min-h-screen bg-background text-foreground py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-6">
@@ -174,8 +192,37 @@ export default function BlackVoidPage() {
           </Button>
         </div>
 
-        {/* Action Button depending on active tab */}
-        <div className="flex items-center gap-3">
+        {/* Action Button and Filters depending on active tab */}
+        <div className="flex flex-wrap items-center gap-3">
+          {activeTab === 'services' && (
+            <div className="flex items-center gap-1.5 bg-muted/20 border border-amber-500/20 rounded-lg p-1">
+              <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1 px-1.5">
+                <Filter className="h-3 w-3 text-amber-400" />
+                Level:
+              </span>
+              <Input
+                type="number"
+                min={1}
+                max={20}
+                placeholder="1–20"
+                value={serviceLevelFilter}
+                onChange={(e) => setServiceLevelFilter(e.target.value)}
+                className="w-16 h-7 text-xs bg-background/80 px-2 text-center"
+              />
+              {serviceLevelFilter && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setServiceLevelFilter('')}
+                  className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                  title="Clear level filter"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
+          )}
+
           {(activeTab === 'items' || activeTab === 'services') && (
             <div className="relative w-48 sm:w-64">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -395,7 +442,10 @@ export default function BlackVoidPage() {
 
                   <div className="p-3 bg-muted/30 border-t border-border/20 flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">
-                      Max Service Level: <strong className="text-amber-300">Level {svc.maxLevel}</strong>
+                      Service Level:{' '}
+                      <strong className="text-amber-300">
+                        {svc.minLevel ? `Lvl ${svc.minLevel} - ${svc.maxLevel ?? 'Any'}` : `Up to Lvl ${svc.maxLevel ?? 'Any'}`}
+                      </strong>
                     </span>
                   </div>
                 </Card>

@@ -799,6 +799,8 @@ export const createBlackVoidServiceListing = mutation({
         percentage: v.optional(v.number()),
         markupGp: v.optional(v.number()),
         priceDetails: v.optional(v.string()),
+        minLevel: v.optional(v.number()),
+        maxLevel: v.optional(v.number()),
     },
     handler: async (ctx, args) => {
         const user = await requireUser(ctx, args.apiKey)
@@ -808,6 +810,22 @@ export const createBlackVoidServiceListing = mutation({
         const char = await ctx.db.get(cId)
         if (!char || char.userId !== user.userId) {
             throw new Error('You do not own this character')
+        }
+
+        const minLvl = args.minLevel !== undefined && args.minLevel >= 1
+            ? Math.min(20, Math.max(1, Math.floor(args.minLevel)))
+            : undefined
+
+        let maxLvl = args.maxLevel !== undefined && args.maxLevel >= 1
+            ? Math.min(20, Math.max(1, Math.floor(args.maxLevel)))
+            : char.lvl
+
+        if (maxLvl > char.lvl) {
+            maxLvl = char.lvl
+        }
+
+        if (minLvl !== undefined && maxLvl !== undefined && minLvl > maxLvl) {
+            throw new Error('Minimum level cannot exceed maximum level.')
         }
 
         return await ctx.db.insert('blackVoidListings', {
@@ -820,7 +838,8 @@ export const createBlackVoidServiceListing = mutation({
             percentage: args.percentage,
             markupGp: args.markupGp,
             priceDetails: args.priceDetails?.trim(),
-            maxLevel: char.lvl,
+            minLevel: minLvl,
+            maxLevel: maxLvl,
             status: 'active',
             sellerClaimed: false,
             buyerClaimed: false,

@@ -110,6 +110,8 @@ export const createServiceListing = mutation({
     percentage: v.optional(v.number()),
     markupGp: v.optional(v.number()),
     priceDetails: v.optional(v.string()),
+    minLevel: v.optional(v.number()),
+    maxLevel: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
@@ -126,6 +128,22 @@ export const createServiceListing = mutation({
       throw new Error('Service name is required.')
     }
 
+    const minLvl = args.minLevel !== undefined && args.minLevel >= 1
+      ? Math.min(20, Math.max(1, Math.floor(args.minLevel)))
+      : undefined
+
+    let maxLvl = args.maxLevel !== undefined && args.maxLevel >= 1
+      ? Math.min(20, Math.max(1, Math.floor(args.maxLevel)))
+      : character.lvl
+
+    if (maxLvl > character.lvl) {
+      maxLvl = character.lvl
+    }
+
+    if (minLvl !== undefined && maxLvl !== undefined && minLvl > maxLvl) {
+      throw new Error('Minimum level cannot exceed maximum level.')
+    }
+
     const listingId = await ctx.db.insert('blackVoidListings', {
       characterId: args.characterId,
       type: 'service',
@@ -136,7 +154,8 @@ export const createServiceListing = mutation({
       percentage: args.percentage,
       markupGp: args.markupGp,
       priceDetails: args.priceDetails?.trim(),
-      maxLevel: character.lvl,
+      minLevel: minLvl,
+      maxLevel: maxLvl,
       status: 'active',
       sellerClaimed: false,
       buyerClaimed: false,
