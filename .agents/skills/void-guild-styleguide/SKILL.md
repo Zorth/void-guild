@@ -53,13 +53,16 @@ This document establishes the official code architecture, design system, compone
    - If a dialog tab, complex form, or customizer grows beyond 150–200 lines, extract it into its own dedicated `.tsx` script under `components/<domain>/`.
 
 2. **Clear Separation of Concerns**:
-   - **`convex/`**: Database schemas, queries, mutations, actions, and server-side evaluation logic.
+   - **`convex/`**: Database schemas, queries, mutations, actions, and server-side evaluation logic (`sessions.ts`, `blackVoid.ts`, `quests.ts`, `characters.ts`, `users.ts`, `external_api.ts`).
    - **`lib/`**: Pure functions, data models, formatters, and cosmetic resolvers (e.g., `lib/cosmetics.ts`, `lib/utils.ts`).
-   - **`components/`**: Domain-grouped UI components (`components/characters/`, `components/sessions/`, `components/world/`).
+   - **`components/`**: Domain-grouped UI components (`components/characters/`, `components/sessions/`, `components/world/`, `components/black-void/`).
+   - **`app/api/`**: Next.js route handlers exposing the public & authenticated external REST API (`app/api/external/v1/`).
 
-3. **Typed Component Props**:
-   - Always define clear TypeScript interfaces for sub-component props.
-   - Pass explicit handlers or immutable data structures rather than exposing internal page-level state directly.
+3. **Domain Features & Ledger Logic**:
+   - **The Black Void & Economy**: Keep market listings, bidding logic (2-sig-fig auto-bids), character quest sponsorships (20% reimbursement), and regional Guildmaster cuts (20% session loot value) strictly consistent across both Convex mutations and `components/black-void/CharacterSheetLog.tsx`.
+   - **Structured Quest Rewards**: Quests differentiate between monetary rewards (`rewardMoneyGP` in GP with up to 2 decimals) and other found loot (`rewardOther`). Rewards can be flagged as `'party'` or `'per_person'`. Sponsorship calculations apply to the monetary component.
+   - **Effective Session Level**: Never assume `session.level` is directly populated. Always evaluate effective session level using `computeEffectiveLevel(session, quest)` so XP calculations and lock readiness correctly respect levels inherited from attached quests.
+   - **Typed Component Props**: Always define clear TypeScript interfaces for sub-component props. Pass explicit handlers or immutable data structures rather than exposing internal page-level state directly.
 
 ---
 

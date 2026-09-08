@@ -7,15 +7,21 @@
 ## Key Features
 
 * **Character Management:** Create, edit, and delete your game characters.
-* **Character Ranks:** Admins can assign ranks (`Journeyman`, `Guildmaster`) to characters, displayed with special icons.
-* **Session Scheduling:** Game Masters can create and manage upcoming and past sessions.
-* **Session Participation:** Players can join and leave sessions with their characters.
-* **XP Tracking:** Sessions award experience points to participating characters.
+* **Character Ranks & Perks:** Characters can be promoted to `Journeyman` and `Guildmaster` ranks, unlocking perks, special cosmetic badges, quest issuance sponsorship, and regional GM assignments.
+* **The Black Void (Marketplace & Economy):** In-game auction house and marketplace supporting item listings with automated 2-sig-fig proxy bidding, level & price filters, duration presets, crafting/downtime service listings with editable level caps, and transaction settlement tracking.
+* **Character Quests & Guild Sponsorship:** High-rank characters can post quests with split GP currency, extra item rewards, and party vs. per-person payout calculations; `Journeyman` and `Guildmaster` quests receive a 20% Guild sponsorship payback, with integrated financial ledger logs and payout claims.
+* **Guildmaster Quest Suggestions & Regional Compensation:** Guildmasters can suggest quests to world owners for free review/approval, and sessions can assign regional Guildmasters who receive a 20% total loot compensation claimable in The Black Void.
+* **Session Scheduling & Effective Level Derivation:** Game Masters can schedule sessions with automatic quest level inheritance (calculating XP gains and lock eligibility even when session level is inherited from its attached quest), lock sessions, and manage live combat clocks.
+* **Live Initiative Tracker:** Event-driven initiative list with smooth Framer Motion drag-and-drop reordering, active turn tracking, and round timers.
+* **Session Participation & Interest:** Players can join and leave sessions with their characters, or mark interest in sessions during planning phases.
+* **XP & Loot Tracking:** Sessions award experience points to participating characters; GMs can distribute items and GP loot with individual claim assignments.
+* **Pathbuilder 2e Character Sheet Sync:** Import and synchronize detailed Pathfinder 2e character sheets directly via the REST API or extension (AC, HP, saves, abilities, skills, gear, conditions).
+* **External REST API & Key Management:** Secure public GET and authenticated POST/PATCH external API (`/api/external/v1`) with per-user API key management directly from the user profile.
 * **System-Aware Quest Levels:** Dual-system quests automatically evaluate and display system-matched levels (`PF` vs `DnD`).
 * **Character Relationships & Mutual Streaks:** Attending character lists display mutual session streaks (`🔥 3+ streak`), first-time co-adventurer badges (`NEW`), and total shared sessions (`5x`, `10x`).
 * **World Visit & Streak Tracking:** Badges highlight a character's first visit to a world (`NEW WORLD`), world visit counts, and consecutive world streaks. GM bonus characters are excluded from attendance counts and never break streaks.
 * **Character Commendation System:** Players can award 1 commendation per session to a party member across 4 categories (🎭 *Roleplay MVP*, ⚔️ *Tactical Genius*, 🛡️ *Clutch Savior*, 🌟 *Heroic MVP*). Earned commendations are displayed per category on character cards on the homepage.
-* **Event-Driven Achievements:** Achievements auto-unlock and toast upon completion of real-world actions (e.g. giving commendations, viewing leaderboards, visiting world pages) without background polling.
+* **Event-Driven Achievements & Cosmetics:** Achievements auto-unlock upon completion of real-world actions without background polling, awarding customizable card borders, font colors, and backgrounds.
 * **7-Day Overview:** A calendar-like view of upcoming sessions for the next seven days, with visual cues for owned and joined sessions.
 * **Character Website Links:** Characters can have an associated website link, editable by the owner and visible to all in session details.
 * **Session Locking:** Game Masters can lock sessions to finalize attendance and XP awards.
@@ -124,10 +130,12 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 ---
 
-## Developer Guidelines
+## Developer & API Documentation
 
-For detailed subagent rules, coding standards, and Convex AI function guidelines, refer to:
-* [`AGENTS.md`](./AGENTS.md)
-* [`CLAUDE.md`](./CLAUDE.md)
-* [`convex/README.md`](./convex/README.md)
-* [`convex/_generated/ai/guidelines.md`](./convex/_generated/ai/guidelines.md)
+For detailed subagent rules, coding standards, external APIs, and Convex function guidelines, refer to:
+* [`API.md`](./API.md) - External REST API endpoints (v1.1) and authorization model
+* [`CHARACTER_EXPORT_SPEC.md`](./CHARACTER_EXPORT_SPEC.md) - Pathbuilder 2e sync & character details schema specification
+* [`AGENTS.md`](./AGENTS.md) - Developer & agent standards and platform limits
+* [`CLAUDE.md`](./CLAUDE.md) - Development commands and guidelines
+* [`convex/README.md`](./convex/README.md) - Backend architecture rules
+* [`convex/_generated/ai/guidelines.md`](./convex/_generated/ai/guidelines.md) - Convex function conventions
