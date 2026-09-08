@@ -50,7 +50,7 @@ function getApiDocsResponse() {
             { method: "PATCH", path: "/session/:id", description: "Update session metadata" },
             { method: "PATCH", path: "/session/:id/state", description: "Update initiative & clock" },
 
-            { method: "GET", path: "/characters", description: "List user characters", queryParams: ["userId=string"] },
+            { method: "GET", path: "/characters", description: "List all characters (optionally filter by userId)", queryParams: ["userId=string"] },
             { method: "GET", path: "/character/:id", description: "Get full character details (including synced Pathbuilder sheet)" },
             { method: "GET", path: "/character/:id/sheet", description: "Get Pathbuilder character sheet data directly" },
             { method: "POST", path: "/character", description: "Create a new character (starts at Lvl 1, 0 XP)" },

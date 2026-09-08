@@ -13,7 +13,41 @@ async function validateKey(ctx: any, apiKey?: string) {
         .withIndex('by_apiKey', (q: any) => q.eq('apiKey', apiKey))
         .first()
     
-    return user || null
+    if (!user) return null
+
+    // Determine admin and GM status, honoring user document plus character guildmaster rank or owned world
+    let isAdmin = Boolean(user.isAdmin)
+    let isGM = Boolean(user.isGM) || isAdmin
+
+    if (!isAdmin) {
+        const userCharacters = await ctx.db
+            .query('characters')
+            .withIndex('by_userId', (q: any) => q.eq('userId', user.userId))
+            .collect()
+        
+        if (userCharacters.some((c: any) => c.rank === 'guildmaster')) {
+            isAdmin = true
+            isGM = true
+        } else if (!isGM && userCharacters.some((c: any) => c.rank === 'journeyman')) {
+            isGM = true
+        }
+    }
+
+    if (!isGM) {
+        const ownedWorld = await ctx.db
+            .query('worlds')
+            .withIndex('by_owner', (q: any) => q.eq('owner', user.userId))
+            .first()
+        if (ownedWorld) {
+            isGM = true
+        }
+    }
+
+    return {
+        ...user,
+        isAdmin,
+        isGM,
+    }
 }
 
 async function requireUser(ctx: any, apiKey?: string) {
@@ -434,14 +468,13 @@ function formatPlayerName(user: any): string | null {
 export const listCharacters = query({
     args: { apiKey: v.optional(v.string()), userId: v.optional(v.string()) },
     handler: async (ctx, args) => {
-        const user = await validateKey(ctx, args.apiKey)
-        const targetUserId = args.userId || user?.userId
+        await validateKey(ctx, args.apiKey)
         
         let characters = []
-        if (targetUserId) {
+        if (args.userId) {
             characters = await ctx.db
                 .query('characters')
-                .withIndex('by_userId', (q) => q.eq('userId', targetUserId))
+                .withIndex('by_userId', (q) => q.eq('userId', args.userId!))
                 .collect()
         } else {
             characters = await ctx.db.query('characters').collect()

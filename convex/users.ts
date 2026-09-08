@@ -454,13 +454,19 @@ export const generateApiKey = mutation({
       .withIndex('by_userId', (q) => q.eq('userId', identity.subject))
       .first()
 
+    const isAdminUser = await isAdmin(ctx)
+    const isGMUser = isAdminUser || (userRecord?.isGM ?? false)
+
     if (userRecord) {
-      await ctx.db.patch(userRecord._id, { apiKey })
+      await ctx.db.patch(userRecord._id, { 
+        apiKey,
+        ...(isAdminUser && !userRecord.isAdmin ? { isAdmin: true, isGM: true } : {})
+      })
     } else {
       await ctx.db.insert('users', {
         userId: identity.subject,
-        isAdmin: false,
-        isGM: false,
+        isAdmin: isAdminUser,
+        isGM: isGMUser,
         name: identity.name,
         apiKey,
       })

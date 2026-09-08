@@ -41,7 +41,7 @@ https://guild.tarragon.be/api/external/v1
 *   **PATCH** `/session/:sessionId/state` - Update initiative/clock (Owner/Admin). Body: `{ initiative?, currentIndex?, round?, timeSeconds?, isClockRunning?, multiplier? }`.
 
 ### Characters
-*   **GET** `/characters?userId=...` - List characters owned by a user.
+*   **GET** `/characters?userId=...` - List all characters (public, no auth required; optionally filter by `userId`).
 *   **GET** `/character/:characterId` - Get full character details (includes synced `details` character sheet if present).
 *   **GET** `/character/:characterId/sheet` - Get detailed Pathbuilder 2e character sheet data (defenses, HP, saves, skills, money, gear, build feats, conditions).
 *   **POST** `/character` - Create a new character for your account (starts at level 1, 0 XP). Body: `{ name, ancestry?, class?, system?, websiteLink? }`.
