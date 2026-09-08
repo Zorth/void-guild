@@ -10,6 +10,9 @@ export const createQuest = mutation({
     description: v.optional(v.string()),
     questgiver: v.optional(v.string()),
     reward: v.optional(v.string()),
+    rewardType: v.optional(v.union(v.literal('party'), v.literal('per_person'))),
+    rewardMoneyGP: v.optional(v.number()),
+    rewardOther: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
     characterId: v.optional(v.id('characters')),
     isSuggested: v.optional(v.boolean()),
@@ -27,6 +30,30 @@ export const createQuest = mutation({
 
     const isSuggested = args.isSuggested ?? false
     let suggestionStatus: 'pending' | 'approved' | 'rejected' | undefined = undefined
+
+    // Round rewardMoneyGP to 2 decimals if provided
+    const roundedMoneyGP = args.rewardMoneyGP !== undefined && args.rewardMoneyGP !== null
+      ? Math.round(args.rewardMoneyGP * 100) / 100
+      : undefined
+
+    // Determine final reward string
+    let finalReward = args.reward
+    if (roundedMoneyGP !== undefined || args.rewardOther) {
+      const parts: string[] = []
+      if (roundedMoneyGP !== undefined && roundedMoneyGP > 0) {
+        const moneyFormatted = roundedMoneyGP % 1 === 0
+          ? `${roundedMoneyGP.toLocaleString()} GP`
+          : `${roundedMoneyGP.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} GP`
+        const typeSuffix = args.rewardType === 'per_person' ? ' / person' : ''
+        parts.push(`${moneyFormatted}${typeSuffix}`)
+      }
+      if (args.rewardOther && args.rewardOther.trim()) {
+        parts.push(args.rewardOther.trim())
+      }
+      if (parts.length > 0) {
+        finalReward = parts.join(' + ')
+      }
+    }
 
     if (args.characterId) {
       const character = await ctx.db.get(args.characterId)
@@ -51,16 +78,25 @@ export const createQuest = mutation({
         // Journeyman & Guildmaster perk: quests up to level - 4 get 1/5th (20%) sponsored by Guild of the Void
         if ((characterRank === 'journeyman' || characterRank === 'guildmaster') && questLevel <= maxSponsoredLevel) {
           isSponsored = true
-          if (args.reward) {
-            const rewardClean = args.reward.replace(/,/g, '')
+          if (roundedMoneyGP !== undefined && roundedMoneyGP > 0) {
+            const sponsorVal = Math.round((roundedMoneyGP / 5) * 100) / 100
+            const netVal = Math.round((roundedMoneyGP - sponsorVal) * 100) / 100
+            const formatGP = (n: number) => n % 1 === 0 ? `${n.toLocaleString()} GP` : `${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} GP`
+            const typeSuffix = args.rewardType === 'per_person' ? ' / person' : ''
+            const otherSuffix = args.rewardOther && args.rewardOther.trim() ? ` + ${args.rewardOther.trim()}` : ''
+            sponsoredAmount = `${formatGP(sponsorVal)}${typeSuffix}`
+            netCost = `${formatGP(netVal)}${typeSuffix}${otherSuffix}`
+          } else if (finalReward) {
+            const rewardClean = finalReward.replace(/,/g, '')
             const match = rewardClean.match(/(\d+(?:\.\d+)?)\s*(sp|gp|cp|pp|gold|silver|copper|platinum)?/i)
             if (match) {
               const num = parseFloat(match[1])
               const unit = match[2] ? match[2].toUpperCase() : 'GP'
-              const sponsorVal = Math.round(num / 5)
-              const netVal = num - sponsorVal
-              sponsoredAmount = `${sponsorVal.toLocaleString()} ${unit}`
-              netCost = `${netVal.toLocaleString()} ${unit}`
+              const sponsorVal = Math.round((num / 5) * 100) / 100
+              const netVal = Math.round((num - sponsorVal) * 100) / 100
+              const typeSuffix = args.rewardType === 'per_person' ? ' / person' : ''
+              sponsoredAmount = `${sponsorVal.toLocaleString()} ${unit}${typeSuffix}`
+              netCost = `${netVal.toLocaleString()} ${unit}${typeSuffix}`
             } else {
               sponsoredAmount = '20% (1/5th) reimbursed by Guild'
               netCost = '80% (4/5ths) net cost'
@@ -73,10 +109,14 @@ export const createQuest = mutation({
       }
     }
 
-    const { levelPF, levelDnD, isSuggested: _sug, ...otherFields } = args
+    const { levelPF, levelDnD, isSuggested: _sug, rewardMoneyGP: _rm, ...otherFields } = args
 
     const questId = await ctx.db.insert('quests', {
       ...otherFields,
+      reward: finalReward,
+      rewardType: args.rewardType || 'party',
+      rewardMoneyGP: roundedMoneyGP,
+      rewardOther: args.rewardOther?.trim(),
       levelPF: levelPF === null ? undefined : levelPF,
       levelDnD: levelDnD === null ? undefined : levelDnD,
       owner: user.subject,
@@ -105,6 +145,9 @@ export const updateQuest = mutation({
     description: v.optional(v.string()),
     questgiver: v.optional(v.string()),
     reward: v.optional(v.string()),
+    rewardType: v.optional(v.union(v.literal('party'), v.literal('per_person'))),
+    rewardMoneyGP: v.optional(v.number()),
+    rewardOther: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
     characterId: v.optional(v.id('characters')),
   },
@@ -135,6 +178,30 @@ export const updateQuest = mutation({
     let sponsoredAmount = quest.sponsoredAmount
     let netCost = quest.netCost
 
+    // Round rewardMoneyGP to 2 decimals if provided
+    const roundedMoneyGP = args.rewardMoneyGP !== undefined && args.rewardMoneyGP !== null
+      ? Math.round(args.rewardMoneyGP * 100) / 100
+      : undefined
+
+    // Determine final reward string
+    let finalReward = args.reward
+    if (roundedMoneyGP !== undefined || args.rewardOther) {
+      const parts: string[] = []
+      if (roundedMoneyGP !== undefined && roundedMoneyGP > 0) {
+        const moneyFormatted = roundedMoneyGP % 1 === 0
+          ? `${roundedMoneyGP.toLocaleString()} GP`
+          : `${roundedMoneyGP.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} GP`
+        const typeSuffix = args.rewardType === 'per_person' ? ' / person' : ''
+        parts.push(`${moneyFormatted}${typeSuffix}`)
+      }
+      if (args.rewardOther && args.rewardOther.trim()) {
+        parts.push(args.rewardOther.trim())
+      }
+      if (parts.length > 0) {
+        finalReward = parts.join(' + ')
+      }
+    }
+
     if (args.characterId) {
       const character = await ctx.db.get(args.characterId)
       if (character) {
@@ -144,16 +211,25 @@ export const updateQuest = mutation({
 
         if ((characterRank === 'journeyman' || characterRank === 'guildmaster') && questLevel <= maxSponsoredLevel) {
           isSponsored = true
-          if (args.reward) {
-            const rewardClean = args.reward.replace(/,/g, '')
+          if (roundedMoneyGP !== undefined && roundedMoneyGP > 0) {
+            const sponsorVal = Math.round((roundedMoneyGP / 5) * 100) / 100
+            const netVal = Math.round((roundedMoneyGP - sponsorVal) * 100) / 100
+            const formatGP = (n: number) => n % 1 === 0 ? `${n.toLocaleString()} GP` : `${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} GP`
+            const typeSuffix = args.rewardType === 'per_person' ? ' / person' : ''
+            const otherSuffix = args.rewardOther && args.rewardOther.trim() ? ` + ${args.rewardOther.trim()}` : ''
+            sponsoredAmount = `${formatGP(sponsorVal)}${typeSuffix}`
+            netCost = `${formatGP(netVal)}${typeSuffix}${otherSuffix}`
+          } else if (finalReward) {
+            const rewardClean = finalReward.replace(/,/g, '')
             const match = rewardClean.match(/(\d+(?:\.\d+)?)\s*(sp|gp|cp|pp|gold|silver|copper|platinum)?/i)
             if (match) {
               const num = parseFloat(match[1])
               const unit = match[2] ? match[2].toUpperCase() : 'GP'
-              const sponsorVal = Math.round(num / 5)
-              const netVal = num - sponsorVal
-              sponsoredAmount = `${sponsorVal.toLocaleString()} ${unit}`
-              netCost = `${netVal.toLocaleString()} ${unit}`
+              const sponsorVal = Math.round((num / 5) * 100) / 100
+              const netVal = Math.round((num - sponsorVal) * 100) / 100
+              const typeSuffix = args.rewardType === 'per_person' ? ' / person' : ''
+              sponsoredAmount = `${sponsorVal.toLocaleString()} ${unit}${typeSuffix}`
+              netCost = `${netVal.toLocaleString()} ${unit}${typeSuffix}`
             } else {
               sponsoredAmount = '20% (1/5th) reimbursed by Guild'
               netCost = '80% (4/5ths) net cost'
@@ -170,11 +246,15 @@ export const updateQuest = mutation({
       }
     }
 
-    const { questId, levelPF, levelDnD, ...otherFields } = args
+    const { questId, levelPF, levelDnD, rewardMoneyGP: _rm, ...otherFields } = args
     
     await ctx.db.replace(questId, {
         ...quest,
         ...otherFields,
+        reward: finalReward,
+        rewardType: args.rewardType || quest.rewardType || 'party',
+        rewardMoneyGP: roundedMoneyGP !== undefined ? roundedMoneyGP : quest.rewardMoneyGP,
+        rewardOther: args.rewardOther !== undefined ? args.rewardOther.trim() : quest.rewardOther,
         levelPF: levelPF === null ? undefined : levelPF,
         levelDnD: levelDnD === null ? undefined : levelDnD,
         // Clear deprecated level if PF level is explicitly unset

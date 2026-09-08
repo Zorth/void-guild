@@ -15,7 +15,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
-import { Scroll, Sword, Trophy, User, Hash } from 'lucide-react'
+import { Scroll, Sword, Trophy, User, Hash, Coins, Sparkles } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface QuestDialogProps {
   isOpen: boolean
@@ -30,6 +31,9 @@ interface QuestDialogProps {
     description?: string
     questgiver?: string
     reward?: string
+    rewardType?: 'party' | 'per_person'
+    rewardMoneyGP?: number
+    rewardOther?: string
     tags?: string[]
     worldId?: Id<'worlds'>
   }
@@ -41,7 +45,9 @@ export default function QuestDialog({ isOpen, onClose, worldId, quest }: QuestDi
   const [levelDnD, setLevelDnD] = useState<number | null>(null)
   const [description, setDescription] = useState('')
   const [questgiver, setQuestgiver] = useState('')
-  const [reward, setReward] = useState('')
+  const [rewardType, setRewardType] = useState<'party' | 'per_person'>('party')
+  const [rewardMoneyGP, setRewardMoneyGP] = useState<string>('')
+  const [rewardOther, setRewardOther] = useState<string>('')
   const [tagsString, setTagsString] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -56,7 +62,9 @@ export default function QuestDialog({ isOpen, onClose, worldId, quest }: QuestDi
       setLevelDnD(quest.levelDnD ?? null)
       setDescription(quest.description || '')
       setQuestgiver(quest.questgiver || '')
-      setReward(quest.reward || '')
+      setRewardType(quest.rewardType || 'party')
+      setRewardMoneyGP(quest.rewardMoneyGP !== undefined ? String(quest.rewardMoneyGP) : '')
+      setRewardOther(quest.rewardOther || (!quest.rewardMoneyGP && quest.reward ? quest.reward : ''))
       setTagsString(quest.tags?.join(', ') || '')
     } else {
       setName('')
@@ -64,7 +72,9 @@ export default function QuestDialog({ isOpen, onClose, worldId, quest }: QuestDi
       setLevelDnD(null)
       setDescription('')
       setQuestgiver('')
-      setReward('')
+      setRewardType('party')
+      setRewardMoneyGP('')
+      setRewardOther('')
       setTagsString('')
     }
   }, [quest, isOpen])
@@ -79,6 +89,9 @@ export default function QuestDialog({ isOpen, onClose, worldId, quest }: QuestDi
       .map((t) => t.trim())
       .filter((t) => t !== '')
 
+    const moneyVal = parseFloat(rewardMoneyGP)
+    const hasMoney = !isNaN(moneyVal) && moneyVal > 0
+
     try {
       if (quest) {
         await updateQuest({
@@ -88,7 +101,9 @@ export default function QuestDialog({ isOpen, onClose, worldId, quest }: QuestDi
           levelDnD,
           description,
           questgiver,
-          reward,
+          rewardType,
+          rewardMoneyGP: hasMoney ? Math.round(moneyVal * 100) / 100 : undefined,
+          rewardOther: rewardOther.trim() || undefined,
           tags,
           worldId: quest.worldId, // Keep original worldId when editing
         })
@@ -100,7 +115,9 @@ export default function QuestDialog({ isOpen, onClose, worldId, quest }: QuestDi
           levelDnD,
           description,
           questgiver,
-          reward,
+          rewardType,
+          rewardMoneyGP: hasMoney ? Math.round(moneyVal * 100) / 100 : undefined,
+          rewardOther: rewardOther.trim() || undefined,
           tags,
           worldId,
         })
@@ -199,17 +216,82 @@ export default function QuestDialog({ isOpen, onClose, worldId, quest }: QuestDi
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-semibold flex items-center gap-2">
-              <Trophy className="h-4 w-4 text-muted-foreground" />
-              Reward
-            </label>
-            <Input
-              value={reward}
-              onChange={(e) => setReward(e.target.value)}
-              placeholder="Gold, Items, or Renown"
-              className="bg-muted/30"
-            />
+          <div className="space-y-3 p-3 rounded-lg border border-border/50 bg-muted/20">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <Trophy className="h-3.5 w-3.5 text-amber-400" />
+                Reward Distribution
+              </label>
+
+              <div className="flex items-center gap-1 bg-muted/60 p-0.5 rounded-md border border-border/40 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setRewardType('party')}
+                  className={cn(
+                    "px-2.5 py-1 rounded text-[11px] font-semibold transition-all",
+                    rewardType === 'party'
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Party Total
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRewardType('per_person')}
+                  className={cn(
+                    "px-2.5 py-1 rounded text-[11px] font-semibold transition-all",
+                    rewardType === 'per_person'
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Per Person
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-muted-foreground flex items-center gap-1">
+                  <Coins className="h-3.5 w-3.5 text-amber-400" />
+                  Money ({rewardType === 'per_person' ? 'GP / person' : 'GP party total'})
+                </label>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={rewardMoneyGP}
+                    onChange={(e) => setRewardMoneyGP(e.target.value)}
+                    placeholder="e.g. 50.00"
+                    className="bg-muted/30 border-border/40 text-xs pr-10 font-mono font-bold text-amber-300"
+                  />
+                  <span className="absolute right-2.5 top-2 text-[10px] font-bold text-muted-foreground">
+                    GP
+                  </span>
+                </div>
+                <p className="text-[10px] text-muted-foreground italic">
+                  Gold Pieces (up to 2 decimals).
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-muted-foreground flex items-center gap-1">
+                  <Sparkles className="h-3.5 w-3.5 text-purple-400" />
+                  Other Loot / Special Item
+                </label>
+                <Input
+                  value={rewardOther}
+                  onChange={(e) => setRewardOther(e.target.value)}
+                  placeholder="e.g. +1 Weapon, Special Item"
+                  className="bg-muted/30 border-border/40 text-xs"
+                />
+                <p className="text-[10px] text-muted-foreground italic">
+                  Found loot, magic item, or renown.
+                </p>
+              </div>
+            </div>
           </div>
 
           <div className="space-y-2">

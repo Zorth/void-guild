@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import { Scroll, Sword, Trophy, Globe, Sparkles, AlertCircle, Coins, ArrowRight, Crown, Send } from 'lucide-react'
-import { CharacterRankIcon } from '@/lib/utils'
+import { CharacterRankIcon, cn } from '@/lib/utils'
 
 interface CharacterQuestDialogProps {
   isOpen: boolean
@@ -40,7 +40,9 @@ export default function CharacterQuestDialog({
   const [levelPF, setLevelPF] = useState<number | null>(null)
   const [levelDnD, setLevelDnD] = useState<number | null>(null)
   const [description, setDescription] = useState('')
-  const [reward, setReward] = useState('')
+  const [rewardType, setRewardType] = useState<'party' | 'per_person'>('party')
+  const [rewardMoneyGP, setRewardMoneyGP] = useState<string>('')
+  const [rewardOther, setRewardOther] = useState<string>('')
   const [tagsString, setTagsString] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -52,55 +54,62 @@ export default function CharacterQuestDialog({
   const effectiveQuestLevel = levelPF ?? levelDnD ?? 0
   const isQuestLevelEligible = isRankEligible && effectiveQuestLevel <= maxSponsoredLevel
 
+  // Format GP with up to 2 decimal places
+  const formatGPNumber = (num: number) => {
+    return num % 1 === 0
+      ? `${num.toLocaleString()} GP`
+      : `${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} GP`
+  }
+
   // Real-time sponsorship & payback calculation
   const calculatedBreakdown = useMemo(() => {
-    if (!reward) return null
-    
-    const rewardClean = reward.replace(/,/g, '')
-    const match = rewardClean.match(/(\d+(?:\.\d+)?)\s*(sp|gp|cp|pp|gold|silver|copper|platinum)?/i)
-    
-    if (!match) {
-      if (isQuestLevelEligible) {
-        return {
-          hasNumeric: false,
-          total: reward,
-          payback: '20% (1/5th)',
-          netCost: '80% (4/5ths)',
-        }
-      }
-      return null
-    }
+    const rawMoney = parseFloat(rewardMoneyGP)
+    const hasMoney = !isNaN(rawMoney) && rawMoney > 0
+    const moneyNum = hasMoney ? Math.round(rawMoney * 100) / 100 : 0
+    const otherTrimmed = rewardOther.trim()
 
-    const totalNum = parseFloat(match[1])
-    const unit = match[2] ? match[2].toUpperCase() : 'GP'
+    if (!hasMoney && !otherTrimmed) return null
+
+    const typeSuffix = rewardType === 'per_person' ? ' / person' : ''
+    const otherSuffix = otherTrimmed ? ` + ${otherTrimmed}` : ''
+
+    const totalLabel = hasMoney
+      ? `${formatGPNumber(moneyNum)}${typeSuffix}${otherSuffix}`
+      : otherTrimmed
 
     if (!isQuestLevelEligible) {
       return {
-        hasNumeric: true,
-        total: `${totalNum.toLocaleString()} ${unit}`,
+        hasNumeric: hasMoney,
+        total: totalLabel,
         payback: '0 GP (Not eligible for sponsorship)',
-        netCost: `${totalNum.toLocaleString()} ${unit}`,
-        unit,
-        totalNum,
-        paybackNum: 0,
-        netNum: totalNum,
+        netCost: totalLabel,
+        rewardType,
       }
     }
 
-    const paybackNum = Math.round(totalNum / 5)
-    const netNum = totalNum - paybackNum
+    if (!hasMoney) {
+      return {
+        hasNumeric: false,
+        total: totalLabel,
+        payback: '20% (1/5th) reimbursed by Guild',
+        netCost: `${totalLabel} (net of reimbursement)`,
+        rewardType,
+      }
+    }
+
+    const paybackNum = Math.round((moneyNum / 5) * 100) / 100
+    const netNum = Math.round((moneyNum - paybackNum) * 100) / 100
 
     return {
       hasNumeric: true,
-      total: `${totalNum.toLocaleString()} ${unit}`,
-      payback: `${paybackNum.toLocaleString()} ${unit}`,
-      netCost: `${netNum.toLocaleString()} ${unit}`,
-      unit,
-      totalNum,
+      total: totalLabel,
+      payback: `${formatGPNumber(paybackNum)}${typeSuffix}`,
+      netCost: `${formatGPNumber(netNum)}${typeSuffix}${otherSuffix}`,
       paybackNum,
       netNum,
+      rewardType,
     }
-  }, [isQuestLevelEligible, reward])
+  }, [isQuestLevelEligible, rewardMoneyGP, rewardOther, rewardType])
 
   useEffect(() => {
     if (!isOpen) {
@@ -109,7 +118,9 @@ export default function CharacterQuestDialog({
       setLevelPF(null)
       setLevelDnD(null)
       setDescription('')
-      setReward('')
+      setRewardType('party')
+      setRewardMoneyGP('')
+      setRewardOther('')
       setTagsString('')
     }
   }, [isOpen])
@@ -124,6 +135,13 @@ export default function CharacterQuestDialog({
 
     if (!worldId) {
       toast.error('A character quest requires selecting a World.')
+      return
+    }
+
+    const moneyVal = parseFloat(rewardMoneyGP)
+    const hasMoney = !isNaN(moneyVal) && moneyVal > 0
+    if (!hasMoney && !rewardOther.trim()) {
+      toast.error('Please enter a reward (money in GP or found loot/item).')
       return
     }
 
@@ -143,7 +161,9 @@ export default function CharacterQuestDialog({
         levelDnD,
         description,
         questgiver: characterName ? `Character: ${characterName}` : 'Character Quest',
-        reward,
+        rewardType,
+        rewardMoneyGP: hasMoney ? Math.round(moneyVal * 100) / 100 : undefined,
+        rewardOther: rewardOther.trim() || undefined,
         tags,
       })
       toast.success(
@@ -178,6 +198,13 @@ export default function CharacterQuestDialog({
       return
     }
 
+    const moneyVal = parseFloat(rewardMoneyGP)
+    const hasMoney = !isNaN(moneyVal) && moneyVal > 0
+    if (!hasMoney && !rewardOther.trim()) {
+      toast.error('Please enter a proposed reward (money in GP or found loot/item).')
+      return
+    }
+
     setIsSubmitting(true)
 
     const tags = tagsString
@@ -194,7 +221,9 @@ export default function CharacterQuestDialog({
         levelDnD,
         description,
         questgiver: characterName ? `Guildmaster: ${characterName}` : 'Guildmaster Suggestion',
-        reward,
+        rewardType,
+        rewardMoneyGP: hasMoney ? Math.round(moneyVal * 100) / 100 : undefined,
+        rewardOther: rewardOther.trim() || undefined,
         tags,
         isSuggested: true,
       })
@@ -349,23 +378,91 @@ export default function CharacterQuestDialog({
             />
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <Trophy className="h-3.5 w-3.5 text-amber-400" />
-              Reward Offered to Party
-            </label>
-            <Input
-              value={reward}
-              onChange={(e) => setReward(e.target.value)}
-              placeholder="e.g. 5,000 SP + loot found"
-              className="bg-muted/30 border-border/40 text-xs"
-            />
+          <div className="space-y-3 p-3 rounded-lg border border-purple-500/30 bg-purple-950/15">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <label className="text-xs font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                <Trophy className="h-3.5 w-3.5 text-amber-400" />
+                Quest Reward
+              </label>
+
+              {/* Reward Distribution Toggle: Per Person vs Party as a whole */}
+              <div className="flex items-center gap-1 bg-muted/40 p-0.5 rounded-md border border-border/40 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setRewardType('party')}
+                  className={cn(
+                    "px-2.5 py-1 rounded text-[11px] font-semibold transition-all",
+                    rewardType === 'party'
+                      ? "bg-purple-600 text-white shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Party Total
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRewardType('per_person')}
+                  className={cn(
+                    "px-2.5 py-1 rounded text-[11px] font-semibold transition-all",
+                    rewardType === 'per_person'
+                      ? "bg-purple-600 text-white shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Per Person
+                </button>
+              </div>
+            </div>
+
+            {/* Split loot inputs: Money (GP) and Other (Items/Loot) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-muted-foreground flex items-center gap-1">
+                  <Coins className="h-3.5 w-3.5 text-amber-400" />
+                  Money ({rewardType === 'per_person' ? 'GP / person' : 'GP party total'})
+                </label>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={rewardMoneyGP}
+                    onChange={(e) => setRewardMoneyGP(e.target.value)}
+                    placeholder="e.g. 50.00"
+                    className="bg-muted/30 border-border/40 text-xs pr-10 font-mono font-bold text-amber-300"
+                  />
+                  <span className="absolute right-2.5 top-2 text-[10px] font-bold text-muted-foreground">
+                    GP
+                  </span>
+                </div>
+                <p className="text-[10px] text-muted-foreground italic">
+                  Number in GP (up to 2 decimal places).
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-muted-foreground flex items-center gap-1">
+                  <Sparkles className="h-3.5 w-3.5 text-purple-400" />
+                  Other Loot / Special Reward
+                </label>
+                <Input
+                  value={rewardOther}
+                  onChange={(e) => setRewardOther(e.target.value)}
+                  placeholder="e.g. +1 Striking Dagger, Potion"
+                  className="bg-muted/30 border-border/40 text-xs"
+                />
+                <p className="text-[10px] text-muted-foreground italic">
+                  Found loot, magic items, titles, or renown.
+                </p>
+              </div>
+            </div>
+
             {calculatedBreakdown && (
               <div className="rounded-lg border bg-gradient-to-br from-purple-950/40 via-muted/30 to-emerald-950/20 border-purple-500/30 p-3 space-y-2 text-xs">
                 <div className="flex items-center justify-between font-bold text-foreground">
                   <span className="flex items-center gap-1.5 text-purple-300">
                     <Coins className="h-4 w-4 text-amber-400" />
-                    Payment & Sponsorship Breakdown
+                    Payment & Sponsorship Breakdown ({rewardType === 'per_person' ? 'Per Person' : 'Party Total'})
                   </span>
                   {isQuestLevelEligible ? (
                     <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold px-2 py-0.5 rounded">
@@ -388,7 +485,7 @@ export default function CharacterQuestDialog({
                       {calculatedBreakdown.total}
                     </span>
                     <span className="text-[10px] text-muted-foreground block mt-0.5">
-                      Paid to adventurers
+                      {rewardType === 'per_person' ? 'Per adventurer' : 'To party'}
                     </span>
                   </div>
 
@@ -421,7 +518,7 @@ export default function CharacterQuestDialog({
 
                 {isQuestLevelEligible ? (
                   <p className="text-[11px] text-muted-foreground italic pt-0.5">
-                    Upon quest completion in a session, you pay the party the full agreed reward, and the Guild of the Void immediately reimburses you <strong>{calculatedBreakdown.payback}</strong> in your character log!
+                    Upon quest completion in a session, you pay the party the agreed reward ({rewardType === 'per_person' ? 'per adventurer' : 'party total'}), and the Guild of the Void immediately reimburses you <strong>{calculatedBreakdown.payback}</strong> in your character log!
                   </p>
                 ) : (
                   <p className="text-[11px] text-muted-foreground italic pt-0.5">

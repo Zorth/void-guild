@@ -271,9 +271,17 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
                         
                         <div className="grid grid-cols-1 gap-2 pt-2">
                             {quest.reward && (
-                                <div className="flex items-start gap-2 text-[11px]">
-                                    <Trophy className="h-3.5 w-3.5 text-yellow-500 shrink-0" />
-                                    <span><span className="font-bold text-muted-foreground uppercase mr-1">Reward:</span> {quest.reward}</span>
+                                <div className="flex items-start gap-2 text-[11px] flex-wrap">
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        <Trophy className="h-3.5 w-3.5 text-yellow-500 shrink-0" />
+                                        <span className="font-bold text-muted-foreground uppercase">Reward:</span>
+                                    </div>
+                                    <span>{quest.reward}</span>
+                                    {quest.rewardType === 'per_person' && (
+                                        <span className="text-[9px] uppercase font-bold bg-blue-500/15 text-blue-400 px-1.5 py-0.5 rounded border border-blue-500/20">
+                                            Per Person
+                                        </span>
+                                    )}
                                 </div>
                             )}
                             {!quest.worldId && !worldId && (

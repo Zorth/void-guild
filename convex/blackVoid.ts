@@ -802,14 +802,20 @@ export const getCharacterTransactions = query({
           }
 
           let guildmasterCut = '1/5th (20%) of Quest Gains'
-          if (q.reward) {
+          if (q.rewardMoneyGP !== undefined && q.rewardMoneyGP > 0) {
+            const cutVal = Math.round((q.rewardMoneyGP / 5) * 100) / 100
+            const formatGP = (n: number) => n % 1 === 0 ? `${n.toLocaleString()} GP` : `${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} GP`
+            const typeSuffix = q.rewardType === 'per_person' ? ' / person' : ''
+            guildmasterCut = `${formatGP(cutVal)}${typeSuffix}`
+          } else if (q.reward) {
             const rewardClean = q.reward.replace(/,/g, '')
             const match = rewardClean.match(/(\d+(?:\.\d+)?)\s*(sp|gp|cp|pp|gold|silver|copper|platinum)?/i)
             if (match) {
               const num = parseFloat(match[1])
               const unit = match[2] ? match[2].toUpperCase() : 'GP'
-              const cutVal = Math.round(num / 5)
-              guildmasterCut = `${cutVal.toLocaleString()} ${unit}`
+              const cutVal = Math.round((num / 5) * 100) / 100
+              const typeSuffix = q.rewardType === 'per_person' ? ' / person' : ''
+              guildmasterCut = `${cutVal.toLocaleString()} ${unit}${typeSuffix}`
             }
           }
 

@@ -596,8 +596,15 @@ export default function BlackVoidPage() {
 
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-1 flex-wrap">
                     {q.reward ? (
-                      <div className="text-xs font-semibold text-amber-300 bg-amber-500/10 px-2.5 py-1 rounded border border-amber-500/20">
-                        Reward: {q.reward}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <div className="text-xs font-semibold text-amber-300 bg-amber-500/10 px-2.5 py-1 rounded border border-amber-500/20">
+                          Reward: {q.reward}
+                        </div>
+                        {q.rewardType === 'per_person' && (
+                          <span className="text-[10px] uppercase font-bold bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded border border-blue-500/30">
+                            Per Person
+                          </span>
+                        )}
                       </div>
                     ) : <div />}
 

@@ -116,6 +116,9 @@ export default defineSchema({
         description: v.optional(v.string()),
         questgiver: v.optional(v.string()),
         reward: v.optional(v.string()),
+        rewardType: v.optional(v.union(v.literal('party'), v.literal('per_person'))), // 'party' (default) or 'per_person'
+        rewardMoneyGP: v.optional(v.number()), // Gold Piece reward with up to 2 decimals
+        rewardOther: v.optional(v.string()), // Found loot, special magic items, or custom extra reward
         tags: v.optional(v.array(v.string())),
         owner: v.string(), // Clerk userId of the creator
         characterId: v.optional(v.id("characters")), // Character owner for character quests
