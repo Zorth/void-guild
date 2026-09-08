@@ -468,7 +468,10 @@ export const previewXPGains = query({
         const session = await ctx.db.get(sessionId)
         if (!session) return null
 
-        if (session.level === undefined) {
+        const quest = session.questId ? await ctx.db.get(session.questId) : null
+        const effectiveLevel = computeEffectiveLevel(session, quest)
+
+        if (effectiveLevel === undefined) {
             return []
         }
 
@@ -480,7 +483,7 @@ export const previewXPGains = query({
         const characters = await Promise.all(characterIds.map(id => ctx.db.get(id)))
         
         return characters.filter((c): c is Doc<'characters'> => c !== null).map(char => {
-            const xpGain = calculateXPGain(session.level!, char.lvl, char._id === session.gmCharacter)
+            const xpGain = calculateXPGain(effectiveLevel, char.lvl, char._id === session.gmCharacter)
             const { lvl: newLvl, xp: newXp } = calculateNewStats(char.lvl, char.xp, xpGain)
             return {
                 id: char._id,
@@ -858,8 +861,11 @@ export const lockSession = mutation({
         throw new Error('Only the session owner or an admin can lock it.')
       }
   
-      if (session.level === undefined) {
-          throw new Error('Session cannot be locked without a level.')
+      const quest = session.questId ? await ctx.db.get(session.questId) : null
+      const effectiveLevel = computeEffectiveLevel(session, quest)
+
+      if (effectiveLevel === undefined) {
+          throw new Error('Session cannot be locked without a level or selected quest with a level.')
       }
 
       if (session.locked) return
@@ -874,7 +880,7 @@ export const lockSession = mutation({
       for (const characterId of characterIds) {
         const character = await ctx.db.get(characterId)
         if (character) {
-          const xpGain = calculateXPGain(session.level, character.lvl, character._id === session.gmCharacter)
+          const xpGain = calculateXPGain(effectiveLevel, character.lvl, character._id === session.gmCharacter)
           const { lvl: newLvl, xp: newXp } = calculateNewStats(character.lvl, character.xp, xpGain)
           
           xpGains.push({
