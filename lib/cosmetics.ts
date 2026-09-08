@@ -377,8 +377,7 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
   const isGradientBorder =
     cardClassName.includes('gold-card-border') ||
     cardClassName.includes('silver-card-border') ||
-    cardClassName.includes('bronze-card-border') ||
-    cardClassName.includes('rainbow-border')
+    cardClassName.includes('bronze-card-border')
 
   if (bgObj?.value === 'gold-bg-tint' || cosmetics.bgColor === 'gold_tint' || cosmetics.bgColor === 'gold-bg-tint') {
     if (isGradientBorder) {
