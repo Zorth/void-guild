@@ -294,6 +294,10 @@ export default function VoidObjectiveWidget() {
         monthKey={currentMonthKey}
         objectiveTitle={title}
         unit={unit}
+        currentProgress={progress}
+        tier1={tier1}
+        tier2={tier2}
+        tier3={tier3}
       />
     </div>
   )
