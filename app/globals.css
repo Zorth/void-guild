@@ -165,6 +165,19 @@
     border-radius: 0.75rem !important;
 }
 
+.purple-card-border {
+    border-radius: 0.5rem !important;
+    border: 2px solid #D8B4FE !important;
+    background: var(--card-bg, rgba(147, 51, 234, 0.1)) !important;
+    box-shadow: 0 0 10px rgba(216, 180, 254, 0.35) !important;
+}
+
+.purple-card-border[data-selected="true"] {
+    border: 2px solid #D8B4FE !important;
+    background: rgba(147, 51, 234, 0.25) !important;
+    box-shadow: 0 0 14px rgba(216, 180, 254, 0.6) !important;
+}
+
 .achievement-description {
     color: #E9D5FF !important;
     opacity: 0.9;

@@ -145,8 +145,8 @@ export const BORDER_SHAPE_OPTIONS: CosmeticOption[] = [
     name: 'Purple Highlight Border',
     unlockedByDefault: false,
     requiredAchievementId: 'tutorial_completed',
-    value: 'rounded-lg border-2 border-[#D8B4FE] bg-[rgba(147,51,234,0.1)]',
-    previewClass: 'rounded-lg border-2 border-[#D8B4FE] bg-[rgba(147,51,234,0.1)] p-1',
+    value: 'purple-card-border',
+    previewClass: 'purple-card-border rounded-lg p-1',
   },
   {
     id: 'silver_border',
@@ -372,7 +372,12 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
   const subFontVal = subFontObj ? subFontObj.value : ''
 
   // Border Shape
-  const shapeObj = BORDER_SHAPE_OPTIONS.find((s) => s.id === cosmetics.borderShape || s.value === cosmetics.borderShape)
+  const shapeObj = BORDER_SHAPE_OPTIONS.find(
+    (s) =>
+      s.id === cosmetics.borderShape ||
+      s.value === cosmetics.borderShape ||
+      (s.id === 'purple_border' && cosmetics.borderShape?.includes('#D8B4FE'))
+  )
   let cardClassName = shapeObj ? shapeObj.value : ''
 
   // Profile Border
@@ -385,7 +390,8 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
   const isGradientBorder =
     cardClassName.includes('gold-card-border') ||
     cardClassName.includes('silver-card-border') ||
-    cardClassName.includes('bronze-card-border')
+    cardClassName.includes('bronze-card-border') ||
+    cardClassName.includes('purple-card-border')
 
   if (bgObj?.value === 'gold-bg-tint' || cosmetics.bgColor === 'gold_tint' || cosmetics.bgColor === 'gold-bg-tint') {
     if (isGradientBorder) {
