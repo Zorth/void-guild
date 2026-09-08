@@ -484,11 +484,35 @@ export const getCharacter = query({
             .withIndex('by_userId', (q) => q.eq('userId', char.userId))
             .first()
 
+        const details = await ctx.db
+            .query('characterDetails')
+            .withIndex('by_characterId', (q) => q.eq('characterId', charId))
+            .first()
+
         return {
             ...char,
             title: char.title ?? null,
             player: formatPlayerName(owner),
+            details: details ?? null,
         }
+    }
+})
+
+export const getCharacterSheet = query({
+    args: { apiKey: v.optional(v.string()), characterId: v.string() },
+    handler: async (ctx, args) => {
+        await validateKey(ctx, args.apiKey)
+        const charId = ctx.db.normalizeId('characters', args.characterId)
+        if (!charId) throw new Error('Invalid character ID')
+        const char = await ctx.db.get(charId)
+        if (!char) return null
+
+        const details = await ctx.db
+            .query('characterDetails')
+            .withIndex('by_characterId', (q) => q.eq('characterId', charId))
+            .first()
+
+        return details ?? null
     }
 })
 
@@ -539,6 +563,290 @@ export const updateCharacter = mutation({
         const { apiKey, characterId, ...patch } = args
         await ctx.db.patch(cId, patch)
         return { success: true }
+    },
+})
+
+export const updateCharacterSheet = mutation({
+    args: {
+        apiKey: v.string(),
+        characterId: v.string(),
+        pathbuilderId: v.optional(v.number()),
+        system: v.optional(v.string()),
+        name: v.optional(v.string()),
+        level: v.optional(v.number()), // Note: character table lvl is NOT modified; stored as informational in details
+        xp: v.optional(v.number()),    // Note: character table xp is NOT modified; stored as informational in details
+        ancestry: v.optional(v.string()),
+        heritage: v.optional(v.string()),
+        background: v.optional(v.string()),
+        class: v.optional(v.string()),
+        dualClass: v.optional(v.union(v.string(), v.null())),
+        keyAbility: v.optional(v.union(
+            v.literal('str'),
+            v.literal('dex'),
+            v.literal('con'),
+            v.literal('int'),
+            v.literal('wis'),
+            v.literal('cha')
+        )),
+        alignment: v.optional(v.string()),
+        deity: v.optional(v.string()),
+        size: v.optional(v.string()),
+        speed: v.optional(v.number()),
+        // Support both "ac": number and "armorClass": object
+        ac: v.optional(v.number()),
+        armorClass: v.optional(v.object({
+            total: v.number(),
+            shieldBonus: v.optional(v.number()),
+            unarmoredProf: v.optional(v.number()),
+            equippedArmorName: v.optional(v.string()),
+            shieldHardness: v.optional(v.number()),
+            shieldCurrentHP: v.optional(v.number()),
+            shieldMaxHP: v.optional(v.number()),
+        })),
+        // Support both simplified hp { current, max, temp } and full hitPoints
+        hp: v.optional(v.object({
+            current: v.number(),
+            max: v.number(),
+            temp: v.optional(v.number()),
+            temporary: v.optional(v.number()),
+        })),
+        hitPoints: v.optional(v.object({
+            max: v.number(),
+            current: v.number(),
+            temporary: v.number(),
+            dieSize: v.optional(v.number()),
+            ancestryHP: v.optional(v.number()),
+            classHP: v.optional(v.number()),
+            bonusHP: v.optional(v.number()),
+        })),
+        saves: v.optional(v.object({
+            fortitude: v.optional(v.object({
+                bonus: v.number(),
+                proficiency: v.optional(v.union(v.literal('U'), v.literal('T'), v.literal('E'), v.literal('M'), v.literal('L'))),
+                profValue: v.optional(v.number()),
+                itemBonus: v.optional(v.number()),
+            })),
+            reflex: v.optional(v.object({
+                bonus: v.number(),
+                proficiency: v.optional(v.union(v.literal('U'), v.literal('T'), v.literal('E'), v.literal('M'), v.literal('L'))),
+                profValue: v.optional(v.number()),
+                itemBonus: v.optional(v.number()),
+            })),
+            will: v.optional(v.object({
+                bonus: v.number(),
+                proficiency: v.optional(v.union(v.literal('U'), v.literal('T'), v.literal('E'), v.literal('M'), v.literal('L'))),
+                profValue: v.optional(v.number()),
+                itemBonus: v.optional(v.number()),
+            })),
+            perception: v.optional(v.object({
+                bonus: v.number(),
+                proficiency: v.optional(v.union(v.literal('U'), v.literal('T'), v.literal('E'), v.literal('M'), v.literal('L'))),
+                profValue: v.optional(v.number()),
+                itemBonus: v.optional(v.number()),
+            })),
+        })),
+        abilities: v.optional(v.object({
+            str: v.number(),
+            dex: v.number(),
+            con: v.number(),
+            int: v.number(),
+            wis: v.number(),
+            cha: v.number(),
+        })),
+        skills: v.optional(v.record(v.string(), v.object({
+            name: v.string(),
+            modifier: v.number(),
+            proficiency: v.optional(v.union(v.literal('U'), v.literal('T'), v.literal('E'), v.literal('M'), v.literal('L'))),
+            ability: v.optional(v.string()),
+            isLore: v.optional(v.boolean()),
+        }))),
+        conditions: v.optional(v.array(v.object({
+            name: v.string(),
+            value: v.optional(v.number()),
+        }))),
+        money: v.optional(v.object({
+            cp: v.number(),
+            sp: v.number(),
+            gp: v.number(),
+            pp: v.number(),
+            totalInGold: v.optional(v.number()),
+        })),
+        // Support gear as structured object or array of items
+        gear: v.optional(v.union(
+            v.object({
+                weapons: v.optional(v.array(v.object({
+                    name: v.string(),
+                    die: v.optional(v.string()),
+                    damageType: v.optional(v.string()),
+                    attackBonus: v.optional(v.number()),
+                    potency: v.optional(v.number()),
+                    striking: v.optional(v.union(v.string(), v.null())),
+                    runes: v.optional(v.array(v.string())),
+                    traits: v.optional(v.array(v.string())),
+                    qty: v.number(),
+                }))),
+                armor: v.optional(v.array(v.object({
+                    name: v.string(),
+                    acBonus: v.optional(v.number()),
+                    potency: v.optional(v.number()),
+                    resilient: v.optional(v.string()),
+                    runes: v.optional(v.array(v.string())),
+                    worn: v.optional(v.boolean()),
+                    qty: v.number(),
+                }))),
+                equipment: v.optional(v.array(v.object({
+                    name: v.string(),
+                    qty: v.number(),
+                    bulk: v.optional(v.string()),
+                    container: v.optional(v.string()),
+                }))),
+            }),
+            v.array(v.object({
+                name: v.string(),
+                qty: v.number(),
+                bulk: v.optional(v.string()),
+                container: v.optional(v.string()),
+            }))
+        )),
+        buildSummary: v.optional(v.object({
+            classFeatures: v.optional(v.array(v.string())),
+            ancestryFeats: v.optional(v.array(v.string())),
+            classFeats: v.optional(v.array(v.string())),
+            skillFeats: v.optional(v.array(v.string())),
+            generalFeats: v.optional(v.array(v.string())),
+            languages: v.optional(v.array(v.string())),
+            specialResistances: v.optional(v.array(v.string())),
+            feats: v.optional(v.array(v.string())),
+            specials: v.optional(v.array(v.string())),
+        })),
+        rawExport: v.optional(v.any()),
+    },
+    handler: async (ctx, args) => {
+        const user = await requireUser(ctx, args.apiKey)
+        const cId = ctx.db.normalizeId('characters', args.characterId)
+        if (!cId) throw new Error('Invalid character ID')
+
+        const char = await ctx.db.get(cId)
+        if (!char) throw new Error('Character not found')
+
+        if (char.userId !== user.userId && !user.isAdmin) {
+            throw new Error('Unauthorized: You do not own this character')
+        }
+
+        // Normalize Hit Points
+        let normalizedHitPoints = args.hitPoints
+        if (!normalizedHitPoints && args.hp) {
+            normalizedHitPoints = {
+                max: args.hp.max,
+                current: args.hp.current,
+                temporary: args.hp.temp ?? args.hp.temporary ?? 0,
+                dieSize: undefined,
+                ancestryHP: undefined,
+                classHP: undefined,
+                bonusHP: undefined,
+            }
+        }
+
+        // Normalize Armor Class
+        let normalizedArmorClass = args.armorClass
+        if (!normalizedArmorClass && args.ac !== undefined) {
+            normalizedArmorClass = {
+                total: args.ac,
+                shieldBonus: undefined,
+                unarmoredProf: undefined,
+                equippedArmorName: undefined,
+                shieldHardness: undefined,
+                shieldCurrentHP: undefined,
+                shieldMaxHP: undefined,
+            }
+        }
+
+        // Normalize Money total if not present
+        let normalizedMoney = args.money
+        if (normalizedMoney && normalizedMoney.totalInGold === undefined) {
+            const cp = normalizedMoney.cp || 0
+            const sp = normalizedMoney.sp || 0
+            const gp = normalizedMoney.gp || 0
+            const pp = normalizedMoney.pp || 0
+            normalizedMoney = {
+                ...normalizedMoney,
+                totalInGold: Math.round((gp + (pp * 10) + (sp / 10) + (cp / 100)) * 100) / 100,
+            }
+        }
+
+        // Normalize Gear
+        let normalizedGear: any = undefined
+        if (Array.isArray(args.gear)) {
+            normalizedGear = {
+                weapons: [],
+                armor: [],
+                equipment: args.gear,
+            }
+        } else if (args.gear) {
+            normalizedGear = args.gear
+        }
+
+        // Existing details check
+        const existing = await ctx.db
+            .query('characterDetails')
+            .withIndex('by_characterId', (q) => q.eq('characterId', cId))
+            .first()
+
+        const now = Date.now()
+
+        const detailsRecord = {
+            characterId: cId,
+            pathbuilderId: args.pathbuilderId ?? existing?.pathbuilderId,
+            system: args.system ?? existing?.system ?? 'PF2e',
+            name: args.name ?? existing?.name ?? char.name,
+            level: args.level ?? existing?.level ?? char.lvl,
+            xp: args.xp ?? existing?.xp ?? char.xp,
+            ancestry: args.ancestry ?? existing?.ancestry ?? char.ancestry,
+            heritage: args.heritage ?? existing?.heritage,
+            background: args.background ?? existing?.background,
+            class: args.class ?? existing?.class ?? char.class,
+            dualClass: args.dualClass ?? existing?.dualClass,
+            keyAbility: args.keyAbility ?? existing?.keyAbility,
+            alignment: args.alignment ?? existing?.alignment,
+            deity: args.deity ?? existing?.deity,
+            size: args.size ?? existing?.size,
+            speed: args.speed ?? existing?.speed,
+            hitPoints: normalizedHitPoints ?? existing?.hitPoints,
+            armorClass: normalizedArmorClass ?? existing?.armorClass,
+            saves: args.saves ?? existing?.saves,
+            abilities: args.abilities ?? existing?.abilities,
+            skills: args.skills ?? existing?.skills,
+            conditions: args.conditions ?? existing?.conditions,
+            money: normalizedMoney ?? existing?.money,
+            gear: normalizedGear ?? existing?.gear,
+            buildSummary: args.buildSummary ?? existing?.buildSummary,
+            rawExport: args.rawExport ?? existing?.rawExport,
+            lastSyncedAt: now,
+        }
+
+        if (existing) {
+            await ctx.db.patch(existing._id, detailsRecord)
+        } else {
+            await ctx.db.insert('characterDetails', detailsRecord)
+        }
+
+        // Optionally update character's basic profile details if supplied (excluding level and xp to preserve integrity)
+        const charProfilePatch: { ancestry?: string; class?: string } = {}
+        if (args.ancestry && args.ancestry !== char.ancestry) {
+            charProfilePatch.ancestry = args.ancestry
+        }
+        if (args.class && args.class !== char.class) {
+            charProfilePatch.class = args.class
+        }
+        if (Object.keys(charProfilePatch).length > 0) {
+            await ctx.db.patch(cId, charProfilePatch)
+        }
+
+        return {
+            success: true,
+            characterId: cId,
+            lastSyncedAt: now,
+        }
     },
 })
 

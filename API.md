@@ -42,9 +42,12 @@ https://guild.tarragon.be/api/external/v1
 
 ### Characters
 *   **GET** `/characters?userId=...` - List characters owned by a user.
-*   **GET** `/character/:characterId` - Get full character details.
+*   **GET** `/character/:characterId` - Get full character details (includes synced `details` character sheet if present).
+*   **GET** `/character/:characterId/sheet` - Get detailed Pathbuilder 2e character sheet data (defenses, HP, saves, skills, money, gear, build feats, conditions).
 *   **POST** `/character` - Create a new character for your account (starts at level 1, 0 XP). Body: `{ name, ancestry?, class?, system?, websiteLink? }`.
+*   **POST** `/character/:characterId/sheet` - Push/sync Pathbuilder character sheet data (Owner/Admin). Body supports full `CharacterSheetDetails` or lightweight `{ ac, hp, money, conditions, gear, buildSummary }`.
 *   **PATCH** `/character/:characterId` - Update character details (Owner/Admin only; XP and Level cannot be modified via API). Body: `{ name?, ancestry?, class?, websiteLink? }`.
+*   **PATCH** `/character/:characterId/sheet` - Update/sync Pathbuilder character sheet data (Owner/Admin). Body: `{ ac?, hp?, money?, conditions?, gear?, buildSummary?, ... }`.
 
 ### Worlds & Quests
 *   **GET** `/worlds` - List all campaign worlds.

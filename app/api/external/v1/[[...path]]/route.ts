@@ -51,9 +51,12 @@ function getApiDocsResponse() {
             { method: "PATCH", path: "/session/:id/state", description: "Update initiative & clock" },
 
             { method: "GET", path: "/characters", description: "List user characters", queryParams: ["userId=string"] },
-            { method: "GET", path: "/character/:id", description: "Get full character details" },
+            { method: "GET", path: "/character/:id", description: "Get full character details (including synced Pathbuilder sheet)" },
+            { method: "GET", path: "/character/:id/sheet", description: "Get Pathbuilder character sheet data directly" },
             { method: "POST", path: "/character", description: "Create a new character (starts at Lvl 1, 0 XP)" },
+            { method: "POST", path: "/character/:id/sheet", description: "Push/sync Pathbuilder character sheet details" },
             { method: "PATCH", path: "/character/:id", description: "Update character details (XP/Lvl protected)" },
+            { method: "PATCH", path: "/character/:id/sheet", description: "Update/sync Pathbuilder character sheet details" },
 
             { method: "GET", path: "/worlds", description: "List all campaign worlds" },
             { method: "GET", path: "/world/:id", description: "Get details for a specific world" },
@@ -137,6 +140,9 @@ export async function GET(
             const uId = req.nextUrl.searchParams.get('userId') || undefined;
             return handleResponse(convex.query(api.external_api.listCharacters, { apiKey, userId: uId }));
         case 'character':
+            if (id && subresource === 'sheet') {
+                return handleResponse(convex.query(api.external_api.getCharacterSheet, { apiKey, characterId: id }));
+            }
             return handleResponse(convex.query(api.external_api.getCharacter, { apiKey, characterId: id }));
         case 'quests':
             return handleResponse(convex.query(api.external_api.listQuests, { apiKey }));
@@ -197,6 +203,9 @@ export async function POST(
             }
             return handleResponse(convex.mutation(api.external_api.createSession, { apiKey, ...body }));
         case 'character':
+            if (id && subresource === 'sheet') {
+                return handleResponse(convex.mutation(api.external_api.updateCharacterSheet, { apiKey, characterId: id, ...body }));
+            }
             return handleResponse(convex.mutation(api.external_api.createCharacter, { apiKey, ...body }));
         case 'quest':
             return handleResponse(convex.mutation(api.external_api.createQuest, { apiKey, ...body }));
@@ -246,6 +255,9 @@ export async function PATCH(
             }
             break;
         case 'character':
+            if (id && subresource === 'sheet') {
+                return handleResponse(convex.mutation(api.external_api.updateCharacterSheet, { apiKey, characterId: id, ...body }));
+            }
             return handleResponse(convex.mutation(api.external_api.updateCharacter, { apiKey, characterId: id, ...body }));
         case 'quest':
             return handleResponse(convex.mutation(api.external_api.updateQuest, { apiKey, questId: id, ...body }));
