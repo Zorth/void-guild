@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Trophy, Book, Globe, Sparkles, Coins, Key } from 'lucide-react'
 import ActivityFeed from '@/components/ActivityFeed'
+import VoidObjectiveWidget from '@/components/VoidObjectiveWidget'
 import { useState, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
@@ -170,7 +171,10 @@ export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
 
       <Authenticated>
         <Characters filters={{ pf: pfFilter, dnd: dndFilter }} />
-        <ActivityFeed />
+        <div className="mt-16 grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+          <VoidObjectiveWidget />
+          <ActivityFeed />
+        </div>
       </Authenticated>
 
       <Unauthenticated>

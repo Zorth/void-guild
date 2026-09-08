@@ -49,6 +49,7 @@ import QuestList from '@/components/quests/QuestList'
 import LootList from '@/components/sessions/details/LootList'
 import ToolSidebar from '@/components/sessions/ToolSidebar'
 import ReputationSystem from '@/components/world/ReputationSystem'
+import VoidObjectiveContributeModal from '@/components/sessions/details/VoidObjectiveContributeModal'
 
 interface SessionWithGM extends Doc<'sessions'> {
     attendingCharacters: Doc<'characters'>[];
@@ -88,6 +89,7 @@ export default function SessionClient() {
   const isAdmin = useQuery(api.sessions.isAdminQuery)
   const allCharacters = useQuery(api.characters.listAllCharacters, isAdmin ? undefined : "skip")
   const worldQuests = useQuery(api.quests.getQuestsByWorld, session?.world ? { worldId: session.world } : "skip")
+  const currentObjective = useQuery(api.voidObjectives.getCurrentObjective)
 
   const currentWorldDate = useMemo(() => {
     if (!world?.calendar) return null;
@@ -106,6 +108,7 @@ export default function SessionClient() {
   const [leavingCharacterId, setLeavingCharacterId] = useState<string | null>(null)
   const [optimisticInterestedPlayers, setOptimisticInterestedPlayers] = useState<{ userId: string; username: string }[] | null>(null)
   const [isJoinSuccessDialogOpen, setIsJoinSuccessDialogOpen] = useState(false)
+  const [isObjectiveContributeOpen, setIsObjectiveContributeOpen] = useState(false)
 
   const userIds = useMemo(() => {
     if (!session) return [];
@@ -278,6 +281,10 @@ export default function SessionClient() {
             duration: 8000,
             icon: '🏆'
         });
+        // If there's an active void objective, prompt Voidmaster for contribution
+        if (currentObjective) {
+          setIsObjectiveContributeOpen(true)
+        }
     }
     catch (e) { alert(e instanceof Error ? e.message : 'Failed to lock session') }
   }
@@ -949,6 +956,13 @@ export default function SessionClient() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Voidmaster contribution popup when session is locked */}
+      <VoidObjectiveContributeModal
+        isOpen={isObjectiveContributeOpen}
+        onClose={() => setIsObjectiveContributeOpen(false)}
+        sessionId={session._id}
+      />
     </div>
   )
 }

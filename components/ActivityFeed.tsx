@@ -8,7 +8,7 @@ import { Sparkles, Trophy, User } from 'lucide-react'
 import { useMemo } from 'react'
 import { UserMetadata } from '@/app/stats/actions'
 
-export default function ActivityFeed() {
+export default function ActivityFeed({ className }: { className?: string }) {
   const activities = useQuery(api.activity.listActivity)
 
   const userIds = useMemo(() => {
@@ -34,7 +34,7 @@ export default function ActivityFeed() {
 
   if (activities === undefined) {
     return (
-      <div className="mt-12 space-y-4">
+      <div className={cn("space-y-4", className)}>
         <Skeleton className="h-6 w-48" />
         <Skeleton className="h-12 w-full" />
         <Skeleton className="h-12 w-full" />
@@ -43,7 +43,7 @@ export default function ActivityFeed() {
   }
 
   return (
-    <div className="mt-16 max-w-2xl mx-auto">
+    <div className={cn("w-full", className)}>
       <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-muted-foreground">
         <Sparkles className="h-5 w-5" /> Global Activity
       </h2>

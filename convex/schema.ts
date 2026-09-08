@@ -370,6 +370,29 @@ export default defineSchema({
         rawExport: v.optional(v.any()), // Compact optional raw snapshot
         lastSyncedAt: v.number(),
     }).index('by_characterId', ['characterId']),
+    voidObjectives: defineTable({
+        monthKey: v.string(), // "YYYY-MM" (e.g. "2026-03")
+        title: v.string(),
+        description: v.string(),
+        unit: v.optional(v.string()), // e.g. "bugs", "kills", "points"
+        tier1Goal: v.number(),
+        tier2Goal: v.number(),
+        tier3Goal: v.number(),
+        currentProgress: v.number(),
+        deadline: v.number(), // timestamp for end of the month
+    }).index('by_monthKey', ['monthKey']),
+    voidObjectiveContributions: defineTable({
+        monthKey: v.string(),
+        characterId: v.id('characters'),
+        amount: v.number(), // total contributed
+        rewardClaimed: v.optional(v.boolean()),
+        claimedTier: v.optional(v.number()), // 1, 2, 3 or 0 if none
+        claimedRewardGP: v.optional(v.number()),
+        claimedAt: v.optional(v.number()),
+        lastSessionId: v.optional(v.id('sessions')),
+    }).index('by_monthKey_character', ['monthKey', 'characterId'])
+      .index('by_monthKey', ['monthKey'])
+      .index('by_character', ['characterId']),
 })
 
 

@@ -156,3 +156,20 @@ export function getXPBarStyles(level: number, xp: number) {
         background: `linear-gradient(to right, ${currentStyle.backgroundColor}, ${nextStyle.backgroundColor})`
     };
 }
+
+/**
+ * Calculates Void Objective reward for a given tier (1, 2, or 3) and character level.
+ * Formula: base * (1.5)^level rounded to 2 significant digits.
+ * Base multiplier: Tier 1 = 6, Tier 2 = 9, Tier 3 = 12.
+ */
+export function calculateVoidReward(tier: number, level: number): number {
+  if (tier < 1 || tier > 3) return 0
+  const base = tier === 1 ? 6 : tier === 2 ? 9 : 12
+  const raw = base * Math.pow(1.5, Math.max(1, level))
+  // Round to 2 significant digits
+  if (raw === 0) return 0
+  const magnitude = Math.floor(Math.log10(Math.abs(raw)))
+  const factor = Math.pow(10, magnitude - 1)
+  return Math.round(raw / factor) * factor
+}
+

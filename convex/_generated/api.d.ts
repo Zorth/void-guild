@@ -23,6 +23,7 @@ import type * as quests from "../quests.js";
 import type * as roles from "../roles.js";
 import type * as sessions from "../sessions.js";
 import type * as users from "../users.js";
+import type * as voidObjectives from "../voidObjectives.js";
 import type * as worlds from "../worlds.js";
 
 import type {
@@ -47,6 +48,7 @@ declare const fullApi: ApiFromModules<{
   roles: typeof roles;
   sessions: typeof sessions;
   users: typeof users;
+  voidObjectives: typeof voidObjectives;
   worlds: typeof worlds;
 }>;
 
