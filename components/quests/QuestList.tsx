@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { 
   Scroll, Sword, Trophy, User, Hash, Plus, Pencil, Trash2, 
-  ChevronDown, ChevronUp, MapPin, Tag
+  ChevronDown, ChevronUp, MapPin, Tag, Crown, Check, X, Sparkles
 } from 'lucide-react'
 import { useAuth } from '@clerk/nextjs'
 import QuestDialog from './QuestDialog'
@@ -28,8 +28,16 @@ interface QuestListProps {
 export default function QuestList({ worldId, worldOwner, isSidebar = false, filters }: QuestListProps) {
   const { userId } = useAuth()
   const questsRaw = useQuery(api.quests.getQuestsByWorld, { worldId })
+  const suggestedQuests = useQuery(
+    api.quests.getSuggestedQuestsByWorld,
+    worldId ? { worldId } : 'skip'
+  )
   const isAdmin = useQuery(api.sessions.isAdminQuery)
   const deleteQuest = useMutation(api.quests.deleteQuest)
+  const approveSuggestedQuest = useMutation(api.quests.approveSuggestedQuest)
+  const rejectSuggestedQuest = useMutation(api.quests.rejectSuggestedQuest)
+
+  const isWorldOwner = userId === worldOwner || !!isAdmin
 
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingQuest, setEditingQuest] = useState<any>(null)
@@ -53,6 +61,24 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
         return false;
     });
   }, [questsRaw, filters]);
+
+  const handleApproveSuggestion = async (questId: Id<'quests'>) => {
+    try {
+      await approveSuggestedQuest({ questId })
+      toast.success('Suggested quest approved! Now posted to the world board and paid in full by The Void.')
+    } catch (error) {
+      toast.error('Failed to approve quest')
+    }
+  }
+
+  const handleRejectSuggestion = async (questId: Id<'quests'>) => {
+    try {
+      await rejectSuggestedQuest({ questId })
+      toast.success('Suggested quest rejected.')
+    } catch (error) {
+      toast.error('Failed to reject quest')
+    }
+  }
   const handleCreate = () => {
     setEditingQuest(null)
     setIsDialogOpen(true)
@@ -92,6 +118,67 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
             </Button>
         )}
       </div>
+
+      {/* Suggested Quests from Guildmasters (Visible to World Owner and Admin) */}
+      {isWorldOwner && suggestedQuests && suggestedQuests.length > 0 && (
+        <Card className="border-amber-500/40 bg-gradient-to-br from-amber-950/30 to-purple-950/20 overflow-hidden">
+          <CardHeader className="py-2.5 px-3 border-b border-amber-500/20 bg-amber-500/10 flex flex-row items-center justify-between">
+            <CardTitle className="text-xs font-bold flex items-center gap-1.5 text-amber-300">
+              <Crown className="h-4 w-4 text-amber-400" />
+              Guildmaster Suggestions ({suggestedQuests.length})
+            </CardTitle>
+            <span className="text-[10px] bg-amber-400/20 text-amber-300 font-semibold px-2 py-0.5 rounded">
+              Paid in Full by The Void if Approved
+            </span>
+          </CardHeader>
+          <CardContent className="p-3 space-y-2.5">
+            {suggestedQuests.map((sug: any) => (
+              <div
+                key={sug._id}
+                className="p-2.5 rounded-lg border border-amber-500/30 bg-background/50 space-y-2 text-xs"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h5 className="font-bold text-foreground text-sm">{sug.name}</h5>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Suggested by Guildmaster: <strong className="text-amber-300">{sug.characterName || 'Guildmaster'}</strong>
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      size="sm"
+                      onClick={() => handleApproveSuggestion(sug._id)}
+                      className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold gap-1 px-2.5"
+                    >
+                      <Check className="h-3.5 w-3.5" /> Approve (Free)
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleRejectSuggestion(sug._id)}
+                      className="h-7 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 px-2"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+
+                {sug.description && (
+                  <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2">
+                    {sug.description}
+                  </p>
+                )}
+
+                {sug.reward && (
+                  <div className="text-[11px] text-amber-300 font-medium">
+                    Proposed Reward: <strong className="font-mono">{sug.reward}</strong>
+                  </div>
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {quests.length === 0 ? (
         <Card className="border-dashed bg-muted/20">

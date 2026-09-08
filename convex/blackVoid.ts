@@ -693,11 +693,39 @@ export const getCharacterTransactions = query({
       )
     }
 
+    // 5. Quests issued by this character completed in sessions: 'To be Paid' to adventurers
+    // The character pays the agreed reward (or net cost after sponsorship reimbursement)
+    const completedQuestsToPay = await Promise.all(
+      characterQuests
+        .filter((q) => q.isCompleted)
+        .map(async (q) => {
+          let worldName = 'The Void'
+          if (q.worldId) {
+            const w = await ctx.db.get(q.worldId)
+            if (w) worldName = w.name
+          }
+          const actualToPay = q.netCost || q.reward || 'Custom reward'
+          return {
+            _id: q._id,
+            name: q.name,
+            worldName,
+            reward: q.reward || 'Custom',
+            actualToPay,
+            isSponsored: !!q.isSponsored,
+            sponsoredAmount: q.sponsoredAmount,
+            netCost: q.netCost,
+            completedAt: q.completedAt || q._creationTime,
+            paymentClaimed: !!q.paymentClaimed,
+          }
+        })
+    )
+
     return {
       createdItems: itemsSoldOrActive,
       wonItems: wonListings,
       servicesOffered,
       sponsoredQuestReimbursements: completedSponsoredQuests,
+      completedQuestsToPay,
       guildmasterAreaGains,
       isGuildmaster,
     }

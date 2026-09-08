@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
-import { Scroll, Sword, Trophy, Globe, Sparkles, AlertCircle, Coins, ArrowRight } from 'lucide-react'
+import { Scroll, Sword, Trophy, Globe, Sparkles, AlertCircle, Coins, ArrowRight, Crown, Send } from 'lucide-react'
 import { CharacterRankIcon } from '@/lib/utils'
 
 interface CharacterQuestDialogProps {
@@ -155,6 +155,54 @@ export default function CharacterQuestDialog({
     } catch (error) {
       console.error(error)
       toast.error(error instanceof Error ? error.message : 'Failed to post quest')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleSuggest = async (e: React.MouseEvent) => {
+    e.preventDefault()
+
+    if (!characterId) {
+      toast.error('Please select an active character first.')
+      return
+    }
+
+    if (!worldId) {
+      toast.error('Suggesting a quest requires selecting a Target World.')
+      return
+    }
+
+    if (!name.trim()) {
+      toast.error('Please provide a Quest Title.')
+      return
+    }
+
+    setIsSubmitting(true)
+
+    const tags = tagsString
+      .split(',')
+      .map((t) => t.trim())
+      .filter((t) => t !== '')
+
+    try {
+      await createQuest({
+        name,
+        worldId: worldId as Id<'worlds'>,
+        characterId,
+        levelPF,
+        levelDnD,
+        description,
+        questgiver: characterName ? `Guildmaster: ${characterName}` : 'Guildmaster Suggestion',
+        reward,
+        tags,
+        isSuggested: true,
+      })
+      toast.success('Quest suggested to the World Owner! Once approved, it is paid in full by The Void (free of charge).')
+      onClose()
+    } catch (error) {
+      console.error(error)
+      toast.error(error instanceof Error ? error.message : 'Failed to suggest quest')
     } finally {
       setIsSubmitting(false)
     }
@@ -396,17 +444,32 @@ export default function CharacterQuestDialog({
             />
           </div>
 
-          <DialogFooter className="pt-2">
+          <DialogFooter className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
             <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting || !characterId || !worldId}
-              className="bg-purple-600 hover:bg-purple-700 font-semibold"
-            >
-              {isSubmitting ? 'Posting...' : 'Issue Character Quest'}
-            </Button>
+            <div className="flex items-center gap-2 justify-end">
+              {characterRank === 'guildmaster' && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleSuggest}
+                  disabled={isSubmitting || !characterId || !worldId}
+                  className="border-amber-500/40 text-amber-300 hover:bg-amber-950/40 font-semibold gap-1.5"
+                  title="Suggest this quest to the World Owner. If approved, it is paid in full by The Void (free of charge to you)."
+                >
+                  <Crown className="h-4 w-4 text-amber-400" />
+                  Suggest to World Owner (Free)
+                </Button>
+              )}
+              <Button
+                type="submit"
+                disabled={isSubmitting || !characterId || !worldId}
+                className="bg-purple-600 hover:bg-purple-700 font-semibold"
+              >
+                {isSubmitting ? 'Posting...' : 'Issue Character Quest'}
+              </Button>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>

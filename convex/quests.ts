@@ -12,6 +12,7 @@ export const createQuest = mutation({
     reward: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
     characterId: v.optional(v.id('characters')),
+    isSuggested: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
@@ -24,6 +25,9 @@ export const createQuest = mutation({
     let sponsoredAmount: string | undefined = undefined
     let netCost: string | undefined = undefined
 
+    const isSuggested = args.isSuggested ?? false
+    let suggestionStatus: 'pending' | 'approved' | 'rejected' | undefined = undefined
+
     if (args.characterId) {
       const character = await ctx.db.get(args.characterId)
       if (!character || character.userId !== user.subject) {
@@ -34,34 +38,42 @@ export const createQuest = mutation({
       }
 
       characterRank = character.rank || 'none'
-      const questLevel = args.levelPF ?? args.levelDnD ?? 0
-      const maxSponsoredLevel = Math.max(0, (character.lvl || 1) - 4)
 
-      // Journeyman & Guildmaster perk: quests up to level - 4 get 1/5th (20%) sponsored by Guild of the Void
-      if ((characterRank === 'journeyman' || characterRank === 'guildmaster') && questLevel <= maxSponsoredLevel) {
-        isSponsored = true
-        if (args.reward) {
-          const rewardClean = args.reward.replace(/,/g, '')
-          const match = rewardClean.match(/(\d+(?:\.\d+)?)\s*(sp|gp|cp|pp|gold|silver|copper|platinum)?/i)
-          if (match) {
-            const num = parseFloat(match[1])
-            const unit = match[2] ? match[2].toUpperCase() : 'GP'
-            const sponsorVal = Math.round(num / 5)
-            const netVal = num - sponsorVal
-            sponsoredAmount = `${sponsorVal.toLocaleString()} ${unit}`
-            netCost = `${netVal.toLocaleString()} ${unit}`
+      if (isSuggested) {
+        if (characterRank !== 'guildmaster') {
+          throw new Error('Only Guildmasters can suggest quests to worlds/the Void Council.')
+        }
+        suggestionStatus = 'pending'
+      } else {
+        const questLevel = args.levelPF ?? args.levelDnD ?? 0
+        const maxSponsoredLevel = Math.max(0, (character.lvl || 1) - 4)
+
+        // Journeyman & Guildmaster perk: quests up to level - 4 get 1/5th (20%) sponsored by Guild of the Void
+        if ((characterRank === 'journeyman' || characterRank === 'guildmaster') && questLevel <= maxSponsoredLevel) {
+          isSponsored = true
+          if (args.reward) {
+            const rewardClean = args.reward.replace(/,/g, '')
+            const match = rewardClean.match(/(\d+(?:\.\d+)?)\s*(sp|gp|cp|pp|gold|silver|copper|platinum)?/i)
+            if (match) {
+              const num = parseFloat(match[1])
+              const unit = match[2] ? match[2].toUpperCase() : 'GP'
+              const sponsorVal = Math.round(num / 5)
+              const netVal = num - sponsorVal
+              sponsoredAmount = `${sponsorVal.toLocaleString()} ${unit}`
+              netCost = `${netVal.toLocaleString()} ${unit}`
+            } else {
+              sponsoredAmount = '20% (1/5th) reimbursed by Guild'
+              netCost = '80% (4/5ths) net cost'
+            }
           } else {
             sponsoredAmount = '20% (1/5th) reimbursed by Guild'
             netCost = '80% (4/5ths) net cost'
           }
-        } else {
-          sponsoredAmount = '20% (1/5th) reimbursed by Guild'
-          netCost = '80% (4/5ths) net cost'
         }
       }
     }
 
-    const { levelPF, levelDnD, ...otherFields } = args
+    const { levelPF, levelDnD, isSuggested: _sug, ...otherFields } = args
 
     const questId = await ctx.db.insert('quests', {
       ...otherFields,
@@ -72,7 +84,10 @@ export const createQuest = mutation({
       isSponsored,
       sponsoredAmount,
       netCost,
+      isSuggested,
+      suggestionStatus,
       reimbursementClaimed: false,
+      paymentClaimed: false,
       isCompleted: false,
     })
 
@@ -195,6 +210,126 @@ export const toggleQuestReimbursementClaimed = mutation({
   },
 })
 
+export const toggleQuestPaymentClaimed = mutation({
+  args: {
+    questId: v.id('quests'),
+    characterId: v.id('characters'),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    const quest = await ctx.db.get(args.questId)
+    if (!quest) throw new Error('Quest not found')
+
+    const character = await ctx.db.get(args.characterId)
+    if (!character || character.userId !== user.subject || quest.characterId !== args.characterId) {
+      throw new Error('You do not own this quest.')
+    }
+
+    await ctx.db.patch(args.questId, {
+      paymentClaimed: !quest.paymentClaimed,
+    })
+  },
+})
+
+export const approveSuggestedQuest = mutation({
+  args: {
+    questId: v.id('quests'),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    const quest = await ctx.db.get(args.questId)
+    if (!quest) throw new Error('Quest not found')
+    if (!quest.worldId) throw new Error('Quest has no associated world')
+
+    const world = await ctx.db.get(quest.worldId)
+    const isAdminUser = await isAdmin(ctx)
+    if (!world || (world.owner !== user.subject && !isAdminUser)) {
+      throw new Error('Only the world owner or an admin can approve suggested quests.')
+    }
+
+    // When approved, it becomes an official world quest paid in full by The Void (free of charge to character/poster)
+    await ctx.db.patch(args.questId, {
+      suggestionStatus: 'approved',
+      isSuggested: false, // Now an official active quest on the world board
+      isSponsored: true,
+      sponsoredAmount: quest.reward ? `${quest.reward} (100% Paid in Full by The Void)` : 'Paid in Full by The Void',
+      netCost: '0 GP (Free of charge)',
+    })
+  },
+})
+
+export const rejectSuggestedQuest = mutation({
+  args: {
+    questId: v.id('quests'),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    const quest = await ctx.db.get(args.questId)
+    if (!quest) throw new Error('Quest not found')
+    if (!quest.worldId) throw new Error('Quest has no associated world')
+
+    const world = await ctx.db.get(quest.worldId)
+    const isAdminUser = await isAdmin(ctx)
+    if (!world || (world.owner !== user.subject && !isAdminUser)) {
+      throw new Error('Only the world owner or an admin can reject suggested quests.')
+    }
+
+    await ctx.db.patch(args.questId, {
+      suggestionStatus: 'rejected',
+    })
+  },
+})
+
+export const getSuggestedQuestsByWorld = query({
+  args: { worldId: v.id('worlds') },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) return []
+
+    const world = await ctx.db.get(args.worldId)
+    const isAdminUser = await isAdmin(ctx)
+    const isWorldOwner = world?.owner === user.subject
+
+    // Only world owner or admin can view pending suggestions
+    if (!isWorldOwner && !isAdminUser) return []
+
+    const worldQuests = await ctx.db
+      .query('quests')
+      .withIndex('by_worldId_isSuggested', (q) => q.eq('worldId', args.worldId).eq('isSuggested', true))
+      .collect()
+
+    const pendingSuggestions = worldQuests.filter(q => q.suggestionStatus === 'pending' && !q.isCompleted)
+
+    return await Promise.all(
+      pendingSuggestions.map(async (q) => {
+        let charName = ''
+        let charRank = 'guildmaster'
+        let charLvl = 14
+        if (q.characterId) {
+          const c = await ctx.db.get(q.characterId)
+          if (c) {
+            charName = c.name
+            if (c.rank) charRank = c.rank
+            if (c.lvl) charLvl = c.lvl
+          }
+        }
+        return {
+          ...q,
+          characterName: charName,
+          characterRank: charRank,
+          characterLevel: charLvl,
+        }
+      })
+    )
+  },
+})
+
 export const deleteQuest = mutation({
   args: {
     questId: v.id('quests'),
@@ -240,7 +375,8 @@ export const getQuestsByWorld = query({
         .withIndex('by_worldId', (q) => q.eq('worldId', undefined))
         .collect()
 
-    const activeQuests = [...worldQuests, ...worldlessQuests].filter(q => !q.isCompleted)
+    // Exclude completed quests and pending suggestions (pending suggestions are reviewed by world owner first)
+    const activeQuests = [...worldQuests, ...worldlessQuests].filter(q => !q.isCompleted && !q.isSuggested)
     
     return activeQuests.sort((a, b) => {
         const aLvl = a.levelPF ?? a.levelDnD ?? a.level ?? 0;

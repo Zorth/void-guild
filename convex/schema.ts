@@ -116,12 +116,16 @@ export default defineSchema({
         isSponsored: v.optional(v.boolean()), // 20% (1/5th) reimbursed by Guild of the Void
         sponsoredAmount: v.optional(v.string()), // Formatted reimbursement string e.g. "1,000 SP" or "100 GP"
         netCost: v.optional(v.string()), // Actual out-of-pocket cost for the issuer e.g. "4,000 SP" or "80 GP"
-        reimbursementClaimed: v.optional(v.boolean()), // Claim checkmark for character sheet log
+        reimbursementClaimed: v.optional(v.boolean()), // Claim checkmark for reimbursement payback in character sheet log
+        paymentClaimed: v.optional(v.boolean()), // Claim checkmark for paying out adventurers ('to be paid') in character sheet log
+        isSuggested: v.optional(v.boolean()), // True if suggested to a world owner by a Guildmaster
+        suggestionStatus: v.optional(v.union(v.literal('pending'), v.literal('approved'), v.literal('rejected'))), // Approval status
         isCompleted: v.optional(v.boolean()),
         completedSessionId: v.optional(v.id("sessions")),
         completedAt: v.optional(v.number()),
     }).index('by_worldId', ['worldId'])
-      .index('by_characterId', ['characterId']),
+      .index('by_characterId', ['characterId'])
+      .index('by_worldId_isSuggested', ['worldId', 'isSuggested']),
     sessionStates: defineTable({
         sessionId: v.id('sessions'),
         initiative: v.optional(v.array(v.object({

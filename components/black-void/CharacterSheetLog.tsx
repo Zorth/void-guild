@@ -19,6 +19,7 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
   const toggleSellerClaimed = useMutation(api.blackVoid.toggleSellerClaimed)
   const toggleBuyerClaimed = useMutation(api.blackVoid.toggleBuyerClaimed)
   const toggleQuestClaimed = useMutation(api.quests.toggleQuestReimbursementClaimed)
+  const togglePaymentClaimed = useMutation(api.quests.toggleQuestPaymentClaimed)
 
   if (!characterId) {
     return (
@@ -42,6 +43,7 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
     wonItems = [],
     servicesOffered = [],
     sponsoredQuestReimbursements = [],
+    completedQuestsToPay = [],
     guildmasterAreaGains = [],
     isGuildmaster = false,
   } = (transactions as any) || {}
@@ -70,6 +72,15 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
       toast.success('Updated quest reimbursement log state!')
     } catch (error) {
       toast.error('Failed to update quest reimbursement status')
+    }
+  }
+
+  const handleTogglePaymentClaimed = async (questId: Id<'quests'>) => {
+    try {
+      await togglePaymentClaimed({ questId, characterId })
+      toast.success('Updated quest payout status!')
+    } catch (error) {
+      toast.error('Failed to update quest payout status')
     }
   }
 
@@ -300,7 +311,87 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
         </CardContent>
       </Card>
 
-      {/* 4. Guildmaster Regional Quest Cuts (Level 14+ Guildmaster Perk) */}
+      {/* 4. Quests Completed: To Be Paid (Party Reward Expenses) */}
+      <Card className="border-purple-500/30 bg-card/60">
+        <CardHeader className="pb-3 border-b border-border/20">
+          <CardTitle className="text-base font-bold flex items-center justify-between text-purple-300">
+            <span className="flex items-center gap-2">
+              <Scroll className="h-5 w-5 text-amber-400" />
+              Completed Quests: To Be Paid to Adventurers
+            </span>
+            <span className="text-xs text-muted-foreground font-normal">
+              Actual Out-of-Pocket Expense
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-4">
+          {completedQuestsToPay.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-4 text-center">
+              No completed quests issued by this character requiring payment.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {completedQuestsToPay.map((quest: any) => {
+                const isClaimed = !!quest.paymentClaimed
+
+                return (
+                  <div
+                    key={quest._id}
+                    className={cn(
+                      "p-3 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all",
+                      isClaimed
+                        ? "bg-emerald-950/20 border-emerald-500/30"
+                        : "bg-amber-950/20 border-amber-500/30"
+                    )}
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm text-foreground">{quest.name}</span>
+                        <span className="text-[10px] uppercase font-bold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded">
+                          To Be Paid
+                        </span>
+                        {quest.isSponsored && (
+                          <span className="text-[10px] uppercase font-bold bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded">
+                            20% Guild Reimbursed
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        World: <strong className="text-blue-300">{quest.worldName}</strong> | Agreed Total Reward:{' '}
+                        <span className="text-amber-300 font-semibold">{quest.reward}</span>
+                      </p>
+                      <p className="text-xs text-amber-300 font-mono font-medium">
+                        Actual Price Character Has to Pay:{' '}
+                        <strong className="text-white text-sm">{quest.actualToPay}</strong>
+                        {quest.isSponsored && (
+                          <span className="text-muted-foreground text-[11px] ml-1.5 font-normal">
+                            (after 20% Guild payback of {quest.sponsoredAmount})
+                          </span>
+                        )}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                      <label className="flex items-center gap-2 cursor-pointer bg-background/60 hover:bg-background px-3 py-1.5 rounded-md border border-purple-500/30 text-xs">
+                        <Checkbox
+                          checked={isClaimed}
+                          onCheckedChange={() => handleTogglePaymentClaimed(quest._id)}
+                          className="border-purple-400 data-[state=checked]:bg-emerald-600"
+                        />
+                        <span className={cn("font-medium", isClaimed ? "text-emerald-300" : "text-muted-foreground")}>
+                          {isClaimed ? 'Paid & Added to Sheet ✓' : 'Add Expense to Sheet'}
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 5. Guildmaster Regional Quest Cuts (Level 14+ Guildmaster Perk) */}
       {isGuildmaster && (
         <Card className="border-amber-500/30 bg-card/60">
           <CardHeader className="pb-3 border-b border-border/20">
