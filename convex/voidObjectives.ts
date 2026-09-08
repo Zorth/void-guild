@@ -4,20 +4,46 @@ import { Doc, Id } from './_generated/dataModel'
 import { isAdmin } from './roles'
 
 /**
- * Helper to get the YYYY-MM key and deadline for a given date or offset month.
+ * Helper to get the YYYY-MM key and deadline for a given date or offset month in CE(S)T (Europe/Paris) time.
  * Can take an explicit timestamp to avoid unparameterized clock reads in queries.
  */
 export function getMonthInfo(offsetMonths: number = 0, timestamp?: number) {
   const d = new Date(timestamp ?? Date.now())
-  d.setDate(1)
-  d.setMonth(d.getMonth() + offsetMonths)
-  const year = d.getFullYear()
-  const month = d.getMonth() + 1
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Paris',
+    year: 'numeric',
+    month: 'numeric',
+  }).formatToParts(d)
+
+  let year = parseInt(parts.find((p) => p.type === 'year')!.value, 10)
+  let month = parseInt(parts.find((p) => p.type === 'month')!.value, 10)
+
+  month += offsetMonths
+  while (month > 12) {
+    month -= 12
+    year += 1
+  }
+  while (month < 1) {
+    month += 12
+    year -= 1
+  }
+
   const monthKey = `${year}-${String(month).padStart(2, '0')}`
-  
-  // End of month is 23:59:59.999 of the last day
-  const nextMonth = new Date(year, month, 0, 23, 59, 59, 999)
-  const deadline = nextMonth.getTime()
+
+  // Last day of month
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate()
+
+  // Determine CET/CEST offset at end of this month
+  const probe = new Date(Date.UTC(year, month - 1, lastDay, 20, 0, 0))
+  const tzParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Paris',
+    timeZoneName: 'shortOffset',
+  }).formatToParts(probe)
+  const offsetName = tzParts.find((p) => p.type === 'timeZoneName')?.value
+  const tzOffset = offsetName === 'GMT+2' ? '+02:00' : '+01:00'
+
+  const deadlineIso = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}T23:59:59.999${tzOffset}`
+  const deadline = Date.parse(deadlineIso)
 
   return { monthKey, year, month, deadline }
 }
@@ -162,7 +188,17 @@ export const upsertObjective = mutation({
     const [yStr, mStr] = args.monthKey.split('-')
     const year = parseInt(yStr, 10)
     const month = parseInt(mStr, 10)
-    const deadline = new Date(year, month, 0, 23, 59, 59, 999).getTime()
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate()
+    const probe = new Date(Date.UTC(year, month - 1, lastDay, 20, 0, 0))
+    const tzParts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Europe/Paris',
+      timeZoneName: 'shortOffset',
+    }).formatToParts(probe)
+    const offsetName = tzParts.find((p) => p.type === 'timeZoneName')?.value
+    const tzOffset = offsetName === 'GMT+2' ? '+02:00' : '+01:00'
+    const deadline = Date.parse(
+      `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}T23:59:59.999${tzOffset}`
+    )
 
     if (existing) {
       // Diff validation to eliminate zero-change write transactions
