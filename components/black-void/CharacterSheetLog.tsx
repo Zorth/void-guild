@@ -6,7 +6,7 @@ import { Id } from '@/convex/_generated/dataModel'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Coins, CheckCircle2, PackageCheck, Receipt, Hammer, AlertCircle } from 'lucide-react'
+import { Coins, CheckCircle2, PackageCheck, Receipt, Hammer, AlertCircle, Sparkles, Crown, Scroll } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
@@ -18,6 +18,7 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
   const transactions = useQuery(api.blackVoid.getCharacterTransactions, { characterId: characterId || undefined })
   const toggleSellerClaimed = useMutation(api.blackVoid.toggleSellerClaimed)
   const toggleBuyerClaimed = useMutation(api.blackVoid.toggleBuyerClaimed)
+  const toggleQuestClaimed = useMutation(api.quests.toggleQuestReimbursementClaimed)
 
   if (!characterId) {
     return (
@@ -36,7 +37,14 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
     return <div className="p-8 text-center text-muted-foreground animate-pulse">Loading transaction logs...</div>
   }
 
-  const { createdItems = [], wonItems = [], servicesOffered = [] } = transactions || {}
+  const {
+    createdItems = [],
+    wonItems = [],
+    servicesOffered = [],
+    sponsoredQuestReimbursements = [],
+    guildmasterAreaGains = [],
+    isGuildmaster = false,
+  } = (transactions as any) || {}
 
   const handleToggleSellerClaimed = async (listingId: Id<'blackVoidListings'>) => {
     try {
@@ -53,6 +61,15 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
       toast.success('Updated character sheet log state!')
     } catch (error) {
       toast.error('Failed to update character sheet status')
+    }
+  }
+
+  const handleToggleQuestClaimed = async (questId: Id<'quests'>) => {
+    try {
+      await toggleQuestClaimed({ questId, characterId })
+      toast.success('Updated quest reimbursement log state!')
+    } catch (error) {
+      toast.error('Failed to update quest reimbursement status')
     }
   }
 
@@ -78,7 +95,7 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
             </p>
           ) : (
             <div className="space-y-3">
-              {createdItems.map((item) => {
+              {createdItems.map((item: any) => {
                 const isSold = item.status === 'completed' && item.winningAmount
                 const isClaimed = !!item.sellerClaimed
 
@@ -161,7 +178,7 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
             </p>
           ) : (
             <div className="space-y-3">
-              {wonItems.map((item) => {
+              {wonItems.map((item: any) => {
                 const isClaimed = !!item.buyerClaimed
 
                 return (
@@ -207,7 +224,147 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
         </CardContent>
       </Card>
 
-      {/* 3. Crafting Services Offered */}
+      {/* 3. Guild Sponsorship Reimbursements (Journeyman / Guildmaster Perk) */}
+      <Card className="border-purple-500/30 bg-card/60">
+        <CardHeader className="pb-3 border-b border-border/20">
+          <CardTitle className="text-base font-bold flex items-center justify-between text-purple-300">
+            <span className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-purple-400" />
+              Guild Sponsorship Reimbursements (20% Perk)
+            </span>
+            <span className="text-xs text-muted-foreground font-normal">
+              1/5th Cost Sponsored by The Void
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-4">
+          {sponsoredQuestReimbursements.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-4 text-center">
+              No completed sponsored character quests to reimburse yet. (Quests up to Level - 4 issued by Journeymen / Guildmasters are sponsored 20% by the Guild).
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {sponsoredQuestReimbursements.map((quest: any) => {
+                const isClaimed = !!quest.reimbursementClaimed
+
+                return (
+                  <div
+                    key={quest._id}
+                    className={cn(
+                      "p-3 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all",
+                      isClaimed
+                        ? "bg-emerald-950/20 border-emerald-500/30"
+                        : "bg-purple-950/20 border-purple-500/30"
+                    )}
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm text-foreground">{quest.name}</span>
+                        <span className="text-[10px] uppercase font-bold bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded">
+                          20% Reimbursed
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        World: <strong className="text-blue-300">{quest.worldName}</strong> | Total Reward Offered:{' '}
+                        <span className="text-amber-300 font-semibold">{quest.reward || 'Custom'}</span>
+                      </p>
+                      <p className="text-xs text-emerald-300 font-mono font-medium">
+                        Guild Reimbursement to Collect: <strong>{quest.sponsoredAmount}</strong>
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                      <label className="flex items-center gap-2 cursor-pointer bg-background/60 hover:bg-background px-3 py-1.5 rounded-md border border-purple-500/30 text-xs">
+                        <Checkbox
+                          checked={isClaimed}
+                          onCheckedChange={() => handleToggleQuestClaimed(quest._id)}
+                          className="border-purple-400 data-[state=checked]:bg-emerald-600"
+                        />
+                        <span className={cn("font-medium", isClaimed ? "text-emerald-300" : "text-muted-foreground")}>
+                          {isClaimed ? 'Added to Character Sheet ✓' : 'Add to Character Sheet'}
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 4. Guildmaster Regional Quest Cuts (Level 14+ Guildmaster Perk) */}
+      {isGuildmaster && (
+        <Card className="border-amber-500/30 bg-card/60">
+          <CardHeader className="pb-3 border-b border-border/20">
+            <CardTitle className="text-base font-bold flex items-center justify-between text-amber-300">
+              <span className="flex items-center gap-2">
+                <Crown className="h-5 w-5 text-amber-400" />
+                Guildmaster Regional Quest Gains (1/5th of all Area Quests)
+              </span>
+              <span className="text-xs text-muted-foreground font-normal">
+                Paid by Guild of the Void
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            {guildmasterAreaGains.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-4 text-center">
+                No completed regional quests up to Level - 4 found yet.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {guildmasterAreaGains.map((quest: any) => {
+                  const isClaimed = !!quest.reimbursementClaimed
+
+                  return (
+                    <div
+                      key={quest._id}
+                      className={cn(
+                        "p-3 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all",
+                        isClaimed
+                          ? "bg-emerald-950/20 border-emerald-500/30"
+                          : "bg-amber-950/20 border-amber-500/30"
+                      )}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-sm text-foreground">{quest.name}</span>
+                          <span className="text-[10px] uppercase font-bold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded">
+                            Lvl {quest.level} Area Quest
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Region: <strong className="text-blue-300">{quest.worldName}</strong> | Quest Gains:{' '}
+                          <span className="text-amber-300 font-semibold">{quest.reward}</span>
+                        </p>
+                        <p className="text-xs text-amber-300 font-mono font-medium">
+                          Guildmaster 1/5th Cut: <strong>{quest.guildmasterCut}</strong>
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                        <label className="flex items-center gap-2 cursor-pointer bg-background/60 hover:bg-background px-3 py-1.5 rounded-md border border-amber-500/30 text-xs">
+                          <Checkbox
+                            checked={isClaimed}
+                            onCheckedChange={() => handleToggleQuestClaimed(quest._id)}
+                            className="border-amber-400 data-[state=checked]:bg-emerald-600"
+                          />
+                          <span className={cn("font-medium", isClaimed ? "text-emerald-300" : "text-muted-foreground")}>
+                            {isClaimed ? 'Added to Character Sheet ✓' : 'Add to Character Sheet'}
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 5. Crafting Services Offered */}
       {servicesOffered.length > 0 && (
         <Card className="border-amber-500/30 bg-card/60">
           <CardHeader className="pb-3 border-b border-border/20">
@@ -218,7 +375,7 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
           </CardHeader>
           <CardContent className="pt-4">
             <div className="space-y-3">
-              {servicesOffered.map((svc) => (
+              {servicesOffered.map((svc: any) => (
                 <div
                   key={svc._id}
                   className="p-3 rounded-lg border bg-muted/20 border-border/30 flex items-center justify-between gap-3"

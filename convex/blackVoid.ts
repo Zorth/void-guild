@@ -597,10 +597,108 @@ export const getCharacterTransactions = query({
     const itemsSoldOrActive = createdListings.filter((l) => l.type === 'item')
     const servicesOffered = createdListings.filter((l) => l.type === 'service')
 
+    // 3. Sponsored Character Quests issued by this character that have completed
+    const characterQuests = await ctx.db
+      .query('quests')
+      .withIndex('by_characterId', (q) => q.eq('characterId', args.characterId!))
+      .collect()
+
+    const completedSponsoredQuests = await Promise.all(
+      characterQuests
+        .filter((q) => q.isCompleted && q.isSponsored)
+        .map(async (q) => {
+          let worldName = 'The Void'
+          if (q.worldId) {
+            const w = await ctx.db.get(q.worldId)
+            if (w) worldName = w.name
+          }
+          return {
+            _id: q._id,
+            name: q.name,
+            reward: q.reward,
+            sponsoredAmount: q.sponsoredAmount || '20% of reward',
+            worldName,
+            completedAt: q.completedAt || q._creationTime,
+            reimbursementClaimed: !!q.reimbursementClaimed,
+          }
+        })
+    )
+
+    // 4. Guildmaster Area Quest Perks
+    // "1/5th of the gains of all quests (up to your level - 4) completed in this area are paid to you by the Guild."
+    const character = await ctx.db.get(args.characterId)
+    const isGuildmaster = character?.rank === 'guildmaster'
+    const charLvl = character?.lvl || 1
+    const maxGMLevel = Math.max(0, charLvl - 4)
+
+    let guildmasterAreaGains: Array<{
+      _id: Id<'quests'>
+      name: string
+      worldName: string
+      level: number
+      reward: string
+      guildmasterCut: string
+      completedAt: number
+      reimbursementClaimed: boolean
+    }> = []
+
+    if (isGuildmaster) {
+      // Find all completed quests in worlds
+      const allCompletedQuests = await ctx.db
+        .query('quests')
+        .collect()
+
+      const eligibleGMQuests = allCompletedQuests.filter((q) => {
+        if (!q.isCompleted || !q.worldId) return false
+        // Exclude quests issued by this character itself (already covered under sponsored reimbursement)
+        if (q.characterId === args.characterId) return false
+        const qLvl = q.levelPF ?? q.levelDnD ?? q.level ?? 0
+        return qLvl <= maxGMLevel
+      })
+
+      guildmasterAreaGains = await Promise.all(
+        eligibleGMQuests.map(async (q) => {
+          let worldName = 'The Void'
+          if (q.worldId) {
+            const w = await ctx.db.get(q.worldId)
+            if (w) worldName = w.name
+          }
+
+          let guildmasterCut = '1/5th (20%) of Quest Gains'
+          if (q.reward) {
+            const rewardClean = q.reward.replace(/,/g, '')
+            const match = rewardClean.match(/(\d+(?:\.\d+)?)\s*(sp|gp|cp|pp|gold|silver|copper|platinum)?/i)
+            if (match) {
+              const num = parseFloat(match[1])
+              const unit = match[2] ? match[2].toUpperCase() : 'GP'
+              const cutVal = Math.round(num / 5)
+              guildmasterCut = `${cutVal.toLocaleString()} ${unit}`
+            }
+          }
+
+          const qLvl = q.levelPF ?? q.levelDnD ?? q.level ?? 0
+
+          return {
+            _id: q._id,
+            name: q.name,
+            worldName,
+            level: qLvl,
+            reward: q.reward || 'None stated',
+            guildmasterCut,
+            completedAt: q.completedAt || q._creationTime,
+            reimbursementClaimed: !!q.reimbursementClaimed,
+          }
+        })
+      )
+    }
+
     return {
       createdItems: itemsSoldOrActive,
       wonItems: wonListings,
       servicesOffered,
+      sponsoredQuestReimbursements: completedSponsoredQuests,
+      guildmasterAreaGains,
+      isGuildmaster,
     }
   },
 })

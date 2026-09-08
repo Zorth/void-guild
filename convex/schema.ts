@@ -112,6 +112,10 @@ export default defineSchema({
         tags: v.optional(v.array(v.string())),
         owner: v.string(), // Clerk userId of the creator
         characterId: v.optional(v.id("characters")), // Character owner for character quests
+        characterRank: v.optional(v.string()), // 'none' | 'journeyman' | 'guildmaster' at time of creation
+        isSponsored: v.optional(v.boolean()), // 20% (1/5th) reimbursed by Guild of the Void
+        sponsoredAmount: v.optional(v.string()), // Formatted reimbursement string e.g. "1,000 SP" or "100 GP"
+        reimbursementClaimed: v.optional(v.boolean()), // Claim checkmark for character sheet log
         isCompleted: v.optional(v.boolean()),
         completedSessionId: v.optional(v.id("sessions")),
         completedAt: v.optional(v.number()),

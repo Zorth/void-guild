@@ -33,7 +33,7 @@ import {
   ChevronLeft,
 } from 'lucide-react'
 import Link from 'next/link'
-import { cn } from '@/lib/utils'
+import { cn, CharacterRankIcon } from '@/lib/utils'
 import { motion } from 'framer-motion'
 
 export default function BlackVoidPage() {
@@ -495,19 +495,52 @@ export default function BlackVoidPage() {
                   )}
                 >
                   <div className="flex justify-between items-start gap-2">
-                    <div>
-                      <div className="flex items-center gap-2">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-bold text-base text-foreground">{q.name}</h3>
                         {q.isCompleted && (
                           <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
                             <CheckCircle2 className="h-3 w-3" /> Completed in Session
                           </span>
                         )}
+                        {q.isSponsored && (
+                          <span className="bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <Sparkles className="h-3 w-3 text-purple-400" />
+                            20% Guild Sponsored
+                          </span>
+                        )}
                       </div>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        World: <strong className="text-blue-300">{q.worldName}</strong> | Issued by:{' '}
-                        <strong className="text-purple-300">{q.characterName || q.questgiver || 'Character'}</strong>
-                      </p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                        <span>
+                          World: <strong className="text-blue-300">{q.worldName}</strong>
+                        </span>
+                        <span>•</span>
+                        <span className="flex items-center gap-1">
+                          Issued by:
+                          <CharacterRankIcon rank={q.characterRank} className="h-3.5 w-3.5 inline" />
+                          <strong className="text-purple-300">{q.characterName || q.questgiver || 'Character'}</strong>
+                          {q.characterRank && q.characterRank !== 'none' && (
+                            <span className="capitalize text-[10px] font-semibold text-purple-400">
+                              ({q.characterRank})
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0 text-xs font-mono font-bold">
+                      {q.levelPF !== undefined && q.levelPF !== null && (
+                        <span className="flex items-center gap-1 bg-muted/40 px-2 py-0.5 rounded border border-border/40 text-foreground">
+                          <img src="/PFVoid.svg" alt="PF" className="h-3 w-3" />
+                          {q.levelPF === 0 ? 'TBD' : `Lvl ${q.levelPF}`}
+                        </span>
+                      )}
+                      {q.levelDnD !== undefined && q.levelDnD !== null && (
+                        <span className="flex items-center gap-1 bg-muted/40 px-2 py-0.5 rounded border border-border/40 text-foreground">
+                          <img src="/DnDVoid.svg" alt="DnD" className="h-3 w-3" />
+                          {q.levelDnD === 0 ? 'TBD' : `Lvl ${q.levelDnD}`}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -517,11 +550,20 @@ export default function BlackVoidPage() {
                     </p>
                   )}
 
-                  {q.reward && (
-                    <div className="text-xs font-semibold text-amber-300 bg-amber-500/10 px-2.5 py-1 rounded border border-amber-500/20">
-                      Reward: {q.reward}
-                    </div>
-                  )}
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-1">
+                    {q.reward ? (
+                      <div className="text-xs font-semibold text-amber-300 bg-amber-500/10 px-2.5 py-1 rounded border border-amber-500/20">
+                        Reward: {q.reward}
+                      </div>
+                    ) : <div />}
+
+                    {q.isSponsored && (
+                      <div className="text-[11px] font-medium text-emerald-300 bg-emerald-950/30 px-2.5 py-0.5 rounded border border-emerald-500/30 flex items-center gap-1">
+                        <Sparkles className="h-3 w-3 text-emerald-400" />
+                        Guild Reimbursement: {q.sponsoredAmount || '20% of reward'}
+                      </div>
+                    )}
+                  </div>
                 </Card>
               ))}
             </div>
@@ -560,6 +602,8 @@ export default function BlackVoidPage() {
         onClose={() => setIsQuestModalOpen(false)}
         characterId={selectedCharacterId}
         characterName={selectedChar?.name}
+        characterRank={selectedChar?.rank || 'none'}
+        characterLevel={selectedChar?.lvl || 1}
       />
     </div>
   )

@@ -19,6 +19,10 @@ export const createQuest = mutation({
       throw new Error('Not authenticated')
     }
 
+    let characterRank: string | undefined = undefined
+    let isSponsored = false
+    let sponsoredAmount: string | undefined = undefined
+
     if (args.characterId) {
       const character = await ctx.db.get(args.characterId)
       if (!character || character.userId !== user.subject) {
@@ -26,6 +30,31 @@ export const createQuest = mutation({
       }
       if (!args.worldId) {
         throw new Error('Character quests require selecting a world.')
+      }
+
+      characterRank = character.rank || 'none'
+      const questLevel = args.levelPF ?? args.levelDnD ?? 0
+      const maxSponsoredLevel = Math.max(0, (character.lvl || 1) - 4)
+
+      // Journeyman & Guildmaster perk: quests up to level - 4 get 1/5th (20%) sponsored by Guild of the Void
+      if ((characterRank === 'journeyman' || characterRank === 'guildmaster') && questLevel <= maxSponsoredLevel) {
+        isSponsored = true
+        if (args.reward) {
+          // Attempt parsing gold / silver / currency amount
+          // e.g. "5000 SP", "5,000 SP", "100 GP", "500 gold"
+          const rewardClean = args.reward.replace(/,/g, '')
+          const match = rewardClean.match(/(\d+(?:\.\d+)?)\s*(sp|gp|cp|pp|gold|silver|copper|platinum)?/i)
+          if (match) {
+            const num = parseFloat(match[1])
+            const unit = match[2] ? match[2].toUpperCase() : 'GP'
+            const sponsorVal = Math.round(num / 5)
+            sponsoredAmount = `${sponsorVal.toLocaleString()} ${unit}`
+          } else {
+            sponsoredAmount = '20% (1/5th) reimbursed by Guild'
+          }
+        } else {
+          sponsoredAmount = '20% (1/5th) reimbursed by Guild'
+        }
       }
     }
 
@@ -36,6 +65,10 @@ export const createQuest = mutation({
       levelPF: levelPF === null ? undefined : levelPF,
       levelDnD: levelDnD === null ? undefined : levelDnD,
       owner: user.subject,
+      characterRank,
+      isSponsored,
+      sponsoredAmount,
+      reimbursementClaimed: false,
       isCompleted: false,
     })
 
@@ -78,6 +111,40 @@ export const updateQuest = mutation({
       throw new Error('You do not have permission to update this quest.')
     }
 
+    let characterRank = quest.characterRank
+    let isSponsored = quest.isSponsored ?? false
+    let sponsoredAmount = quest.sponsoredAmount
+
+    if (args.characterId) {
+      const character = await ctx.db.get(args.characterId)
+      if (character) {
+        characterRank = character.rank || 'none'
+        const questLevel = (args.levelPF !== null ? args.levelPF : undefined) ?? (args.levelDnD !== null ? args.levelDnD : undefined) ?? 0
+        const maxSponsoredLevel = Math.max(0, (character.lvl || 1) - 4)
+
+        if ((characterRank === 'journeyman' || characterRank === 'guildmaster') && questLevel <= maxSponsoredLevel) {
+          isSponsored = true
+          if (args.reward) {
+            const rewardClean = args.reward.replace(/,/g, '')
+            const match = rewardClean.match(/(\d+(?:\.\d+)?)\s*(sp|gp|cp|pp|gold|silver|copper|platinum)?/i)
+            if (match) {
+              const num = parseFloat(match[1])
+              const unit = match[2] ? match[2].toUpperCase() : 'GP'
+              const sponsorVal = Math.round(num / 5)
+              sponsoredAmount = `${sponsorVal.toLocaleString()} ${unit}`
+            } else {
+              sponsoredAmount = '20% (1/5th) reimbursed by Guild'
+            }
+          } else {
+            sponsoredAmount = '20% (1/5th) reimbursed by Guild'
+          }
+        } else {
+          isSponsored = false
+          sponsoredAmount = undefined
+        }
+      }
+    }
+
     const { questId, levelPF, levelDnD, ...otherFields } = args
     
     await ctx.db.replace(questId, {
@@ -87,6 +154,32 @@ export const updateQuest = mutation({
         levelDnD: levelDnD === null ? undefined : levelDnD,
         // Clear deprecated level if PF level is explicitly unset
         level: levelPF === null ? undefined : quest.level,
+        characterRank,
+        isSponsored,
+        sponsoredAmount,
+    })
+  },
+})
+
+export const toggleQuestReimbursementClaimed = mutation({
+  args: {
+    questId: v.id('quests'),
+    characterId: v.id('characters'),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    const quest = await ctx.db.get(args.questId)
+    if (!quest) throw new Error('Quest not found')
+
+    const character = await ctx.db.get(args.characterId)
+    if (!character || character.userId !== user.subject || quest.characterId !== args.characterId) {
+      throw new Error('You do not own this quest.')
+    }
+
+    await ctx.db.patch(args.questId, {
+      reimbursementClaimed: !quest.reimbursementClaimed,
     })
   },
 })
@@ -174,14 +267,22 @@ export const getCharacterQuests = query({
             if (w) worldName = w.name
           }
           let charName = ''
+          let charRank = q.characterRank || 'none'
+          let charLvl = 1
           if (q.characterId) {
             const c = await ctx.db.get(q.characterId)
-            if (c) charName = c.name
+            if (c) {
+              charName = c.name
+              if (c.rank) charRank = c.rank
+              if (c.lvl) charLvl = c.lvl
+            }
           }
           return {
             ...q,
             worldName,
             characterName: charName,
+            characterRank: charRank,
+            characterLevel: charLvl,
           }
         })
       )
@@ -201,14 +302,22 @@ export const getCharacterQuests = query({
           if (w) worldName = w.name
         }
         let charName = ''
+        let charRank = q.characterRank || 'none'
+        let charLvl = 1
         if (q.characterId) {
           const c = await ctx.db.get(q.characterId)
-          if (c) charName = c.name
+          if (c) {
+            charName = c.name
+            if (c.rank) charRank = c.rank
+            if (c.lvl) charLvl = c.lvl
+          }
         }
         return {
           ...q,
           worldName,
           characterName: charName,
+          characterRank: charRank,
+          characterLevel: charLvl,
         }
       })
     )
