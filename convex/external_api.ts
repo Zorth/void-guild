@@ -408,6 +408,27 @@ export const updateQuest = mutation({
     }
 })
 
+function formatPlayerName(user: any): string | null {
+    if (!user) return null
+
+    // If username is provided, format it (e.g. "John Doe" -> "John D." or "John_Doe" -> "John D.")
+    const rawName = user.username || user.name
+    if (!rawName || typeof rawName !== 'string') return null
+
+    const trimmed = rawName.trim()
+    if (!trimmed) return null
+
+    // Split on spaces or underscores/dots
+    const parts = trimmed.split(/[\s_]+/).filter(Boolean)
+    if (parts.length > 1) {
+        const first = parts[0]
+        const lastInitial = parts[parts.length - 1].charAt(0).toUpperCase()
+        return `${first} ${lastInitial}.`
+    }
+
+    return trimmed
+}
+
 // --- CHARACTER ENDPOINTS ---
 
 export const listCharacters = query({
@@ -416,13 +437,36 @@ export const listCharacters = query({
         const user = await validateKey(ctx, args.apiKey)
         const targetUserId = args.userId || user?.userId
         
+        let characters = []
         if (targetUserId) {
-            return await ctx.db
+            characters = await ctx.db
                 .query('characters')
                 .withIndex('by_userId', (q) => q.eq('userId', targetUserId))
                 .collect()
+        } else {
+            characters = await ctx.db.query('characters').collect()
         }
-        return await ctx.db.query('characters').collect()
+
+        const usersMap = new Map<string, any>()
+        const userIds = Array.from(new Set(characters.map((c) => c.userId)))
+        await Promise.all(
+            userIds.map(async (uId) => {
+                const u = await ctx.db
+                    .query('users')
+                    .withIndex('by_userId', (q) => q.eq('userId', uId))
+                    .first()
+                if (u) usersMap.set(uId, u)
+            })
+        )
+
+        return characters.map((c) => {
+            const owner = usersMap.get(c.userId)
+            return {
+                ...c,
+                title: c.title ?? null,
+                player: formatPlayerName(owner),
+            }
+        })
     }
 })
 
@@ -432,7 +476,19 @@ export const getCharacter = query({
         await validateKey(ctx, args.apiKey)
         const charId = ctx.db.normalizeId('characters', args.characterId)
         if (!charId) throw new Error('Invalid character ID')
-        return await ctx.db.get(charId)
+        const char = await ctx.db.get(charId)
+        if (!char) return null
+
+        const owner = await ctx.db
+            .query('users')
+            .withIndex('by_userId', (q) => q.eq('userId', char.userId))
+            .first()
+
+        return {
+            ...char,
+            title: char.title ?? null,
+            player: formatPlayerName(owner),
+        }
     }
 })
 

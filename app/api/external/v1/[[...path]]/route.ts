@@ -26,7 +26,7 @@ async function handleResponse(promise: Promise<any>) {
 function getApiDocsResponse() {
     return NextResponse.json({
         name: "Guild of The Void External API",
-        version: "v1",
+        version: "v1.1",
         documentationUrl: "https://github.com/Zorth/void-guild/blob/main/API.md",
         baseUrl: "https://guild.tarragon.be/api/external/v1",
         authentication: {
@@ -36,7 +36,7 @@ function getApiDocsResponse() {
             restrictions: [
                 "XP and Level cannot be edited via API",
                 "Character deletion is disabled via API",
-                "Mutations verify resource ownership"
+                "Mutations verify resource ownership (only owned resources can be modified unless user is Admin)"
             ]
         },
         endpoints: [

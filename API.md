@@ -1,11 +1,14 @@
-# Guild of The Void - External API Documentation
+# Guild of The Void - External API Documentation (v1.1)
 
 This API allows external tools to interact with your "Guild of The Void" data using an API key generated on your account.
 
 ## Authentication & Permissions
 
 * **GET Requests (Public)**: All `GET` endpoints are public and **do not require an API key or token**.
-* **POST / PATCH Requests (Authenticated)**: All mutation operations strictly require an API key, either via the `Authorization` header (`Bearer vg_your_api_key_here`) or `apiKey` parameter. Mutations verify resource ownership (e.g. you can only create listings or update characters owned by your account).
+* **POST / PATCH Requests (Authenticated)**: All mutation operations strictly require an API key, either via the `Authorization` header (`Bearer vg_your_api_key_here`) or `apiKey` parameter.
+* **Ownership & Access Control**:
+  * API keys can **only modify characters, worlds, and sessions that the authenticated user owns**.
+  * **Admin Exception**: If the user is an administrator (`isAdmin: true`), their API key has global authority to modify any character, session, or world.
 * **Security Guarantees**:
   * Character **XP** (`xp`) and **Level** (`lvl`) values **CANNOT** be modified via the API by anyone.
   * Character **deletion** is completely disabled over the API.
@@ -86,6 +89,8 @@ https://guild.tarragon.be/api/external/v1
 {
   "_id": "jh7...",
   "name": "Kaelen",
+  "title": "Defender of the Void",
+  "player": "John D.",
   "lvl": 5,
   "xp": 450,
   "ancestry": "Human",
