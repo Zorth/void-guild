@@ -918,7 +918,7 @@ export default function SessionClient() {
 
         {/* Right Column: Sits to the right of the centered pillar */}
         <aside className="hidden lg:block w-80 flex-none z-30 lg:col-start-2 2xl:col-start-3">
-          <div className="sticky top-8 overflow-y-auto max-h-[calc(100vh-4rem)] custom-scrollbar pb-8">
+          <div className="sticky top-8 pb-8">
             {rightColumnContent}
           </div>
         </aside>
