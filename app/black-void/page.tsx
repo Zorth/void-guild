@@ -43,7 +43,9 @@ export default function BlackVoidPage() {
   const [activeTab, setActiveTab] = useState<'items' | 'services' | 'quests' | 'log'>('items')
   const [selectedCharacterId, setSelectedCharacterId] = useState<Id<'characters'> | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [serviceLevelFilter, setServiceLevelFilter] = useState<string>('')
+  const [serviceLevelFilter, setServiceLevelFilter] = useState<number | null>(null)
+  const [itemLevelFilter, setItemLevelFilter] = useState<number | null>(null)
+  const [itemMaxPriceFilter, setItemMaxPriceFilter] = useState<string>('')
 
   // Dialog states
   const [isItemModalOpen, setIsItemModalOpen] = useState(false)
@@ -82,15 +84,31 @@ export default function BlackVoidPage() {
   const selectedChar = userCharacters?.find((c: any) => c._id === selectedCharacterId)
 
   // Filter items
-  const filteredItems = (activeItemListings || []).filter((l: any) =>
-    l.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (l.description && l.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (l.sellerName && l.sellerName.toLowerCase().includes(searchQuery.toLowerCase()))
-  )
+  const parsedMaxPrice = itemMaxPriceFilter.trim() !== '' ? parseFloat(itemMaxPriceFilter) : null
+
+  const filteredItems = (activeItemListings || []).filter((l: any) => {
+    const matchesSearch =
+      l.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (l.description && l.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (l.sellerName && l.sellerName.toLowerCase().includes(searchQuery.toLowerCase()))
+    if (!matchesSearch) return false
+
+    // Level filter (seller's character level)
+    if (itemLevelFilter !== null) {
+      const sLevel = l.sellerLevel ?? 1
+      if (sLevel !== itemLevelFilter) return false
+    }
+
+    // Price filter (effective price: current bid or buyout or starting bid)
+    if (parsedMaxPrice !== null && !isNaN(parsedMaxPrice)) {
+      const currentPrice = l.winningAmount || l.startingBid || l.buyoutPrice || 0
+      if (currentPrice > parsedMaxPrice) return false
+    }
+
+    return true
+  })
 
   // Filter services
-  const targetLevel = serviceLevelFilter.trim() !== '' ? parseInt(serviceLevelFilter, 10) : undefined
-
   const filteredServices = (activeServiceListings || []).filter((s: any) => {
     const matchesSearch =
       s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -98,11 +116,11 @@ export default function BlackVoidPage() {
       (s.sellerName && s.sellerName.toLowerCase().includes(searchQuery.toLowerCase()))
     if (!matchesSearch) return false
 
-    if (targetLevel !== undefined && !isNaN(targetLevel)) {
+    if (serviceLevelFilter !== null) {
       const minLvl = s.minLevel !== undefined ? s.minLevel : 1
       const maxLvl = s.maxLevel !== undefined ? s.maxLevel : 20
-      // Inclusive range check: does the service range contain targetLevel?
-      if (targetLevel < minLvl || targetLevel > maxLvl) {
+      // Inclusive range check: does the service range contain serviceLevelFilter?
+      if (serviceLevelFilter < minLvl || serviceLevelFilter > maxLvl) {
         return false
       }
     }
@@ -209,30 +227,94 @@ export default function BlackVoidPage() {
 
         {/* Action Button and Filters depending on active tab */}
         <div className="flex flex-wrap items-center gap-3">
+          {activeTab === 'items' && (
+            <>
+              {/* Items Level Slider */}
+              <div className="flex items-center gap-2 bg-muted/20 border border-purple-500/20 rounded-lg px-2.5 py-1">
+                <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
+                  <Filter className="h-3 w-3 text-purple-400" />
+                  Lvl:
+                </span>
+                <input
+                  type="range"
+                  min={1}
+                  max={20}
+                  value={itemLevelFilter ?? 1}
+                  onChange={(e) => setItemLevelFilter(parseInt(e.target.value))}
+                  className="w-20 accent-purple-500 cursor-pointer h-1.5"
+                />
+                <span className="text-[11px] font-mono font-bold text-purple-300 min-w-[38px]">
+                  {itemLevelFilter !== null ? `Lvl ${itemLevelFilter}` : 'Any'}
+                </span>
+                {itemLevelFilter !== null && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setItemLevelFilter(null)}
+                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                    title="Clear level filter"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+
+              {/* Items Price Filter */}
+              <div className="flex items-center gap-1.5 bg-muted/20 border border-purple-500/20 rounded-lg px-2.5 py-1">
+                <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
+                  <Coins className="h-3 w-3 text-amber-400" />
+                  Max GP:
+                </span>
+                <Input
+                  type="number"
+                  min={0}
+                  step="any"
+                  placeholder="Any"
+                  value={itemMaxPriceFilter}
+                  onChange={(e) => setItemMaxPriceFilter(e.target.value)}
+                  className="w-20 h-7 text-xs bg-background/80 px-2 font-mono text-amber-300"
+                />
+                {itemMaxPriceFilter !== '' && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setItemMaxPriceFilter('')}
+                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                    title="Clear price filter"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+            </>
+          )}
+
           {activeTab === 'services' && (
-            <div className="flex items-center gap-1.5 bg-muted/20 border border-amber-500/20 rounded-lg p-1">
-              <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1 px-1.5">
+            <div className="flex items-center gap-2 bg-muted/20 border border-amber-500/20 rounded-lg px-2.5 py-1">
+              <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
                 <Filter className="h-3 w-3 text-amber-400" />
-                Level:
+                Lvl:
               </span>
-              <Input
-                type="number"
+              <input
+                type="range"
                 min={1}
                 max={20}
-                placeholder="1–20"
-                value={serviceLevelFilter}
-                onChange={(e) => setServiceLevelFilter(e.target.value)}
-                className="w-16 h-7 text-xs bg-background/80 px-2 text-center"
+                value={serviceLevelFilter ?? 1}
+                onChange={(e) => setServiceLevelFilter(parseInt(e.target.value))}
+                className="w-20 accent-amber-500 cursor-pointer h-1.5"
               />
-              {serviceLevelFilter && (
+              <span className="text-[11px] font-mono font-bold text-amber-300 min-w-[38px]">
+                {serviceLevelFilter !== null ? `Lvl ${serviceLevelFilter}` : 'Any'}
+              </span>
+              {serviceLevelFilter !== null && (
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => setServiceLevelFilter('')}
-                  className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                  onClick={() => setServiceLevelFilter(null)}
+                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
                   title="Clear level filter"
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X className="h-3 w-3" />
                 </Button>
               )}
             </div>

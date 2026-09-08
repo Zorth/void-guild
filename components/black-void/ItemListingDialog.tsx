@@ -178,10 +178,8 @@ export default function ItemListingDialog({
               className="w-full accent-purple-500 cursor-pointer"
             />
             <div className="flex justify-between text-[10px] text-muted-foreground">
-              <span>1 Day</span>
-              <span>7 Days</span>
-              <span>14 Days</span>
-              <span>30 Days</span>
+              <span>1 Day (Min)</span>
+              <span>30 Days (Max)</span>
             </div>
           </div>
 
