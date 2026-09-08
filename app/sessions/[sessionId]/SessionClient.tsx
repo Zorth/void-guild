@@ -55,6 +55,7 @@ interface SessionWithGM extends Doc<'sessions'> {
     isOwner: boolean;
     canManage: boolean;
     gmCharacterData?: Doc<'characters'> | null;
+    guildmasterCutCharacterData?: Doc<'characters'> | null;
     worldName: string;
     interestedPlayers?: { userId: string; username: string }[];
     quest?: Doc<'quests'> | null;

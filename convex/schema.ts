@@ -23,7 +23,8 @@ export default defineSchema({
             profileBorder: v.optional(v.string()),
             bgColor: v.optional(v.string()),
         })),
-    }).index('by_userId', ['userId']),
+    }).index('by_userId', ['userId'])
+      .index('by_rank', ['rank']),
     sessions: defineTable({
         date: v.optional(v.number()),
         world: v.id("worlds"),
@@ -66,7 +67,13 @@ export default defineSchema({
             isPerCharacter: v.optional(v.boolean()),
             claimedBy: v.optional(v.id("characters")),
         }))),
-  }).index('by_locked', ['locked']).index('by_owner', ['owner']),
+        guildmasterCut: v.optional(v.object({
+            characterId: v.id("characters"),
+            claimed: v.optional(v.boolean()),
+        })),
+  }).index('by_locked', ['locked'])
+    .index('by_owner', ['owner'])
+    .index('by_guildmaster_cut', ['guildmasterCut.characterId']),
     worlds: defineTable({
         name: v.string(),
         owner: v.string(), // Clerk userId of the world owner

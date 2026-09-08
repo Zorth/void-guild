@@ -20,6 +20,7 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
   const toggleBuyerClaimed = useMutation(api.blackVoid.toggleBuyerClaimed)
   const toggleQuestClaimed = useMutation(api.quests.toggleQuestReimbursementClaimed)
   const togglePaymentClaimed = useMutation(api.quests.toggleQuestPaymentClaimed)
+  const toggleSessionCutClaimed = useMutation(api.sessions.toggleGuildmasterCutClaimed)
 
   if (!characterId) {
     return (
@@ -81,6 +82,19 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
       toast.success('Updated quest payout status!')
     } catch (error) {
       toast.error('Failed to update quest payout status')
+    }
+  }
+
+  const handleToggleGuildmasterGain = async (item: any) => {
+    try {
+      if (item.isSessionLootCut && item.sessionId) {
+        await toggleSessionCutClaimed({ sessionId: item.sessionId, characterId })
+      } else {
+        await toggleQuestClaimed({ questId: item._id, characterId })
+      }
+      toast.success('Updated regional gains status!')
+    } catch (error) {
+      toast.error('Failed to update regional gains status')
     }
   }
 
@@ -391,33 +405,33 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
         </CardContent>
       </Card>
 
-      {/* 5. Guildmaster Regional Quest Cuts (Level 14+ Guildmaster Perk) */}
+      {/* 5. Guildmaster Regional Quest & Loot Gains (Level 14+ Guildmaster Perk) */}
       {isGuildmaster && (
         <Card className="border-amber-500/30 bg-card/60">
           <CardHeader className="pb-3 border-b border-border/20">
             <CardTitle className="text-base font-bold flex items-center justify-between text-amber-300">
               <span className="flex items-center gap-2">
                 <Crown className="h-5 w-5 text-amber-400" />
-                Guildmaster Regional Quest Gains (1/5th of all Area Quests)
+                Guildmaster Regional Gains (20% Area Quests & Session Loot)
               </span>
               <span className="text-xs text-muted-foreground font-normal">
-                Paid by Guild of the Void
+                Compensated by Guild of the Void
               </span>
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-4">
             {guildmasterAreaGains.length === 0 ? (
               <p className="text-xs text-muted-foreground py-4 text-center">
-                No completed regional quests up to Level - 4 found yet.
+                No completed regional quests or session loot cuts awarded yet.
               </p>
             ) : (
               <div className="space-y-3">
-                {guildmasterAreaGains.map((quest: any) => {
-                  const isClaimed = !!quest.reimbursementClaimed
+                {guildmasterAreaGains.map((item: any) => {
+                  const isClaimed = !!item.reimbursementClaimed
 
                   return (
                     <div
-                      key={quest._id}
+                      key={item._id}
                       className={cn(
                         "p-3 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all",
                         isClaimed
@@ -427,17 +441,17 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
                     >
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-sm text-foreground">{quest.name}</span>
+                          <span className="font-bold text-sm text-foreground">{item.name}</span>
                           <span className="text-[10px] uppercase font-bold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded">
-                            Lvl {quest.level} Area Quest
+                            {item.isSessionLootCut ? 'Session Loot Cut' : `Lvl ${item.level} Area Quest`}
                           </span>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          Region: <strong className="text-blue-300">{quest.worldName}</strong> | Quest Gains:{' '}
-                          <span className="text-amber-300 font-semibold">{quest.reward}</span>
+                          Region: <strong className="text-blue-300">{item.worldName}</strong> | Value:{' '}
+                          <span className="text-amber-300 font-semibold">{item.reward}</span>
                         </p>
                         <p className="text-xs text-amber-300 font-mono font-medium">
-                          Guildmaster 1/5th Cut: <strong>{quest.guildmasterCut}</strong>
+                          Guildmaster Compensation: <strong>{item.guildmasterCut}</strong>
                         </p>
                       </div>
 
@@ -445,7 +459,7 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
                         <label className="flex items-center gap-2 cursor-pointer bg-background/60 hover:bg-background px-3 py-1.5 rounded-md border border-amber-500/30 text-xs">
                           <Checkbox
                             checked={isClaimed}
-                            onCheckedChange={() => handleToggleQuestClaimed(quest._id)}
+                            onCheckedChange={() => handleToggleGuildmasterGain(item)}
                             className="border-amber-400 data-[state=checked]:bg-emerald-600"
                           />
                           <span className={cn("font-medium", isClaimed ? "text-emerald-300" : "text-muted-foreground")}>

@@ -51,6 +51,17 @@ export const listAllCharactersPublic = query({
   },
 })
 
+export const listGuildmasters = query({
+  args: {},
+  handler: async (ctx) => {
+    const guildmasters = await ctx.db
+      .query('characters')
+      .withIndex('by_rank', (q) => q.eq('rank', 'guildmaster'))
+      .collect()
+    return guildmasters.sort((a, b) => a.name.localeCompare(b.name))
+  },
+})
+
 export const getCharacterLeaderboardRanks = query({
   args: {},
   handler: async (ctx) => {

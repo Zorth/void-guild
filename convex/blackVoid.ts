@@ -633,7 +633,8 @@ export const getCharacterTransactions = query({
     const maxGMLevel = Math.max(0, charLvl - 4)
 
     let guildmasterAreaGains: Array<{
-      _id: Id<'quests'>
+      _id: Id<'quests'> | Id<'sessions'>
+      sessionId?: Id<'sessions'>
       name: string
       worldName: string
       level: number
@@ -641,10 +642,58 @@ export const getCharacterTransactions = query({
       guildmasterCut: string
       completedAt: number
       reimbursementClaimed: boolean
+      isSessionLootCut?: boolean
     }> = []
 
     if (isGuildmaster) {
-      // Find all completed quests in worlds
+      // 1) Find sessions where this Guildmaster was awarded the 20% regional loot cut
+      const gmSessions = await ctx.db
+        .query('sessions')
+        .withIndex('by_guildmaster_cut', (q) => q.eq('guildmasterCut.characterId', args.characterId!))
+        .collect()
+
+      for (const sess of gmSessions) {
+        let worldName = 'The Void'
+        if (sess.world) {
+          const w = await ctx.db.get(sess.world)
+          if (w) worldName = w.name
+        }
+
+        const lootList = sess.loot || []
+        const attendingCount = (sess.characters || []).length
+        const totalLootValue = lootList.reduce((sum, item) => {
+          const baseVal = item.isGood ? item.valueGP : item.valueGP / 2
+          const itemTotal = item.isPerCharacter ? baseVal * attendingCount : baseVal
+          return sum + itemTotal
+        }, 0)
+
+        // 20% extra compensated loot worth
+        const cutVal = Math.round(totalLootValue * 0.2 * 100) / 100
+        const total_cp = Math.round(cutVal * 100)
+        const gp = Math.floor(total_cp / 100)
+        const sp = Math.floor((total_cp % 100) / 10)
+        const cp = total_cp % 10
+        const parts = []
+        if (gp > 0) parts.push(`${gp} GP`)
+        if (sp > 0) parts.push(`${sp} SP`)
+        if (cp > 0) parts.push(`${cp} CP`)
+        const formattedCut = parts.length > 0 ? parts.join(' ') : '0 GP'
+
+        guildmasterAreaGains.push({
+          _id: sess._id,
+          sessionId: sess._id,
+          name: `Session Loot Compensation (${worldName})`,
+          worldName,
+          level: sess.level || 0,
+          reward: `${totalLootValue.toLocaleString()} GP Total Loot`,
+          guildmasterCut: `${formattedCut} (20% Extra)`,
+          completedAt: sess.date || sess._creationTime,
+          reimbursementClaimed: !!sess.guildmasterCut?.claimed,
+          isSessionLootCut: true,
+        })
+      }
+
+      // 2) Find all completed quests in worlds
       const allCompletedQuests = await ctx.db
         .query('quests')
         .collect()
@@ -657,7 +706,7 @@ export const getCharacterTransactions = query({
         return qLvl <= maxGMLevel
       })
 
-      guildmasterAreaGains = await Promise.all(
+      const questGains = await Promise.all(
         eligibleGMQuests.map(async (q) => {
           let worldName = 'The Void'
           if (q.worldId) {
@@ -688,9 +737,12 @@ export const getCharacterTransactions = query({
             guildmasterCut,
             completedAt: q.completedAt || q._creationTime,
             reimbursementClaimed: !!q.reimbursementClaimed,
+            isSessionLootCut: false,
           }
         })
       )
+
+      guildmasterAreaGains.push(...questGains)
     }
 
     // 5. Quests issued by this character completed in sessions: 'To be Paid' to adventurers

@@ -2,14 +2,14 @@
 
 import { useState, useMemo } from 'react'
 import { Doc, Id } from '@/convex/_generated/dataModel'
-import { useMutation } from 'convex/react'
+import { useMutation, useQuery } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog'
-import { Plus, Edit2, Trash2, Coins, Link as LinkIcon, Check, X, User } from 'lucide-react'
+import { Plus, Edit2, Trash2, Coins, Link as LinkIcon, Check, X, User, Crown } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
@@ -24,7 +24,12 @@ interface LootItem {
 }
 
 interface LootListProps {
-    session: Doc<'sessions'> & { isOwner: boolean; canManage: boolean; attendingCharacters: Doc<'characters'>[] };
+    session: Doc<'sessions'> & { 
+        isOwner: boolean; 
+        canManage: boolean; 
+        attendingCharacters: Doc<'characters'>[];
+        guildmasterCutCharacterData?: Doc<'characters'> | null;
+    };
     userCharacterIds: Set<Id<'characters'>>;
 }
 
@@ -34,9 +39,13 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
     const deleteLoot = useMutation(api.sessions.deleteLoot)
     const claimLoot = useMutation(api.sessions.claimLoot)
     const unclaimLoot = useMutation(api.sessions.unclaimLoot)
+    const setSessionGuildmasterCut = useMutation(api.sessions.setSessionGuildmasterCut)
+    const guildmasters = useQuery(api.characters.listGuildmasters)
 
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+    const [isGuildmasterDialogOpen, setIsGuildmasterDialogOpen] = useState(false)
     const [editingItem, setEditingItem] = useState<LootItem | null>(null)
+    const [selectedGmId, setSelectedGmId] = useState<string>(session.guildmasterCut?.characterId || '')
 
     const [name, setName] = useState('')
     const [link, setLink] = useState('')
@@ -46,6 +55,20 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
     const [quantity, setQuantity] = useState<string>('1')
 
     const loot = (session as any).loot as LootItem[] || []
+
+    const handleSetGuildmaster = async (charId: string) => {
+        try {
+            await setSessionGuildmasterCut({
+                sessionId: session._id,
+                characterId: charId ? (charId as Id<'characters'>) : undefined,
+            })
+            setSelectedGmId(charId)
+            setIsGuildmasterDialogOpen(false)
+            toast.success(charId ? 'Guildmaster assigned to session!' : 'Guildmaster removed from session')
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Failed to update Guildmaster')
+        }
+    }
 
     const resetForm = () => {
         setName('')
@@ -165,12 +188,14 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
             }, 0)
 
         const userFinalShare = sharePerPlayer - userClaimedValue
+        const guildmasterCutValue = Math.round(totalValue * 0.2 * 100) / 100
 
         return {
             totalValue,
             sharePerPlayer,
             userFinalShare,
-            userClaimedValue
+            userClaimedValue,
+            guildmasterCutValue,
         }
     }, [loot, session.attendingCharacters.length, userCharacterIds])
 
@@ -182,69 +207,162 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                     Loot
                 </h3>
                 {session.canManage && (
-                    <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                        <DialogTrigger asChild>
-                            <Button size="sm" onClick={resetForm} className="h-8 gap-1">
-                                <Plus className="h-3.5 w-3.5" />
-                                Add Loot
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Add Loot</DialogTitle>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Item Name</label>
-                                    <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Hide Shield" />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Link (Optional)</label>
-                                    <Input value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://..." />
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center gap-2">
+                        <Dialog open={isGuildmasterDialogOpen} onOpenChange={setIsGuildmasterDialogOpen}>
+                            <DialogTrigger asChild>
+                                <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    className="h-8 gap-1 border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 hover:text-amber-200"
+                                >
+                                    <Crown className="h-3.5 w-3.5 text-amber-400" />
+                                    {session.guildmasterCutCharacterData ? 'Edit Guildmaster' : 'Assign Guildmaster'}
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-[425px]">
+                                <DialogHeader>
+                                    <DialogTitle className="flex items-center gap-2 text-amber-300">
+                                        <Crown className="h-5 w-5 text-amber-400" />
+                                        Assign Regional Guildmaster
+                                    </DialogTitle>
+                                </DialogHeader>
+                                <div className="space-y-4 py-3 text-sm">
+                                    <p className="text-xs text-muted-foreground">
+                                        Assign a Guildmaster (Level 14+) to this session. They will be compensated an extra <strong>20% of the total session loot value</strong> by the Guild of the Void.
+                                    </p>
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium">Value in GP</label>
-                                        <Input 
-                                            type="number" 
-                                            step="0.01" 
-                                            value={valueGP} 
-                                            onChange={(e) => setValueGP(e.target.value)} 
-                                        />
+                                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                            Select Guildmaster
+                                        </label>
+                                        <select
+                                            value={selectedGmId}
+                                            onChange={(e) => setSelectedGmId(e.target.value)}
+                                            className="w-full bg-muted/40 border border-border/40 text-foreground rounded-md px-3 py-2 text-sm font-medium focus:border-amber-500 focus:outline-none"
+                                        >
+                                            <option value="">-- None (No Guildmaster assigned) --</option>
+                                            {guildmasters?.map((gm) => (
+                                                <option key={gm._id} value={gm._id} className="bg-popover text-foreground">
+                                                    {gm.name} (Lvl {gm.lvl})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    {calculations && (
+                                        <div className="rounded-lg border border-amber-500/30 bg-amber-950/20 p-3 text-xs space-y-1">
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Total Session Loot:</span>
+                                                <span className="font-mono font-medium text-foreground">{formatGP(calculations.totalValue)}</span>
+                                            </div>
+                                            <div className="flex justify-between font-bold text-amber-300">
+                                                <span>Guildmaster 20% Cut:</span>
+                                                <span className="font-mono">+{formatGP(calculations.guildmasterCutValue)}</span>
+                                            </div>
+                                            <p className="text-[11px] text-muted-foreground pt-1 italic">
+                                                * Note: Players&apos; shares are NOT reduced; this extra compensation is paid by the Guild of the Void and claimed in The Black Void.
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                                <DialogFooter className="gap-2 sm:gap-0">
+                                    {session.guildmasterCut?.characterId && (
+                                        <Button 
+                                            variant="ghost" 
+                                            size="sm" 
+                                            onClick={() => handleSetGuildmaster('')}
+                                            className="text-muted-foreground hover:text-destructive mr-auto"
+                                        >
+                                            Remove
+                                        </Button>
+                                    )}
+                                    <Button onClick={() => handleSetGuildmaster(selectedGmId)}>
+                                        Save Guildmaster
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+
+                        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                            <DialogTrigger asChild>
+                                <Button size="sm" onClick={resetForm} className="h-8 gap-1">
+                                    <Plus className="h-3.5 w-3.5" />
+                                    Add Loot
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Add Loot</DialogTitle>
+                                </DialogHeader>
+                                <div className="space-y-4 py-4">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Item Name</label>
+                                        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Hide Shield" />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium">Quantity</label>
-                                        <Input 
-                                            type="number" 
-                                            min="1"
-                                            value={quantity} 
-                                            onChange={(e) => setQuantity(e.target.value)} 
-                                        />
+                                        <label className="text-sm font-medium">Link (Optional)</label>
+                                        <Input value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://..." />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium">Value in GP</label>
+                                            <Input 
+                                                type="number" 
+                                                step="0.01" 
+                                                value={valueGP} 
+                                                onChange={(e) => setValueGP(e.target.value)} 
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium">Quantity</label>
+                                            <Input 
+                                                type="number" 
+                                                min="1" 
+                                                value={quantity} 
+                                                onChange={(e) => setQuantity(e.target.value)} 
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col gap-2 pt-1">
+                                        <div className="flex items-center gap-2">
+                                            <Checkbox id="isGood" checked={isGood} onCheckedChange={(val) => setIsGood(!!val)} />
+                                            <label htmlFor="isGood" className="text-sm font-medium cursor-pointer">
+                                                Is &quot;Good&quot; (Trade good - unclaimable, full resale value)
+                                            </label>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Checkbox id="isPerCharacter" checked={isPerCharacter} onCheckedChange={(val) => setIsPerCharacter(!!val)} />
+                                            <label htmlFor="isPerCharacter" className="text-sm font-medium cursor-pointer flex items-center gap-1.5">
+                                                For <span className="font-bold underline text-primary">EACH</span> character
+                                                <span className="text-xs text-muted-foreground font-normal">(Added to every player&apos;s share)</span>
+                                            </label>
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="flex flex-col gap-2 pt-1">
-                                    <div className="flex items-center gap-2">
-                                        <Checkbox id="isGood" checked={isGood} onCheckedChange={(val) => setIsGood(!!val)} />
-                                        <label htmlFor="isGood" className="text-sm font-medium cursor-pointer">
-                                            Is &quot;Good&quot; (Trade good - unclaimable, full resale value)
-                                        </label>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Checkbox id="isPerCharacter" checked={isPerCharacter} onCheckedChange={(val) => setIsPerCharacter(!!val)} />
-                                        <label htmlFor="isPerCharacter" className="text-sm font-medium cursor-pointer flex items-center gap-1.5">
-                                            For <span className="font-bold underline text-primary">EACH</span> character
-                                            <span className="text-xs text-muted-foreground font-normal">(Added to every player&apos;s share)</span>
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-                            <DialogFooter>
-                                <Button onClick={handleAdd}>Add Loot Item(s)</Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
+                                <DialogFooter>
+                                    <Button onClick={handleAdd}>Add Loot Item(s)</Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                    </div>
                 )}
             </div>
+
+            {/* Guildmaster Cut Banner if assigned */}
+            {session.guildmasterCutCharacterData && calculations && (
+                <div className="flex items-center justify-between rounded-lg border border-amber-500/30 bg-amber-950/20 px-3.5 py-2 text-xs">
+                    <div className="flex items-center gap-2">
+                        <Crown className="h-4 w-4 text-amber-400 shrink-0" />
+                        <div>
+                            <span className="text-muted-foreground">Regional Guildmaster: </span>
+                            <strong className="text-amber-300 font-semibold">{session.guildmasterCutCharacterData.name}</strong>
+                            <span className="text-muted-foreground text-[11px] ml-1.5">(Lvl {session.guildmasterCutCharacterData.lvl})</span>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 font-mono">
+                        <span className="text-muted-foreground text-[11px]">20% Compensation:</span>
+                        <strong className="text-amber-300 font-bold">+{formatGP(calculations.guildmasterCutValue)}</strong>
+                    </div>
+                </div>
+            )}
 
             {userCharacterInSession && calculations && (
                 <Card className="bg-primary/5 border-primary/20">

@@ -391,11 +391,18 @@ export const getSession = query({
     const isOwner = user ? (user.subject === session.owner) : false
     const canManage = user ? (isOwner || isAdminUser) : false
     let gmCharacterData = null
-
     if (session.gmCharacter) {
         const gmChar = await ctx.db.get(session.gmCharacter)
         if (gmChar) {
             gmCharacterData = gmChar
+        }
+    }
+
+    let guildmasterCutCharacterData = null
+    if (session.guildmasterCut?.characterId) {
+        const gmCutChar = await ctx.db.get(session.guildmasterCut.characterId)
+        if (gmCutChar) {
+            guildmasterCutCharacterData = gmCutChar
         }
     }
 
@@ -413,6 +420,7 @@ export const getSession = query({
       // Hide gmCharacter ID from non-managers
       gmCharacter: canManage ? session.gmCharacter : undefined,
       gmCharacterData: gmCharacterData,
+      guildmasterCutCharacterData,
       attendingCharacters: characterDocs.filter((c): c is Doc<'characters'> => c !== null),
       isOwner,
       canManage,
@@ -1205,6 +1213,71 @@ export const unclaimLoot = mutation({
     })
 
     await ctx.db.patch(args.sessionId, { loot })
+  },
+})
+
+export const setSessionGuildmasterCut = mutation({
+  args: {
+    sessionId: v.id('sessions'),
+    characterId: v.optional(v.id('characters')),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    const session = await ctx.db.get(args.sessionId)
+    if (!session) throw new Error('Session not found')
+
+    const isAdminUser = await isAdmin(ctx)
+    if (session.owner !== user.subject && !isAdminUser) {
+      throw new Error('Only the session owner or an admin can set the Guildmaster.')
+    }
+
+    if (args.characterId) {
+      const character = await ctx.db.get(args.characterId)
+      if (!character) throw new Error('Guildmaster character not found')
+      await ctx.db.patch(args.sessionId, {
+        guildmasterCut: {
+          characterId: args.characterId,
+          claimed: session.guildmasterCut?.characterId === args.characterId ? session.guildmasterCut.claimed : false,
+        },
+      })
+    } else {
+      await ctx.db.patch(args.sessionId, {
+        guildmasterCut: undefined,
+      })
+    }
+  },
+})
+
+export const toggleGuildmasterCutClaimed = mutation({
+  args: {
+    sessionId: v.id('sessions'),
+    characterId: v.id('characters'),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    const session = await ctx.db.get(args.sessionId)
+    if (!session || !session.guildmasterCut) throw new Error('Session or Guildmaster cut not found')
+
+    if (session.guildmasterCut.characterId !== args.characterId) {
+      throw new Error('This Guildmaster cut is not assigned to this character')
+    }
+
+    const character = await ctx.db.get(args.characterId)
+    const isAdminUser = await isAdmin(ctx)
+    if (!character || (character.userId !== user.subject && !isAdminUser)) {
+      throw new Error('You do not own this Guildmaster character')
+    }
+
+    await ctx.db.patch(args.sessionId, {
+      guildmasterCut: {
+        ...session.guildmasterCut,
+        claimed: !session.guildmasterCut.claimed,
+      },
+    })
   },
 })
 
