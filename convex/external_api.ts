@@ -50,6 +50,7 @@ export const getSessionCharacters = query({
         return characters.filter((c: any) => c !== null).map((c: any) => ({
             id: c!._id,
             name: c!.name,
+            title: c!.title,
             lvl: c!.lvl,
             xp: c!.xp,
             class: c!.class,

@@ -252,6 +252,11 @@ export default function Characters({ filters }: { filters?: { pf: boolean; dnd: 
                               <Book size={16} />
                             </a>
                           </div>
+                          {character.title && (
+                            <span className="text-xs text-amber-400/90 italic font-medium">
+                              {character.title}
+                            </span>
+                          )}
                           <span
                             className={cosmetics.subtitleClassName}
                             style={cosmetics.subtitleStyle}
@@ -496,6 +501,19 @@ export default function Characters({ filters }: { filters?: { pf: boolean; dnd: 
                       required
                     />
                   </div>
+                  {selectedCharacter.title && (
+                    <div className="flex flex-col gap-2">
+                      <label className="text-sm font-medium flex items-center justify-between">
+                        <span>Title</span>
+                        <span className="text-[10px] text-muted-foreground font-normal">(Admin set)</span>
+                      </label>
+                      <Input
+                        value={selectedCharacter.title}
+                        disabled
+                        className="bg-muted/50 italic text-amber-400/90 font-medium"
+                      />
+                    </div>
+                  )}
                   <div className="flex flex-col gap-2">
                     <label className="text-sm font-medium">Ancestry</label>
                     <Input
@@ -534,6 +552,7 @@ export default function Characters({ filters }: { filters?: { pf: boolean; dnd: 
                 <CharacterCosmeticsTab
                   characterId={selectedCharacter._id}
                   characterName={editedCharacterData.name}
+                  title={selectedCharacter.title}
                   ancestry={editedCharacterData.ancestry}
                   characterClass={editedCharacterData.class}
                   characterLvl={selectedCharacter.lvl}

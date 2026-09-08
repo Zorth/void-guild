@@ -231,6 +231,9 @@ export default function ReputationSystem({
                                                         {char.lvl}
                                                     </span>
                                                 </div>
+                                                {char.title && (
+                                                    <span className="text-[9px] text-amber-400/90 italic font-medium whitespace-normal">{char.title}</span>
+                                                )}
                                                 <span className="text-[9px] text-muted-foreground uppercase tracking-widest font-medium whitespace-normal">{char.class}</span>
                                             </div>
                                         </td>

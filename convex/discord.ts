@@ -229,7 +229,8 @@ export const syncSessionToDiscord = internalAction({
     const signupList = session.attendingCharacters.length > 0
       ? session.attendingCharacters.map(c => {
           const ping = c.discordId ? ` (<@${c.discordId}>)` : "";
-          return `• **${c.name}** (Lvl ${c.lvl} ${c.class})${ping}`;
+          const titleStr = c.title ? ` *"${c.title}"*` : "";
+          return `• **${c.name}**${titleStr} (Lvl ${c.lvl} ${c.class})${ping}`;
         }).join("\n")
       : (isPlanning ? "_Signups not yet open._" : "_No characters signed up yet._");
     

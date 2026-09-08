@@ -29,6 +29,7 @@ export default function AdminCharacterList() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editData, setEditData] = useState({
     name: '',
+    title: '',
     lvl: 1,
     xp: 0,
     ancestry: '',
@@ -52,6 +53,7 @@ export default function AdminCharacterList() {
     setSelectedCharacter(character)
     setEditData({
       name: character.name,
+      title: character.title ?? '',
       lvl: character.lvl,
       xp: character.xp,
       ancestry: character.ancestry ?? '',
@@ -106,6 +108,9 @@ export default function AdminCharacterList() {
                         {char.rank === 'guildmaster' && <span className="text-xs text-amber-500 font-bold uppercase tracking-wider">GM</span>}
                         {char.rank === 'journeyman' && <span className="text-xs text-purple-500 font-bold uppercase tracking-wider">JRN</span>}
                     </div>
+                    {char.title && (
+                      <p className="text-xs text-amber-400/90 italic font-medium">{char.title}</p>
+                    )}
                     <p className="text-xs text-muted-foreground">{char.ancestry} {char.class}</p>
                   </div>
                   <div className="text-right whitespace-nowrap">
@@ -131,6 +136,15 @@ export default function AdminCharacterList() {
                     className="col-span-3"
                     value={editData.name}
                     onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <label className="text-right text-sm">Title</label>
+                  <Input
+                    className="col-span-3"
+                    placeholder="Title (Admin set)"
+                    value={editData.title}
+                    onChange={(e) => setEditData({ ...editData, title: e.target.value })}
                   />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">

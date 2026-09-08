@@ -294,7 +294,7 @@ export async function POST(req: Request) {
               name: `${character.name}` + (character.ownerName ? ` (Owner: ${character.ownerName})` : ''),
               url: character.websiteLink || undefined
             },
-            title: `${systemEmoji} ${character.ancestry || 'Unknown'} ${character.class || 'Character'}`,
+            title: `${systemEmoji} ${character.title ? `"${character.title}" • ` : ''}${character.ancestry || 'Unknown'} ${character.class || 'Character'}`,
             description: `**Current Progress** \n\`${xpBar}\` \n**${character.xp}** / 1000 XP (*${xpNeeded} XP to level ${character.lvl + 1}*)${rankInfo}`,
             fields: fields,
             color: character.system === 'PF' ? 0xde2e2e : 0xe81123,

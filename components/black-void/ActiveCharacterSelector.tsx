@@ -57,6 +57,11 @@ export default function ActiveCharacterSelector({
               <span className="text-xs font-bold text-foreground truncate leading-tight">
                 {selectedChar?.name || 'Select Character'}
               </span>
+              {selectedChar?.title && (
+                <span className="text-[10px] text-amber-400/90 italic font-medium truncate leading-tight">
+                  {selectedChar.title}
+                </span>
+              )}
               <span className="text-[10px] text-purple-300/80 truncate leading-none">
                 Lvl {selectedChar?.lvl || 1} {selectedChar?.class ? `• ${selectedChar.class}` : ''}
               </span>
@@ -100,6 +105,11 @@ export default function ActiveCharacterSelector({
                     <span className={cn("font-bold truncate", isSelected ? "text-white" : "text-foreground")}>
                       {char.name}
                     </span>
+                    {char.title && (
+                      <span className="text-[10px] text-amber-400/90 italic font-medium truncate">
+                        {char.title}
+                      </span>
+                    )}
                     <span className="text-[10px] text-muted-foreground truncate">
                       Lvl {char.lvl} {char.class ? `• ${char.class}` : ''} {char.ancestry ? `(${char.ancestry})` : ''}
                     </span>

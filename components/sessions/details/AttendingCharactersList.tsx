@@ -152,6 +152,11 @@ export default function AttendingCharactersList({
                             <Book size={16} />
                         </a>
                     </div>
+                    {char.title && (
+                      <div className="text-xs text-amber-400/90 italic font-medium">
+                        {char.title}
+                      </div>
+                    )}
                     <div className="text-[10px] text-muted-foreground mt-1 whitespace-normal flex items-center flex-wrap gap-1.5">
                       <span className={cosmeticsStyles.subtitleClassName} style={cosmeticsStyles.subtitleStyle}>{char.ancestry} {char.class}</span>
 

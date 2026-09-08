@@ -158,6 +158,7 @@ export const adminUpdateCharacter = mutation({
     websiteLink: v.optional(v.string()),
     rank: v.optional(v.string()),
     system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
+    title: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const isAdminUser = await isAdmin(ctx)
@@ -176,6 +177,7 @@ export const adminUpdateCharacter = mutation({
       websiteLink: args.websiteLink,
       rank: args.rank,
       system: args.system,
+      title: args.title,
     })
 
     if (args.rank && args.rank !== 'none' && args.rank !== oldCharacter?.rank) {

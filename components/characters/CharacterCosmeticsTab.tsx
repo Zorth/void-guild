@@ -31,6 +31,7 @@ import {
 interface CharacterCosmeticsTabProps {
   characterId?: string
   characterName: string
+  title?: string
   ancestry: string
   characterClass: string
   characterLvl: number
@@ -44,6 +45,7 @@ interface CharacterCosmeticsTabProps {
 export default function CharacterCosmeticsTab({
   characterId,
   characterName,
+  title,
   ancestry,
   characterClass,
   characterLvl,
@@ -212,6 +214,11 @@ export default function CharacterCosmeticsTab({
                   You
                 </span>
               </div>
+              {title && (
+                <div className="text-xs text-amber-400/90 italic font-medium">
+                  {title}
+                </div>
+              )}
               <div className="text-[10px] text-muted-foreground mt-0.5">
                 <span className={previewStyles.subtitleClassName} style={previewStyles.subtitleStyle}>
                   {ancestry || 'Ancestry'} {characterClass || 'Class'}
