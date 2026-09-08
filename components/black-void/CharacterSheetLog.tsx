@@ -265,12 +265,19 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        World: <strong className="text-blue-300">{quest.worldName}</strong> | Total Reward Offered:{' '}
+                        World: <strong className="text-blue-300">{quest.worldName}</strong> | Agreed Reward:{' '}
                         <span className="text-amber-300 font-semibold">{quest.reward || 'Custom'}</span>
                       </p>
-                      <p className="text-xs text-emerald-300 font-mono font-medium">
-                        Guild Reimbursement to Collect: <strong>{quest.sponsoredAmount}</strong>
-                      </p>
+                      <div className="flex items-center gap-3 text-xs pt-0.5 flex-wrap">
+                        <span className="text-emerald-300 font-mono font-medium">
+                          Guild Payback: <strong>{quest.sponsoredAmount}</strong>
+                        </span>
+                        {quest.netCost && (
+                          <span className="text-purple-300 font-mono font-medium">
+                            Net Out-of-Pocket: <strong>{quest.netCost}</strong>
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">

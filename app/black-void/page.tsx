@@ -550,7 +550,7 @@ export default function BlackVoidPage() {
                     </p>
                   )}
 
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-1">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-1 flex-wrap">
                     {q.reward ? (
                       <div className="text-xs font-semibold text-amber-300 bg-amber-500/10 px-2.5 py-1 rounded border border-amber-500/20">
                         Reward: {q.reward}
@@ -558,9 +558,16 @@ export default function BlackVoidPage() {
                     ) : <div />}
 
                     {q.isSponsored && (
-                      <div className="text-[11px] font-medium text-emerald-300 bg-emerald-950/30 px-2.5 py-0.5 rounded border border-emerald-500/30 flex items-center gap-1">
-                        <Sparkles className="h-3 w-3 text-emerald-400" />
-                        Guild Reimbursement: {q.sponsoredAmount || '20% of reward'}
+                      <div className="flex items-center gap-2 flex-wrap text-[11px]">
+                        <div className="font-medium text-emerald-300 bg-emerald-950/30 px-2.5 py-0.5 rounded border border-emerald-500/30 flex items-center gap-1">
+                          <Sparkles className="h-3 w-3 text-emerald-400" />
+                          Payback: <strong>{q.sponsoredAmount || '20% (1/5th)'}</strong>
+                        </div>
+                        {q.netCost && (
+                          <div className="font-medium text-purple-300 bg-purple-950/40 px-2.5 py-0.5 rounded border border-purple-500/40">
+                            Net Cost: <strong>{q.netCost}</strong>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

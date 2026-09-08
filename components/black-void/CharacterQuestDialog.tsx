@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
-import { Scroll, Sword, Trophy, Globe, Sparkles, AlertCircle } from 'lucide-react'
+import { Scroll, Sword, Trophy, Globe, Sparkles, AlertCircle, Coins, ArrowRight } from 'lucide-react'
 import { CharacterRankIcon } from '@/lib/utils'
 
 interface CharacterQuestDialogProps {
@@ -52,20 +52,54 @@ export default function CharacterQuestDialog({
   const effectiveQuestLevel = levelPF ?? levelDnD ?? 0
   const isQuestLevelEligible = isRankEligible && effectiveQuestLevel <= maxSponsoredLevel
 
-  // Real-time sponsorship calculation
-  const calculatedSponsorship = useMemo(() => {
-    if (!isQuestLevelEligible) return null
-    if (!reward) return '20% (1/5th) reimbursed by Guild of the Void upon completion'
+  // Real-time sponsorship & payback calculation
+  const calculatedBreakdown = useMemo(() => {
+    if (!reward) return null
     
     const rewardClean = reward.replace(/,/g, '')
     const match = rewardClean.match(/(\d+(?:\.\d+)?)\s*(sp|gp|cp|pp|gold|silver|copper|platinum)?/i)
-    if (match) {
-      const num = parseFloat(match[1])
-      const unit = match[2] ? match[2].toUpperCase() : 'GP'
-      const sponsorVal = Math.round(num / 5)
-      return `${sponsorVal.toLocaleString()} ${unit} (1/5th Guild Sponsorship)`
+    
+    if (!match) {
+      if (isQuestLevelEligible) {
+        return {
+          hasNumeric: false,
+          total: reward,
+          payback: '20% (1/5th)',
+          netCost: '80% (4/5ths)',
+        }
+      }
+      return null
     }
-    return '20% (1/5th) reimbursed by Guild of the Void upon completion'
+
+    const totalNum = parseFloat(match[1])
+    const unit = match[2] ? match[2].toUpperCase() : 'GP'
+
+    if (!isQuestLevelEligible) {
+      return {
+        hasNumeric: true,
+        total: `${totalNum.toLocaleString()} ${unit}`,
+        payback: '0 GP (Not eligible for sponsorship)',
+        netCost: `${totalNum.toLocaleString()} ${unit}`,
+        unit,
+        totalNum,
+        paybackNum: 0,
+        netNum: totalNum,
+      }
+    }
+
+    const paybackNum = Math.round(totalNum / 5)
+    const netNum = totalNum - paybackNum
+
+    return {
+      hasNumeric: true,
+      total: `${totalNum.toLocaleString()} ${unit}`,
+      payback: `${paybackNum.toLocaleString()} ${unit}`,
+      netCost: `${netNum.toLocaleString()} ${unit}`,
+      unit,
+      totalNum,
+      paybackNum,
+      netNum,
+    }
   }, [isQuestLevelEligible, reward])
 
   useEffect(() => {
@@ -278,12 +312,74 @@ export default function CharacterQuestDialog({
               placeholder="e.g. 5,000 SP + loot found"
               className="bg-muted/30 border-border/40 text-xs"
             />
-            {isQuestLevelEligible && (
-              <div className="p-2 rounded bg-emerald-950/30 border border-emerald-500/30 text-emerald-300 text-[11px] flex items-center gap-1.5">
-                <Sparkles className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                <span>
-                  <strong>Guild Sponsorship Reimbursement:</strong> {calculatedSponsorship}
-                </span>
+            {calculatedBreakdown && (
+              <div className="rounded-lg border bg-gradient-to-br from-purple-950/40 via-muted/30 to-emerald-950/20 border-purple-500/30 p-3 space-y-2 text-xs">
+                <div className="flex items-center justify-between font-bold text-foreground">
+                  <span className="flex items-center gap-1.5 text-purple-300">
+                    <Coins className="h-4 w-4 text-amber-400" />
+                    Payment & Sponsorship Breakdown
+                  </span>
+                  {isQuestLevelEligible ? (
+                    <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold px-2 py-0.5 rounded">
+                      20% Reimbursed
+                    </span>
+                  ) : (
+                    <span className="bg-muted text-muted-foreground border border-border/40 text-[10px] font-medium px-2 py-0.5 rounded">
+                      100% Poster Cost
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                  {/* Step 1: Upfront Agreed Reward */}
+                  <div className="bg-background/60 p-2 rounded border border-border/30">
+                    <span className="text-[10px] text-muted-foreground uppercase font-bold block">
+                      Agreed Reward
+                    </span>
+                    <span className="text-xs font-bold text-amber-300 font-mono">
+                      {calculatedBreakdown.total}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground block mt-0.5">
+                      Paid to adventurers
+                    </span>
+                  </div>
+
+                  {/* Step 2: Guild Sponsorship Payback */}
+                  <div className="bg-emerald-950/30 p-2 rounded border border-emerald-500/30">
+                    <span className="text-[10px] text-emerald-400 uppercase font-bold block flex items-center gap-1">
+                      <Sparkles className="h-3 w-3" /> Guild Payback
+                    </span>
+                    <span className="text-xs font-bold text-emerald-300 font-mono">
+                      + {calculatedBreakdown.payback}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground block mt-0.5">
+                      {isQuestLevelEligible ? 'Reimbursed by Void' : 'No reimbursement'}
+                    </span>
+                  </div>
+
+                  {/* Step 3: Actual Out-of-Pocket Net Cost */}
+                  <div className="bg-purple-950/30 p-2 rounded border border-purple-500/40">
+                    <span className="text-[10px] text-purple-300 uppercase font-bold block">
+                      Actual Cost to You
+                    </span>
+                    <span className="text-xs font-bold text-white font-mono">
+                      {calculatedBreakdown.netCost}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground block mt-0.5">
+                      Net expense after quest
+                    </span>
+                  </div>
+                </div>
+
+                {isQuestLevelEligible ? (
+                  <p className="text-[11px] text-muted-foreground italic pt-0.5">
+                    Upon quest completion in a session, you pay the party the full agreed reward, and the Guild of the Void immediately reimburses you <strong>{calculatedBreakdown.payback}</strong> in your character log!
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground italic pt-0.5">
+                    Quests above Level {maxSponsoredLevel} or posted without Journeyman rank are not eligible for 1/5th Guild reimbursement.
+                  </p>
+                )}
               </div>
             )}
           </div>

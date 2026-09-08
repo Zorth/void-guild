@@ -617,6 +617,7 @@ export const getCharacterTransactions = query({
             name: q.name,
             reward: q.reward,
             sponsoredAmount: q.sponsoredAmount || '20% of reward',
+            netCost: q.netCost,
             worldName,
             completedAt: q.completedAt || q._creationTime,
             reimbursementClaimed: !!q.reimbursementClaimed,

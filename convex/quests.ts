@@ -22,6 +22,7 @@ export const createQuest = mutation({
     let characterRank: string | undefined = undefined
     let isSponsored = false
     let sponsoredAmount: string | undefined = undefined
+    let netCost: string | undefined = undefined
 
     if (args.characterId) {
       const character = await ctx.db.get(args.characterId)
@@ -40,20 +41,22 @@ export const createQuest = mutation({
       if ((characterRank === 'journeyman' || characterRank === 'guildmaster') && questLevel <= maxSponsoredLevel) {
         isSponsored = true
         if (args.reward) {
-          // Attempt parsing gold / silver / currency amount
-          // e.g. "5000 SP", "5,000 SP", "100 GP", "500 gold"
           const rewardClean = args.reward.replace(/,/g, '')
           const match = rewardClean.match(/(\d+(?:\.\d+)?)\s*(sp|gp|cp|pp|gold|silver|copper|platinum)?/i)
           if (match) {
             const num = parseFloat(match[1])
             const unit = match[2] ? match[2].toUpperCase() : 'GP'
             const sponsorVal = Math.round(num / 5)
+            const netVal = num - sponsorVal
             sponsoredAmount = `${sponsorVal.toLocaleString()} ${unit}`
+            netCost = `${netVal.toLocaleString()} ${unit}`
           } else {
             sponsoredAmount = '20% (1/5th) reimbursed by Guild'
+            netCost = '80% (4/5ths) net cost'
           }
         } else {
           sponsoredAmount = '20% (1/5th) reimbursed by Guild'
+          netCost = '80% (4/5ths) net cost'
         }
       }
     }
@@ -68,6 +71,7 @@ export const createQuest = mutation({
       characterRank,
       isSponsored,
       sponsoredAmount,
+      netCost,
       reimbursementClaimed: false,
       isCompleted: false,
     })
@@ -114,6 +118,7 @@ export const updateQuest = mutation({
     let characterRank = quest.characterRank
     let isSponsored = quest.isSponsored ?? false
     let sponsoredAmount = quest.sponsoredAmount
+    let netCost = quest.netCost
 
     if (args.characterId) {
       const character = await ctx.db.get(args.characterId)
@@ -131,16 +136,21 @@ export const updateQuest = mutation({
               const num = parseFloat(match[1])
               const unit = match[2] ? match[2].toUpperCase() : 'GP'
               const sponsorVal = Math.round(num / 5)
+              const netVal = num - sponsorVal
               sponsoredAmount = `${sponsorVal.toLocaleString()} ${unit}`
+              netCost = `${netVal.toLocaleString()} ${unit}`
             } else {
               sponsoredAmount = '20% (1/5th) reimbursed by Guild'
+              netCost = '80% (4/5ths) net cost'
             }
           } else {
             sponsoredAmount = '20% (1/5th) reimbursed by Guild'
+            netCost = '80% (4/5ths) net cost'
           }
         } else {
           isSponsored = false
           sponsoredAmount = undefined
+          netCost = undefined
         }
       }
     }
@@ -157,6 +167,7 @@ export const updateQuest = mutation({
         characterRank,
         isSponsored,
         sponsoredAmount,
+        netCost,
     })
   },
 })
