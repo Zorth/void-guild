@@ -110,9 +110,14 @@ export default function CharacterCosmeticsTab({
     }))
   }
 
-  const renderColorSwatches = (colorKey: 'nameColor' | 'subtitleColor') => {
+  const renderColorSwatches = (colorKey: 'nameColor' | 'titleColor' | 'subtitleColor') => {
     const isDefaultSelected = !cosmetics[colorKey] || cosmetics[colorKey] === ''
-    const defaultFillClass = colorKey === 'nameColor' ? 'bg-foreground' : 'bg-muted-foreground'
+    const defaultFillClass =
+      colorKey === 'nameColor'
+        ? 'bg-foreground'
+        : colorKey === 'titleColor'
+          ? 'bg-amber-400/90'
+          : 'bg-muted-foreground'
 
     return (
       <div className="flex flex-wrap gap-2.5 items-center">
@@ -215,7 +220,7 @@ export default function CharacterCosmeticsTab({
                 </span>
               </div>
               {title && (
-                <div className="text-xs text-amber-400/90 italic font-medium">
+                <div className={previewStyles.titleClassName} style={previewStyles.titleStyle}>
                   {title}
                 </div>
               )}
@@ -253,21 +258,54 @@ export default function CharacterCosmeticsTab({
           }}
         >
           {FONT_OPTIONS.filter(isOptionVisible).map((f) => {
-            const { isUnlocked, isHidden, title } = getOptionLockStatus(f)
+            const { isUnlocked, isHidden, title: reqTitle } = getOptionLockStatus(f)
             return (
               <option key={f.id} value={f.id} disabled={!isUnlocked}>
                 {isUnlocked
                   ? f.name
                   : isAdmin
-                    ? `🔒 ${f.name} (Requires: ${title}${isHidden ? ' - Secret' : ''})`
+                    ? `🔒 ${f.name} (Requires: ${reqTitle}${isHidden ? ' - Secret' : ''})`
                     : isHidden
                       ? `🔒 ${f.name} (Secret Achievement)`
-                      : `🔒 ${f.name} (Requires: ${title})`}
+                      : `🔒 ${f.name} (Requires: ${reqTitle})`}
               </option>
             )
           })}
         </select>
       </div>
+
+      {/* Title Font (Only when character has a title) */}
+      {title && (
+        <div className="flex flex-col gap-2">
+          <label className="text-xs font-semibold flex items-center gap-1.5">
+            <Type className="h-4 w-4 text-amber-400" />
+            Title Font
+          </label>
+          <select
+            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs"
+            value={cosmetics.titleFont || 'default'}
+            onChange={(e) => {
+              const opt = FONT_OPTIONS.find((f) => f.id === e.target.value)
+              if (opt) handleSelectOption('titleFont', opt)
+            }}
+          >
+            {FONT_OPTIONS.filter(isOptionVisible).map((f) => {
+              const { isUnlocked, isHidden, title: reqTitle } = getOptionLockStatus(f)
+              return (
+                <option key={f.id} value={f.id} disabled={!isUnlocked}>
+                  {isUnlocked
+                    ? f.name
+                    : isAdmin
+                      ? `🔒 ${f.name} (Requires: ${reqTitle}${isHidden ? ' - Secret' : ''})`
+                      : isHidden
+                        ? `🔒 ${f.name} (Secret Achievement)`
+                        : `🔒 ${f.name} (Requires: ${reqTitle})`}
+                </option>
+              )
+            })}
+          </select>
+        </div>
+      )}
 
       {/* 2. Subtitle Font */}
       <div className="flex flex-col gap-2">
@@ -284,16 +322,16 @@ export default function CharacterCosmeticsTab({
           }}
         >
           {FONT_OPTIONS.filter(isOptionVisible).map((f) => {
-            const { isUnlocked, isHidden, title } = getOptionLockStatus(f)
+            const { isUnlocked, isHidden, title: reqTitle } = getOptionLockStatus(f)
             return (
               <option key={f.id} value={f.id} disabled={!isUnlocked}>
                 {isUnlocked
                   ? f.name
                   : isAdmin
-                    ? `🔒 ${f.name} (Requires: ${title}${isHidden ? ' - Secret' : ''})`
+                    ? `🔒 ${f.name} (Requires: ${reqTitle}${isHidden ? ' - Secret' : ''})`
                     : isHidden
                       ? `🔒 ${f.name} (Secret Achievement)`
-                      : `🔒 ${f.name} (Requires: ${title})`}
+                      : `🔒 ${f.name} (Requires: ${reqTitle})`}
               </option>
             )
           })}
@@ -308,6 +346,17 @@ export default function CharacterCosmeticsTab({
         </label>
         {renderColorSwatches('nameColor')}
       </div>
+
+      {/* Title Color Swatches (Only when character has a title) */}
+      {title && (
+        <div className="flex flex-col gap-2">
+          <label className="text-xs font-semibold flex items-center gap-1.5">
+            <Palette className="h-4 w-4 text-amber-400" />
+            Title Color
+          </label>
+          {renderColorSwatches('titleColor')}
+        </div>
+      )}
 
       {/* 4. Subtitle Color Swatches */}
       <div className="flex flex-col gap-2">

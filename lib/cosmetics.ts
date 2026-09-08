@@ -333,8 +333,10 @@ export const BG_COLOR_OPTIONS: CosmeticOption[] = [
 
 export interface CharacterCosmetics {
   nameFont?: string
+  titleFont?: string
   subtitleFont?: string
   nameColor?: string
+  titleColor?: string
   subtitleColor?: string
   borderShape?: string
   borderColor?: string
@@ -349,6 +351,8 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
       cardStyle: {},
       nameClassName: '',
       nameStyle: {},
+      titleClassName: 'text-xs text-amber-400/90 italic font-medium',
+      titleStyle: {},
       subtitleClassName: 'font-normal opacity-80',
       subtitleStyle: { opacity: 0.8 },
       profileRingClassName: 'border border-border',
@@ -358,6 +362,10 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
   // Name Font
   const nameFontObj = FONT_OPTIONS.find((f) => f.id === cosmetics.nameFont)
   const nameFontVal = nameFontObj ? nameFontObj.value : ''
+
+  // Title Font
+  const titleFontObj = FONT_OPTIONS.find((f) => f.id === cosmetics.titleFont)
+  const titleFontVal = titleFontObj ? titleFontObj.value : ''
 
   // Subtitle Font
   const subFontObj = FONT_OPTIONS.find((f) => f.id === cosmetics.subtitleFont)
@@ -463,6 +471,28 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
     nameStyle = { color: cosmetics.nameColor }
   }
 
+  // Title Style & Class (Default is amber-400/90 italic font-medium)
+  const titleColorObj = COLOR_OPTIONS.find((c) => c.id === cosmetics.titleColor || c.value === cosmetics.titleColor)
+  let titleClassName = titleFontVal
+    ? `${titleFontVal} text-xs italic font-medium`
+    : 'text-xs italic font-medium'
+  let titleStyle: React.CSSProperties = {}
+
+  if (titleColorObj?.value === 'gold-text' || cosmetics.titleColor === 'gold_text' || cosmetics.titleColor === 'gold-text') {
+    titleClassName = `${titleClassName} gold-text`
+    titleStyle = {}
+  } else if (titleColorObj?.value === 'rainbow-text' || cosmetics.titleColor === 'rainbow' || cosmetics.titleColor === 'rainbow-text') {
+    titleClassName = `${titleClassName} rainbow-text`
+    titleStyle = {}
+  } else if (titleColorObj?.value) {
+    titleStyle = { color: titleColorObj.value }
+  } else if (cosmetics.titleColor) {
+    titleStyle = { color: cosmetics.titleColor }
+  } else {
+    // Default title color
+    titleClassName = `${titleClassName} text-amber-400/90`
+  }
+
   // Subtitle Style & Class (Always translucent with opacity 0.8)
   const subColorObj = COLOR_OPTIONS.find((c) => c.id === cosmetics.subtitleColor || c.value === cosmetics.subtitleColor)
   let subtitleClassName = `${subFontVal} font-normal opacity-80`
@@ -484,6 +514,8 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
     cardStyle,
     nameClassName,
     nameStyle,
+    titleClassName,
+    titleStyle,
     subtitleClassName,
     subtitleStyle,
     profileRingClassName,

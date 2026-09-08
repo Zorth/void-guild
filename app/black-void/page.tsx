@@ -153,10 +153,34 @@ export default function BlackVoidPage() {
           </span>
         </div>
 
-        <ActiveCharacterSelector
-          selectedCharacterId={selectedCharacterId}
-          onSelectCharacter={handleSelectCharacter}
-        />
+        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+          {selectedChar?.money && (
+            <div
+              className="h-11 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 flex items-center gap-2 shadow-md shrink-0"
+              title={`Purse breakdown: ${selectedChar.money.pp}pp, ${selectedChar.money.gp}gp, ${selectedChar.money.sp}sp, ${selectedChar.money.cp}cp`}
+            >
+              <div className="p-1 rounded-md bg-amber-500/20 text-amber-400">
+                <Coins className="h-4 w-4" />
+              </div>
+              <div className="flex flex-col text-left leading-none">
+                <span className="text-[10px] uppercase font-bold text-amber-200/70 tracking-wider">
+                  Purse
+                </span>
+                <span className="text-xs sm:text-sm font-bold font-mono text-amber-300">
+                  {selectedChar.money.totalInGold % 1 === 0
+                    ? selectedChar.money.totalInGold.toLocaleString()
+                    : selectedChar.money.totalInGold.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}{' '}
+                  GP
+                </span>
+              </div>
+            </div>
+          )}
+
+          <ActiveCharacterSelector
+            selectedCharacterId={selectedCharacterId}
+            onSelectCharacter={handleSelectCharacter}
+          />
+        </div>
       </div>
 
       {/* Navigation Tabs */}
@@ -739,6 +763,8 @@ export default function BlackVoidPage() {
         onClose={() => setBiddingListing(null)}
         listing={biddingListing}
         characterId={selectedCharacterId}
+        characterName={selectedChar?.name}
+        characterWealth={selectedChar?.money || null}
       />
 
       <CharacterQuestDialog

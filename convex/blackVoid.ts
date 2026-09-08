@@ -34,10 +34,51 @@ export const getUserCharacters = query({
     const user = await ctx.auth.getUserIdentity()
     if (!user) return []
 
-    return await ctx.db
+    const characters = await ctx.db
       .query('characters')
       .withIndex('by_userId', (q) => q.eq('userId', user.subject))
       .collect()
+
+    return await Promise.all(
+      characters.map(async (char) => {
+        const details = await ctx.db
+          .query('characterDetails')
+          .withIndex('by_characterId', (q) => q.eq('characterId', char._id))
+          .first()
+
+        let money: {
+          cp: number
+          sp: number
+          gp: number
+          pp: number
+          totalInGold: number
+        } | null = null
+
+        if (details?.money) {
+          const cp = details.money.cp || 0
+          const sp = details.money.sp || 0
+          const gp = details.money.gp || 0
+          const pp = details.money.pp || 0
+          const totalInGold =
+            details.money.totalInGold !== undefined
+              ? details.money.totalInGold
+              : Math.round((gp + pp * 10 + sp / 10 + cp / 100) * 100) / 100
+
+          money = {
+            cp,
+            sp,
+            gp,
+            pp,
+            totalInGold,
+          }
+        }
+
+        return {
+          ...char,
+          money,
+        }
+      })
+    )
   },
 })
 

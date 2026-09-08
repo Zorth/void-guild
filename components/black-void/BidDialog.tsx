@@ -22,6 +22,14 @@ interface BidDialogProps {
   onClose: () => void
   listing: any
   characterId: Id<'characters'> | null
+  characterName?: string
+  characterWealth?: {
+    cp: number
+    sp: number
+    gp: number
+    pp: number
+    totalInGold: number
+  } | null
 }
 
 export default function BidDialog({
@@ -29,6 +37,8 @@ export default function BidDialog({
   onClose,
   listing,
   characterId,
+  characterName,
+  characterWealth,
 }: BidDialogProps) {
   const [bidAmount, setBidAmount] = useState<string>('')
   const [enableAutoBid, setEnableAutoBid] = useState<boolean>(false)
@@ -185,6 +195,33 @@ export default function BidDialog({
               </span>
             </div>
           </div>
+
+          {/* Active Character Wealth Display */}
+          {characterWealth && (
+            <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2">
+                <div className="p-1 rounded bg-amber-500/20 text-amber-300">
+                  <Coins className="h-4 w-4" />
+                </div>
+                <div>
+                  <span className="text-[10px] text-amber-200/80 block uppercase font-bold tracking-wider">
+                    {characterName ? `${characterName}'s Funds` : 'Character Funds'}
+                  </span>
+                  <span className="text-sm font-bold text-amber-300 font-mono">
+                    {characterWealth.totalInGold % 1 === 0
+                      ? characterWealth.totalInGold.toLocaleString()
+                      : characterWealth.totalInGold.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} GP
+                  </span>
+                </div>
+              </div>
+              <div className="text-[10px] font-mono text-muted-foreground text-right space-x-1.5">
+                {characterWealth.pp > 0 && <span className="text-purple-300">{characterWealth.pp}pp</span>}
+                <span className="text-amber-300">{characterWealth.gp}gp</span>
+                {characterWealth.sp > 0 && <span className="text-slate-300">{characterWealth.sp}sp</span>}
+                {characterWealth.cp > 0 && <span className="text-amber-600">{characterWealth.cp}cp</span>}
+              </div>
+            </div>
+          )}
 
           {/* Bid Form */}
           <div className="space-y-3 pt-2 border-t border-border/20">

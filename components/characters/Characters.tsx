@@ -86,8 +86,10 @@ export default function Characters({ filters }: { filters?: { pf: boolean; dnd: 
 
   const [editedCosmetics, setEditedCosmetics] = useState<CharacterCosmetics>({
     nameFont: 'default',
+    titleFont: 'default',
     subtitleFont: 'default',
     nameColor: '',
+    titleColor: '',
     subtitleColor: '',
     borderShape: 'default',
     borderColor: '',
@@ -173,8 +175,10 @@ export default function Characters({ filters }: { filters?: { pf: boolean; dnd: 
     })
     setEditedCosmetics({
       nameFont: character.cosmetics?.nameFont || 'default',
+      titleFont: character.cosmetics?.titleFont || 'default',
       subtitleFont: character.cosmetics?.subtitleFont || 'default',
       nameColor: character.cosmetics?.nameColor || '',
+      titleColor: character.cosmetics?.titleColor || '',
       subtitleColor: character.cosmetics?.subtitleColor || '',
       borderShape: character.cosmetics?.borderShape || 'default',
       borderColor: character.cosmetics?.borderColor || '',
@@ -253,7 +257,7 @@ export default function Characters({ filters }: { filters?: { pf: boolean; dnd: 
                             </a>
                           </div>
                           {character.title && (
-                            <span className="text-xs text-amber-400/90 italic font-medium">
+                            <span className={cosmetics.titleClassName} style={cosmetics.titleStyle}>
                               {character.title}
                             </span>
                           )}

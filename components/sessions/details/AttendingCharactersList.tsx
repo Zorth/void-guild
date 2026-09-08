@@ -153,7 +153,7 @@ export default function AttendingCharactersList({
                         </a>
                     </div>
                     {char.title && (
-                      <div className="text-xs text-amber-400/90 italic font-medium">
+                      <div className={cosmeticsStyles.titleClassName} style={cosmeticsStyles.titleStyle}>
                         {char.title}
                       </div>
                     )}

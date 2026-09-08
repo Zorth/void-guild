@@ -15,8 +15,10 @@ export default defineSchema({
         system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
         cosmetics: v.optional(v.object({
             nameFont: v.optional(v.string()),
+            titleFont: v.optional(v.string()),
             subtitleFont: v.optional(v.string()),
             nameColor: v.optional(v.string()),
+            titleColor: v.optional(v.string()),
             subtitleColor: v.optional(v.string()),
             borderShape: v.optional(v.string()),
             borderColor: v.optional(v.string()),
