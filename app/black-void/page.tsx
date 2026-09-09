@@ -11,6 +11,8 @@ import ServiceListingDialog from '@/components/black-void/ServiceListingDialog'
 import BidDialog from '@/components/black-void/BidDialog'
 import CharacterQuestDialog from '@/components/black-void/CharacterQuestDialog'
 import CharacterSheetLog from '@/components/black-void/CharacterSheetLog'
+import BettingTab from '@/components/black-void/BettingTab'
+import SendBetDialog from '@/components/black-void/SendBetDialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -54,6 +56,7 @@ export default function BlackVoidPage() {
   const [editingService, setEditingService] = useState<any | null>(null)
   const [isQuestModalOpen, setIsQuestModalOpen] = useState(false)
   const [biddingListing, setBiddingListing] = useState<any>(null)
+  const [isSendBetOpen, setIsSendBetOpen] = useState(false)
 
   // Mutations
   const deleteServiceListing = useMutation(api.blackVoid.deleteServiceListing)
@@ -63,6 +66,7 @@ export default function BlackVoidPage() {
   const activeItemListings = useQuery(api.blackVoid.getListings, { type: 'item', status: 'active' })
   const activeServiceListings = useQuery(api.blackVoid.getListings, { type: 'service', status: 'active' })
   const characterQuests = useQuery(api.quests.getCharacterQuests, { characterId: selectedCharacterId || undefined })
+  const bettingData = useQuery(api.blackVoidBets.getBettingData, { characterId: selectedCharacterId || undefined })
 
   // Auto-select initial character
   useEffect(() => {
@@ -259,7 +263,12 @@ export default function BlackVoidPage() {
             )}
           >
             <Dices className="h-4 w-4" />
-            Gambling
+            Betting
+            {bettingData && (bettingData.activeMatches.length > 0 || bettingData.receivedInvitations.length > 0) && (
+              <span className="ml-1 bg-rose-950 px-1.5 py-0.5 rounded text-[10px] text-rose-200 font-mono font-bold animate-pulse">
+                {bettingData.activeMatches.length + bettingData.receivedInvitations.length}
+              </span>
+            )}
           </Button>
         </div>
 
@@ -754,26 +763,13 @@ export default function BlackVoidPage() {
         <CharacterSheetLog characterId={selectedCharacterId} />
       )}
 
-      {/* TAB 5: GAMBLING */}
+      {/* TAB 5: BETTING */}
       {activeTab === 'gambling' && (
-        <div className="flex flex-col items-center justify-center min-h-[380px] p-8 text-center rounded-2xl border border-dashed border-rose-500/30 bg-gradient-to-b from-rose-950/10 via-card/50 to-background">
-          <div className="relative mb-5">
-            <div className="absolute -inset-2 rounded-full bg-rose-500/20 blur-xl animate-pulse pointer-events-none" />
-            <div className="relative p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 shadow-inner">
-              <Dices className="h-12 w-12" />
-            </div>
-          </div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30 mb-3 tracking-wide uppercase">
-            <Sparkles className="h-3.5 w-3.5" />
-            Coming Soon
-          </div>
-          <h3 className="text-xl font-bold tracking-tight text-foreground mb-2">
-            High Stakes & Void Games
-          </h3>
-          <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
-            The dice are being weighted and the card decks shuffled. Soon you will be able to test your luck and wager coin in the Black Void.
-          </p>
-        </div>
+        <BettingTab
+          characterId={selectedCharacterId}
+          selectedChar={selectedChar}
+          onOpenSendBet={() => setIsSendBetOpen(true)}
+        />
       )}
 
       {/* Dialog Modals */}
@@ -811,6 +807,16 @@ export default function BlackVoidPage() {
         characterRank={selectedChar?.rank || 'none'}
         characterLevel={selectedChar?.lvl || 1}
       />
+
+      {selectedCharacterId && (
+        <SendBetDialog
+          isOpen={isSendBetOpen}
+          onClose={() => setIsSendBetOpen(false)}
+          senderCharacterId={selectedCharacterId}
+          senderName={selectedChar?.name}
+          availableOpponents={bettingData?.availableOpponents || []}
+        />
+      )}
     </div>
   )
 }

@@ -24,6 +24,9 @@ import {
   Package,
   Loader2,
   ListTodo,
+  Trophy,
+  Skull,
+  Dices,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -75,6 +78,8 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
   const toggleQuestClaimed = useMutation(api.quests.toggleQuestReimbursementClaimed)
   const togglePaymentClaimed = useMutation(api.quests.toggleQuestPaymentClaimed)
   const toggleSessionCutClaimed = useMutation(api.sessions.toggleGuildmasterCutClaimed)
+  const toggleBetWinnerClaimed = useMutation(api.blackVoidBets.toggleBetWinnerClaimed)
+  const toggleBetLoserClaimed = useMutation(api.blackVoidBets.toggleBetLoserClaimed)
   const markAllClaimed = useMutation(api.blackVoid.markAllCharacterTransactionsClaimed)
   const deleteServiceListing = useMutation(api.blackVoid.deleteServiceListing)
 
@@ -85,6 +90,8 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
     sponsoredQuestReimbursements = [],
     completedQuestsToPay = [],
     guildmasterAreaGains = [],
+    betsWon = [],
+    betsLost = [],
     isGuildmaster = false,
   } = (transactions as any) || {}
 
@@ -114,23 +121,37 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
     [isGuildmaster, guildmasterAreaGains]
   )
 
+  const pendingWonBets = useMemo(
+    () => betsWon.filter((bet: any) => !bet.winnerClaimed),
+    [betsWon]
+  )
+
+  const pendingLostBets = useMemo(
+    () => betsLost.filter((bet: any) => !bet.loserClaimed),
+    [betsLost]
+  )
+
   // Calculations for summary metrics
   const { totalPendingIncome, totalPendingExpense, netPendingGold, totalPendingCount } = useMemo(() => {
     let income = 0
     for (const item of pendingSoldItems) income += parseGpAmount(item.winningAmount)
     for (const q of pendingSponsoredQuests) income += parseGpAmount(q.sponsoredAmount)
     for (const g of pendingGuildmasterGains) income += parseGpAmount(g.guildmasterCut)
+    for (const b of pendingWonBets) income += b.wagerAmount
 
     let expense = 0
     for (const item of pendingWonItems) expense += parseGpAmount(item.winningAmount)
     for (const q of pendingQuestsToPay) expense += parseGpAmount(q.actualToPay)
+    for (const b of pendingLostBets) expense += b.wagerAmount
 
     const count =
       pendingSoldItems.length +
       pendingWonItems.length +
       pendingSponsoredQuests.length +
       pendingQuestsToPay.length +
-      pendingGuildmasterGains.length
+      pendingGuildmasterGains.length +
+      pendingWonBets.length +
+      pendingLostBets.length
 
     return {
       totalPendingIncome: Math.round(income * 100) / 100,
@@ -138,7 +159,7 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
       netPendingGold: Math.round((income - expense) * 100) / 100,
       totalPendingCount: count,
     }
-  }, [pendingSoldItems, pendingWonItems, pendingSponsoredQuests, pendingQuestsToPay, pendingGuildmasterGains])
+  }, [pendingSoldItems, pendingWonItems, pendingSponsoredQuests, pendingQuestsToPay, pendingGuildmasterGains, pendingWonBets, pendingLostBets])
 
   if (!characterId) {
     return (
@@ -201,6 +222,24 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
       }
     } catch {
       toast.error('Failed to update regional gains status')
+    }
+  }
+
+  const handleToggleBetWinnerClaimed = async (betId: Id<'blackVoidBets'>) => {
+    try {
+      await toggleBetWinnerClaimed({ betId, characterId })
+      toast.success('Updated betting winnings log state!')
+    } catch {
+      toast.error('Failed to update betting winnings status')
+    }
+  }
+
+  const handleToggleBetLoserClaimed = async (betId: Id<'blackVoidBets'>) => {
+    try {
+      await toggleBetLoserClaimed({ betId, characterId })
+      toast.success('Updated betting loss log state!')
+    } catch {
+      toast.error('Failed to update betting loss status')
     }
   }
 
@@ -366,13 +405,40 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
               )}
 
               {/* 2. Pending Gold Income */}
-              {(pendingSoldItems.length > 0 || pendingSponsoredQuests.length > 0 || pendingGuildmasterGains.length > 0) && (
+              {(pendingSoldItems.length > 0 || pendingSponsoredQuests.length > 0 || pendingGuildmasterGains.length > 0 || pendingWonBets.length > 0) && (
                 <div className="space-y-2">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
                     <ArrowDownLeft className="h-4 w-4" />
                     Pending Gold Income to Add (+{formatGpAmount(totalPendingIncome)})
                   </h4>
                   <div className="grid gap-2">
+                    {pendingWonBets.map((bet: any) => (
+                      <div
+                        key={bet._id}
+                        className="p-2.5 rounded-md border border-emerald-500/30 bg-emerald-950/15 flex items-center justify-between gap-3 text-xs"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <Trophy className="h-4 w-4 text-emerald-400 shrink-0" />
+                          <div className="truncate">
+                            <span className="font-bold text-foreground">Deathroll Bet Won</span>
+                            <span className="text-muted-foreground ml-2">vs {bet.opponentName} ({bet.lossReason === 'timeout' ? 'by 24h Timeout' : 'Rolled a 0'})</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="font-mono font-bold text-emerald-300">+{bet.wagerAmount} GP</span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleToggleBetWinnerClaimed(bet._id)}
+                            className="h-7 px-2 text-[11px] border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-300 gap-1"
+                          >
+                            <CheckCheck className="h-3 w-3" />
+                            Mark Added
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+
                     {pendingSoldItems.map((item: any) => (
                       <div
                         key={item._id}
@@ -458,13 +524,39 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
               )}
 
               {/* 3. Pending Gold Expenses */}
-              {(pendingWonItems.length > 0 || pendingQuestsToPay.length > 0) && (
+              {(pendingWonItems.length > 0 || pendingQuestsToPay.length > 0 || pendingLostBets.length > 0) && (
                 <div className="space-y-2">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
                     <ArrowUpRight className="h-4 w-4" />
                     Pending Gold Expenses to Deduct (-{formatGpAmount(totalPendingExpense)})
                   </h4>
                   <div className="grid gap-2">
+                    {pendingLostBets.map((bet: any) => (
+                      <div
+                        key={bet._id}
+                        className="p-2.5 rounded-md border border-rose-500/30 bg-rose-950/15 flex items-center justify-between gap-3 text-xs"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <Skull className="h-4 w-4 text-rose-400 shrink-0" />
+                          <div className="truncate">
+                            <span className="font-bold text-foreground">Deathroll Bet Lost</span>
+                            <span className="text-muted-foreground ml-2">vs {bet.opponentName} ({bet.lossReason === 'timeout' ? 'Missed 24h Window' : 'Rolled a 0'})</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="font-mono font-bold text-rose-300">-{bet.wagerAmount} GP</span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleToggleBetLoserClaimed(bet._id)}
+                            className="h-7 px-2 text-[11px] border-rose-500/30 hover:bg-rose-500/20 text-rose-300 gap-1"
+                          >
+                            <CheckCheck className="h-3 w-3" />
+                            Mark Deducted
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
                     {pendingWonItems.map((item: any) => (
                       <div
                         key={item._id}
@@ -902,7 +994,117 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
         </Card>
       )}
 
-      {/* 5. Crafting Services Offered */}
+      {/* 5. Deathroll Betting & Void Wagers */}
+      {(betsWon.length > 0 || betsLost.length > 0) && (
+        <Card className="border-rose-500/30 bg-card/60">
+          <CardHeader className="pb-3 border-b border-border/20">
+            <CardTitle className="text-base font-bold flex items-center justify-between text-rose-300">
+              <span className="flex items-center gap-2">
+                <Dices className="h-5 w-5 text-rose-400" />
+                Deathroll Betting & Void Wagers
+              </span>
+              <span className="text-xs font-mono text-muted-foreground font-normal">
+                High-Stakes Duel Results
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="space-y-3">
+              {/* Bets Won */}
+              {betsWon.map((bet: any) => {
+                const isClaimed = !!bet.winnerClaimed
+                return (
+                  <div
+                    key={bet._id}
+                    className={cn(
+                      "p-3 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all",
+                      isClaimed
+                        ? "bg-emerald-950/20 border-emerald-500/30"
+                        : "bg-emerald-950/15 border-emerald-500/40"
+                    )}
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm text-foreground">
+                          Won vs {bet.opponentName}
+                        </span>
+                        <span className="text-[10px] uppercase font-bold bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded">
+                          Duel Won
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Wager Won:{' '}
+                        <strong className="text-emerald-300 font-mono font-bold">+{bet.wagerAmount} GP</strong> •
+                        Starting Max: 0-{bet.deathrollValue?.toLocaleString()} • {bet.lossReason === 'timeout' ? 'Opponent Timed Out (24h)' : 'Opponent Rolled a 0'} ({bet.rollsCount} rolls)
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                      <label className="flex items-center gap-2 cursor-pointer bg-background/60 hover:bg-background px-3 py-1.5 rounded-md border border-emerald-500/30 text-xs">
+                        <Checkbox
+                          checked={isClaimed}
+                          onCheckedChange={() => handleToggleBetWinnerClaimed(bet._id)}
+                          className="border-emerald-400 data-[state=checked]:bg-emerald-600"
+                        />
+                        <span className={cn("font-medium", isClaimed ? "text-emerald-300" : "text-muted-foreground")}>
+                          {isClaimed ? 'Added to Sheet ✓' : 'Add to Sheet'}
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                )
+              })}
+
+              {/* Bets Lost */}
+              {betsLost.map((bet: any) => {
+                const isClaimed = !!bet.loserClaimed
+                return (
+                  <div
+                    key={bet._id}
+                    className={cn(
+                      "p-3 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all",
+                      isClaimed
+                        ? "bg-emerald-950/20 border-emerald-500/30"
+                        : "bg-rose-950/15 border-rose-500/40"
+                    )}
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm text-foreground">
+                          Lost vs {bet.opponentName}
+                        </span>
+                        <span className="text-[10px] uppercase font-bold bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded">
+                          Duel Lost
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Wager Lost:{' '}
+                        <strong className="text-rose-300 font-mono font-bold">-{bet.wagerAmount} GP</strong> •
+                        Starting Max: 0-{bet.deathrollValue?.toLocaleString()} • {bet.lossReason === 'timeout' ? 'Missed 24h Window' : 'Rolled a 0'} ({bet.rollsCount} rolls)
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                      <label className="flex items-center gap-2 cursor-pointer bg-background/60 hover:bg-background px-3 py-1.5 rounded-md border border-rose-500/30 text-xs">
+                        <Checkbox
+                          checked={isClaimed}
+                          onCheckedChange={() => handleToggleBetLoserClaimed(bet._id)}
+                          className="border-rose-400 data-[state=checked]:bg-emerald-600"
+                        />
+                        <span className={cn("font-medium", isClaimed ? "text-emerald-300" : "text-muted-foreground")}>
+                          {isClaimed ? 'Deducted from Sheet ✓' : 'Deduct from Sheet'}
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 6. Crafting Services Offered */}
       {servicesOffered.length > 0 && (
         <Card className="border-amber-500/30 bg-card/60">
           <CardHeader className="pb-3 border-b border-border/20">

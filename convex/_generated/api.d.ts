@@ -11,6 +11,7 @@
 import type * as achievements from "../achievements.js";
 import type * as activity from "../activity.js";
 import type * as blackVoid from "../blackVoid.js";
+import type * as blackVoidBets from "../blackVoidBets.js";
 import type * as characters from "../characters.js";
 import type * as commendations from "../commendations.js";
 import type * as crons from "../crons.js";
@@ -36,6 +37,7 @@ declare const fullApi: ApiFromModules<{
   achievements: typeof achievements;
   activity: typeof activity;
   blackVoid: typeof blackVoid;
+  blackVoidBets: typeof blackVoidBets;
   characters: typeof characters;
   commendations: typeof commendations;
   crons: typeof crons;

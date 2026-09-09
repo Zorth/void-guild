@@ -234,6 +234,44 @@ export default defineSchema({
         buyerClaimed: v.optional(v.boolean()),
     }).index('by_listingId', ['listingId'])
       .index('by_characterId', ['characterId']),
+    blackVoidBets: defineTable({
+        senderCharacterId: v.id('characters'),
+        targetCharacterId: v.optional(v.id('characters')), // Specific opponent or null for open challenge
+        wagerAmount: v.number(), // GP wager amount
+        deathrollValue: v.number(), // Starting max roll (e.g. 1000, up to 1000000)
+        message: v.optional(v.string()), // Optional message/flavor
+        status: v.union(
+            v.literal('pending'),
+            v.literal('accepted'),
+            v.literal('declined'),
+            v.literal('cancelled'),
+            v.literal('completed')
+        ),
+        acceptedByCharacterId: v.optional(v.id('characters')),
+        winnerCharacterId: v.optional(v.id('characters')),
+        loserCharacterId: v.optional(v.id('characters')),
+        lossReason: v.optional(v.union(v.literal('rolled_zero'), v.literal('timeout'))),
+        currentRollMax: v.optional(v.number()),
+        currentTurnCharacterId: v.optional(v.id('characters')),
+        turnDeadline: v.optional(v.number()), // 24-hour timestamp deadline
+        rolls: v.optional(v.array(v.object({
+            characterId: v.id('characters'),
+            roll: v.number(),
+            outOf: v.number(),
+            timestamp: v.number(),
+        }))),
+        winnerClaimed: v.optional(v.boolean()), // Ledger claim checkmark for winner
+        loserClaimed: v.optional(v.boolean()), // Ledger claim checkmark for loser
+        createdAt: v.number(),
+        updatedAt: v.optional(v.number()),
+    }).index('by_senderCharacterId_and_status', ['senderCharacterId', 'status'])
+      .index('by_targetCharacterId_and_status', ['targetCharacterId', 'status'])
+      .index('by_status', ['status'])
+      .index('by_senderCharacterId', ['senderCharacterId'])
+      .index('by_targetCharacterId', ['targetCharacterId'])
+      .index('by_acceptedByCharacterId', ['acceptedByCharacterId'])
+      .index('by_winnerCharacterId', ['winnerCharacterId'])
+      .index('by_loserCharacterId', ['loserCharacterId']),
     characterDetails: defineTable({
         characterId: v.id('characters'),
         pathbuilderId: v.optional(v.number()),

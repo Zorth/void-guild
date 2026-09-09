@@ -744,6 +744,32 @@ export const markAllCharacterTransactionsClaimed = mutation({
       }
     }
 
+    // 5. Claim won bets (Deathroll)
+    const wonBets = await ctx.db
+      .query('blackVoidBets')
+      .withIndex('by_winnerCharacterId', (q) => q.eq('winnerCharacterId', args.characterId))
+      .collect()
+
+    for (const bet of wonBets) {
+      if (bet.status === 'completed' && !bet.winnerClaimed) {
+        await ctx.db.patch(bet._id, { winnerClaimed: true })
+        count++
+      }
+    }
+
+    // 6. Claim lost bets (Deathroll)
+    const lostBets = await ctx.db
+      .query('blackVoidBets')
+      .withIndex('by_loserCharacterId', (q) => q.eq('loserCharacterId', args.characterId))
+      .collect()
+
+    for (const bet of lostBets) {
+      if (bet.status === 'completed' && !bet.loserClaimed) {
+        await ctx.db.patch(bet._id, { loserClaimed: true })
+        count++
+      }
+    }
+
     return { success: true, count }
   },
 })
@@ -934,6 +960,55 @@ export const getCharacterTransactions = query({
         })
     )
 
+    // 6. Completed Bets (Deathroll)
+    const wonBetsRaw = await ctx.db
+      .query('blackVoidBets')
+      .withIndex('by_winnerCharacterId', (q) => q.eq('winnerCharacterId', args.characterId!))
+      .collect()
+
+    const betsWon = await Promise.all(
+      wonBetsRaw
+        .filter((b) => b.status === 'completed')
+        .map(async (b) => {
+          const opponentId = b.senderCharacterId === args.characterId ? b.acceptedByCharacterId : b.senderCharacterId
+          const opponent = opponentId ? await ctx.db.get(opponentId) : null
+          return {
+            _id: b._id,
+            wagerAmount: b.wagerAmount,
+            deathrollValue: b.deathrollValue,
+            opponentName: opponent?.name || 'Opponent',
+            lossReason: b.lossReason || 'rolled_zero',
+            rollsCount: b.rolls?.length || 0,
+            completedAt: b.updatedAt || b.createdAt,
+            winnerClaimed: !!b.winnerClaimed,
+          }
+        })
+    )
+
+    const lostBetsRaw = await ctx.db
+      .query('blackVoidBets')
+      .withIndex('by_loserCharacterId', (q) => q.eq('loserCharacterId', args.characterId!))
+      .collect()
+
+    const betsLost = await Promise.all(
+      lostBetsRaw
+        .filter((b) => b.status === 'completed')
+        .map(async (b) => {
+          const opponentId = b.winnerCharacterId
+          const opponent = opponentId ? await ctx.db.get(opponentId) : null
+          return {
+            _id: b._id,
+            wagerAmount: b.wagerAmount,
+            deathrollValue: b.deathrollValue,
+            opponentName: opponent?.name || 'Opponent',
+            lossReason: b.lossReason || 'rolled_zero',
+            rollsCount: b.rolls?.length || 0,
+            completedAt: b.updatedAt || b.createdAt,
+            loserClaimed: !!b.loserClaimed,
+          }
+        })
+    )
+
     return {
       createdItems: itemsSoldOrActive,
       wonItems: wonListings,
@@ -941,6 +1016,8 @@ export const getCharacterTransactions = query({
       sponsoredQuestReimbursements: completedSponsoredQuests,
       completedQuestsToPay,
       guildmasterAreaGains,
+      betsWon,
+      betsLost,
       isGuildmaster,
     }
   },
