@@ -500,13 +500,13 @@
 /* Void Incursion Purple Moving Background Tint */
 .void-nebula-bg {
   position: relative !important;
-  background-image: 
-    radial-gradient(ellipse at 25% 25%, rgba(168, 85, 247, 0.28) 0%, transparent 55%),
-    radial-gradient(ellipse at 75% 75%, rgba(147, 51, 234, 0.24) 0%, transparent 55%),
-    radial-gradient(circle at 50% 50%, rgba(88, 28, 135, 0.3) 0%, transparent 65%),
-    linear-gradient(135deg, rgba(59, 7, 100, 0.18) 0%, rgba(15, 2, 25, 0.22) 100%) !important;
+  background: 
+    radial-gradient(ellipse at 25% 25%, rgba(192, 132, 252, 0.4) 0%, transparent 55%),
+    radial-gradient(ellipse at 75% 75%, rgba(168, 85, 247, 0.35) 0%, transparent 55%),
+    radial-gradient(circle at 50% 50%, rgba(126, 34, 206, 0.35) 0%, transparent 65%),
+    linear-gradient(135deg, rgba(88, 28, 135, 0.3) 0%, rgba(30, 10, 50, 0.4) 100%) !important;
   background-size: 200% 200%, 200% 200%, 160% 160%, 100% 100% !important;
-  animation: void-nebula-flow 12s ease-in-out infinite alternate !important;
+  animation: void-nebula-flow 10s ease-in-out infinite alternate !important;
 }
 
 @keyframes void-nebula-flow {
