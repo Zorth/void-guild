@@ -444,32 +444,18 @@ function MonthOverview({
     );
 }
 
-function SevenDayOverview({ sessions, userCharacterIds }: { sessions: SessionWithDetails[], userCharacterIds: Set<string> }) {
+function FiveDayOverview({ sessions, userCharacterIds }: { sessions: SessionWithDetails[], userCharacterIds: Set<string> }) {
     const { width } = useWindowSize();
-    let numberOfDaysToShow = 7;
-    let gridColsClass = "grid-cols-7";
+    let numberOfDaysToShow = 5;
+    let gridColsClass = "grid-cols-5";
 
-    // Adjust breakpoints based on window width and parent's md:grid-cols-2 layout
-    if (width < 768) { // Parent is grid-cols-1
-      if (width <= 480) {
-        numberOfDaysToShow = 3;
-        gridColsClass = "grid-cols-3";
-      } else { // width > 480 and < 768
-        numberOfDaysToShow = 5;
-        gridColsClass = "grid-cols-5";
-      }
-    } else { // Parent is md:grid-cols-2, so SevenDayOverview gets ~half width
-      // We're in a two-column layout, so effective width is roughly width / 2
-      if (width / 2 <= 480) { // Effective width for 3 columns
-        numberOfDaysToShow = 3;
-        gridColsClass = "grid-cols-3";
-      } else if (width / 2 <= 768) { // Effective width for 5 columns
-        numberOfDaysToShow = 5;
-        gridColsClass = "grid-cols-5";
-      } else { // Effective width for 7 columns (large desktop)
-        numberOfDaysToShow = 7;
-        gridColsClass = "grid-cols-7";
-      }
+    // Adjust breakpoints based on window width
+    if (width > 0 && (width < 640 || (width >= 768 && width / 2 <= 380))) {
+      numberOfDaysToShow = 3;
+      gridColsClass = "grid-cols-3";
+    } else {
+      numberOfDaysToShow = 5;
+      gridColsClass = "grid-cols-5";
     }
 
     const today = new Date();
@@ -493,9 +479,9 @@ function SevenDayOverview({ sessions, userCharacterIds }: { sessions: SessionWit
     }, {} as Record<string, SessionWithDetails[]>);
 
     return (
-        <div className="seven-day-overview-container">
+        <div className="five-day-overview-container mb-4">
             <div className={cn("grid gap-2", gridColsClass)}>
-                {nextDays.map(day => {
+                {nextDays.map((day, i) => {
                     const dayString = day.toDateString();
                     const daySessions = sessionsByDay[dayString] || [];
                     
@@ -508,24 +494,105 @@ function SevenDayOverview({ sessions, userCharacterIds }: { sessions: SessionWit
                     }
 
                     return (
-                        <div
-                            key={dayString}
-                            className={cn(
-                                "day-box overflow-hidden min-h-[8rem]",
-                                !dayBoxClass && "border border-gray-300",
-                                dayBoxClass === "day-box-joined" && "ring-2 ring-inset ring-purple-500/50",
-                                dayBoxClass
+                        <div key={dayString} className="flex flex-col gap-0.5 min-w-0">
+                            {i === 0 ? (
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70 text-center leading-tight">
+                                    Today
+                                </span>
+                            ) : (
+                                <span className="text-[10px] leading-tight select-none opacity-0" aria-hidden="true">
+                                    &nbsp;
+                                </span>
                             )}
-                        >
-                            <div className="day-box-header px-2 py-1">
-                                {`${day.toLocaleDateString('en-US', { weekday: 'long' })} ${day.getDate()}`}
-                            </div>
-                            <div className="day-box-content">
-                                {daySessions.map(session => (
-                                    <Link href={`/sessions/${session._id}`} key={session._id} className="block text-sm font-medium truncate">
-                                        {session.worldName}
-                                    </Link>
-                                ))}
+                            <div
+                                className={cn(
+                                    "day-box overflow-hidden min-h-[8rem] flex flex-col bg-card/40 border border-border/60 rounded-lg",
+                                    !dayBoxClass && "border border-border/40",
+                                    dayBoxClass === "day-box-joined" && "ring-2 ring-inset ring-purple-500/50",
+                                    dayBoxClass
+                                )}
+                            >
+                                <div className="day-box-header px-2 py-1.5 flex items-center justify-between text-xs font-semibold gap-1 border-b border-border/50 bg-muted/40 overflow-hidden">
+                                    <span className="truncate text-muted-foreground font-medium" title={day.toLocaleDateString('en-US', { weekday: 'long' })}>
+                                        {day.toLocaleDateString('en-US', { weekday: 'short' })}
+                                    </span>
+                                    <span className="text-foreground font-bold text-sm font-mono shrink-0">
+                                        {day.getDate()}
+                                    </span>
+                                </div>
+                                <div className="day-box-content p-1.5 flex flex-col gap-1.5 flex-grow">
+                                    {daySessions.map(session => {
+                                        const q = session.quest;
+                                        const levelPF = q?.levelPF ?? q?.level;
+                                        const levelDnD = q?.levelDnD ?? q?.level;
+                                        const numLevel = typeof session.level === 'number' ? session.level : undefined;
+                                        
+                                        let displayLevel: number | 'V' | 'TBD' | undefined = undefined;
+                                        let badgeStyle: React.CSSProperties = {};
+
+                                        if (session.system === 'PF') {
+                                            const l = levelPF ?? numLevel;
+                                            if (l !== undefined) {
+                                                displayLevel = l;
+                                                badgeStyle = getLevelBadgeStyle(l);
+                                            }
+                                        } else if (session.system === 'DnD') {
+                                            const l = levelDnD ?? numLevel;
+                                            if (l !== undefined) {
+                                                displayLevel = l;
+                                                badgeStyle = getLevelBadgeStyle(l);
+                                            }
+                                        } else {
+                                            const isDual = levelPF !== undefined && levelDnD !== undefined && levelPF !== levelDnD;
+                                            if (isDual) {
+                                                displayLevel = 'V';
+                                                badgeStyle = getDualLevelBadgeStyle(levelPF, levelDnD);
+                                            } else {
+                                                const l = levelPF ?? levelDnD ?? numLevel;
+                                                if (l !== undefined) {
+                                                    displayLevel = l;
+                                                    badgeStyle = getLevelBadgeStyle(l);
+                                                }
+                                            }
+                                        }
+
+                                        const isJoined = session.characters.some(id => userCharacterIds.has(id));
+
+                                        return (
+                                            <Link
+                                                href={`/sessions/${session._id}`}
+                                                key={session._id}
+                                                className={cn(
+                                                    "group flex flex-col gap-1 p-1.5 rounded-md bg-muted/40 hover:bg-muted/90 border border-border/50 hover:border-primary/50 transition-all shadow-xs",
+                                                    session.isOwner && "border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20",
+                                                    isJoined && "border-purple-500/40 bg-purple-500/10 hover:bg-purple-500/20"
+                                                )}
+                                                title={`${session.worldName}${displayLevel !== undefined ? ` (Lvl ${displayLevel})` : ''}`}
+                                            >
+                                                <div className="flex items-center gap-1 flex-wrap">
+                                                    {session.system && (
+                                                        <img
+                                                            src={session.system === 'PF' ? '/PFVoid.svg' : '/DnDVoid.svg'}
+                                                            alt={session.system}
+                                                            className="h-3.5 w-3.5 shrink-0"
+                                                        />
+                                                    )}
+                                                    {displayLevel !== undefined && (
+                                                        <span
+                                                            className="inline-flex items-center justify-center rounded-full px-1.5 py-0 text-[9px] font-bold shrink-0 leading-none h-4"
+                                                            style={badgeStyle}
+                                                        >
+                                                            {typeof displayLevel === 'number' ? `Lvl ${displayLevel}` : displayLevel}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <span className="font-semibold text-xs leading-tight truncate text-foreground group-hover:text-primary transition-colors">
+                                                    {session.worldName}
+                                                </span>
+                                            </Link>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         </div>
                     );
@@ -798,9 +865,18 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
             ) : sessions === undefined ? (
               <div className="space-y-6">
                 {activeTab === 'upcoming' && (
-                  <div className="grid grid-cols-7 gap-2 mb-4">
-                    {[...Array(7)].map((_, i) => (
-                      <Skeleton key={i} className="h-20 w-full" />
+                  <div className="grid grid-cols-5 gap-2 mb-4">
+                    {[...Array(5)].map((_, i) => (
+                      <div key={i} className="flex flex-col gap-0.5">
+                        {i === 0 ? (
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70 text-center leading-tight">
+                            Today
+                          </span>
+                        ) : (
+                          <span className="text-[10px] leading-tight select-none opacity-0" aria-hidden="true">&nbsp;</span>
+                        )}
+                        <Skeleton className="h-32 w-full rounded-lg" />
+                      </div>
                     ))}
                   </div>
                 )}
@@ -813,7 +889,7 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
             ) : (
               <>
                 {sessions.length === 0 && <p>No {activeTab} sessions found.</p>}
-                {activeTab === 'upcoming' && sessions.length > 0 && <SevenDayOverview sessions={sessions} userCharacterIds={userCharacterIds} />}
+                {activeTab === 'upcoming' && sessions.length > 0 && <FiveDayOverview sessions={sessions} userCharacterIds={userCharacterIds} />}
                 <ul className={cn("space-y-4", activeTab === 'upcoming' && sessions.length > 0 && "mt-8")}>
                   {sessions.map((session, i) => {
                     const hasJoined = activeTab === 'upcoming' && session.characters.some(id => userCharacterIds.has(id))
