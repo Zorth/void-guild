@@ -458,7 +458,26 @@ export const getQuestsByWorld = query({
     // Exclude completed quests and pending suggestions (pending suggestions are reviewed by world owner first)
     const activeQuests = [...worldQuests, ...worldlessQuests].filter(q => !q.isCompleted && !q.isSuggested)
     
-    return activeQuests.sort((a, b) => {
+    const questsWithChar = await Promise.all(
+      activeQuests.map(async (q) => {
+        let characterName: string | undefined = undefined
+        let characterRank: string | undefined = q.characterRank
+        if (q.characterId) {
+          const c = await ctx.db.get(q.characterId)
+          if (c) {
+            characterName = c.name
+            if (c.rank) characterRank = c.rank
+          }
+        }
+        return {
+          ...q,
+          characterName,
+          characterRank,
+        }
+      })
+    )
+
+    return questsWithChar.sort((a, b) => {
         const aLvl = a.levelPF ?? a.levelDnD ?? a.level ?? 0;
         const bLvl = b.levelPF ?? b.levelDnD ?? b.level ?? 0;
 

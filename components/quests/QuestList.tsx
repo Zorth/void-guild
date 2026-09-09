@@ -12,8 +12,8 @@ import {
 import { useAuth } from '@clerk/nextjs'
 import QuestDialog from './QuestDialog'
 import { toast } from 'sonner'
-import { cn, getLevelBadgeStyle, getDualLevelBadgeStyle } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
+import { cn, getLevelBadgeStyle, getDualLevelBadgeStyle, CharacterRankIcon } from '@/lib/utils'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useState, useMemo } from 'react'
@@ -192,6 +192,7 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
             const isOwner = quest.owner === userId
             const canEdit = isOwner || userId === worldOwner || isAdmin
             const isExpanded = expandedQuestId === quest._id
+            const isCharacterQuest = Boolean(quest.characterId)
 
             const levelPF = quest.levelPF ?? (quest.levelDnD === undefined ? quest.level : undefined)
             const levelDnD = quest.levelDnD
@@ -202,6 +203,7 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
                 key={quest._id} 
                 className={cn(
                     "overflow-hidden transition-all border-border/40 hover:border-border/80",
+                    isCharacterQuest && "border-purple-500/30 bg-purple-950/10",
                     isExpanded ? "ring-1 ring-primary/20 bg-muted/10" : "bg-card/50"
                 )}
               >
@@ -220,16 +222,43 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
                       {isDual ? 'V' : (levelPF ?? levelDnD ?? 0) > 0 ? (levelPF ?? levelDnD) : '?'}
                     </div>
                     <div className="min-w-0">
-                        <h4 className={cn("font-bold truncate flex items-center gap-1.5", isSidebar ? "text-xs" : "text-sm")}>
+                        <h4 className={cn("font-bold truncate flex items-center gap-1.5 flex-wrap", isSidebar ? "text-xs" : "text-sm")}>
                             <div className="flex items-center shrink-0">
                                 {levelPF !== undefined && <img src="/PFVoid.svg" alt="PF" className="h-3 w-3 -mr-0.5" />}
                                 {levelDnD !== undefined && <img src="/DnDVoid.svg" alt="DnD" className="h-3 w-3" />}
                             </div>
-                            {quest.name}
+                            <span className="truncate">{quest.name}</span>
+                            {isCharacterQuest && (
+                                <span 
+                                  className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 shrink-0 shadow-xs"
+                                  title={`Given by Character: ${quest.characterName || quest.questgiver?.replace(/^Character:\s*/, '') || 'Player Character'}`}
+                                >
+                                    <User className="h-2.5 w-2.5 text-purple-400" />
+                                    <span className={cn(isSidebar ? "hidden" : "hidden sm:inline")}>Character Quest</span>
+                                    <span className={cn(isSidebar ? "inline" : "sm:hidden")}>PC</span>
+                                </span>
+                            )}
                         </h4>
-                        {quest.questgiver && (
+                        {(quest.questgiver || quest.characterName || isCharacterQuest) && (
                             <p className="text-[10px] text-muted-foreground truncate flex items-center gap-1">
-                                <User className="h-2.5 w-2.5" /> {quest.questgiver}
+                                {isCharacterQuest ? (
+                                    <span className="text-purple-400/90 font-medium truncate flex items-center gap-1">
+                                        <User className="h-2.5 w-2.5 shrink-0" />
+                                        <span>
+                                            {quest.characterName 
+                                                ? `Character: ${quest.characterName}` 
+                                                : (quest.questgiver?.startsWith('Character:') ? quest.questgiver : `Character: ${quest.questgiver || 'Player Character'}`)}
+                                        </span>
+                                        {quest.characterRank && (
+                                            <CharacterRankIcon rank={quest.characterRank} />
+                                        )}
+                                    </span>
+                                ) : (
+                                    <>
+                                        <User className="h-2.5 w-2.5 shrink-0" />
+                                        <span className="truncate">{quest.questgiver}</span>
+                                    </>
+                                )}
                             </p>
                         )}
                     </div>
@@ -258,6 +287,22 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
                       transition={{ duration: 0.2 }}
                     >
                       <div className="px-3 pb-4 pt-0 text-sm border-t border-border/20 space-y-3">
+                        {isCharacterQuest && (
+                            <div className="mt-3 flex items-center gap-2 text-[11px] text-purple-300 bg-purple-500/10 border border-purple-500/20 rounded-md px-2.5 py-1.5 flex-wrap">
+                                <User className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span>Posted by Character:</span>
+                                    <strong className="text-purple-200">{quest.characterName || quest.questgiver?.replace(/^Character:\s*/, '') || 'Player Character'}</strong>
+                                    {quest.characterRank && <CharacterRankIcon rank={quest.characterRank} />}
+                                </div>
+                                {quest.isSponsored && (
+                                    <span className="ml-auto text-[9px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded">
+                                        Guild Sponsored
+                                    </span>
+                                )}
+                            </div>
+                        )}
+
                         {quest.description && (
                             <div className={cn(
                                 "mt-3 text-muted-foreground leading-relaxed [&_>_*:first-child]:mt-0 [&>p]:mt-2 [&>ul]:list-disc [&>ul]:pl-4 [&>ul]:mt-2 [&>ol]:list-decimal [&>ol]:pl-4 [&>ol]:mt-2 [&>blockquote]:border-l-2 [&>blockquote]:pl-3 [&>blockquote]:italic [&>blockquote]:mt-2 [&_a]:text-primary [&_a]:underline",

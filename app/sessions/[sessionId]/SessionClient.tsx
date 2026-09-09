@@ -8,10 +8,10 @@ import { Button } from '@/components/ui/button'
 import { useState, useEffect, useMemo } from 'react'
 import { Id, Doc } from '@/convex/_generated/dataModel'
 import Link from 'next/link'
-import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, Unlock, Globe, Scroll, Trophy, Menu } from 'lucide-react'
+import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, Unlock, Globe, Scroll, Trophy, Menu, User } from 'lucide-react'
 import { useAuth, SignInButton } from '@clerk/nextjs'
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatDate, formatTime as formatTimeUtil, getLevelBadgeStyle, getDualLevelBadgeStyle } from '@/lib/utils'
+import { formatDate, formatTime as formatTimeUtil, getLevelBadgeStyle, getDualLevelBadgeStyle, CharacterRankIcon } from '@/lib/utils'
 import { fireJoinParticles, fireGoldParticles } from '@/lib/particles'
 import { toast } from 'sonner'
 import { track } from '@vercel/analytics'
@@ -782,6 +782,15 @@ export default function SessionClient() {
                                     <div className="flex items-center gap-2 font-bold text-sm">
                                         <Scroll className="h-4 w-4 text-primary" />
                                         Active Quest
+                                        {q.characterId && (
+                                            <span 
+                                                className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 ml-1 shadow-xs"
+                                                title={`Character Quest (Given by ${(q as any).characterName || q.questgiver?.replace(/^Character:\s*/, '') || 'a player character'})`}
+                                            >
+                                                <User className="h-2.5 w-2.5 text-purple-400" />
+                                                Character Quest
+                                            </span>
+                                        )}
                                     </div>
                                     <div 
                                         className="flex items-center justify-center rounded-full font-bold h-6 w-6 text-[10px]"
@@ -792,6 +801,21 @@ export default function SessionClient() {
                                 </div>
                                 <div className="p-4 space-y-3">
                                     <h4 className="font-bold text-lg">{q.name}</h4>
+                                    {q.characterId && (
+                                        <div className="flex items-center gap-2 text-[11px] text-purple-300 bg-purple-500/10 border border-purple-500/20 rounded-md px-2.5 py-1.5 flex-wrap">
+                                            <User className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span>Given by Character:</span>
+                                                <strong className="text-purple-200">{(q as any).characterName || q.questgiver?.replace(/^Character:\s*/, '') || 'Player Character'}</strong>
+                                                {q.characterRank && <CharacterRankIcon rank={q.characterRank} />}
+                                            </div>
+                                            {q.isSponsored && (
+                                                <span className="ml-auto text-[9px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded">
+                                                    Guild Sponsored
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
                                     {q.description && (
                                         <div className="text-sm text-muted-foreground leading-relaxed [&_>_*:first-child]:mt-0 [&>p]:mt-2 [&>ul]:list-disc [&>ul]:pl-4 [&>ul]:mt-2 [&>ol]:list-decimal [&>ol]:pl-4 [&>ol]:mt-2 [&>blockquote]:border-l-4 [&>blockquote]:pl-4 [&>blockquote]:italic [&>blockquote]:mt-2 [&_a]:text-primary [&_a]:underline">
                                             <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -804,6 +828,12 @@ export default function SessionClient() {
                                             <div className="flex items-start gap-2 text-xs">
                                                 <Trophy className="h-3.5 w-3.5 text-yellow-500 shrink-0" />
                                                 <span><span className="font-bold text-muted-foreground uppercase mr-1">Reward:</span> {q.reward}</span>
+                                            </div>
+                                        )}
+                                        {!q.characterId && q.questgiver && (
+                                            <div className="flex items-start gap-2 text-xs">
+                                                <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                                <span><span className="font-bold text-muted-foreground uppercase mr-1">Questgiver:</span> {q.questgiver}</span>
                                             </div>
                                         )}
                                         {isDual && (

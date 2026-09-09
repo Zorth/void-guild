@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { Pencil, CheckCircle2, Shield, Send, Bell, XCircle, Scroll, Calendar, CalendarRange, Clock, Unlock } from 'lucide-react'
+import { Pencil, CheckCircle2, Shield, Send, Bell, XCircle, Scroll, Calendar, CalendarRange, Clock, Unlock, User } from 'lucide-react'
 import SessionDialog from '@/components/sessions/SessionDialog'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -194,7 +194,16 @@ export default function SessionManagement({
                                                     </div>
                                                 );
                                             })()}
-                                            {quest.name}
+                                            <span className="font-semibold truncate">{quest.name}</span>
+                                            {quest.characterId && (
+                                                <span 
+                                                    className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 shrink-0"
+                                                    title="Character Quest"
+                                                >
+                                                    <User className="h-2.5 w-2.5 text-purple-400" />
+                                                    <span>PC Quest</span>
+                                                </span>
+                                            )}
                                         </div>
                                         {quest.description && (
                                             <div className="text-[10px] text-muted-foreground italic line-clamp-1">
