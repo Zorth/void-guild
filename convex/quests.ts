@@ -251,6 +251,7 @@ export const updateQuest = mutation({
     await ctx.db.replace(questId, {
         ...quest,
         ...otherFields,
+        worldId: args.worldId,
         reward: finalReward,
         rewardType: args.rewardType || quest.rewardType || 'party',
         rewardMoneyGP: roundedMoneyGP !== undefined ? roundedMoneyGP : quest.rewardMoneyGP,
@@ -443,20 +444,27 @@ export const deleteQuest = mutation({
 export const getQuestsByWorld = query({
   args: { worldId: v.optional(v.id('worlds')) },
   handler: async (ctx, args) => {
-    const worldQuests = args.worldId 
-        ? await ctx.db
-            .query('quests')
-            .withIndex('by_worldId', (q) => q.eq('worldId', args.worldId))
-            .collect()
-        : []
+    const worldQuests = args.worldId
+      ? await ctx.db
+          .query('quests')
+          .withIndex('by_worldId', (q) => q.eq('worldId', args.worldId))
+          .collect()
+      : []
     
-    const worldlessQuests = await ctx.db
-        .query('quests')
-        .withIndex('by_worldId', (q) => q.eq('worldId', undefined))
-        .collect()
+    // Global quests are quests without an associated world (worldId: undefined)
+    const allQuests = await ctx.db.query('quests').collect()
+    const worldlessQuests = allQuests.filter((q) => !q.worldId)
+
+    const questMap = new Map<string, typeof allQuests[0]>()
+    for (const q of worldQuests) {
+      questMap.set(q._id, q)
+    }
+    for (const q of worldlessQuests) {
+      questMap.set(q._id, q)
+    }
 
     // Exclude completed quests and pending suggestions (pending suggestions are reviewed by world owner first)
-    const activeQuests = [...worldQuests, ...worldlessQuests].filter(q => !q.isCompleted && !q.isSuggested)
+    const activeQuests = Array.from(questMap.values()).filter(q => !q.isCompleted && !q.isSuggested)
     
     const questsWithChar = await Promise.all(
       activeQuests.map(async (q) => {

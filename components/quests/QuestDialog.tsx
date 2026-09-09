@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
-import { Scroll, Sword, Trophy, User, Hash, Coins, Sparkles } from 'lucide-react'
+import { Scroll, Sword, Trophy, User, Hash, Coins, Sparkles, Globe } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface QuestDialogProps {
@@ -49,8 +49,10 @@ export default function QuestDialog({ isOpen, onClose, worldId, quest }: QuestDi
   const [rewardMoneyGP, setRewardMoneyGP] = useState<string>('')
   const [rewardOther, setRewardOther] = useState<string>('')
   const [tagsString, setTagsString] = useState('')
+  const [isGlobal, setIsGlobal] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  const isAdmin = useQuery(api.sessions.isAdminQuery)
   const createQuest = useMutation(api.quests.createQuest)
   const updateQuest = useMutation(api.quests.updateQuest)
 
@@ -66,6 +68,7 @@ export default function QuestDialog({ isOpen, onClose, worldId, quest }: QuestDi
       setRewardMoneyGP(quest.rewardMoneyGP !== undefined ? String(quest.rewardMoneyGP) : '')
       setRewardOther(quest.rewardOther || (!quest.rewardMoneyGP && quest.reward ? quest.reward : ''))
       setTagsString(quest.tags?.join(', ') || '')
+      setIsGlobal(!quest.worldId)
     } else {
       setName('')
       setLevelPF(null)
@@ -76,8 +79,9 @@ export default function QuestDialog({ isOpen, onClose, worldId, quest }: QuestDi
       setRewardMoneyGP('')
       setRewardOther('')
       setTagsString('')
+      setIsGlobal(!worldId)
     }
-  }, [quest, isOpen])
+  }, [quest, isOpen, worldId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -91,6 +95,7 @@ export default function QuestDialog({ isOpen, onClose, worldId, quest }: QuestDi
 
     const moneyVal = parseFloat(rewardMoneyGP)
     const hasMoney = !isNaN(moneyVal) && moneyVal > 0
+    const targetWorldId = isGlobal ? undefined : (quest ? (quest.worldId || worldId) : worldId)
 
     try {
       if (quest) {
@@ -105,7 +110,7 @@ export default function QuestDialog({ isOpen, onClose, worldId, quest }: QuestDi
           rewardMoneyGP: hasMoney ? Math.round(moneyVal * 100) / 100 : undefined,
           rewardOther: rewardOther.trim() || undefined,
           tags,
-          worldId: quest.worldId, // Keep original worldId when editing
+          worldId: targetWorldId,
         })
         toast.success('Quest updated successfully!')
       } else {
@@ -119,7 +124,7 @@ export default function QuestDialog({ isOpen, onClose, worldId, quest }: QuestDi
           rewardMoneyGP: hasMoney ? Math.round(moneyVal * 100) / 100 : undefined,
           rewardOther: rewardOther.trim() || undefined,
           tags,
-          worldId,
+          worldId: targetWorldId,
         })
         toast.success('Quest created successfully!')
       }
@@ -155,6 +160,23 @@ export default function QuestDialog({ isOpen, onClose, worldId, quest }: QuestDi
               className="bg-muted/30"
             />
           </div>
+
+          {/* Admin Only: Global Quest Checkbox */}
+          {isAdmin && (
+            <div className="flex items-center gap-2.5 p-2.5 rounded-lg bg-blue-500/10 border border-blue-500/20">
+              <input
+                type="checkbox"
+                id="isGlobalQuest"
+                checked={isGlobal}
+                onChange={(e) => setIsGlobal(e.target.checked)}
+                className="h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600 shrink-0"
+              />
+              <label htmlFor="isGlobalQuest" className="text-xs font-semibold text-foreground cursor-pointer flex items-center gap-1.5 select-none">
+                <Globe className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+                <span>Global Quest (Shared across all campaign worlds)</span>
+              </label>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">

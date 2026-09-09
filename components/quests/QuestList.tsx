@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { 
   Scroll, Sword, Trophy, User, Hash, Plus, Pencil, Trash2, 
-  ChevronDown, ChevronUp, MapPin, Tag, Crown, Check, X, Sparkles
+  ChevronDown, ChevronUp, MapPin, Tag, Crown, Check, X, Sparkles, Globe
 } from 'lucide-react'
 import { useAuth } from '@clerk/nextjs'
 import QuestDialog from './QuestDialog'
@@ -228,6 +228,16 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
                                 {levelDnD !== undefined && <img src="/DnDVoid.svg" alt="DnD" className="h-3 w-3" />}
                             </div>
                             <span className="truncate">{quest.name}</span>
+                            {!quest.worldId && (
+                                <span 
+                                  className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40 shrink-0 shadow-xs"
+                                  title="Global Quest (Shared across all worlds)"
+                                >
+                                    <Globe className="h-2.5 w-2.5 text-blue-400" />
+                                    <span className={cn(isSidebar ? "hidden" : "hidden sm:inline")}>Global Quest</span>
+                                    <span className={cn(isSidebar ? "inline" : "sm:hidden")}>Global</span>
+                                </span>
+                            )}
                             {isCharacterQuest && (
                                 <span 
                                   className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 shrink-0 shadow-xs"
