@@ -85,10 +85,10 @@ export default function ProfileAvatarWithBadge({
           <img
             src={imageUrl}
             alt={name}
-            className="w-full h-full rounded-full object-cover shrink-0"
+            className="w-full h-full rounded-full object-cover shrink-0 relative z-10"
           />
         ) : (
-          <div className="w-full h-full rounded-full bg-purple-500/20 flex items-center justify-center font-bold shrink-0">
+          <div className="w-full h-full rounded-full bg-purple-500/20 flex items-center justify-center font-bold shrink-0 relative z-10">
             {name ? name[0]?.toUpperCase() : 'C'}
           </div>
         )}

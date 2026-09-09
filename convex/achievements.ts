@@ -394,7 +394,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     title: 'Multiverse Wanderer',
     description: 'Participated in completed sessions across 5 different campaign worlds.',
     category: 'hidden',
-    reward: '',
+    reward: 'Multiverse Astrolabe Avatar Ring Cosmetic',
     chainId: 'unique_worlds',
     tier: 2,
     maxTier: 2,

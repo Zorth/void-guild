@@ -203,6 +203,14 @@ export const PROFILE_BORDER_OPTIONS: CosmeticOption[] = [
     previewClass: 'compass-avatar-ring',
   },
   {
+    id: 'multiverse_compass_ring',
+    name: 'Multiverse Astrolabe Ring 🌌',
+    unlockedByDefault: false,
+    requiredAchievementId: 'worlds_played_5',
+    value: 'multiverse-compass-avatar-ring',
+    previewClass: 'multiverse-compass-avatar-ring',
+  },
+  {
     id: 'laurel_spirit_ring',
     name: 'Silver Laurel Twig Ring 🌿',
     unlockedByDefault: false,
