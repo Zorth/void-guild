@@ -497,6 +497,30 @@
               radial-gradient(circle at 80% 70%, rgba(220, 38, 38, 0.2) 0%, transparent 40%) !important;
 }
 
+/* Void Incursion Purple Moving Background Tint */
+.void-nebula-bg {
+  position: relative !important;
+  background-image: 
+    radial-gradient(ellipse at 25% 25%, rgba(168, 85, 247, 0.28) 0%, transparent 55%),
+    radial-gradient(ellipse at 75% 75%, rgba(147, 51, 234, 0.24) 0%, transparent 55%),
+    radial-gradient(circle at 50% 50%, rgba(88, 28, 135, 0.3) 0%, transparent 65%),
+    linear-gradient(135deg, rgba(59, 7, 100, 0.18) 0%, rgba(15, 2, 25, 0.22) 100%) !important;
+  background-size: 200% 200%, 200% 200%, 160% 160%, 100% 100% !important;
+  animation: void-nebula-flow 12s ease-in-out infinite alternate !important;
+}
+
+@keyframes void-nebula-flow {
+  0% {
+    background-position: 0% 0%, 100% 100%, 50% 50%, 0% 0%;
+  }
+  50% {
+    background-position: 100% 50%, 0% 50%, 20% 80%, 0% 0%;
+  }
+  100% {
+    background-position: 50% 100%, 50% 0%, 80% 20%, 0% 0%;
+  }
+}
+
 /* Treasure Seeker Bronze Metallic Card Border */
 .bronze-card-border {
   border-radius: 0.5rem !important;

@@ -389,6 +389,13 @@ export const BG_COLOR_OPTIONS: CosmeticOption[] = [
     requiredAchievementId: 'rank_guildmaster',
     value: 'gold-bg-tint',
   },
+  {
+    id: 'void_nebula',
+    name: 'Moving Void Nebula Tint',
+    unlockedByDefault: false,
+    requiredAchievementId: 'void_objective_contribution',
+    value: 'void-nebula-bg',
+  },
 ]
 
 export interface CharacterCosmetics {
@@ -492,6 +499,15 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
       cardBgStyle = { '--card-bg': parchmentPaddingLayer } as React.CSSProperties
     } else {
       cardClassName = cardClassName ? `${cardClassName} parchment-bg-tint` : 'parchment-bg-tint'
+    }
+  } else if (bgObj?.value === 'void-nebula-bg' || cosmetics.bgColor === 'void_nebula' || cosmetics.bgColor === 'void-nebula-bg') {
+    if (isGradientBorder) {
+      const voidPaddingLayer =
+        'radial-gradient(ellipse at 25% 25%, rgba(168, 85, 247, 0.28) 0%, transparent 55%), radial-gradient(ellipse at 75% 75%, rgba(147, 51, 234, 0.24) 0%, transparent 55%), linear-gradient(var(--card), var(--card))'
+      cardBgStyle = { '--card-bg': voidPaddingLayer } as React.CSSProperties
+      cardClassName = cardClassName ? `${cardClassName} void-nebula-bg` : 'void-nebula-bg'
+    } else {
+      cardClassName = cardClassName ? `${cardClassName} void-nebula-bg` : 'void-nebula-bg'
     }
   } else if (bgObj && bgObj.value) {
     if (isGradientBorder) {

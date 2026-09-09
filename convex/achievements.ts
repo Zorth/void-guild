@@ -475,7 +475,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     title: 'Void Incursion Defender',
     description: 'Contributed to a monthly Void Objective with your character.',
     category: 'hidden',
-    reward: '',
+    reward: 'Moving Void Nebula Background Tint Cosmetic',
     checkEligibility: (data) => data.hasVoidObjectiveContribution,
   },
   {
