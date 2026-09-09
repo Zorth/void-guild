@@ -13,6 +13,7 @@ import { toast } from 'sonner'
 import { resolveCosmeticsStyles } from '@/lib/cosmetics'
 import ProfileAvatarWithBadge from '@/components/characters/ProfileAvatarWithBadge'
 import InSyncPlasmaEffect from '@/components/characters/InSyncPlasmaEffect'
+import BlazeTextParticles from '@/components/characters/BlazeTextParticles'
 
 interface CharacterRelationship {
   count: number
@@ -138,7 +139,10 @@ export default function AttendingCharactersList({
                 />
                 <div className="min-w-0">
                     <div className="font-bold flex items-center flex-wrap gap-2">
-                        <span className={cn("break-words", cosmeticsStyles.nameClassName)} style={cosmeticsStyles.nameStyle}>{char.name}</span>
+                        <span className={cn("break-words relative", cosmeticsStyles.nameClassName)} style={cosmeticsStyles.nameStyle}>
+                          {cosmeticsStyles.nameClassName?.includes('blaze-fire-text') && <BlazeTextParticles />}
+                          {char.name}
+                        </span>
                         {isUserCharacter && <span className="text-[10px] bg-purple-200 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded-full uppercase tracking-wider font-bold shrink-0">You</span>}
                         {/* Book Icon */}
                         <a
@@ -155,12 +159,16 @@ export default function AttendingCharactersList({
                         </a>
                     </div>
                     {char.title && (
-                      <div className={cosmeticsStyles.titleClassName} style={cosmeticsStyles.titleStyle}>
+                      <div className={cn("relative", cosmeticsStyles.titleClassName)} style={cosmeticsStyles.titleStyle}>
+                        {cosmeticsStyles.titleClassName?.includes('blaze-fire-text') && <BlazeTextParticles />}
                         {char.title}
                       </div>
                     )}
                     <div className="text-[10px] text-muted-foreground mt-1 whitespace-normal flex items-center flex-wrap gap-1.5">
-                      <span className={cosmeticsStyles.subtitleClassName} style={cosmeticsStyles.subtitleStyle}>{char.ancestry} {char.class}</span>
+                      <span className={cn("relative", cosmeticsStyles.subtitleClassName)} style={cosmeticsStyles.subtitleStyle}>
+                        {cosmeticsStyles.subtitleClassName?.includes('blaze-fire-text') && <BlazeTextParticles />}
+                        {char.ancestry} {char.class}
+                      </span>
 
                       {hasUserSignedUp && rel && (
                         isUserCharacter ? (

@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
 import { resolveCosmeticsStyles } from '@/lib/cosmetics'
+import BlazeTextParticles from '@/components/characters/BlazeTextParticles'
 
 interface ReputationCellProps {
   charId: Id<'characters'>
@@ -390,7 +391,10 @@ export default function ReputationSystem({
                                          <td className="px-4 py-2.5 sticky left-0 bg-card z-20 backdrop-blur-sm border-r border-border/40 w-[160px] min-w-[140px]">
                                              <div className="flex flex-col gap-0.5 min-w-0">
                                                  <div className="flex items-center flex-wrap gap-2 min-w-0">
-                                                     <span className={cn("font-bold text-sm tracking-tight break-words", cosmetics.nameClassName)} style={cosmetics.nameStyle}>{char.name}</span>
+                                                     <span className={cn("font-bold text-sm tracking-tight break-words relative", cosmetics.nameClassName)} style={cosmetics.nameStyle}>
+                                                         {cosmetics.nameClassName?.includes('blaze-fire-text') && <BlazeTextParticles />}
+                                                         {char.name}
+                                                     </span>
                                                      <span
                                                          className="inline-flex items-center justify-center rounded-full w-4 h-4 text-[8px] font-bold shrink-0"
                                                          style={getLevelBadgeStyle(char.lvl)}
@@ -399,9 +403,15 @@ export default function ReputationSystem({
                                                      </span>
                                                  </div>
                                                  {char.title && (
-                                                     <span className={cn("text-[9px] whitespace-normal", cosmetics.titleClassName)} style={cosmetics.titleStyle}>{char.title}</span>
+                                                     <span className={cn("text-[9px] whitespace-normal relative", cosmetics.titleClassName)} style={cosmetics.titleStyle}>
+                                                         {cosmetics.titleClassName?.includes('blaze-fire-text') && <BlazeTextParticles />}
+                                                         {char.title}
+                                                     </span>
                                                  )}
-                                                 <span className={cn("text-[9px] text-muted-foreground uppercase tracking-widest font-medium whitespace-normal", cosmetics.subtitleClassName)} style={cosmetics.subtitleStyle}>{char.class}</span>
+                                                 <span className={cn("text-[9px] text-muted-foreground uppercase tracking-widest font-medium whitespace-normal relative", cosmetics.subtitleClassName)} style={cosmetics.subtitleStyle}>
+                                                     {cosmetics.subtitleClassName?.includes('blaze-fire-text') && <BlazeTextParticles />}
+                                                     {char.class}
+                                                 </span>
                                              </div>
                                          </td>
                                         {displayedFactions.map(faction => (

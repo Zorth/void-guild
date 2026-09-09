@@ -484,6 +484,43 @@
   }
 }
 
+/* Blazing Fire Gradient Text (Unbreakable Bond - 5 Streak) */
+.blaze-fire-text {
+  position: relative !important;
+  display: inline-block !important;
+  background: linear-gradient(
+    180deg,
+    #ffffff 0%,
+    #fef08a 18%,
+    #fb923c 45%,
+    #ea580c 70%,
+    #991b1b 100%
+  ) !important;
+  background-size: 100% 200% !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  color: transparent !important;
+  font-weight: 800 !important;
+  filter: drop-shadow(0 -1px 3px rgba(249, 115, 22, 0.8)) drop-shadow(0 0 7px rgba(234, 88, 12, 0.6)) !important;
+  animation: blaze-text-flicker 2.5s ease-in-out infinite alternate !important;
+}
+
+@keyframes blaze-text-flicker {
+  0% {
+    background-position: 0% 0%;
+    filter: drop-shadow(0 -1px 2px rgba(249, 115, 22, 0.7)) drop-shadow(0 0 5px rgba(234, 88, 12, 0.5));
+  }
+  50% {
+    background-position: 0% 40%;
+    filter: drop-shadow(0 -2px 5px rgba(251, 146, 60, 0.95)) drop-shadow(0 0 9px rgba(239, 68, 68, 0.75));
+  }
+  100% {
+    background-position: 0% 80%;
+    filter: drop-shadow(0 -1.5px 3px rgba(249, 115, 22, 0.8)) drop-shadow(0 0 7px rgba(234, 88, 12, 0.6));
+  }
+}
+
 /* Guildmaster Metallic Gold Cosmetics */
 .gold-text {
   background: linear-gradient(135deg, #BF953F 0%, #FCF6BA 45%, #AA771C 100%) !important;

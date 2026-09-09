@@ -332,7 +332,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     title: 'Unbreakable Bond',
     description: 'Achieved a character streak of 5 consecutive sessions.',
     category: 'hidden',
-    reward: '',
+    reward: 'Blazing Fire Gradient Text Color Cosmetic',
     chainId: 'character_streak',
     tier: 2,
     maxTier: 3,

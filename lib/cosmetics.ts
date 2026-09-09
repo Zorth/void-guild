@@ -39,6 +39,7 @@ export const ACHIEVEMENT_INFO: Record<string, AchievementInfo> = {
   comm_heroic: { title: 'Heroic Legend', category: 'hidden' },
   comm_jack_of_all_trades: { title: 'Jack of All Trades', category: 'hidden' },
   character_streak_3: { title: 'In Sync', category: 'hidden' },
+  character_streak_5: { title: 'Unbreakable Bond', category: 'hidden' },
   system_polymath: { title: 'System Polymath', category: 'hidden' },
   loot_first: { title: 'Treasure Seeker', category: 'normal' },
   loot_hoarder_5: { title: 'Hoarder', category: 'hidden' },
@@ -163,6 +164,14 @@ export const COLOR_OPTIONS: CosmeticOption[] = [
     requiredAchievementId: 'secret_logo_clicks',
     value: 'rainbow-text',
     previewClass: 'rainbow-text font-bold',
+  },
+  {
+    id: 'blaze_text',
+    name: 'Blazing Fire Gradient Text',
+    unlockedByDefault: false,
+    requiredAchievementId: 'character_streak_5',
+    value: 'blaze-fire-text',
+    previewClass: 'blaze-fire-text font-extrabold',
   },
 ]
 
@@ -556,6 +565,9 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
   } else if (colorObj?.value === 'rainbow-text' || cosmetics.nameColor === 'rainbow' || cosmetics.nameColor === 'rainbow-text') {
     nameClassName = `${nameClassName} rainbow-text font-bold`
     nameStyle = {}
+  } else if (colorObj?.value === 'blaze-fire-text' || cosmetics.nameColor === 'blaze_text' || cosmetics.nameColor === 'blaze-fire-text') {
+    nameClassName = nameClassName ? `${nameClassName} blaze-fire-text font-extrabold` : 'blaze-fire-text font-extrabold'
+    nameStyle = {}
   } else if (colorObj?.value) {
     nameStyle = { color: colorObj.value }
   } else if (cosmetics.nameColor) {
@@ -574,6 +586,9 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
     titleStyle = {}
   } else if (titleColorObj?.value === 'rainbow-text' || cosmetics.titleColor === 'rainbow' || cosmetics.titleColor === 'rainbow-text') {
     titleClassName = `${titleClassName} rainbow-text`
+    titleStyle = {}
+  } else if (titleColorObj?.value === 'blaze-fire-text' || cosmetics.titleColor === 'blaze_text' || cosmetics.titleColor === 'blaze-fire-text') {
+    titleClassName = `${titleClassName} blaze-fire-text font-bold`
     titleStyle = {}
   } else if (titleColorObj && titleColorObj.id !== 'default' && titleColorObj.value) {
     titleStyle = { color: titleColorObj.value }
@@ -596,6 +611,9 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
     subtitleStyle = {}
   } else if (subColorObj?.value === 'rainbow-text' || cosmetics.subtitleColor === 'rainbow' || cosmetics.subtitleColor === 'rainbow-text') {
     subtitleClassName = `${subtitleClassName} rainbow-text`
+    subtitleStyle = {}
+  } else if (subColorObj?.value === 'blaze-fire-text' || cosmetics.subtitleColor === 'blaze_text' || cosmetics.subtitleColor === 'blaze-fire-text') {
+    subtitleClassName = `${subtitleClassName} blaze-fire-text font-semibold`
     subtitleStyle = {}
   } else if (subColorObj && subColorObj.id !== 'default' && subColorObj.value) {
     subtitleStyle = { color: subColorObj.value, opacity: 0.8 }

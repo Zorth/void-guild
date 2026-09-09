@@ -42,6 +42,7 @@ import AdminCharacterList from './AdminCharacterList'
 import AdminUserList from './AdminUserList'
 import CharacterCosmeticsTab from './CharacterCosmeticsTab'
 import InSyncPlasmaEffect from './InSyncPlasmaEffect'
+import BlazeTextParticles from './BlazeTextParticles'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getLevelBadgeStyle, CharacterRankIcon, getXPBarStyles, cn } from '@/lib/utils'
 import { track } from '@vercel/analytics'
@@ -242,9 +243,10 @@ export default function Characters({ filters }: { filters?: { pf: boolean; dnd: 
                         <div className="flex flex-col">
                           <div className="flex items-center gap-2">
                             <span
-                              className={cn('font-medium', cosmetics.nameClassName)}
+                              className={cn('font-medium relative', cosmetics.nameClassName)}
                               style={cosmetics.nameStyle}
                             >
+                              {cosmetics.nameClassName?.includes('blaze-fire-text') && <BlazeTextParticles />}
                               {character.name}
                             </span>
                             <a
@@ -261,14 +263,16 @@ export default function Characters({ filters }: { filters?: { pf: boolean; dnd: 
                             </a>
                           </div>
                           {character.title && (
-                            <span className={cosmetics.titleClassName} style={cosmetics.titleStyle}>
+                            <span className={cn('relative', cosmetics.titleClassName)} style={cosmetics.titleStyle}>
+                              {cosmetics.titleClassName?.includes('blaze-fire-text') && <BlazeTextParticles />}
                               {character.title}
                             </span>
                           )}
                           <span
-                            className={cosmetics.subtitleClassName}
+                            className={cn('relative', cosmetics.subtitleClassName)}
                             style={cosmetics.subtitleStyle}
                           >
+                            {cosmetics.subtitleClassName?.includes('blaze-fire-text') && <BlazeTextParticles />}
                             {character.ancestry} {character.class}
                           </span>
                           {character.websiteLink && (

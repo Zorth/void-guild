@@ -18,6 +18,7 @@ import { api } from '@/convex/_generated/api'
 import { getLevelBadgeStyle, CharacterRankIcon, cn } from '@/lib/utils'
 import ProfileAvatarWithBadge from '@/components/characters/ProfileAvatarWithBadge'
 import InSyncPlasmaEffect from '@/components/characters/InSyncPlasmaEffect'
+import BlazeTextParticles from '@/components/characters/BlazeTextParticles'
 import {
   resolveCosmeticsStyles,
   FONT_OPTIONS,
@@ -146,6 +147,7 @@ export default function CharacterCosmeticsTab({
           const isSelected = cosmetics[colorKey] === opt.value || cosmetics[colorKey] === opt.id
           const isRainbowOpt = opt.value === 'rainbow-text' || opt.id === 'rainbow'
           const isGoldOpt = opt.value === 'gold-text' || opt.id === 'gold_text'
+          const isBlazeOpt = opt.value === 'blaze-fire-text' || opt.id === 'blaze_text'
 
           return (
             <button
@@ -157,13 +159,14 @@ export default function CharacterCosmeticsTab({
                 'w-8 h-8 rounded-full transition-all flex items-center justify-center relative border overflow-hidden shrink-0',
                 isRainbowOpt && 'bg-gradient-to-r from-red-500 via-green-500 to-purple-500',
                 isGoldOpt && 'bg-gradient-to-br from-[#BF953F] via-[#FCF6BA] to-[#AA771C]',
+                isBlazeOpt && 'bg-gradient-to-t from-red-600 via-orange-500 to-amber-300',
                 isSelected
                   ? 'ring-2 ring-purple-500 ring-offset-2 ring-offset-background scale-110 border-white dark:border-slate-900'
                   : isUnlocked
                     ? 'border-transparent hover:scale-105 shadow-sm'
                     : 'opacity-40 grayscale cursor-not-allowed border-border/40'
               )}
-              style={!isRainbowOpt && !isGoldOpt ? { backgroundColor: opt.value } : {}}
+              style={!isRainbowOpt && !isGoldOpt && !isBlazeOpt ? { backgroundColor: opt.value } : {}}
             >
               {isRainbowOpt && (
                 <span className="text-[9px] font-black text-white drop-shadow tracking-tighter">
@@ -173,6 +176,11 @@ export default function CharacterCosmeticsTab({
               {isGoldOpt && (
                 <span className="text-[9px] font-black text-amber-950 drop-shadow-sm tracking-tighter">
                   AU
+                </span>
+              )}
+              {isBlazeOpt && (
+                <span className="text-[9px] font-black text-white drop-shadow-sm tracking-tighter">
+                  🔥
                 </span>
               )}
               {!isUnlocked && <Lock className="h-3 w-3 text-white drop-shadow z-10" />}
@@ -243,7 +251,8 @@ export default function CharacterCosmeticsTab({
             />
             <div className="min-w-0">
               <div className="font-bold flex items-center gap-2">
-                <span className={cn('break-words', previewStyles.nameClassName)} style={previewStyles.nameStyle}>
+                <span className={cn('break-words relative', previewStyles.nameClassName)} style={previewStyles.nameStyle}>
+                  {previewStyles.nameClassName.includes('blaze-fire-text') && <BlazeTextParticles />}
                   {characterName || 'Character Name'}
                 </span>
                 <span className="text-[10px] bg-purple-200 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded-full uppercase tracking-wider font-bold shrink-0">
@@ -251,16 +260,19 @@ export default function CharacterCosmeticsTab({
                 </span>
               </div>
               {title ? (
-                <div className={previewStyles.titleClassName} style={previewStyles.titleStyle}>
+                <div className={cn('relative', previewStyles.titleClassName)} style={previewStyles.titleStyle}>
+                  {previewStyles.titleClassName.includes('blaze-fire-text') && <BlazeTextParticles />}
                   {title}
                 </div>
               ) : (
-                <div className={previewStyles.titleClassName} style={previewStyles.titleStyle}>
+                <div className={cn('relative', previewStyles.titleClassName)} style={previewStyles.titleStyle}>
+                  {previewStyles.titleClassName.includes('blaze-fire-text') && <BlazeTextParticles />}
                   The Wanderer <span className="text-[9px] opacity-60 font-normal tracking-tight">(Sample Title)</span>
                 </div>
               )}
               <div className="text-[10px] text-muted-foreground mt-0.5">
-                <span className={previewStyles.subtitleClassName} style={previewStyles.subtitleStyle}>
+                <span className={cn('relative', previewStyles.subtitleClassName)} style={previewStyles.subtitleStyle}>
+                  {previewStyles.subtitleClassName.includes('blaze-fire-text') && <BlazeTextParticles />}
                   {ancestry || 'Ancestry'} {characterClass || 'Class'}
                 </span>
               </div>
