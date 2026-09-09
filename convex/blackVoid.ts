@@ -1,7 +1,7 @@
 import { query, mutation, QueryCtx } from './_generated/server'
 import { v } from 'convex/values'
-
 import { Doc, Id } from './_generated/dataModel'
+import { isAdmin } from './roles'
 
 // Helper function to decorate a listing with character info
 async function decorateListing(ctx: QueryCtx, listing: Doc<'blackVoidListings'>) {
@@ -660,6 +660,94 @@ export const toggleBuyerClaimed = mutation({
   },
 })
 
+export const markAllCharacterTransactionsClaimed = mutation({
+  args: {
+    characterId: v.id('characters'),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    const character = await ctx.db.get(args.characterId)
+    const isAdminUser = await isAdmin(ctx)
+    if (!character || (character.userId !== user.subject && !isAdminUser)) {
+      throw new Error('You do not own this character.')
+    }
+
+    let count = 0
+
+    // 1. Sold items created by this character
+    const createdListings = await ctx.db
+      .query('blackVoidListings')
+      .withIndex('by_characterId', (q) => q.eq('characterId', args.characterId))
+      .collect()
+
+    for (const item of createdListings) {
+      if (item.type === 'item' && item.status === 'completed' && item.winningAmount && !item.sellerClaimed) {
+        await ctx.db.patch(item._id, { sellerClaimed: true })
+        count++
+      }
+    }
+
+    // 2. Won listings by this character
+    const wonListings = await ctx.db
+      .query('blackVoidListings')
+      .withIndex('by_winningBidderCharacterId', (q) => q.eq('winningBidderCharacterId', args.characterId))
+      .collect()
+
+    for (const item of wonListings) {
+      if (!item.buyerClaimed) {
+        await ctx.db.patch(item._id, { buyerClaimed: true })
+        count++
+      }
+    }
+
+    // 3. Quests issued by this character (reimbursements & payments)
+    const characterQuests = await ctx.db
+      .query('quests')
+      .withIndex('by_characterId', (q) => q.eq('characterId', args.characterId))
+      .collect()
+
+    for (const quest of characterQuests) {
+      if (quest.isCompleted) {
+        const patch: { reimbursementClaimed?: boolean; paymentClaimed?: boolean } = {}
+        if (quest.isSponsored && !quest.reimbursementClaimed) {
+          patch.reimbursementClaimed = true
+        }
+        if (!quest.paymentClaimed) {
+          patch.paymentClaimed = true
+        }
+        if (Object.keys(patch).length > 0) {
+          await ctx.db.patch(quest._id, patch)
+          count++
+        }
+      }
+    }
+
+    // 4. If Guildmaster, claim session cuts
+    if (character.rank === 'guildmaster') {
+      const gmSessions = await ctx.db
+        .query('sessions')
+        .withIndex('by_guildmaster_cut', (q) => q.eq('guildmasterCut.characterId', args.characterId))
+        .collect()
+
+      for (const sess of gmSessions) {
+        if (sess.guildmasterCut && !sess.guildmasterCut.claimed) {
+          await ctx.db.patch(sess._id, {
+            guildmasterCut: {
+              ...sess.guildmasterCut,
+              claimed: true,
+            },
+          })
+          count++
+        }
+      }
+    }
+
+    return { success: true, count }
+  },
+})
+
 export const getListings = query({
   args: {
     type: v.optional(v.union(v.literal('item'), v.literal('service'))),
@@ -701,7 +789,7 @@ export const getListings = query({
 
 export const getCharacterTransactions = query({
   args: {
-    characterId: v.optional(v.id('characters')),
+    characterId: v.id('characters'),
   },
   handler: async (ctx, args) => {
     if (!args.characterId) return { createdListings: [], wonListings: [], services: [] }
@@ -753,16 +841,13 @@ export const getCharacterTransactions = query({
         })
     )
 
-    // 4. Guildmaster Area Quest Perks
-    // "1/5th of the gains of all quests (up to your level - 4) completed in this area are paid to you by the Guild."
+    // 4. Guildmaster Area Perks
     const character = await ctx.db.get(args.characterId)
     const isGuildmaster = character?.rank === 'guildmaster'
-    const charLvl = character?.lvl || 1
-    const maxGMLevel = Math.max(0, charLvl - 4)
 
     let guildmasterAreaGains: Array<{
-      _id: Id<'quests'> | Id<'sessions'>
-      sessionId?: Id<'sessions'>
+      _id: Id<'sessions'>
+      sessionId: Id<'sessions'>
       name: string
       worldName: string
       level: number
@@ -774,7 +859,7 @@ export const getCharacterTransactions = query({
     }> = []
 
     if (isGuildmaster) {
-      // 1) Find sessions where this Guildmaster was awarded the 20% regional loot cut
+      // Find sessions where this Guildmaster was awarded the 20% regional loot cut
       const gmSessions = await ctx.db
         .query('sessions')
         .withIndex('by_guildmaster_cut', (q) => q.eq('guildmasterCut.characterId', args.characterId!))
@@ -820,63 +905,6 @@ export const getCharacterTransactions = query({
           isSessionLootCut: true,
         })
       }
-
-      // 2) Find all completed quests in worlds
-      const allCompletedQuests = await ctx.db
-        .query('quests')
-        .collect()
-
-      const eligibleGMQuests = allCompletedQuests.filter((q) => {
-        if (!q.isCompleted || !q.worldId) return false
-        // Exclude quests issued by this character itself (already covered under sponsored reimbursement)
-        if (q.characterId === args.characterId) return false
-        const qLvl = q.levelPF ?? q.levelDnD ?? q.level ?? 0
-        return qLvl <= maxGMLevel
-      })
-
-      const questGains = await Promise.all(
-        eligibleGMQuests.map(async (q) => {
-          let worldName = 'The Void'
-          if (q.worldId) {
-            const w = await ctx.db.get(q.worldId)
-            if (w) worldName = w.name
-          }
-
-          let guildmasterCut = '1/5th (20%) of Quest Gains'
-          if (q.rewardMoneyGP !== undefined && q.rewardMoneyGP > 0) {
-            const cutVal = Math.round((q.rewardMoneyGP / 5) * 100) / 100
-            const formatGP = (n: number) => n % 1 === 0 ? `${n.toLocaleString()} GP` : `${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} GP`
-            const typeSuffix = q.rewardType === 'per_person' ? ' / person' : ''
-            guildmasterCut = `${formatGP(cutVal)}${typeSuffix}`
-          } else if (q.reward) {
-            const rewardClean = q.reward.replace(/,/g, '')
-            const match = rewardClean.match(/(\d+(?:\.\d+)?)\s*(sp|gp|cp|pp|gold|silver|copper|platinum)?/i)
-            if (match) {
-              const num = parseFloat(match[1])
-              const unit = match[2] ? match[2].toUpperCase() : 'GP'
-              const cutVal = Math.round((num / 5) * 100) / 100
-              const typeSuffix = q.rewardType === 'per_person' ? ' / person' : ''
-              guildmasterCut = `${cutVal.toLocaleString()} ${unit}${typeSuffix}`
-            }
-          }
-
-          const qLvl = q.levelPF ?? q.levelDnD ?? q.level ?? 0
-
-          return {
-            _id: q._id,
-            name: q.name,
-            worldName,
-            level: qLvl,
-            reward: q.reward || 'None stated',
-            guildmasterCut,
-            completedAt: q.completedAt || q._creationTime,
-            reimbursementClaimed: !!q.reimbursementClaimed,
-            isSessionLootCut: false,
-          }
-        })
-      )
-
-      guildmasterAreaGains.push(...questGains)
     }
 
     // 5. Quests issued by this character completed in sessions: 'To be Paid' to adventurers

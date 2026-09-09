@@ -208,26 +208,35 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
                 )}
               >
                 <div 
-                  className="p-3 cursor-pointer flex items-center justify-between gap-3"
+                  className={cn(
+                    "p-3 cursor-pointer flex justify-between gap-3",
+                    isExpanded ? "items-start" : "items-center"
+                  )}
                   onClick={() => setExpandedQuestId(isExpanded ? null : quest._id)}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
+                  <div className={cn("flex gap-3 min-w-0 flex-1", isExpanded ? "items-start" : "items-center")}>
                     <div 
                         className={cn(
                             "flex items-center justify-center rounded-full font-bold shrink-0",
-                            isSidebar ? "h-6 w-6 text-[10px]" : "h-8 w-8 text-xs"
+                            isSidebar ? "h-6 w-6 text-[10px]" : "h-8 w-8 text-xs",
+                            isExpanded && "mt-0.5"
                         )}
                         style={getDualLevelBadgeStyle(levelPF, levelDnD)}
                     >
                       {isDual ? 'V' : (levelPF ?? levelDnD ?? 0) > 0 ? (levelPF ?? levelDnD) : '?'}
                     </div>
-                    <div className="min-w-0">
-                        <h4 className={cn("font-bold truncate flex items-center gap-1.5 flex-wrap", isSidebar ? "text-xs" : "text-sm")}>
+                    <div className="min-w-0 flex-1">
+                        <h4 className={cn("font-bold flex items-center gap-1.5 flex-wrap", isSidebar ? "text-xs" : "text-sm", !isExpanded && "truncate")}>
                             <div className="flex items-center shrink-0">
                                 {levelPF !== undefined && <img src="/PFVoid.svg" alt="PF" className="h-3 w-3 -mr-0.5" />}
                                 {levelDnD !== undefined && <img src="/DnDVoid.svg" alt="DnD" className="h-3 w-3" />}
                             </div>
-                            <span className="truncate">{quest.name}</span>
+                            <span 
+                              className={cn(isExpanded ? "whitespace-normal break-words" : "truncate")}
+                              title={quest.name}
+                            >
+                              {quest.name}
+                            </span>
                             {!quest.worldId && (
                                 <span 
                                   className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40 shrink-0 shadow-xs"
@@ -250,9 +259,9 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
                             )}
                         </h4>
                         {(quest.questgiver || quest.characterName || isCharacterQuest) && (
-                            <p className="text-[10px] text-muted-foreground truncate flex items-center gap-1">
+                            <p className={cn("text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5", isExpanded ? "whitespace-normal break-words" : "truncate")}>
                                 {isCharacterQuest ? (
-                                    <span className="text-purple-400/90 font-medium truncate flex items-center gap-1">
+                                    <span className={cn("text-purple-400/90 font-medium flex items-center gap-1", isExpanded ? "whitespace-normal break-words" : "truncate")}>
                                         <User className="h-2.5 w-2.5 shrink-0" />
                                         <span>
                                             {quest.characterName 
@@ -266,7 +275,7 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
                                 ) : (
                                     <>
                                         <User className="h-2.5 w-2.5 shrink-0" />
-                                        <span className="truncate">{quest.questgiver}</span>
+                                        <span className={cn(isExpanded ? "whitespace-normal break-words" : "truncate")}>{quest.questgiver}</span>
                                     </>
                                 )}
                             </p>

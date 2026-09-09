@@ -281,7 +281,8 @@ export const toggleQuestReimbursementClaimed = mutation({
     if (!quest) throw new Error('Quest not found')
 
     const character = await ctx.db.get(args.characterId)
-    if (!character || character.userId !== user.subject || quest.characterId !== args.characterId) {
+    const isAdminUser = await isAdmin(ctx)
+    if (!character || (character.userId !== user.subject && !isAdminUser) || quest.characterId !== args.characterId) {
       throw new Error('You do not own this quest.')
     }
 

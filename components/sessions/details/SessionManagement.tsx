@@ -194,7 +194,7 @@ export default function SessionManagement({
                                                     </div>
                                                 );
                                             })()}
-                                            <span className="font-semibold truncate">{quest.name}</span>
+                                            <span className="font-semibold break-words" title={quest.name}>{quest.name}</span>
                                             {!quest.worldId && (
                                                 <span 
                                                     className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40 shrink-0"
