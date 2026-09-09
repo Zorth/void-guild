@@ -6,11 +6,13 @@ import { isAdmin, isGameMaster } from './roles'
 
 /**
  * XP gain based on session level and character level.
+ * Level 1 and 2 sessions count as minimum level 3 for XP calculation.
  */
 export function calculateXPGain(sessionLevel: number, characterLevel: number, isGM: boolean): number {
   if (isGM) return 250
 
-  const L = sessionLevel - characterLevel
+  const effectiveSessionLevel = Math.max(3, sessionLevel)
+  const L = effectiveSessionLevel - characterLevel
   let xpGain = 0
   if (L % 2 === 0) {
     xpGain = 250 * Math.pow(2, L / 2)
