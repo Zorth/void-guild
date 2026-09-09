@@ -45,6 +45,7 @@ import InSyncPlasmaEffect from './InSyncPlasmaEffect'
 import BlazeTextParticles from './BlazeTextParticles'
 import VoidNebulaEffect from './VoidNebulaEffect'
 import InfernoFireEffect from './InfernoFireEffect'
+import TintParticlesEffect from './TintParticlesEffect'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getLevelBadgeStyle, CharacterRankIcon, getXPBarStyles, cn } from '@/lib/utils'
 import { track } from '@vercel/analytics'
@@ -246,6 +247,12 @@ export default function Characters({ filters }: { filters?: { pf: boolean; dnd: 
                       )}
                       {(cosmetics.cardClassName.includes('blaze-inferno') || character.cosmetics?.bgColor === 'blaze_inferno_bg' || character.cosmetics?.bgColor === 'blaze-inferno-bg') && (
                         <InfernoFireEffect />
+                      )}
+                      {(cosmetics.cardClassName.includes('cyan-particle') || character.cosmetics?.bgColor === 'cyan_particles' || character.cosmetics?.bgColor === 'cyan-particle-bg') && (
+                        <TintParticlesEffect variant="cyan" />
+                      )}
+                      {(cosmetics.cardClassName.includes('crimson-particle') || character.cosmetics?.bgColor === 'crimson_particles' || character.cosmetics?.bgColor === 'crimson-particle-bg') && (
+                        <TintParticlesEffect variant="crimson" />
                       )}
                       <div className="flex justify-between items-center w-full relative z-10">
                         <div className="flex flex-col">

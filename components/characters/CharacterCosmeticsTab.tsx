@@ -21,6 +21,7 @@ import InSyncPlasmaEffect from '@/components/characters/InSyncPlasmaEffect'
 import BlazeTextParticles from '@/components/characters/BlazeTextParticles'
 import VoidNebulaEffect from '@/components/characters/VoidNebulaEffect'
 import InfernoFireEffect from '@/components/characters/InfernoFireEffect'
+import TintParticlesEffect from '@/components/characters/TintParticlesEffect'
 import {
   resolveCosmeticsStyles,
   FONT_OPTIONS,
@@ -248,6 +249,12 @@ export default function CharacterCosmeticsTab({
           )}
           {(previewStyles.cardClassName.includes('blaze-inferno') || cosmetics.bgColor === 'blaze_inferno_bg' || cosmetics.bgColor === 'blaze-inferno-bg') && (
             <InfernoFireEffect />
+          )}
+          {(previewStyles.cardClassName.includes('cyan-particle') || cosmetics.bgColor === 'cyan_particles' || cosmetics.bgColor === 'cyan-particle-bg') && (
+            <TintParticlesEffect variant="cyan" />
+          )}
+          {(previewStyles.cardClassName.includes('crimson-particle') || cosmetics.bgColor === 'crimson_particles' || cosmetics.bgColor === 'crimson-particle-bg') && (
+            <TintParticlesEffect variant="crimson" />
           )}
           <div className="flex items-center gap-3 min-w-0 relative z-10">
             <ProfileAvatarWithBadge
@@ -553,6 +560,12 @@ export default function CharacterCosmeticsTab({
                 )}
                 {(opt.id === 'blaze_inferno_bg' || opt.value === 'blaze-inferno-bg') && isUnlocked && (
                   <InfernoFireEffect />
+                )}
+                {(opt.id === 'cyan_particles' || opt.value === 'cyan-particle-bg') && isUnlocked && (
+                  <TintParticlesEffect variant="cyan" />
+                )}
+                {(opt.id === 'crimson_particles' || opt.value === 'crimson-particle-bg') && isUnlocked && (
+                  <TintParticlesEffect variant="crimson" />
                 )}
                 <span className="font-semibold relative z-10">{opt.name}</span>
                 {!isUnlocked && (

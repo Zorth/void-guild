@@ -381,14 +381,14 @@ export const BG_COLOR_OPTIONS: CosmeticOption[] = [
   },
   {
     id: 'cyan_particles',
-    name: 'Cyan Particle Tint (Lvl 5)',
+    name: 'Cyan Particle Tint',
     unlockedByDefault: false,
     requiredAchievementId: 'level_5_char',
     value: 'cyan-particle-bg',
   },
   {
     id: 'crimson_particles',
-    name: 'Crimson Flame Particle Tint (Lvl 10)',
+    name: 'Crimson Flame Particle Tint',
     unlockedByDefault: false,
     requiredAchievementId: 'level_10_char',
     value: 'crimson-particle-bg',

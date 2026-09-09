@@ -16,6 +16,7 @@ import InSyncPlasmaEffect from '@/components/characters/InSyncPlasmaEffect'
 import BlazeTextParticles from '@/components/characters/BlazeTextParticles'
 import VoidNebulaEffect from '@/components/characters/VoidNebulaEffect'
 import InfernoFireEffect from '@/components/characters/InfernoFireEffect'
+import TintParticlesEffect from '@/components/characters/TintParticlesEffect'
 
 interface CharacterRelationship {
   count: number
@@ -134,6 +135,12 @@ export default function AttendingCharactersList({
               )}
               {(cosmeticsStyles.cardClassName.includes('blaze-inferno') || char.cosmetics?.bgColor === 'blaze_inferno_bg' || char.cosmetics?.bgColor === 'blaze-inferno-bg') && (
                 <InfernoFireEffect />
+              )}
+              {(cosmeticsStyles.cardClassName.includes('cyan-particle') || char.cosmetics?.bgColor === 'cyan_particles' || char.cosmetics?.bgColor === 'cyan-particle-bg') && (
+                <TintParticlesEffect variant="cyan" />
+              )}
+              {(cosmeticsStyles.cardClassName.includes('crimson-particle') || char.cosmetics?.bgColor === 'crimson_particles' || char.cosmetics?.bgColor === 'crimson-particle-bg') && (
+                <TintParticlesEffect variant="crimson" />
               )}
               <div className="flex items-center gap-3 min-w-0 relative z-10">
                 <ProfileAvatarWithBadge
