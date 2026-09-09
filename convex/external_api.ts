@@ -697,13 +697,16 @@ export const updateCharacterSheet = mutation({
             name: v.string(),
             value: v.optional(v.number()),
         }))),
-        money: v.optional(v.object({
-            cp: v.number(),
-            sp: v.number(),
-            gp: v.number(),
-            pp: v.number(),
-            totalInGold: v.optional(v.number()),
-        })),
+        money: v.optional(v.union(
+            v.object({
+                cp: v.optional(v.number()),
+                sp: v.optional(v.number()),
+                gp: v.optional(v.number()),
+                pp: v.optional(v.number()),
+                totalInGold: v.optional(v.number()),
+            }),
+            v.number()
+        )),
         // Support gear as structured object or array of items
         gear: v.optional(v.union(
             v.object({
@@ -795,15 +798,28 @@ export const updateCharacterSheet = mutation({
         }
 
         // Normalize Money total if not present
-        let normalizedMoney = args.money
-        if (normalizedMoney && normalizedMoney.totalInGold === undefined) {
-            const cp = normalizedMoney.cp || 0
-            const sp = normalizedMoney.sp || 0
-            const gp = normalizedMoney.gp || 0
-            const pp = normalizedMoney.pp || 0
+        let normalizedMoney = undefined
+        if (typeof args.money === 'number') {
             normalizedMoney = {
-                ...normalizedMoney,
-                totalInGold: Math.round((gp + (pp * 10) + (sp / 10) + (cp / 100)) * 100) / 100,
+                cp: 0,
+                sp: 0,
+                gp: args.money,
+                pp: 0,
+                totalInGold: args.money,
+            }
+        } else if (args.money && typeof args.money === 'object') {
+            const cp = args.money.cp || 0
+            const sp = args.money.sp || 0
+            const gp = args.money.gp || 0
+            const pp = args.money.pp || 0
+            normalizedMoney = {
+                cp,
+                sp,
+                gp,
+                pp,
+                totalInGold: args.money.totalInGold !== undefined
+                    ? args.money.totalInGold
+                    : Math.round((gp + (pp * 10) + (sp / 10) + (cp / 100)) * 100) / 100,
             }
         }
 

@@ -322,10 +322,10 @@ export default defineSchema({
             value: v.optional(v.number()),
         }))),
         money: v.optional(v.object({
-            cp: v.number(),
-            sp: v.number(),
-            gp: v.number(),
-            pp: v.number(),
+            cp: v.optional(v.number()),
+            sp: v.optional(v.number()),
+            gp: v.optional(v.number()),
+            pp: v.optional(v.number()),
             totalInGold: v.optional(v.number()),
         })),
         gear: v.optional(v.object({
