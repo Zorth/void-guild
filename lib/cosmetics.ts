@@ -49,6 +49,8 @@ export const ACHIEVEMENT_INFO: Record<string, AchievementInfo> = {
   give_10_commendations: { title: 'Guild Encourager', category: 'hidden' },
   worlds_played_3: { title: 'Dimensional Traveler', category: 'hidden' },
   worlds_played_5: { title: 'Multiverse Wanderer', category: 'hidden' },
+  express_interest: { title: 'Eager Adventurer', category: 'normal' },
+  availability_5_days: { title: 'Duty Calls', category: 'normal' },
   void_objective_contribution: { title: 'Void Incursion Defender', category: 'hidden' },
   black_void_auction_listing: { title: 'Black Market Auctioneer', category: 'hidden' },
   black_void_service_listing: { title: 'Services for Hire', category: 'hidden' },
@@ -86,6 +88,13 @@ export const FONT_OPTIONS: CosmeticOption[] = [
     requiredAchievementId: 'link_discord',
     value: 'font-rounded',
   },
+  {
+    id: 'cinzel_decorative',
+    name: 'Cinzel Decorative',
+    unlockedByDefault: false,
+    requiredAchievementId: 'system_polymath',
+    value: 'font-cinzel-dec',
+  },
 ]
 
 export const COLOR_OPTIONS: CosmeticOption[] = [
@@ -103,6 +112,27 @@ export const COLOR_OPTIONS: CosmeticOption[] = [
     unlockedByDefault: false,
     requiredAchievementId: 'character_trio',
     value: '#2DD4BF',
+  },
+  {
+    id: 'tangerine_text',
+    name: 'Tangerine Accent',
+    unlockedByDefault: false,
+    requiredAchievementId: 'express_interest',
+    value: '#FB923C',
+  },
+  {
+    id: 'emerald_text',
+    name: 'Emerald Accent',
+    unlockedByDefault: false,
+    requiredAchievementId: 'availability_5_days',
+    value: '#34D399',
+  },
+  {
+    id: 'sky_blue_text',
+    name: 'Sky Blue Accent',
+    unlockedByDefault: false,
+    requiredAchievementId: 'visit_world',
+    value: '#38BDF8',
   },
   {
     id: 'amber_text',

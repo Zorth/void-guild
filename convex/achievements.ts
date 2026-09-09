@@ -238,7 +238,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     title: 'Eager Adventurer',
     description: 'Marked yourself as interested in an upcoming session.',
     category: 'normal',
-    reward: '',
+    reward: 'Tangerine Accent Text Color Cosmetic',
     checkEligibility: (data) => data.isInterestedCount >= 1,
   },
   {
@@ -246,7 +246,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     title: 'Duty Calls',
     description: 'Marked yourself as available for at least 5 days on the planning tool.',
     category: 'normal',
-    reward: '',
+    reward: 'Emerald Accent Text Color Cosmetic',
     checkEligibility: (data) => data.availabilityDaysCount >= 5,
   },
   {
@@ -254,7 +254,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     title: 'World Explorer',
     description: 'Visited a campaign world page.',
     category: 'normal',
-    reward: '',
+    reward: 'Sky Blue Accent Text Color Cosmetic',
     checkEligibility: (data) => Boolean(data.userDoc?.visitedWorld),
   },
   {
@@ -278,7 +278,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     title: 'System Polymath',
     description: 'Own characters in both Pathfinder 2e and D&D 5e.',
     category: 'hidden',
-    reward: '',
+    reward: 'Cinzel Decorative Font Cosmetic',
     checkEligibility: (data) =>
       data.characters.some((c) => c.system === 'PF') &&
       data.characters.some((c) => c.system === 'DnD'),
