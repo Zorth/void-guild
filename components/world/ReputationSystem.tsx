@@ -12,6 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
+import { resolveCosmeticsStyles } from '@/lib/cosmetics'
 
 interface ReputationCellProps {
   charId: Id<'characters'>
@@ -382,25 +383,27 @@ export default function ReputationSystem({
                         </thead>
                         <tbody className="relative z-10">
                             {sortedCharacters.length > 0 ? (
-                                sortedCharacters.map(char => (
-                                    <tr key={char._id} className="border-b border-border/30 hover:bg-primary/5 transition-colors">
-                                        <td className="px-4 py-2.5 sticky left-0 bg-card z-20 backdrop-blur-sm border-r border-border/40 w-[160px] min-w-[140px]">
-                                            <div className="flex flex-col gap-0.5 min-w-0">
-                                                <div className="flex items-center flex-wrap gap-2 min-w-0">
-                                                    <span className="font-bold text-sm tracking-tight break-words">{char.name}</span>
-                                                    <span
-                                                        className="inline-flex items-center justify-center rounded-full w-4 h-4 text-[8px] font-bold shrink-0"
-                                                        style={getLevelBadgeStyle(char.lvl)}
-                                                    >
-                                                        {char.lvl}
-                                                    </span>
-                                                </div>
-                                                {char.title && (
-                                                    <span className="text-[9px] text-amber-400/90 italic font-medium whitespace-normal">{char.title}</span>
-                                                )}
-                                                <span className="text-[9px] text-muted-foreground uppercase tracking-widest font-medium whitespace-normal">{char.class}</span>
-                                            </div>
-                                        </td>
+                                sortedCharacters.map(char => {
+                                    const cosmetics = resolveCosmeticsStyles(char.cosmetics)
+                                    return (
+                                     <tr key={char._id} className="border-b border-border/30 hover:bg-primary/5 transition-colors">
+                                         <td className="px-4 py-2.5 sticky left-0 bg-card z-20 backdrop-blur-sm border-r border-border/40 w-[160px] min-w-[140px]">
+                                             <div className="flex flex-col gap-0.5 min-w-0">
+                                                 <div className="flex items-center flex-wrap gap-2 min-w-0">
+                                                     <span className={cn("font-bold text-sm tracking-tight break-words", cosmetics.nameClassName)} style={cosmetics.nameStyle}>{char.name}</span>
+                                                     <span
+                                                         className="inline-flex items-center justify-center rounded-full w-4 h-4 text-[8px] font-bold shrink-0"
+                                                         style={getLevelBadgeStyle(char.lvl)}
+                                                     >
+                                                         {char.lvl}
+                                                     </span>
+                                                 </div>
+                                                 {char.title && (
+                                                     <span className={cn("text-[9px] whitespace-normal", cosmetics.titleClassName)} style={cosmetics.titleStyle}>{char.title}</span>
+                                                 )}
+                                                 <span className={cn("text-[9px] text-muted-foreground uppercase tracking-widest font-medium whitespace-normal", cosmetics.subtitleClassName)} style={cosmetics.subtitleStyle}>{char.class}</span>
+                                             </div>
+                                         </td>
                                         {displayedFactions.map(faction => (
                                             <td key={faction} className="px-2 py-2.5 align-middle bg-card/50 text-center">
                                                 <ReputationCell
@@ -413,7 +416,8 @@ export default function ReputationSystem({
                                             </td>
                                         ))}
                                     </tr>
-                                ))
+                                    )
+                                })
                             ) : (
                                 <tr>
                                     <td colSpan={displayedFactions.length + 1} className="px-6 py-8 text-center text-sm text-muted-foreground italic">

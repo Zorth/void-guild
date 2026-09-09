@@ -490,18 +490,20 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
   } else if (titleColorObj?.value === 'rainbow-text' || cosmetics.titleColor === 'rainbow' || cosmetics.titleColor === 'rainbow-text') {
     titleClassName = `${titleClassName} rainbow-text`
     titleStyle = {}
-  } else if (titleColorObj?.value) {
+  } else if (titleColorObj && titleColorObj.id !== 'default' && titleColorObj.value) {
     titleStyle = { color: titleColorObj.value }
-  } else if (cosmetics.titleColor) {
+  } else if (cosmetics.titleColor && cosmetics.titleColor !== 'default') {
     titleStyle = { color: cosmetics.titleColor }
   } else {
     // Default title color
     titleClassName = `${titleClassName} text-amber-400/90`
   }
 
-  // Subtitle Style & Class (Always translucent with opacity 0.8)
+  // Subtitle Style & Class (Always translucent with opacity 0.8 by default)
   const subColorObj = COLOR_OPTIONS.find((c) => c.id === cosmetics.subtitleColor || c.value === cosmetics.subtitleColor)
-  let subtitleClassName = `${subFontVal} font-normal opacity-80`
+  let subtitleClassName = subFontVal
+    ? `${subFontVal} font-normal opacity-80`
+    : 'font-normal opacity-80'
   let subtitleStyle: React.CSSProperties = { opacity: 0.8 }
 
   if (subColorObj?.value === 'gold-text' || cosmetics.subtitleColor === 'gold_text' || cosmetics.subtitleColor === 'gold-text') {
@@ -509,9 +511,10 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
     subtitleStyle = {}
   } else if (subColorObj?.value === 'rainbow-text' || cosmetics.subtitleColor === 'rainbow' || cosmetics.subtitleColor === 'rainbow-text') {
     subtitleClassName = `${subtitleClassName} rainbow-text`
-  } else if (subColorObj?.value) {
+    subtitleStyle = {}
+  } else if (subColorObj && subColorObj.id !== 'default' && subColorObj.value) {
     subtitleStyle = { color: subColorObj.value, opacity: 0.8 }
-  } else if (cosmetics.subtitleColor) {
+  } else if (cosmetics.subtitleColor && cosmetics.subtitleColor !== 'default') {
     subtitleStyle = { color: cosmetics.subtitleColor, opacity: 0.8 }
   }
 
