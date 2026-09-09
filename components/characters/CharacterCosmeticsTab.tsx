@@ -221,25 +221,26 @@ export default function CharacterCosmeticsTab({
         </div>
       )}
 
-      {/* Live Calling Card Preview */}
-      <div className="p-4 rounded-xl bg-muted/30 border border-dashed border-border/70 space-y-2">
-        <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center justify-between">
-          <span className="flex items-center gap-1.5">
-            <Sparkles className="h-3.5 w-3.5 text-purple-500" />
-            Calling Card Live Preview
-          </span>
-          <span className="text-[10px] bg-purple-500/20 text-purple-600 dark:text-purple-300 px-2 py-0.5 rounded-full font-bold">
-            Attending List Style
-          </span>
-        </div>
+      {/* Live Calling Card Preview (Pinned at top) */}
+      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md pt-1 pb-3 -mx-1 px-1 border-b border-border/60 shadow-md">
+        <div className="p-3.5 rounded-xl bg-muted/40 border border-dashed border-border/80 space-y-2">
+          <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <Sparkles className="h-3.5 w-3.5 text-purple-500" />
+              Calling Card Live Preview
+            </span>
+            <span className="text-[10px] bg-purple-500/20 text-purple-600 dark:text-purple-300 px-2 py-0.5 rounded-full font-bold">
+              Attending List Style
+            </span>
+          </div>
 
-        <div
-          className={cn(
-            'p-3 rounded-lg flex items-center justify-between gap-3 border transition-all relative overflow-visible',
-            previewStyles.cardClassName
-          )}
-          style={previewStyles.cardStyle}
-        >
+          <div
+            className={cn(
+              'p-3 rounded-lg flex items-center justify-between gap-3 border transition-all relative overflow-visible',
+              previewStyles.cardClassName
+            )}
+            style={previewStyles.cardStyle}
+          >
           {previewStyles.cardClassName.includes('in-sync') && <InSyncPlasmaEffect />}
           {(previewStyles.cardClassName.includes('void-nebula') || cosmetics.bgColor === 'void_nebula' || cosmetics.bgColor === 'void-nebula-bg') && (
             <VoidNebulaEffect />
@@ -292,6 +293,7 @@ export default function CharacterCosmeticsTab({
             </span>
           </div>
         </div>
+      </div>
       </div>
 
       {/* 1. Character Name Styling */}
