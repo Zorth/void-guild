@@ -38,6 +38,10 @@ export interface UserEvaluationData {
   maxWorldStreak: number
   uniqueWorldsCount: number
   claimedLootCount: number
+  hasVoidObjectiveContribution: boolean
+  hasAuctionListing: boolean
+  hasServiceListing: boolean
+  hasCharacterQuest: boolean
   unlockedAchievementIds?: Set<string>
 }
 
@@ -466,6 +470,38 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
       data.commendationCounts.clutch >= 1 &&
       data.commendationCounts.heroic >= 1,
   },
+  {
+    id: 'void_objective_contribution',
+    title: 'Void Incursion Defender',
+    description: 'Contributed to a monthly Void Objective with your character.',
+    category: 'hidden',
+    reward: '',
+    checkEligibility: (data) => data.hasVoidObjectiveContribution,
+  },
+  {
+    id: 'black_void_auction_listing',
+    title: 'Black Market Auctioneer',
+    description: 'Created an Auction House item listing in The Black Void with your character.',
+    category: 'hidden',
+    reward: '',
+    checkEligibility: (data) => data.hasAuctionListing,
+  },
+  {
+    id: 'black_void_service_listing',
+    title: 'Services for Hire',
+    description: 'Offered a craft or spellcasting service in The Black Void with your character.',
+    category: 'hidden',
+    reward: '',
+    checkEligibility: (data) => data.hasServiceListing,
+  },
+  {
+    id: 'create_character_quest',
+    title: 'Quest Benefactor',
+    description: 'Posted a character-sponsored quest for fellow adventurers to undertake.',
+    category: 'hidden',
+    reward: '',
+    checkEligibility: (data) => data.hasCharacterQuest,
+  },
 ]
 
 export const syncAndGetAchievements = mutation({
@@ -660,6 +696,45 @@ export const syncAndGetAchievements = mutation({
     }
     const uniqueWorldsCount = uniqueWorldsSet.size
 
+    // Black Void & Void Objective metrics
+    let hasVoidObjectiveContribution = false
+    let hasAuctionListing = false
+    let hasServiceListing = false
+    let hasCharacterQuest = false
+
+    for (const char of characters) {
+      if (!hasVoidObjectiveContribution) {
+        const contrib = await ctx.db
+          .query('voidObjectiveContributions')
+          .withIndex('by_character', (q) => q.eq('characterId', char._id))
+          .first()
+        if (contrib && contrib.amount > 0) {
+          hasVoidObjectiveContribution = true
+        }
+      }
+
+      if (!hasAuctionListing || !hasServiceListing) {
+        const listings = await ctx.db
+          .query('blackVoidListings')
+          .withIndex('by_characterId', (q) => q.eq('characterId', char._id))
+          .collect()
+        for (const l of listings) {
+          if (l.type === 'item') hasAuctionListing = true
+          if (l.type === 'service') hasServiceListing = true
+        }
+      }
+
+      if (!hasCharacterQuest) {
+        const charQuest = await ctx.db
+          .query('quests')
+          .withIndex('by_characterId', (q) => q.eq('characterId', char._id))
+          .first()
+        if (charQuest) {
+          hasCharacterQuest = true
+        }
+      }
+    }
+
     const evalData: UserEvaluationData = {
       userId: user.subject,
       userDoc,
@@ -674,6 +749,10 @@ export const syncAndGetAchievements = mutation({
       maxWorldStreak,
       uniqueWorldsCount,
       claimedLootCount,
+      hasVoidObjectiveContribution,
+      hasAuctionListing,
+      hasServiceListing,
+      hasCharacterQuest,
     }
 
     // Existing unlocked records in database

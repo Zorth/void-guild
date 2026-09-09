@@ -49,6 +49,10 @@ export const ACHIEVEMENT_INFO: Record<string, AchievementInfo> = {
   give_10_commendations: { title: 'Guild Encourager', category: 'hidden' },
   worlds_played_3: { title: 'Dimensional Traveler', category: 'hidden' },
   worlds_played_5: { title: 'Multiverse Wanderer', category: 'hidden' },
+  void_objective_contribution: { title: 'Void Incursion Defender', category: 'hidden' },
+  black_void_auction_listing: { title: 'Black Market Auctioneer', category: 'hidden' },
+  black_void_service_listing: { title: 'Services for Hire', category: 'hidden' },
+  create_character_quest: { title: 'Quest Benefactor', category: 'hidden' },
 }
 
 
