@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog'
-import { Trophy, Lock, CheckCircle2, Gift, EyeOff, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Trophy, Lock, CheckCircle2, Gift, EyeOff, Loader2, ChevronDown, ChevronUp, Shield } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface Achievement {
@@ -54,6 +54,9 @@ export default function AchievementsModal({ open, onOpenChange }: AchievementsMo
   const [isLoading, setIsLoading] = useState(false)
   const [filter, setFilter] = useState<'all' | 'unlocked' | 'hidden'>('all')
   const [expandedChains, setExpandedChains] = useState<Set<string>>(new Set())
+  const [adminView, setAdminView] = useState(false)
+
+  const isEffectiveAdmin = Boolean(data?.isAdmin && adminView)
 
   useEffect(() => {
     if (open) {
@@ -80,7 +83,12 @@ export default function AchievementsModal({ open, onOpenChange }: AchievementsMo
   }
 
   const achievements = data?.achievements || []
-  const filteredAchievements = achievements.filter((a) => {
+  const visibleAchievements = achievements.filter((a) => {
+    if (!isEffectiveAdmin && a.isHidden && !a.isUnlocked) return false
+    return true
+  })
+
+  const filteredAchievements = visibleAchievements.filter((a) => {
     if (filter === 'unlocked') return a.isUnlocked
     if (filter === 'hidden') return a.isHidden
     return true
@@ -103,7 +111,7 @@ export default function AchievementsModal({ open, onOpenChange }: AchievementsMo
       )
     }
 
-    if (data?.isAdmin) {
+    if (isEffectiveAdmin) {
       return (
         <div className={cn(isSubItem ? 'pt-0.5' : 'pt-1')}>
           <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-muted/40 text-muted-foreground border border-border/40">
@@ -117,13 +125,66 @@ export default function AchievementsModal({ open, onOpenChange }: AchievementsMo
     return null
   }
 
-  const seenChains = new Set<string>()
+  // Group achievements into display entries (standalone + tiered chains)
+  type DisplayEntry =
+    | {
+        type: 'chain'
+        chainId: string
+        primaryItem: Achievement
+        subItems: Achievement[]
+        isUnlocked: boolean
+      }
+    | {
+        type: 'single'
+        item: Achievement
+        isUnlocked: boolean
+      }
+
+  const seenChainIds = new Set<string>()
+  const displayEntries: DisplayEntry[] = []
+
+  for (const item of filteredAchievements) {
+    if (item.chainId) {
+      if (seenChainIds.has(item.chainId)) continue
+      seenChainIds.add(item.chainId)
+
+      const chainItems = filteredAchievements
+        .filter((a) => a.chainId === item.chainId)
+        .sort((a, b) => (b.tier || 0) - (a.tier || 0)) // Higher tier first
+
+      const unlockedItems = chainItems.filter((i) => i.isUnlocked)
+      const primaryItem =
+        unlockedItems.length > 0 ? unlockedItems[0] : chainItems[chainItems.length - 1]
+
+      const subItems = chainItems.filter((i) => i.id !== primaryItem.id)
+
+      displayEntries.push({
+        type: 'chain',
+        chainId: item.chainId,
+        primaryItem,
+        subItems,
+        isUnlocked: primaryItem.isUnlocked,
+      })
+    } else {
+      displayEntries.push({
+        type: 'single',
+        item,
+        isUnlocked: item.isUnlocked,
+      })
+    }
+  }
+
+  // Sort: Locked items (isUnlocked: false) appear before unlocked items (isUnlocked: true)
+  displayEntries.sort((a, b) => {
+    if (a.isUnlocked === b.isUnlocked) return 0
+    return a.isUnlocked ? 1 : -1
+  })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-6 overflow-hidden">
         <DialogHeader className="pb-3 border-b space-y-3">
-          <div className="flex items-center justify-between gap-4 pr-6">
+          <div className="flex items-center justify-between gap-4 pr-6 flex-wrap sm:flex-nowrap">
             <div className="flex items-center gap-2.5">
               <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
                 <Trophy className="h-6 w-6" />
@@ -131,7 +192,7 @@ export default function AchievementsModal({ open, onOpenChange }: AchievementsMo
               <div>
                 <DialogTitle className="text-xl font-bold flex items-center gap-2">
                   Account Achievements
-                  {data?.isAdmin && (
+                  {isEffectiveAdmin && (
                     <span className="text-[10px] bg-purple-500/20 text-purple-600 dark:text-purple-300 px-2 py-0.5 rounded-full font-bold border border-purple-500/30 uppercase tracking-wider">
                       Admin View
                     </span>
@@ -142,6 +203,23 @@ export default function AchievementsModal({ open, onOpenChange }: AchievementsMo
                 </DialogDescription>
               </div>
             </div>
+
+            {data?.isAdmin && (
+              <button
+                type="button"
+                onClick={() => setAdminView(!adminView)}
+                className={cn(
+                  'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-all shrink-0',
+                  adminView
+                    ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                    : 'bg-muted/60 hover:bg-muted text-muted-foreground border-border/70'
+                )}
+                title="Toggle Admin View to reveal locked secret achievements"
+              >
+                <Shield className="h-3.5 w-3.5 shrink-0" />
+                <span>{adminView ? 'Admin View: ON' : 'Admin View: OFF'}</span>
+              </button>
+            )}
           </div>
 
           {/* Progress Bar */}
@@ -162,8 +240,8 @@ export default function AchievementsModal({ open, onOpenChange }: AchievementsMo
             </div>
           )}
 
-          {/* Filter Pills - Only rendered for Admins */}
-          {data?.isAdmin && (
+          {/* Filter Pills - Only rendered when Admin View is enabled */}
+          {isEffectiveAdmin && (
             <div className="flex gap-2 pt-1 text-xs">
               <button
                 type="button"
@@ -175,7 +253,7 @@ export default function AchievementsModal({ open, onOpenChange }: AchievementsMo
                     : 'bg-muted/30 hover:bg-muted/60 border-border/50 text-muted-foreground'
                 )}
               >
-                All ({achievements.length})
+                All ({visibleAchievements.length})
               </button>
               <button
                 type="button"
@@ -199,7 +277,7 @@ export default function AchievementsModal({ open, onOpenChange }: AchievementsMo
                     : 'bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-300 border-purple-500/30'
                 )}
               >
-                <EyeOff className="h-3 w-3" /> Hidden ({achievements.filter((a) => a.isHidden).length})
+                <EyeOff className="h-3 w-3" /> Hidden ({visibleAchievements.filter((a) => a.isHidden).length})
               </button>
             </div>
           )}
@@ -212,34 +290,19 @@ export default function AchievementsModal({ open, onOpenChange }: AchievementsMo
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
               <p className="text-sm font-medium">Syncing achievements...</p>
             </div>
-          ) : filteredAchievements.length === 0 ? (
+          ) : displayEntries.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground text-sm italic">
               No achievements found.
             </div>
           ) : (
-            filteredAchievements.map((item) => {
-              // Handle tiered chain grouping with collapsible sub-tiers
-              if (item.chainId) {
-                if (seenChains.has(item.chainId)) return null
-                seenChains.add(item.chainId)
-
-                const chainItems = filteredAchievements
-                  .filter((a) => a.chainId === item.chainId)
-                  .sort((a, b) => (b.tier || 0) - (a.tier || 0)) // Higher tier first
-
-                // Select primary item: highest unlocked tier, or lowest tier if none unlocked
-                const unlockedItems = chainItems.filter((i) => i.isUnlocked)
-                const primaryItem =
-                  unlockedItems.length > 0
-                    ? unlockedItems[0]
-                    : chainItems[chainItems.length - 1]
-
-                const subItems = chainItems.filter((i) => i.id !== primaryItem.id)
-                const isExpanded = expandedChains.has(item.chainId)
+            displayEntries.map((entry) => {
+              if (entry.type === 'chain') {
+                const { chainId, primaryItem, subItems } = entry
+                const isExpanded = expandedChains.has(chainId)
 
                 return (
                   <div
-                    key={`chain-${item.chainId}`}
+                    key={`chain-${chainId}`}
                     className={cn(
                       'rounded-xl border transition-all duration-200 overflow-hidden',
                       primaryItem.isUnlocked
@@ -390,6 +453,7 @@ export default function AchievementsModal({ open, onOpenChange }: AchievementsMo
               }
 
               // Standalone achievement card
+              const { item } = entry
               return (
                 <div
                   key={item.id}

@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import {
   Sparkles,
   Lock,
@@ -9,6 +9,7 @@ import {
   Frame,
   Paintbrush,
   Circle,
+  Shield,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useUser } from '@clerk/nextjs'
@@ -59,6 +60,9 @@ export default function CharacterCosmeticsTab({
   const profileImageUrl = user?.imageUrl
   const characterRanks = useQuery(api.characters.getCharacterLeaderboardRanks)
   const rankNumber = (characterId ? characterRanks?.[characterId] : undefined) ?? 1
+  const [adminView, setAdminView] = useState(false)
+
+  const isEffectiveAdmin = Boolean(isAdmin && adminView)
 
   function getOptionLockStatus(opt: CosmeticOption) {
     if (opt.unlockedByDefault) return { isUnlocked: true, label: '', badgeLabel: '', isHidden: false, title: '' }
@@ -69,14 +73,14 @@ export default function CharacterCosmeticsTab({
     const title = info?.title || opt.requiredAchievementId
     const label = isUnlocked
       ? ''
-      : isAdmin
+      : isEffectiveAdmin
         ? `Requires achievement: ${title}${isHidden ? ' (Secret)' : ''}`
         : isHidden
           ? 'Locked (Secret Achievement)'
           : `Requires achievement: ${title}`
     const badgeLabel = isUnlocked
       ? ''
-      : isAdmin
+      : isEffectiveAdmin
         ? `Requires: ${title}${isHidden ? ' (Secret)' : ''}`
         : isHidden
           ? 'Locked'
@@ -88,14 +92,14 @@ export default function CharacterCosmeticsTab({
   function isOptionVisible(opt: CosmeticOption) {
     const { isUnlocked, isHidden } = getOptionLockStatus(opt)
     if (isUnlocked) return true
-    if (isHidden && !isAdmin) return false
+    if (isHidden && !isEffectiveAdmin) return false
     return true
   }
 
   function handleSelectOption(category: keyof CharacterCosmetics, opt: CosmeticOption) {
     const { isUnlocked, isHidden, title } = getOptionLockStatus(opt)
     if (!isUnlocked) {
-      if (isAdmin) {
+      if (isEffectiveAdmin) {
         toast.error(`Locked cosmetic! Requires achievement: "${title}"${isHidden ? ' (Secret)' : ''}`)
       } else if (isHidden) {
         toast.error('Locked cosmetic! Unlocked by a secret achievement.')
@@ -182,6 +186,31 @@ export default function CharacterCosmeticsTab({
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Admin View Toggle Bar */}
+      {isAdmin && (
+        <div className="flex items-center justify-between p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs">
+          <div className="flex items-center gap-2">
+            <Shield className="h-4 w-4 text-purple-400 shrink-0" />
+            <div>
+              <span className="font-semibold text-foreground">Admin Mode</span>
+              <p className="text-[11px] text-muted-foreground">Reveal and inspect locked secret cosmetics</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAdminView(!adminView)}
+            className={cn(
+              'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-all',
+              adminView
+                ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                : 'bg-muted/60 hover:bg-muted text-muted-foreground border-border/70'
+            )}
+          >
+            <span>{adminView ? 'Admin View: ON' : 'Admin View: OFF'}</span>
+          </button>
+        </div>
+      )}
+
       {/* Live Calling Card Preview */}
       <div className="p-4 rounded-xl bg-muted/30 border border-dashed border-border/70 space-y-2">
         <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center justify-between">
