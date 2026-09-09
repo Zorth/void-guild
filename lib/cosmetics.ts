@@ -40,6 +40,7 @@ export const ACHIEVEMENT_INFO: Record<string, AchievementInfo> = {
   comm_jack_of_all_trades: { title: 'Jack of All Trades', category: 'hidden' },
   character_streak_3: { title: 'In Sync', category: 'hidden' },
   character_streak_5: { title: 'Unbreakable Bond', category: 'hidden' },
+  character_streak_10: { title: 'Inseparable Adventurers', category: 'hidden' },
   system_polymath: { title: 'System Polymath', category: 'hidden' },
   loot_first: { title: 'Treasure Seeker', category: 'normal' },
   loot_hoarder_5: { title: 'Hoarder', category: 'hidden' },
@@ -413,6 +414,13 @@ export const BG_COLOR_OPTIONS: CosmeticOption[] = [
     requiredAchievementId: 'void_objective_contribution',
     value: 'void-nebula-bg',
   },
+  {
+    id: 'blaze_inferno_bg',
+    name: 'Living Inferno Fire Tint',
+    unlockedByDefault: false,
+    requiredAchievementId: 'character_streak_10',
+    value: 'blaze-inferno-bg',
+  },
 ]
 
 export interface CharacterCosmetics {
@@ -526,6 +534,15 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
       cardClassName = cardClassName ? `${cardClassName} void-nebula-bg` : 'void-nebula-bg'
     } else {
       cardClassName = cardClassName ? `${cardClassName} void-nebula-bg` : 'void-nebula-bg'
+    }
+  } else if (bgObj?.value === 'blaze-inferno-bg' || cosmetics.bgColor === 'blaze_inferno_bg' || cosmetics.bgColor === 'blaze-inferno-bg') {
+    if (isGradientBorder) {
+      const firePaddingLayer =
+        'radial-gradient(ellipse at 50% 100%, rgba(234, 88, 12, 0.35) 0%, rgba(185, 28, 28, 0.2) 50%, transparent 80%), linear-gradient(var(--card), var(--card))'
+      cardBgStyle = { '--card-bg': firePaddingLayer } as React.CSSProperties
+      cardClassName = cardClassName ? `${cardClassName} blaze-inferno-bg` : 'blaze-inferno-bg'
+    } else {
+      cardClassName = cardClassName ? `${cardClassName} blaze-inferno-bg` : 'blaze-inferno-bg'
     }
   } else if (bgObj && bgObj.value) {
     if (isGradientBorder) {

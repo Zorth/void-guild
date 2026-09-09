@@ -343,7 +343,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     title: 'Inseparable Adventurers',
     description: 'Achieved a character streak of 10 consecutive sessions.',
     category: 'hidden',
-    reward: '',
+    reward: 'Living Inferno Fire Background Tint Cosmetic',
     chainId: 'character_streak',
     tier: 3,
     maxTier: 3,

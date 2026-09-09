@@ -20,6 +20,7 @@ import ProfileAvatarWithBadge from '@/components/characters/ProfileAvatarWithBad
 import InSyncPlasmaEffect from '@/components/characters/InSyncPlasmaEffect'
 import BlazeTextParticles from '@/components/characters/BlazeTextParticles'
 import VoidNebulaEffect from '@/components/characters/VoidNebulaEffect'
+import InfernoFireEffect from '@/components/characters/InfernoFireEffect'
 import {
   resolveCosmeticsStyles,
   FONT_OPTIONS,
@@ -244,6 +245,9 @@ export default function CharacterCosmeticsTab({
           {previewStyles.cardClassName.includes('in-sync') && <InSyncPlasmaEffect />}
           {(previewStyles.cardClassName.includes('void-nebula') || cosmetics.bgColor === 'void_nebula' || cosmetics.bgColor === 'void-nebula-bg') && (
             <VoidNebulaEffect />
+          )}
+          {(previewStyles.cardClassName.includes('blaze-inferno') || cosmetics.bgColor === 'blaze_inferno_bg' || cosmetics.bgColor === 'blaze-inferno-bg') && (
+            <InfernoFireEffect />
           )}
           <div className="flex items-center gap-3 min-w-0 relative z-10">
             <ProfileAvatarWithBadge
@@ -546,6 +550,9 @@ export default function CharacterCosmeticsTab({
               >
                 {(opt.id === 'void_nebula' || opt.value === 'void-nebula-bg') && isUnlocked && (
                   <VoidNebulaEffect />
+                )}
+                {(opt.id === 'blaze_inferno_bg' || opt.value === 'blaze-inferno-bg') && isUnlocked && (
+                  <InfernoFireEffect />
                 )}
                 <span className="font-semibold relative z-10">{opt.name}</span>
                 {!isUnlocked && (

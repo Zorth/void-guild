@@ -15,6 +15,7 @@ import ProfileAvatarWithBadge from '@/components/characters/ProfileAvatarWithBad
 import InSyncPlasmaEffect from '@/components/characters/InSyncPlasmaEffect'
 import BlazeTextParticles from '@/components/characters/BlazeTextParticles'
 import VoidNebulaEffect from '@/components/characters/VoidNebulaEffect'
+import InfernoFireEffect from '@/components/characters/InfernoFireEffect'
 
 interface CharacterRelationship {
   count: number
@@ -130,6 +131,9 @@ export default function AttendingCharactersList({
               {cosmeticsStyles.cardClassName.includes('in-sync') && <InSyncPlasmaEffect />}
               {(cosmeticsStyles.cardClassName.includes('void-nebula') || char.cosmetics?.bgColor === 'void_nebula' || char.cosmetics?.bgColor === 'void-nebula-bg') && (
                 <VoidNebulaEffect />
+              )}
+              {(cosmeticsStyles.cardClassName.includes('blaze-inferno') || char.cosmetics?.bgColor === 'blaze_inferno_bg' || char.cosmetics?.bgColor === 'blaze-inferno-bg') && (
+                <InfernoFireEffect />
               )}
               <div className="flex items-center gap-3 min-w-0 relative z-10">
                 <ProfileAvatarWithBadge

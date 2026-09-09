@@ -659,6 +659,14 @@
   }
 }
 
+/* Living Inferno Fire Background Tint (10 Streak - Inseparable Adventurers) */
+.blaze-inferno-bg {
+  position: relative !important;
+  background:
+    radial-gradient(ellipse at 50% 100%, rgba(234, 88, 12, 0.35) 0%, rgba(185, 28, 28, 0.2) 50%, transparent 80%),
+    linear-gradient(180deg, rgba(30, 10, 5, 0.1) 0%, rgba(127, 29, 29, 0.3) 100%) !important;
+}
+
 /* Treasure Seeker Bronze Metallic Card Border */
 .bronze-card-border {
   border-radius: 0.5rem !important;

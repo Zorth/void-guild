@@ -44,6 +44,7 @@ import CharacterCosmeticsTab from './CharacterCosmeticsTab'
 import InSyncPlasmaEffect from './InSyncPlasmaEffect'
 import BlazeTextParticles from './BlazeTextParticles'
 import VoidNebulaEffect from './VoidNebulaEffect'
+import InfernoFireEffect from './InfernoFireEffect'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getLevelBadgeStyle, CharacterRankIcon, getXPBarStyles, cn } from '@/lib/utils'
 import { track } from '@vercel/analytics'
@@ -242,6 +243,9 @@ export default function Characters({ filters }: { filters?: { pf: boolean; dnd: 
                       {cosmetics.cardClassName.includes('in-sync') && <InSyncPlasmaEffect />}
                       {(cosmetics.cardClassName.includes('void-nebula') || character.cosmetics?.bgColor === 'void_nebula' || character.cosmetics?.bgColor === 'void-nebula-bg') && (
                         <VoidNebulaEffect />
+                      )}
+                      {(cosmetics.cardClassName.includes('blaze-inferno') || character.cosmetics?.bgColor === 'blaze_inferno_bg' || character.cosmetics?.bgColor === 'blaze-inferno-bg') && (
+                        <InfernoFireEffect />
                       )}
                       <div className="flex justify-between items-center w-full relative z-10">
                         <div className="flex flex-col">
