@@ -161,7 +161,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     id: 'rank_guildmaster',
     title: "Guildmaster's Pinnacle",
     description: 'Promoted to Guildmaster rank with any character.',
-    category: 'normal',
+    category: 'hidden',
     reward: 'Gold Card Border, Gold Text Color, Gold Background Tint & Gold Avatar Ring Cosmetics',
     chainId: 'guild_rank',
     tier: 2,

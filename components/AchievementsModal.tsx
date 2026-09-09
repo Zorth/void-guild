@@ -376,8 +376,10 @@ export default function AchievementsModal({ open, onOpenChange }: AchievementsMo
                           <span className="flex items-center gap-1.5">
                             <span>
                               {isExpanded
-                                ? 'Hide lower tiers'
-                                : `Show ${subItems.length} lower tier achievement${subItems.length > 1 ? 's' : ''}`}
+                                ? (subItems.every((s) => (s.tier || 0) < (primaryItem.tier || 0)) ? 'Hide lower tiers' : 'Hide other tiers')
+                                : (subItems.every((s) => (s.tier || 0) < (primaryItem.tier || 0))
+                                    ? `Show ${subItems.length} lower tier achievement${subItems.length > 1 ? 's' : ''}`
+                                    : `Show ${subItems.length} other tier achievement${subItems.length > 1 ? 's' : ''}`)}
                             </span>
                           </span>
                           {isExpanded ? (

@@ -30,7 +30,7 @@ export const ACHIEVEMENT_INFO: Record<string, AchievementInfo> = {
   link_discord: { title: 'Discord Connected', category: 'normal' },
   visit_leaderboard: { title: 'Leaderboard Inspector', category: 'hidden' },
   rank_journeyman: { title: 'Journeyman Adventurer', category: 'normal' },
-  rank_guildmaster: { title: "Guildmaster's Pinnacle", category: 'normal' },
+  rank_guildmaster: { title: "Guildmaster's Pinnacle", category: 'hidden' },
   secret_logo_clicks: { title: 'Curious Clicker', category: 'hidden' },
   gm_favor: { title: "Master's Favor", category: 'hidden' },
   comm_roleplay: { title: 'Roleplay Maestro', category: 'hidden' },
