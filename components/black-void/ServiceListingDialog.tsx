@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useMutation } from 'convex/react'
+import { useState, useEffect } from 'react'
+import { useMutation, useQuery } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Id } from '@/convex/_generated/dataModel'
 import {
@@ -15,8 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
-import { Hammer, Percent, AlertTriangle, ExternalLink, ShieldAlert } from 'lucide-react'
-import { useEffect } from 'react'
+import { Hammer, Percent, AlertTriangle, ExternalLink, User } from 'lucide-react'
 
 interface ServiceListingDialogProps {
   isOpen: boolean
@@ -24,6 +23,7 @@ interface ServiceListingDialogProps {
   characterId: Id<'characters'> | null
   characterLevel?: number
   editingService?: any | null
+  onSelectCharacter?: (id: Id<'characters'>) => void
 }
 
 export default function ServiceListingDialog({
@@ -32,8 +32,12 @@ export default function ServiceListingDialog({
   characterId,
   characterLevel = 1,
   editingService = null,
+  onSelectCharacter,
 }: ServiceListingDialogProps) {
   const isEditing = !!editingService
+  const [selectedCharId, setSelectedCharId] = useState<Id<'characters'> | null>(
+    editingService?.characterId || characterId
+  )
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [nethysUrl, setNethysUrl] = useState('')
@@ -45,11 +49,16 @@ export default function ServiceListingDialog({
   const [maxLevel, setMaxLevel] = useState<string>(String(characterLevel || 1))
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  const userCharacters = useQuery(api.blackVoid.getUserCharacters)
   const createServiceListing = useMutation(api.blackVoid.createServiceListing)
   const updateServiceListing = useMutation(api.blackVoid.updateServiceListing)
 
+  const activeChar = userCharacters?.find((c: any) => c._id === selectedCharId)
+  const currentEffectiveLevel = activeChar?.lvl || characterLevel || 1
+
   useEffect(() => {
     if (editingService) {
+      setSelectedCharId(editingService.characterId)
       setName(editingService.name || '')
       setDescription(editingService.description || '')
       setNethysUrl(editingService.nethysUrl || '')
@@ -60,6 +69,11 @@ export default function ServiceListingDialog({
       setMinLevel(editingService.minLevel !== undefined ? String(editingService.minLevel) : '')
       setMaxLevel(editingService.maxLevel !== undefined ? String(editingService.maxLevel) : String(characterLevel || 1))
     } else {
+      if (characterId) {
+        setSelectedCharId(characterId)
+      } else if (userCharacters && userCharacters.length > 0 && !selectedCharId) {
+        setSelectedCharId(userCharacters[0]._id)
+      }
       setName('')
       setDescription('')
       setNethysUrl('')
@@ -70,15 +84,25 @@ export default function ServiceListingDialog({
       setMinLevel('')
       setMaxLevel(String(characterLevel || 1))
     }
-  }, [editingService, characterLevel, isOpen])
+  }, [editingService, characterId, characterLevel, userCharacters, isOpen])
+
+  const handleCharacterChange = (newId: Id<'characters'>) => {
+    setSelectedCharId(newId)
+    onSelectCharacter?.(newId)
+    const newChar = userCharacters?.find((c: any) => c._id === newId)
+    if (newChar) {
+      setMaxLevel(String(newChar.lvl))
+    }
+  }
 
   const pctValue = parseFloat(percentage) || 0
   const isBelowBaseCraftingCost = priceType === 'percentage' && pctValue < 50
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!characterId) {
-      toast.error('Please select an active character first.')
+    const targetCharId = selectedCharId || characterId
+    if (!targetCharId) {
+      toast.error('Please select a character first.')
       return
     }
 
@@ -88,7 +112,7 @@ export default function ServiceListingDialog({
     }
 
     const minLvlNum = minLevel.trim() ? parseInt(minLevel, 10) : undefined
-    const maxLvlNum = maxLevel.trim() ? parseInt(maxLevel, 10) : characterLevel
+    const maxLvlNum = maxLevel.trim() ? parseInt(maxLevel, 10) : currentEffectiveLevel
 
     if (minLvlNum !== undefined && (isNaN(minLvlNum) || minLvlNum < 1 || minLvlNum > 20)) {
       toast.error('Minimum level must be between 1 and 20.')
@@ -100,8 +124,8 @@ export default function ServiceListingDialog({
       return
     }
 
-    if (maxLvlNum !== undefined && maxLvlNum > characterLevel) {
-      toast.error(`Maximum service level cannot exceed your character's level (${characterLevel}).`)
+    if (maxLvlNum !== undefined && maxLvlNum > currentEffectiveLevel) {
+      toast.error(`Maximum service level cannot exceed your character's level (${currentEffectiveLevel}).`)
       return
     }
 
@@ -127,7 +151,7 @@ export default function ServiceListingDialog({
       if (isEditing && editingService) {
         await updateServiceListing({
           listingId: editingService._id,
-          characterId: editingService.characterId,
+          characterId: targetCharId,
           name,
           description: description || undefined,
           nethysUrl: nethysUrl || undefined,
@@ -141,7 +165,7 @@ export default function ServiceListingDialog({
         toast.success('Crafting/Service listing updated!')
       } else {
         await createServiceListing({
-          characterId,
+          characterId: targetCharId,
           name,
           description: description || undefined,
           nethysUrl: nethysUrl || undefined,
@@ -173,6 +197,30 @@ export default function ServiceListingDialog({
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 py-3">
+          {/* Character Selector */}
+          <div className="space-y-1.5 bg-amber-950/20 border border-amber-500/30 p-2.5 rounded-lg">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                <User className="h-3.5 w-3.5 text-amber-400" />
+                Service Provider Character <span className="text-destructive">*</span>
+              </label>
+              <span className="text-[11px] font-mono text-amber-400/90 font-semibold">
+                Lvl {currentEffectiveLevel}
+              </span>
+            </div>
+            <select
+              value={selectedCharId || ''}
+              onChange={(e) => handleCharacterChange(e.target.value as Id<'characters'>)}
+              className="w-full h-9 rounded-md border border-amber-500/40 bg-background/90 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400 text-foreground"
+            >
+              {(userCharacters || []).map((char: any) => (
+                <option key={char._id} value={char._id}>
+                  {char.name} (Lvl {char.lvl} {char.class || 'Adventurer'})
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="space-y-1.5">
             <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Service Title <span className="text-destructive">*</span>
@@ -190,7 +238,7 @@ export default function ServiceListingDialog({
             <div className="flex items-center justify-between text-xs mb-1">
               <span className="text-muted-foreground font-medium">Service Level Range:</span>
               <span className="text-[10px] text-amber-400/80">
-                Max available: Level {characterLevel}
+                Max available: Level {currentEffectiveLevel}
               </span>
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -201,7 +249,7 @@ export default function ServiceListingDialog({
                 <Input
                   type="number"
                   min={1}
-                  max={Math.min(20, characterLevel)}
+                  max={Math.min(20, currentEffectiveLevel)}
                   value={minLevel}
                   onChange={(e) => setMinLevel(e.target.value)}
                   placeholder="e.g. 1"
@@ -215,10 +263,10 @@ export default function ServiceListingDialog({
                 <Input
                   type="number"
                   min={1}
-                  max={Math.min(20, characterLevel)}
+                  max={Math.min(20, currentEffectiveLevel)}
                   value={maxLevel}
                   onChange={(e) => setMaxLevel(e.target.value)}
-                  placeholder={String(characterLevel)}
+                  placeholder={String(currentEffectiveLevel)}
                   className="bg-background/80 h-8 text-xs"
                 />
               </div>
@@ -370,7 +418,7 @@ export default function ServiceListingDialog({
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting || !characterId}
+              disabled={isSubmitting || !selectedCharId}
               className="bg-amber-600 hover:bg-amber-700 text-white font-semibold"
             >
               {isSubmitting ? (isEditing ? 'Saving...' : 'Posting...') : (isEditing ? 'Save Changes' : 'Post Service Listing')}

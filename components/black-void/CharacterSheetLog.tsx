@@ -5,6 +5,7 @@ import { api } from '@/convex/_generated/api'
 import { Id } from '@/convex/_generated/dataModel'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
   Coins,
@@ -27,11 +28,13 @@ import {
   Trophy,
   Skull,
   Dices,
+  Save,
+  Wallet,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import ServiceListingDialog from '@/components/black-void/ServiceListingDialog'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 
 interface CharacterSheetLogProps {
   characterId: Id<'characters'> | null
@@ -72,6 +75,13 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
   const [editingService, setEditingService] = useState<any | null>(null)
   const [isMarkingAll, setIsMarkingAll] = useState(false)
 
+  // Manual currency states
+  const [ppVal, setPpVal] = useState<string>('0')
+  const [gpVal, setGpVal] = useState<string>('0')
+  const [spVal, setSpVal] = useState<string>('0')
+  const [cpVal, setCpVal] = useState<string>('0')
+  const [isSavingCurrency, setIsSavingCurrency] = useState(false)
+
   const transactions = useQuery(api.blackVoid.getCharacterTransactions, characterId ? { characterId } : 'skip')
   const toggleSellerClaimed = useMutation(api.blackVoid.toggleSellerClaimed)
   const toggleBuyerClaimed = useMutation(api.blackVoid.toggleBuyerClaimed)
@@ -82,6 +92,7 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
   const toggleBetLoserClaimed = useMutation(api.blackVoidBets.toggleBetLoserClaimed)
   const markAllClaimed = useMutation(api.blackVoid.markAllCharacterTransactionsClaimed)
   const deleteServiceListing = useMutation(api.blackVoid.deleteServiceListing)
+  const updateCharacterCurrency = useMutation(api.blackVoid.updateCharacterCurrency)
 
   const {
     createdItems = [],
@@ -92,8 +103,19 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
     guildmasterAreaGains = [],
     betsWon = [],
     betsLost = [],
+    currentMoney,
     isGuildmaster = false,
   } = (transactions as any) || {}
+
+  // Sync manual currency inputs when character changes or transactions load
+  useEffect(() => {
+    if (currentMoney) {
+      setPpVal(String(currentMoney.pp ?? 0))
+      setGpVal(String(currentMoney.gp ?? 0))
+      setSpVal(String(currentMoney.sp ?? 0))
+      setCpVal(String(currentMoney.cp ?? 0))
+    }
+  }, [currentMoney, characterId])
 
   // Filter pending items that need to be added to the character sheet
   const pendingSoldItems = useMemo(
@@ -160,6 +182,15 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
       totalPendingCount: count,
     }
   }, [pendingSoldItems, pendingWonItems, pendingSponsoredQuests, pendingQuestsToPay, pendingGuildmasterGains, pendingWonBets, pendingLostBets])
+
+  // Manual currency calculated total
+  const calculatedManualGold = useMemo(() => {
+    const pp = parseFloat(ppVal) || 0
+    const gp = parseFloat(gpVal) || 0
+    const sp = parseFloat(spVal) || 0
+    const cp = parseFloat(cpVal) || 0
+    return Math.round((gp + pp * 10 + sp / 10 + cp / 100) * 100) / 100
+  }, [ppVal, gpVal, spVal, cpVal])
 
   if (!characterId) {
     return (
@@ -256,19 +287,50 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
     }
   }
 
+  const handleSaveCurrency = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!characterId) return
+
+    const pp = Math.max(0, parseInt(ppVal, 10) || 0)
+    const gp = Math.max(0, parseInt(gpVal, 10) || 0)
+    const sp = Math.max(0, parseInt(spVal, 10) || 0)
+    const cp = Math.max(0, parseInt(cpVal, 10) || 0)
+
+    setIsSavingCurrency(true)
+    try {
+      const res = await updateCharacterCurrency({
+        characterId,
+        pp,
+        gp,
+        sp,
+        cp,
+      })
+      toast.success(`Character purse updated to ${formatGpAmount(res.totalInGold)}!`)
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to update character currency.')
+    } finally {
+      setIsSavingCurrency(false)
+    }
+  }
+
+  const handleAddGold = (amount: number) => {
+    const current = parseInt(gpVal, 10) || 0
+    setGpVal(String(Math.max(0, current + amount)))
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-full overflow-hidden">
       {/* 0. SUMMARY & EASY LIST OF GOLD & ITEMS TO BE ADDED */}
-      <Card className="border-purple-500/40 bg-gradient-to-b from-purple-950/25 to-card/90 shadow-md">
-        <CardHeader className="pb-4 border-b border-border/30">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <CardTitle className="text-lg font-bold flex items-center gap-2 text-purple-200">
-                <ListTodo className="h-5 w-5 text-purple-400" />
-                Character Sheet Quick Transfer List
+      <Card className="border-purple-500/40 bg-gradient-to-b from-purple-950/25 to-card/90 shadow-md overflow-hidden">
+        <CardHeader className="p-3.5 sm:p-5 border-b border-border/30">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="min-w-0">
+              <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 text-purple-200 truncate">
+                <ListTodo className="h-5 w-5 text-purple-400 shrink-0" />
+                <span>Quick Transfer List</span>
               </CardTitle>
-              <CardDescription className="text-xs text-muted-foreground mt-1">
-                Consolidated overview of all pending items and gold adjustments to add to your character sheet.
+              <CardDescription className="text-xs text-muted-foreground mt-0.5">
+                Consolidated overview of pending items and gold to record.
               </CardDescription>
             </div>
 
@@ -278,7 +340,7 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
               disabled={totalPendingCount === 0 || isMarkingAll}
               onClick={handleMarkAllClaimed}
               className={cn(
-                'gap-2 font-semibold shrink-0 transition-all cursor-pointer',
+                'w-full sm:w-auto gap-2 font-semibold shrink-0 transition-all cursor-pointer text-xs h-8 sm:h-9',
                 totalPendingCount > 0
                   ? 'bg-purple-600 hover:bg-purple-500 text-white border-purple-400/40 shadow-sm'
                   : 'border-emerald-500/40 text-emerald-300 bg-emerald-950/20 opacity-90 cursor-default'
@@ -304,32 +366,32 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
           </div>
 
           {/* Metric Badges */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-4">
-            <div className="p-2.5 rounded-lg border border-emerald-500/30 bg-emerald-950/20 flex flex-col">
-              <span className="text-[11px] font-medium text-emerald-400/90 flex items-center gap-1">
-                <ArrowDownLeft className="h-3.5 w-3.5" /> Gold to Add
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3">
+            <div className="p-2 sm:p-2.5 rounded-lg border border-emerald-500/30 bg-emerald-950/20 flex flex-col min-w-0">
+              <span className="text-[10px] sm:text-[11px] font-medium text-emerald-400/90 flex items-center gap-1 truncate">
+                <ArrowDownLeft className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" /> Gold to Add
               </span>
-              <span className="text-base font-bold font-mono text-emerald-300 mt-0.5">
+              <span className="text-sm sm:text-base font-bold font-mono text-emerald-300 mt-0.5 truncate">
                 +{formatGpAmount(totalPendingIncome)}
               </span>
             </div>
 
-            <div className="p-2.5 rounded-lg border border-amber-500/30 bg-amber-950/20 flex flex-col">
-              <span className="text-[11px] font-medium text-amber-400/90 flex items-center gap-1">
-                <ArrowUpRight className="h-3.5 w-3.5" /> Gold to Deduct
+            <div className="p-2 sm:p-2.5 rounded-lg border border-amber-500/30 bg-amber-950/20 flex flex-col min-w-0">
+              <span className="text-[10px] sm:text-[11px] font-medium text-amber-400/90 flex items-center gap-1 truncate">
+                <ArrowUpRight className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" /> Gold to Deduct
               </span>
-              <span className="text-base font-bold font-mono text-amber-300 mt-0.5">
+              <span className="text-sm sm:text-base font-bold font-mono text-amber-300 mt-0.5 truncate">
                 -{formatGpAmount(totalPendingExpense)}
               </span>
             </div>
 
-            <div className="p-2.5 rounded-lg border border-purple-500/30 bg-purple-950/20 flex flex-col">
-              <span className="text-[11px] font-medium text-purple-300/90 flex items-center gap-1">
-                <Coins className="h-3.5 w-3.5" /> Net Gold Change
+            <div className="p-2 sm:p-2.5 rounded-lg border border-purple-500/30 bg-purple-950/20 flex flex-col min-w-0">
+              <span className="text-[10px] sm:text-[11px] font-medium text-purple-300/90 flex items-center gap-1 truncate">
+                <Coins className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" /> Net Gold
               </span>
               <span
                 className={cn(
-                  'text-base font-bold font-mono mt-0.5',
+                  'text-sm sm:text-base font-bold font-mono mt-0.5 truncate',
                   netPendingGold > 0
                     ? 'text-emerald-300'
                     : netPendingGold < 0
@@ -342,25 +404,25 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
               </span>
             </div>
 
-            <div className="p-2.5 rounded-lg border border-cyan-500/30 bg-cyan-950/20 flex flex-col">
-              <span className="text-[11px] font-medium text-cyan-300/90 flex items-center gap-1">
-                <Package className="h-3.5 w-3.5" /> Items to Add
+            <div className="p-2 sm:p-2.5 rounded-lg border border-cyan-500/30 bg-cyan-950/20 flex flex-col min-w-0">
+              <span className="text-[10px] sm:text-[11px] font-medium text-cyan-300/90 flex items-center gap-1 truncate">
+                <Package className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" /> Items to Add
               </span>
-              <span className="text-base font-bold font-mono text-cyan-200 mt-0.5">
+              <span className="text-sm sm:text-base font-bold font-mono text-cyan-200 mt-0.5 truncate">
                 {pendingWonItems.length} {pendingWonItems.length === 1 ? 'Item' : 'Items'}
               </span>
             </div>
           </div>
         </CardHeader>
 
-        <CardContent className="pt-4 space-y-4">
+        <CardContent className="p-3.5 sm:p-5 space-y-4">
           {totalPendingCount === 0 ? (
-            <div className="py-6 text-center space-y-1.5 bg-emerald-950/10 border border-emerald-500/20 rounded-lg">
-              <div className="flex items-center justify-center gap-2 text-emerald-400 font-semibold text-sm">
-                <CheckCircle2 className="h-4 w-4" />
-                All Character Sheet Updates Complete!
+            <div className="py-5 text-center space-y-1 bg-emerald-950/10 border border-emerald-500/20 rounded-lg px-3">
+              <div className="flex items-center justify-center gap-2 text-emerald-400 font-semibold text-xs sm:text-sm">
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                <span>All Character Sheet Updates Complete!</span>
               </div>
-              <p className="text-xs text-muted-foreground max-w-md mx-auto">
+              <p className="text-[11px] text-muted-foreground max-w-md mx-auto">
                 No pending gold transfers or acquired items waiting to be recorded. Everything is synchronized.
               </p>
             </div>
@@ -370,20 +432,20 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
               {pendingWonItems.length > 0 && (
                 <div className="space-y-2">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
-                    <PackageCheck className="h-4 w-4" />
+                    <PackageCheck className="h-4 w-4 shrink-0" />
                     Items to Add to Inventory ({pendingWonItems.length})
                   </h4>
                   <div className="grid gap-2">
                     {pendingWonItems.map((item: any) => (
                       <div
                         key={item._id}
-                        className="p-2.5 rounded-md border border-cyan-500/30 bg-cyan-950/15 flex items-center justify-between gap-3 text-xs"
+                        className="p-2.5 rounded-md border border-cyan-500/30 bg-cyan-950/15 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 text-xs"
                       >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <Package className="h-4 w-4 text-cyan-400 shrink-0" />
-                          <div className="truncate">
+                        <div className="flex items-start sm:items-center gap-2 min-w-0">
+                          <Package className="h-4 w-4 text-cyan-400 shrink-0 mt-0.5 sm:mt-0" />
+                          <div className="min-w-0 break-words">
                             <span className="font-bold text-foreground">{item.name}</span>
-                            <span className="text-muted-foreground ml-2">
+                            <span className="text-muted-foreground block sm:inline sm:ml-2">
                               (Won for <span className="text-amber-300 font-mono font-medium">{item.winningAmount} GP</span> from {item.sellerName})
                             </span>
                           </div>
@@ -393,7 +455,7 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
                           variant="outline"
                           size="sm"
                           onClick={() => handleToggleBuyerClaimed(item._id)}
-                          className="h-7 px-2 text-[11px] border-cyan-500/30 hover:bg-cyan-500/20 text-cyan-200 shrink-0 gap-1"
+                          className="h-7 px-2.5 text-[11px] border-cyan-500/30 hover:bg-cyan-500/20 text-cyan-200 self-end sm:self-auto shrink-0 gap-1"
                         >
                           <CheckCheck className="h-3 w-3" />
                           Mark Added
@@ -408,29 +470,31 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
               {(pendingSoldItems.length > 0 || pendingSponsoredQuests.length > 0 || pendingGuildmasterGains.length > 0 || pendingWonBets.length > 0) && (
                 <div className="space-y-2">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-                    <ArrowDownLeft className="h-4 w-4" />
-                    Pending Gold Income to Add (+{formatGpAmount(totalPendingIncome)})
+                    <ArrowDownLeft className="h-4 w-4 shrink-0" />
+                    Pending Gold Income (+{formatGpAmount(totalPendingIncome)})
                   </h4>
                   <div className="grid gap-2">
                     {pendingWonBets.map((bet: any) => (
                       <div
                         key={bet._id}
-                        className="p-2.5 rounded-md border border-emerald-500/30 bg-emerald-950/15 flex items-center justify-between gap-3 text-xs"
+                        className="p-2.5 rounded-md border border-emerald-500/30 bg-emerald-950/15 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 text-xs"
                       >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <Trophy className="h-4 w-4 text-emerald-400 shrink-0" />
-                          <div className="truncate">
+                        <div className="flex items-start sm:items-center gap-2 min-w-0">
+                          <Trophy className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5 sm:mt-0" />
+                          <div className="min-w-0 break-words">
                             <span className="font-bold text-foreground">Deathroll Bet Won</span>
-                            <span className="text-muted-foreground ml-2">vs {bet.opponentName} ({bet.lossReason === 'timeout' ? 'by 24h Timeout' : 'Rolled a 0'})</span>
+                            <span className="text-muted-foreground block sm:inline sm:ml-2">
+                              vs {bet.opponentName} ({bet.lossReason === 'timeout' ? 'by 24h Timeout' : 'Rolled a 0'})
+                            </span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3 shrink-0">
+                        <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-border/20">
                           <span className="font-mono font-bold text-emerald-300">+{bet.wagerAmount} GP</span>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleToggleBetWinnerClaimed(bet._id)}
-                            className="h-7 px-2 text-[11px] border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-300 gap-1"
+                            className="h-7 px-2.5 text-[11px] border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-300 gap-1"
                           >
                             <CheckCheck className="h-3 w-3" />
                             Mark Added
@@ -442,22 +506,22 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
                     {pendingSoldItems.map((item: any) => (
                       <div
                         key={item._id}
-                        className="p-2.5 rounded-md border border-emerald-500/30 bg-emerald-950/15 flex items-center justify-between gap-3 text-xs"
+                        className="p-2.5 rounded-md border border-emerald-500/30 bg-emerald-950/15 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 text-xs"
                       >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <Coins className="h-4 w-4 text-amber-400 shrink-0" />
-                          <div className="truncate">
+                        <div className="flex items-start sm:items-center gap-2 min-w-0">
+                          <Coins className="h-4 w-4 text-amber-400 shrink-0 mt-0.5 sm:mt-0" />
+                          <div className="min-w-0 break-words">
                             <span className="font-bold text-foreground">Sold: {item.name}</span>
-                            <span className="text-muted-foreground ml-2">to {item.winningBidderName}</span>
+                            <span className="text-muted-foreground block sm:inline sm:ml-2">to {item.winningBidderName}</span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3 shrink-0">
+                        <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-border/20">
                           <span className="font-mono font-bold text-emerald-300">+{item.winningAmount} GP</span>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleToggleSellerClaimed(item._id)}
-                            className="h-7 px-2 text-[11px] border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-300 gap-1"
+                            className="h-7 px-2.5 text-[11px] border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-300 gap-1"
                           >
                             <CheckCheck className="h-3 w-3" />
                             Mark Added
@@ -469,22 +533,22 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
                     {pendingSponsoredQuests.map((quest: any) => (
                       <div
                         key={quest._id}
-                        className="p-2.5 rounded-md border border-emerald-500/30 bg-emerald-950/15 flex items-center justify-between gap-3 text-xs"
+                        className="p-2.5 rounded-md border border-emerald-500/30 bg-emerald-950/15 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 text-xs"
                       >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <Sparkles className="h-4 w-4 text-purple-400 shrink-0" />
-                          <div className="truncate">
+                        <div className="flex items-start sm:items-center gap-2 min-w-0">
+                          <Sparkles className="h-4 w-4 text-purple-400 shrink-0 mt-0.5 sm:mt-0" />
+                          <div className="min-w-0 break-words">
                             <span className="font-bold text-foreground">Guild Sponsorship: {quest.name}</span>
-                            <span className="text-muted-foreground ml-2">({quest.worldName})</span>
+                            <span className="text-muted-foreground block sm:inline sm:ml-2">({quest.worldName})</span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3 shrink-0">
+                        <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-border/20">
                           <span className="font-mono font-bold text-emerald-300">+{quest.sponsoredAmount}</span>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleToggleQuestClaimed(quest._id)}
-                            className="h-7 px-2 text-[11px] border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-300 gap-1"
+                            className="h-7 px-2.5 text-[11px] border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-300 gap-1"
                           >
                             <CheckCheck className="h-3 w-3" />
                             Mark Added
@@ -496,22 +560,22 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
                     {pendingGuildmasterGains.map((gain: any) => (
                       <div
                         key={gain._id}
-                        className="p-2.5 rounded-md border border-emerald-500/30 bg-emerald-950/15 flex items-center justify-between gap-3 text-xs"
+                        className="p-2.5 rounded-md border border-emerald-500/30 bg-emerald-950/15 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 text-xs"
                       >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <Crown className="h-4 w-4 text-amber-400 shrink-0" />
-                          <div className="truncate">
+                        <div className="flex items-start sm:items-center gap-2 min-w-0">
+                          <Crown className="h-4 w-4 text-amber-400 shrink-0 mt-0.5 sm:mt-0" />
+                          <div className="min-w-0 break-words">
                             <span className="font-bold text-foreground">GM Regional Gain: {gain.name}</span>
-                            <span className="text-muted-foreground ml-2">({gain.worldName})</span>
+                            <span className="text-muted-foreground block sm:inline sm:ml-2">({gain.worldName})</span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3 shrink-0">
+                        <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-border/20">
                           <span className="font-mono font-bold text-emerald-300">+{gain.guildmasterCut}</span>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleToggleGuildmasterGain(gain)}
-                            className="h-7 px-2 text-[11px] border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-300 gap-1"
+                            className="h-7 px-2.5 text-[11px] border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-300 gap-1"
                           >
                             <CheckCheck className="h-3 w-3" />
                             Mark Added
@@ -527,29 +591,31 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
               {(pendingWonItems.length > 0 || pendingQuestsToPay.length > 0 || pendingLostBets.length > 0) && (
                 <div className="space-y-2">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-                    <ArrowUpRight className="h-4 w-4" />
-                    Pending Gold Expenses to Deduct (-{formatGpAmount(totalPendingExpense)})
+                    <ArrowUpRight className="h-4 w-4 shrink-0" />
+                    Pending Gold Expenses (-{formatGpAmount(totalPendingExpense)})
                   </h4>
                   <div className="grid gap-2">
                     {pendingLostBets.map((bet: any) => (
                       <div
                         key={bet._id}
-                        className="p-2.5 rounded-md border border-rose-500/30 bg-rose-950/15 flex items-center justify-between gap-3 text-xs"
+                        className="p-2.5 rounded-md border border-rose-500/30 bg-rose-950/15 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 text-xs"
                       >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <Skull className="h-4 w-4 text-rose-400 shrink-0" />
-                          <div className="truncate">
+                        <div className="flex items-start sm:items-center gap-2 min-w-0">
+                          <Skull className="h-4 w-4 text-rose-400 shrink-0 mt-0.5 sm:mt-0" />
+                          <div className="min-w-0 break-words">
                             <span className="font-bold text-foreground">Deathroll Bet Lost</span>
-                            <span className="text-muted-foreground ml-2">vs {bet.opponentName} ({bet.lossReason === 'timeout' ? 'Missed 24h Window' : 'Rolled a 0'})</span>
+                            <span className="text-muted-foreground block sm:inline sm:ml-2">
+                              vs {bet.opponentName} ({bet.lossReason === 'timeout' ? 'Missed 24h Window' : 'Rolled a 0'})
+                            </span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3 shrink-0">
+                        <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-border/20">
                           <span className="font-mono font-bold text-rose-300">-{bet.wagerAmount} GP</span>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleToggleBetLoserClaimed(bet._id)}
-                            className="h-7 px-2 text-[11px] border-rose-500/30 hover:bg-rose-500/20 text-rose-300 gap-1"
+                            className="h-7 px-2.5 text-[11px] border-rose-500/30 hover:bg-rose-500/20 text-rose-300 gap-1"
                           >
                             <CheckCheck className="h-3 w-3" />
                             Mark Deducted
@@ -557,25 +623,26 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
                         </div>
                       </div>
                     ))}
+
                     {pendingWonItems.map((item: any) => (
                       <div
                         key={item._id}
-                        className="p-2.5 rounded-md border border-amber-500/30 bg-amber-950/15 flex items-center justify-between gap-3 text-xs"
+                        className="p-2.5 rounded-md border border-amber-500/30 bg-amber-950/15 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 text-xs"
                       >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <Receipt className="h-4 w-4 text-emerald-400 shrink-0" />
-                          <div className="truncate">
+                        <div className="flex items-start sm:items-center gap-2 min-w-0">
+                          <Receipt className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5 sm:mt-0" />
+                          <div className="min-w-0 break-words">
                             <span className="font-bold text-foreground">Purchased: {item.name}</span>
-                            <span className="text-muted-foreground ml-2">from {item.sellerName}</span>
+                            <span className="text-muted-foreground block sm:inline sm:ml-2">from {item.sellerName}</span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3 shrink-0">
+                        <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-border/20">
                           <span className="font-mono font-bold text-amber-300">-{item.winningAmount} GP</span>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleToggleBuyerClaimed(item._id)}
-                            className="h-7 px-2 text-[11px] border-amber-500/30 hover:bg-amber-500/20 text-amber-300 gap-1"
+                            className="h-7 px-2.5 text-[11px] border-amber-500/30 hover:bg-amber-500/20 text-amber-300 gap-1"
                           >
                             <CheckCheck className="h-3 w-3" />
                             Mark Deducted
@@ -587,22 +654,22 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
                     {pendingQuestsToPay.map((quest: any) => (
                       <div
                         key={quest._id}
-                        className="p-2.5 rounded-md border border-amber-500/30 bg-amber-950/15 flex items-center justify-between gap-3 text-xs"
+                        className="p-2.5 rounded-md border border-amber-500/30 bg-amber-950/15 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 text-xs"
                       >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <Scroll className="h-4 w-4 text-amber-400 shrink-0" />
-                          <div className="truncate">
+                        <div className="flex items-start sm:items-center gap-2 min-w-0">
+                          <Scroll className="h-4 w-4 text-amber-400 shrink-0 mt-0.5 sm:mt-0" />
+                          <div className="min-w-0 break-words">
                             <span className="font-bold text-foreground">Quest Payout: {quest.name}</span>
-                            <span className="text-muted-foreground ml-2">({quest.worldName})</span>
+                            <span className="text-muted-foreground block sm:inline sm:ml-2">({quest.worldName})</span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3 shrink-0">
+                        <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-border/20">
                           <span className="font-mono font-bold text-amber-300">-{quest.actualToPay}</span>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleTogglePaymentClaimed(quest._id)}
-                            className="h-7 px-2 text-[11px] border-amber-500/30 hover:bg-amber-500/20 text-amber-300 gap-1"
+                            className="h-7 px-2.5 text-[11px] border-amber-500/30 hover:bg-amber-500/20 text-amber-300 gap-1"
                           >
                             <CheckCheck className="h-3 w-3" />
                             Mark Paid
@@ -619,19 +686,19 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
       </Card>
 
       {/* 1. Items Sold & Earnings */}
-      <Card className="border-purple-500/30 bg-card/60">
-        <CardHeader className="pb-3 border-b border-border/20">
-          <CardTitle className="text-base font-bold flex items-center justify-between text-purple-300">
+      <Card className="border-purple-500/30 bg-card/60 overflow-hidden">
+        <CardHeader className="p-3.5 sm:p-5 border-b border-border/20">
+          <CardTitle className="text-sm sm:text-base font-bold flex flex-wrap items-center justify-between gap-2 text-purple-300">
             <span className="flex items-center gap-2">
-              <Coins className="h-5 w-5 text-amber-400" />
-              Listings Sold & Revenue Earned
+              <Coins className="h-4 w-4 sm:h-5 sm:w-5 text-amber-400 shrink-0" />
+              <span>Listings Sold & Revenue</span>
             </span>
-            <span className="text-xs font-mono text-muted-foreground font-normal">
-              0% Black Market Tax Applied
+            <span className="text-[11px] font-mono text-muted-foreground font-normal">
+              0% Black Market Tax
             </span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-4">
+        <CardContent className="p-3.5 sm:p-5">
           {createdItems.length === 0 ? (
             <p className="text-xs text-muted-foreground py-4 text-center">
               No item listings created by this character yet.
@@ -646,18 +713,18 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
                   <div
                     key={item._id}
                     className={cn(
-                      "p-3 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all",
+                      "p-3 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 sm:gap-3 transition-all",
                       isClaimed
                         ? "bg-emerald-950/20 border-emerald-500/30"
                         : "bg-muted/20 border-border/30"
                     )}
                   >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-foreground">{item.name}</span>
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-xs sm:text-sm text-foreground break-words">{item.name}</span>
                         <span
                           className={cn(
-                            "text-[10px] uppercase font-bold px-2 py-0.5 rounded",
+                            "text-[10px] uppercase font-bold px-1.5 py-0.5 rounded",
                             isSold
                               ? "bg-emerald-500/20 text-emerald-300"
                               : item.status === 'active'
@@ -668,7 +735,7 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
                           {isSold ? 'Sold' : item.status}
                         </span>
                       </div>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground break-words">
                         {isSold ? (
                           <span>
                             Sold to <strong className="text-purple-300">{item.winningBidderName}</strong> for{' '}
@@ -683,15 +750,15 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
                     </div>
 
                     {isSold && (
-                      <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-                        <label className="flex items-center gap-2 cursor-pointer bg-background/60 hover:bg-background px-3 py-1.5 rounded-md border border-purple-500/30 text-xs">
+                      <div className="self-end sm:self-auto shrink-0 pt-1 sm:pt-0">
+                        <label className="flex items-center gap-2 cursor-pointer bg-background/60 hover:bg-background px-2.5 py-1.5 rounded-md border border-purple-500/30 text-xs">
                           <Checkbox
                             checked={isClaimed}
                             onCheckedChange={() => handleToggleSellerClaimed(item._id)}
                             className="border-purple-400 data-[state=checked]:bg-emerald-600"
                           />
-                          <span className={cn("font-medium", isClaimed ? "text-emerald-300" : "text-muted-foreground")}>
-                            {isClaimed ? 'Added to Character Sheet ✓' : 'Add to Character Sheet'}
+                          <span className={cn("font-medium text-[11px]", isClaimed ? "text-emerald-300" : "text-muted-foreground")}>
+                            {isClaimed ? 'Added to Sheet ✓' : 'Add to Sheet'}
                           </span>
                         </label>
                       </div>
@@ -705,16 +772,16 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
       </Card>
 
       {/* 2. Items Won & Expenses Paid */}
-      <Card className="border-purple-500/30 bg-card/60">
-        <CardHeader className="pb-3 border-b border-border/20">
-          <CardTitle className="text-base font-bold flex items-center justify-between text-purple-300">
+      <Card className="border-purple-500/30 bg-card/60 overflow-hidden">
+        <CardHeader className="p-3.5 sm:p-5 border-b border-border/20">
+          <CardTitle className="text-sm sm:text-base font-bold flex items-center justify-between text-purple-300">
             <span className="flex items-center gap-2">
-              <Receipt className="h-5 w-5 text-emerald-400" />
-              Auctions Won & Expenses Paid
+              <Receipt className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-400 shrink-0" />
+              <span>Auctions Won & Expenses Paid</span>
             </span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-4">
+        <CardContent className="p-3.5 sm:p-5">
           {wonItems.length === 0 ? (
             <p className="text-xs text-muted-foreground py-4 text-center">
               No won auctions or items purchased by this character yet.
@@ -728,34 +795,34 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
                   <div
                     key={item._id}
                     className={cn(
-                      "p-3 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all",
+                      "p-3 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 sm:gap-3 transition-all",
                       isClaimed
                         ? "bg-emerald-950/20 border-emerald-500/30"
                         : "bg-muted/20 border-border/30"
                     )}
                   >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-foreground">{item.name}</span>
-                        <span className="text-[10px] uppercase font-bold bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded">
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-xs sm:text-sm text-foreground break-words">{item.name}</span>
+                        <span className="text-[10px] uppercase font-bold bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded">
                           Won ({item.winningType || 'Auction'})
                         </span>
                       </div>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground break-words">
                         Seller: <strong className="text-purple-300">{item.sellerName}</strong> | Amount Paid:{' '}
                         <strong className="text-amber-400 font-mono">{item.winningAmount} GP</strong>
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-                      <label className="flex items-center gap-2 cursor-pointer bg-background/60 hover:bg-background px-3 py-1.5 rounded-md border border-purple-500/30 text-xs">
+                    <div className="self-end sm:self-auto shrink-0 pt-1 sm:pt-0">
+                      <label className="flex items-center gap-2 cursor-pointer bg-background/60 hover:bg-background px-2.5 py-1.5 rounded-md border border-purple-500/30 text-xs">
                         <Checkbox
                           checked={isClaimed}
                           onCheckedChange={() => handleToggleBuyerClaimed(item._id)}
                           className="border-purple-400 data-[state=checked]:bg-emerald-600"
                         />
-                        <span className={cn("font-medium", isClaimed ? "text-emerald-300" : "text-muted-foreground")}>
-                          {isClaimed ? 'Added to Character Sheet ✓' : 'Add to Character Sheet'}
+                        <span className={cn("font-medium text-[11px]", isClaimed ? "text-emerald-300" : "text-muted-foreground")}>
+                          {isClaimed ? 'Added to Sheet ✓' : 'Add to Sheet'}
                         </span>
                       </label>
                     </div>
@@ -768,22 +835,22 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
       </Card>
 
       {/* 3. Guild Sponsorship Reimbursements (Journeyman / Guildmaster Perk) */}
-      <Card className="border-purple-500/30 bg-card/60">
-        <CardHeader className="pb-3 border-b border-border/20">
-          <CardTitle className="text-base font-bold flex items-center justify-between text-purple-300">
+      <Card className="border-purple-500/30 bg-card/60 overflow-hidden">
+        <CardHeader className="p-3.5 sm:p-5 border-b border-border/20">
+          <CardTitle className="text-sm sm:text-base font-bold flex flex-wrap items-center justify-between gap-2 text-purple-300">
             <span className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-purple-400" />
-              Guild Sponsorship Reimbursements (20% Perk)
+              <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-purple-400 shrink-0" />
+              <span>Guild Sponsorship (20% Perk)</span>
             </span>
-            <span className="text-xs text-muted-foreground font-normal">
-              1/5th Cost Sponsored by The Void
+            <span className="text-[11px] text-muted-foreground font-normal">
+              1/5th Cost Sponsored
             </span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-4">
+        <CardContent className="p-3.5 sm:p-5">
           {sponsoredQuestReimbursements.length === 0 ? (
             <p className="text-xs text-muted-foreground py-4 text-center">
-              No completed sponsored character quests to reimburse yet. (Quests up to Level - 4 issued by Journeymen / Guildmasters are sponsored 20% by the Guild).
+              No completed sponsored character quests to reimburse yet.
             </p>
           ) : (
             <div className="space-y-3">
@@ -794,26 +861,26 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
                   <div
                     key={quest._id}
                     className={cn(
-                      "p-3 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all",
+                      "p-3 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 sm:gap-3 transition-all",
                       isClaimed
                         ? "bg-emerald-950/20 border-emerald-500/30"
                         : "bg-purple-950/20 border-purple-500/30"
                     )}
                   >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-foreground">{quest.name}</span>
-                        <span className="text-[10px] uppercase font-bold bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded">
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-xs sm:text-sm text-foreground break-words">{quest.name}</span>
+                        <span className="text-[10px] uppercase font-bold bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded">
                           20% Reimbursed
                         </span>
                       </div>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground break-words">
                         World: <strong className="text-blue-300">{quest.worldName}</strong> | Agreed Reward:{' '}
                         <span className="text-amber-300 font-semibold">{quest.reward || 'Custom'}</span>
                       </p>
                       <div className="flex items-center gap-3 text-xs pt-0.5 flex-wrap">
                         <span className="text-emerald-300 font-mono font-medium">
-                          Guild Payback: <strong>{quest.sponsoredAmount}</strong>
+                          Payback: <strong>{quest.sponsoredAmount}</strong>
                         </span>
                         {quest.netCost && (
                           <span className="text-purple-300 font-mono font-medium">
@@ -823,15 +890,15 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-                      <label className="flex items-center gap-2 cursor-pointer bg-background/60 hover:bg-background px-3 py-1.5 rounded-md border border-purple-500/30 text-xs">
+                    <div className="self-end sm:self-auto shrink-0 pt-1 sm:pt-0">
+                      <label className="flex items-center gap-2 cursor-pointer bg-background/60 hover:bg-background px-2.5 py-1.5 rounded-md border border-purple-500/30 text-xs">
                         <Checkbox
                           checked={isClaimed}
                           onCheckedChange={() => handleToggleQuestClaimed(quest._id)}
                           className="border-purple-400 data-[state=checked]:bg-emerald-600"
                         />
-                        <span className={cn("font-medium", isClaimed ? "text-emerald-300" : "text-muted-foreground")}>
-                          {isClaimed ? 'Added to Character Sheet ✓' : 'Add to Character Sheet'}
+                        <span className={cn("font-medium text-[11px]", isClaimed ? "text-emerald-300" : "text-muted-foreground")}>
+                          {isClaimed ? 'Added to Sheet ✓' : 'Add to Sheet'}
                         </span>
                       </label>
                     </div>
@@ -844,19 +911,19 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
       </Card>
 
       {/* 4. Quests Completed: To Be Paid (Party Reward Expenses) */}
-      <Card className="border-purple-500/30 bg-card/60">
-        <CardHeader className="pb-3 border-b border-border/20">
-          <CardTitle className="text-base font-bold flex items-center justify-between text-purple-300">
+      <Card className="border-purple-500/30 bg-card/60 overflow-hidden">
+        <CardHeader className="p-3.5 sm:p-5 border-b border-border/20">
+          <CardTitle className="text-sm sm:text-base font-bold flex flex-wrap items-center justify-between gap-2 text-purple-300">
             <span className="flex items-center gap-2">
-              <Scroll className="h-5 w-5 text-amber-400" />
-              Completed Quests: To Be Paid to Adventurers
+              <Scroll className="h-4 w-4 sm:h-5 sm:w-5 text-amber-400 shrink-0" />
+              <span>Completed Quests: Payouts</span>
             </span>
-            <span className="text-xs text-muted-foreground font-normal">
-              Actual Out-of-Pocket Expense
+            <span className="text-[11px] text-muted-foreground font-normal">
+              Party Reward Expense
             </span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-4">
+        <CardContent className="p-3.5 sm:p-5">
           {completedQuestsToPay.length === 0 ? (
             <p className="text-xs text-muted-foreground py-4 text-center">
               No completed quests issued by this character requiring payment.
@@ -870,48 +937,43 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
                   <div
                     key={quest._id}
                     className={cn(
-                      "p-3 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all",
+                      "p-3 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 sm:gap-3 transition-all",
                       isClaimed
                         ? "bg-emerald-950/20 border-emerald-500/30"
                         : "bg-amber-950/20 border-amber-500/30"
                     )}
                   >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-foreground">{quest.name}</span>
-                        <span className="text-[10px] uppercase font-bold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded">
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-xs sm:text-sm text-foreground break-words">{quest.name}</span>
+                        <span className="text-[10px] uppercase font-bold bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded">
                           To Be Paid
                         </span>
                         {quest.isSponsored && (
-                          <span className="text-[10px] uppercase font-bold bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded">
-                            20% Guild Reimbursed
+                          <span className="text-[10px] uppercase font-bold bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded">
+                            20% Reimbursed
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        World: <strong className="text-blue-300">{quest.worldName}</strong> | Agreed Total Reward:{' '}
+                      <p className="text-xs text-muted-foreground break-words">
+                        World: <strong className="text-blue-300">{quest.worldName}</strong> | Agreed Reward:{' '}
                         <span className="text-amber-300 font-semibold">{quest.reward}</span>
                       </p>
-                      <p className="text-xs text-amber-300 font-mono font-medium">
-                        Actual Price Character Has to Pay:{' '}
+                      <p className="text-xs text-amber-300 font-mono font-medium break-words">
+                        Actual Payout Cost:{' '}
                         <strong className="text-white text-sm">{quest.actualToPay}</strong>
-                        {quest.isSponsored && (
-                          <span className="text-muted-foreground text-[11px] ml-1.5 font-normal">
-                            (after 20% Guild payback of {quest.sponsoredAmount})
-                          </span>
-                        )}
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-                      <label className="flex items-center gap-2 cursor-pointer bg-background/60 hover:bg-background px-3 py-1.5 rounded-md border border-purple-500/30 text-xs">
+                    <div className="self-end sm:self-auto shrink-0 pt-1 sm:pt-0">
+                      <label className="flex items-center gap-2 cursor-pointer bg-background/60 hover:bg-background px-2.5 py-1.5 rounded-md border border-purple-500/30 text-xs">
                         <Checkbox
                           checked={isClaimed}
                           onCheckedChange={() => handleTogglePaymentClaimed(quest._id)}
                           className="border-purple-400 data-[state=checked]:bg-emerald-600"
                         />
-                        <span className={cn("font-medium", isClaimed ? "text-emerald-300" : "text-muted-foreground")}>
-                          {isClaimed ? 'Paid & Added to Sheet ✓' : 'Add Expense to Sheet'}
+                        <span className={cn("font-medium text-[11px]", isClaimed ? "text-emerald-300" : "text-muted-foreground")}>
+                          {isClaimed ? 'Paid ✓' : 'Mark Paid'}
                         </span>
                       </label>
                     </div>
@@ -925,19 +987,19 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
 
       {/* 5. Guildmaster Regional Quest & Loot Gains (Level 14+ Guildmaster Perk) */}
       {isGuildmaster && (
-        <Card className="border-amber-500/30 bg-card/60">
-          <CardHeader className="pb-3 border-b border-border/20">
-            <CardTitle className="text-base font-bold flex items-center justify-between text-amber-300">
+        <Card className="border-amber-500/30 bg-card/60 overflow-hidden">
+          <CardHeader className="p-3.5 sm:p-5 border-b border-border/20">
+            <CardTitle className="text-sm sm:text-base font-bold flex flex-wrap items-center justify-between gap-2 text-amber-300">
               <span className="flex items-center gap-2">
-                <Crown className="h-5 w-5 text-amber-400" />
-                Guildmaster Regional Gains (20% Area Quests & Session Loot)
+                <Crown className="h-4 w-4 sm:h-5 sm:w-5 text-amber-400 shrink-0" />
+                <span>Guildmaster Regional Gains (20%)</span>
               </span>
-              <span className="text-xs text-muted-foreground font-normal">
-                Compensated by Guild of the Void
+              <span className="text-[11px] text-muted-foreground font-normal">
+                Compensated by The Void
               </span>
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-4">
+          <CardContent className="p-3.5 sm:p-5">
             {guildmasterAreaGains.length === 0 ? (
               <p className="text-xs text-muted-foreground py-4 text-center">
                 No completed regional quests or session loot cuts awarded yet.
@@ -951,37 +1013,37 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
                     <div
                       key={item._id}
                       className={cn(
-                        "p-3 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all",
+                        "p-3 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 sm:gap-3 transition-all",
                         isClaimed
                           ? "bg-emerald-950/20 border-emerald-500/30"
                           : "bg-amber-950/20 border-amber-500/30"
                       )}
                     >
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-sm text-foreground">{item.name}</span>
-                          <span className="text-[10px] uppercase font-bold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded">
-                            {item.isSessionLootCut ? 'Session Loot Cut' : `Lvl ${item.level} Area Quest`}
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-xs sm:text-sm text-foreground break-words">{item.name}</span>
+                          <span className="text-[10px] uppercase font-bold bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded">
+                            {item.isSessionLootCut ? 'Session Loot Cut' : `Lvl ${item.level} Area`}
                           </span>
                         </div>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-muted-foreground break-words">
                           Region: <strong className="text-blue-300">{item.worldName}</strong> | Value:{' '}
                           <span className="text-amber-300 font-semibold">{item.reward}</span>
                         </p>
-                        <p className="text-xs text-amber-300 font-mono font-medium">
-                          Guildmaster Compensation: <strong>{item.guildmasterCut}</strong>
+                        <p className="text-xs text-amber-300 font-mono font-medium break-words">
+                          GM Cut: <strong>{item.guildmasterCut}</strong>
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-                        <label className="flex items-center gap-2 cursor-pointer bg-background/60 hover:bg-background px-3 py-1.5 rounded-md border border-amber-500/30 text-xs">
+                      <div className="self-end sm:self-auto shrink-0 pt-1 sm:pt-0">
+                        <label className="flex items-center gap-2 cursor-pointer bg-background/60 hover:bg-background px-2.5 py-1.5 rounded-md border border-amber-500/30 text-xs">
                           <Checkbox
                             checked={isClaimed}
                             onCheckedChange={() => handleToggleGuildmasterGain(item)}
                             className="border-amber-400 data-[state=checked]:bg-emerald-600"
                           />
-                          <span className={cn("font-medium", isClaimed ? "text-emerald-300" : "text-muted-foreground")}>
-                            {isClaimed ? 'Added to Character Sheet ✓' : 'Add to Character Sheet'}
+                          <span className={cn("font-medium text-[11px]", isClaimed ? "text-emerald-300" : "text-muted-foreground")}>
+                            {isClaimed ? 'Added to Sheet ✓' : 'Add to Sheet'}
                           </span>
                         </label>
                       </div>
@@ -994,21 +1056,21 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
         </Card>
       )}
 
-      {/* 5. Deathroll Betting & Void Wagers */}
+      {/* 6. Deathroll Betting & Void Wagers */}
       {(betsWon.length > 0 || betsLost.length > 0) && (
-        <Card className="border-rose-500/30 bg-card/60">
-          <CardHeader className="pb-3 border-b border-border/20">
-            <CardTitle className="text-base font-bold flex items-center justify-between text-rose-300">
+        <Card className="border-rose-500/30 bg-card/60 overflow-hidden">
+          <CardHeader className="p-3.5 sm:p-5 border-b border-border/20">
+            <CardTitle className="text-sm sm:text-base font-bold flex flex-wrap items-center justify-between gap-2 text-rose-300">
               <span className="flex items-center gap-2">
-                <Dices className="h-5 w-5 text-rose-400" />
-                Deathroll Betting & Void Wagers
+                <Dices className="h-4 w-4 sm:h-5 sm:w-5 text-rose-400 shrink-0" />
+                <span>Deathroll Betting & Void Wagers</span>
               </span>
-              <span className="text-xs font-mono text-muted-foreground font-normal">
-                High-Stakes Duel Results
+              <span className="text-[11px] font-mono text-muted-foreground font-normal">
+                Duel Ledger
               </span>
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-4">
+          <CardContent className="p-3.5 sm:p-5">
             <div className="space-y-3">
               {/* Bets Won */}
               {betsWon.map((bet: any) => {
@@ -1017,36 +1079,36 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
                   <div
                     key={bet._id}
                     className={cn(
-                      "p-3 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all",
+                      "p-3 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 sm:gap-3 transition-all",
                       isClaimed
                         ? "bg-emerald-950/20 border-emerald-500/30"
                         : "bg-emerald-950/15 border-emerald-500/40"
                     )}
                   >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-foreground">
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-xs sm:text-sm text-foreground break-words">
                           Won vs {bet.opponentName}
                         </span>
-                        <span className="text-[10px] uppercase font-bold bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded">
+                        <span className="text-[10px] uppercase font-bold bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded">
                           Duel Won
                         </span>
                       </div>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground break-words">
                         Wager Won:{' '}
                         <strong className="text-emerald-300 font-mono font-bold">+{bet.wagerAmount} GP</strong> •
-                        Starting Max: 0-{bet.deathrollValue?.toLocaleString()} • {bet.lossReason === 'timeout' ? 'Opponent Timed Out (24h)' : 'Opponent Rolled a 0'} ({bet.rollsCount} rolls)
+                        0-{bet.deathrollValue?.toLocaleString()} • {bet.lossReason === 'timeout' ? 'Opponent Timed Out (24h)' : 'Opponent Rolled 0'} ({bet.rollsCount} rolls)
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-                      <label className="flex items-center gap-2 cursor-pointer bg-background/60 hover:bg-background px-3 py-1.5 rounded-md border border-emerald-500/30 text-xs">
+                    <div className="self-end sm:self-auto shrink-0 pt-1 sm:pt-0">
+                      <label className="flex items-center gap-2 cursor-pointer bg-background/60 hover:bg-background px-2.5 py-1.5 rounded-md border border-emerald-500/30 text-xs">
                         <Checkbox
                           checked={isClaimed}
                           onCheckedChange={() => handleToggleBetWinnerClaimed(bet._id)}
                           className="border-emerald-400 data-[state=checked]:bg-emerald-600"
                         />
-                        <span className={cn("font-medium", isClaimed ? "text-emerald-300" : "text-muted-foreground")}>
+                        <span className={cn("font-medium text-[11px]", isClaimed ? "text-emerald-300" : "text-muted-foreground")}>
                           {isClaimed ? 'Added to Sheet ✓' : 'Add to Sheet'}
                         </span>
                       </label>
@@ -1062,36 +1124,36 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
                   <div
                     key={bet._id}
                     className={cn(
-                      "p-3 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all",
+                      "p-3 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 sm:gap-3 transition-all",
                       isClaimed
                         ? "bg-emerald-950/20 border-emerald-500/30"
                         : "bg-rose-950/15 border-rose-500/40"
                     )}
                   >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-foreground">
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-xs sm:text-sm text-foreground break-words">
                           Lost vs {bet.opponentName}
                         </span>
-                        <span className="text-[10px] uppercase font-bold bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded">
+                        <span className="text-[10px] uppercase font-bold bg-rose-500/20 text-rose-300 px-1.5 py-0.5 rounded">
                           Duel Lost
                         </span>
                       </div>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground break-words">
                         Wager Lost:{' '}
                         <strong className="text-rose-300 font-mono font-bold">-{bet.wagerAmount} GP</strong> •
-                        Starting Max: 0-{bet.deathrollValue?.toLocaleString()} • {bet.lossReason === 'timeout' ? 'Missed 24h Window' : 'Rolled a 0'} ({bet.rollsCount} rolls)
+                        0-{bet.deathrollValue?.toLocaleString()} • {bet.lossReason === 'timeout' ? 'Missed 24h Window' : 'Rolled 0'} ({bet.rollsCount} rolls)
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-                      <label className="flex items-center gap-2 cursor-pointer bg-background/60 hover:bg-background px-3 py-1.5 rounded-md border border-rose-500/30 text-xs">
+                    <div className="self-end sm:self-auto shrink-0 pt-1 sm:pt-0">
+                      <label className="flex items-center gap-2 cursor-pointer bg-background/60 hover:bg-background px-2.5 py-1.5 rounded-md border border-rose-500/30 text-xs">
                         <Checkbox
                           checked={isClaimed}
                           onCheckedChange={() => handleToggleBetLoserClaimed(bet._id)}
                           className="border-rose-400 data-[state=checked]:bg-emerald-600"
                         />
-                        <span className={cn("font-medium", isClaimed ? "text-emerald-300" : "text-muted-foreground")}>
+                        <span className={cn("font-medium text-[11px]", isClaimed ? "text-emerald-300" : "text-muted-foreground")}>
                           {isClaimed ? 'Deducted from Sheet ✓' : 'Deduct from Sheet'}
                         </span>
                       </label>
@@ -1104,30 +1166,30 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
         </Card>
       )}
 
-      {/* 6. Crafting Services Offered */}
+      {/* 7. Crafting Services Offered */}
       {servicesOffered.length > 0 && (
-        <Card className="border-amber-500/30 bg-card/60">
-          <CardHeader className="pb-3 border-b border-border/20">
-            <CardTitle className="text-base font-bold flex items-center gap-2 text-amber-300">
-              <Hammer className="h-5 w-5 text-amber-400" />
-              Offered Crafting & Services
+        <Card className="border-amber-500/30 bg-card/60 overflow-hidden">
+          <CardHeader className="p-3.5 sm:p-5 border-b border-border/20">
+            <CardTitle className="text-sm sm:text-base font-bold flex items-center gap-2 text-amber-300">
+              <Hammer className="h-4 w-4 sm:h-5 sm:w-5 text-amber-400 shrink-0" />
+              <span>Offered Crafting & Services</span>
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-4">
+          <CardContent className="p-3.5 sm:p-5">
             <div className="space-y-3">
               {servicesOffered.map((svc: any) => (
                 <div
                   key={svc._id}
-                  className="p-3 rounded-lg border bg-muted/20 border-border/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                  className="p-3 rounded-lg border bg-muted/20 border-border/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3"
                 >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-bold text-sm text-foreground">{svc.name}</h4>
-                      <span className="text-[10px] uppercase font-bold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="font-bold text-xs sm:text-sm text-foreground break-words">{svc.name}</h4>
+                      <span className="text-[10px] uppercase font-bold bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded">
                         {svc.status}
                       </span>
                     </div>
-                    <p className="text-xs text-amber-300/80 font-mono mt-0.5">
+                    <p className="text-xs text-amber-300/80 font-mono mt-0.5 break-words">
                       Price: {svc.priceDetails || 'Custom'} | Level: {svc.minLevel ? `Lvl ${svc.minLevel} - ${svc.maxLevel ?? 'Any'}` : `Up to Lvl ${svc.maxLevel ?? 'Any'}`}
                     </p>
                   </div>
@@ -1168,6 +1230,154 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
           </CardContent>
         </Card>
       )}
+
+      {/* 8. MANUAL CURRENCY ADJUSTMENT FIELD AT THE BOTTOM */}
+      <Card className="border-amber-500/40 bg-gradient-to-b from-amber-950/20 via-card/80 to-background shadow-lg overflow-hidden">
+        <CardHeader className="p-3.5 sm:p-5 border-b border-border/30">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 text-amber-300">
+                <Wallet className="h-5 w-5 text-amber-400 shrink-0" />
+                <span>Manual Currency Adjustment</span>
+              </CardTitle>
+              <CardDescription className="text-xs text-muted-foreground mt-0.5">
+                Directly adjust and save your character&apos;s coin purse (Platinum, Gold, Silver, Copper).
+              </CardDescription>
+            </div>
+            <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-mono font-bold self-start sm:self-auto">
+              Total: {formatGpAmount(calculatedManualGold)}
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-3.5 sm:p-5">
+          <form onSubmit={handleSaveCurrency} className="space-y-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {/* PP */}
+              <div className="space-y-1.5 p-2.5 rounded-lg bg-purple-950/20 border border-purple-500/30">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-purple-300 flex items-center justify-between">
+                  <span>Platinum (PP)</span>
+                  <span className="text-[10px] text-purple-400/70 font-normal">10 GP</span>
+                </label>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={ppVal}
+                    onChange={(e) => setPpVal(e.target.value)}
+                    className="bg-background font-mono text-sm pl-7 text-purple-200 border-purple-500/30 focus-visible:ring-purple-400"
+                  />
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-purple-400">
+                    PP
+                  </span>
+                </div>
+              </div>
+
+              {/* GP */}
+              <div className="space-y-1.5 p-2.5 rounded-lg bg-amber-950/20 border border-amber-500/30">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-amber-300 flex items-center justify-between">
+                  <span>Gold (GP)</span>
+                  <span className="text-[10px] text-amber-400/70 font-normal">1 GP</span>
+                </label>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={gpVal}
+                    onChange={(e) => setGpVal(e.target.value)}
+                    className="bg-background font-mono text-sm pl-7 text-amber-200 border-amber-500/30 focus-visible:ring-amber-400"
+                  />
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-amber-400">
+                    GP
+                  </span>
+                </div>
+              </div>
+
+              {/* SP */}
+              <div className="space-y-1.5 p-2.5 rounded-lg bg-slate-900/40 border border-slate-500/30">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-300 flex items-center justify-between">
+                  <span>Silver (SP)</span>
+                  <span className="text-[10px] text-slate-400/70 font-normal">0.1 GP</span>
+                </label>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={spVal}
+                    onChange={(e) => setSpVal(e.target.value)}
+                    className="bg-background font-mono text-sm pl-7 text-slate-200 border-slate-500/30 focus-visible:ring-slate-400"
+                  />
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                    SP
+                  </span>
+                </div>
+              </div>
+
+              {/* CP */}
+              <div className="space-y-1.5 p-2.5 rounded-lg bg-amber-950/30 border border-amber-700/30">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-amber-600 flex items-center justify-between">
+                  <span>Copper (CP)</span>
+                  <span className="text-[10px] text-amber-600/70 font-normal">0.01 GP</span>
+                </label>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={cpVal}
+                    onChange={(e) => setCpVal(e.target.value)}
+                    className="bg-background font-mono text-sm pl-7 text-amber-500 border-amber-700/30 focus-visible:ring-amber-600"
+                  />
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-amber-600">
+                    CP
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Adjust Buttons */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-border/20">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] text-muted-foreground mr-1">Quick Add:</span>
+                {[10, 50, 100, 500].map((amount) => (
+                  <Button
+                    key={amount}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleAddGold(amount)}
+                    className="h-7 px-2 text-[10px] font-mono border-amber-500/30 text-amber-300 hover:bg-amber-500/20"
+                  >
+                    +{amount} GP
+                  </Button>
+                ))}
+              </div>
+
+              <Button
+                type="submit"
+                size="sm"
+                disabled={isSavingCurrency}
+                className="w-full sm:w-auto bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs h-9 px-4 gap-1.5 shadow-md shadow-amber-900/30"
+              >
+                {isSavingCurrency ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4" />
+                    Save Purse Currency
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
 
       {editingService && (
         <ServiceListingDialog

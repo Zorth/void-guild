@@ -30,6 +30,13 @@ import { cn } from '@/lib/utils'
 interface BettingTabProps {
   characterId: Id<'characters'> | null
   selectedChar: any
+  characterWealth?: {
+    cp: number
+    sp: number
+    gp: number
+    pp: number
+    totalInGold: number
+  } | null
   onOpenSendBet: () => void
 }
 
@@ -52,6 +59,7 @@ function formatRemainingTime(timeLeftMs: number): string {
 export default function BettingTab({
   characterId,
   selectedChar,
+  characterWealth,
   onOpenSendBet,
 }: BettingTabProps) {
   const [rollingBetId, setRollingBetId] = useState<string | null>(null)
@@ -505,6 +513,15 @@ export default function BettingTab({
                       </p>
                     )}
 
+                    {characterWealth && inv.wagerAmount > characterWealth.totalInGold && (
+                      <div className="p-2 rounded bg-amber-500/15 border border-amber-500/40 text-[10px] text-amber-200 flex items-start gap-1.5">
+                        <AlertCircle className="h-3.5 w-3.5 text-amber-400 shrink-0 mt-0.5" />
+                        <span>
+                          <strong>Low Funds:</strong> Wager is <strong className="font-mono">{inv.wagerAmount} GP</strong> but you have <strong className="font-mono">{characterWealth.totalInGold.toLocaleString()} GP</strong>.
+                        </span>
+                      </div>
+                    )}
+
                     <div className="flex items-center justify-end gap-2 pt-1">
                       <Button
                         variant="ghost"
@@ -583,6 +600,15 @@ export default function BettingTab({
                       <p className="text-xs text-muted-foreground italic line-clamp-2">
                         &ldquo;{chall.message}&rdquo;
                       </p>
+                    )}
+
+                    {characterWealth && chall.wagerAmount > characterWealth.totalInGold && (
+                      <div className="p-1.5 rounded bg-amber-500/15 border border-amber-500/40 text-[10px] text-amber-200 flex items-start gap-1.5">
+                        <AlertCircle className="h-3 w-3 text-amber-400 shrink-0 mt-0.5" />
+                        <span>
+                          <strong>Low Funds:</strong> Wager is <strong className="font-mono">{chall.wagerAmount} GP</strong>, you have <strong className="font-mono">{characterWealth.totalInGold.toLocaleString()} GP</strong>.
+                        </span>
+                      </div>
                     )}
 
                     <Button

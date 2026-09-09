@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useMutation } from 'convex/react'
+import { useState, useEffect } from 'react'
+import { useMutation, useQuery } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Id } from '@/convex/_generated/dataModel'
 import {
@@ -14,7 +14,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
-import { Coins, Zap, ExternalLink, User, Bot, HelpCircle } from 'lucide-react'
+import { Coins, Zap, ExternalLink, User, Bot, HelpCircle, AlertCircle } from 'lucide-react'
 import { roundToTwoSigFigs, getNextValidBid } from '@/lib/blackVoidUtils'
 
 interface BidDialogProps {
@@ -30,6 +30,7 @@ interface BidDialogProps {
     pp: number
     totalInGold: number
   } | null
+  onSelectCharacter?: (id: Id<'characters'>) => void
 }
 
 export default function BidDialog({
@@ -39,15 +40,30 @@ export default function BidDialog({
   characterId,
   characterName,
   characterWealth,
+  onSelectCharacter,
 }: BidDialogProps) {
+  const [selectedCharId, setSelectedCharId] = useState<Id<'characters'> | null>(characterId)
   const [bidAmount, setBidAmount] = useState<string>('')
   const [enableAutoBid, setEnableAutoBid] = useState<boolean>(false)
   const [maxAutoBidAmount, setMaxAutoBidAmount] = useState<string>('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  const userCharacters = useQuery(api.blackVoid.getUserCharacters)
   const placeBid = useMutation(api.blackVoid.placeBid)
 
+  useEffect(() => {
+    if (characterId) {
+      setSelectedCharId(characterId)
+    } else if (userCharacters && userCharacters.length > 0 && !selectedCharId) {
+      setSelectedCharId(userCharacters[0]._id)
+    }
+  }, [characterId, userCharacters, isOpen])
+
   if (!listing) return null
+
+  const activeChar = userCharacters?.find((c: any) => c._id === selectedCharId)
+  const effectiveWealth = activeChar?.money || characterWealth
+  const effectiveCharName = activeChar?.name || characterName
 
   const currentHighest = listing.winningAmount || 0
   const startingBid = listing.startingBid || 0
@@ -59,8 +75,14 @@ export default function BidDialog({
   const parsedMax = parseFloat(maxAutoBidAmount)
   const roundedMaxPreview = !isNaN(parsedMax) && parsedMax > 0 ? roundToTwoSigFigs(parsedMax) : null
 
+  const handleCharacterChange = (newId: Id<'characters'>) => {
+    setSelectedCharId(newId)
+    onSelectCharacter?.(newId)
+  }
+
   const handlePlaceBid = async (isBuyout: boolean) => {
-    if (!characterId) {
+    const targetCharId = selectedCharId || characterId
+    if (!targetCharId) {
       toast.error('Please select an active character to place a bid.')
       return
     }
@@ -86,7 +108,7 @@ export default function BidDialog({
     try {
       const res = await placeBid({
         listingId: listing._id,
-        characterId,
+        characterId: targetCharId,
         amount: amount || 0,
         maxAutoBid: autoBidCap,
         isBuyout,
@@ -111,6 +133,8 @@ export default function BidDialog({
     }
   }
 
+  const isOwnListing = listing.characterId === selectedCharId
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px] border-purple-500/40 bg-card/95 backdrop-blur-md max-h-[90vh] overflow-y-auto">
@@ -122,6 +146,25 @@ export default function BidDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
+          {/* Character Selector */}
+          <div className="space-y-1.5 bg-purple-950/20 border border-purple-500/30 p-2.5 rounded-lg">
+            <label className="text-xs font-bold uppercase tracking-wider text-purple-300 flex items-center gap-1.5">
+              <User className="h-3.5 w-3.5 text-purple-400" />
+              Bidding Character
+            </label>
+            <select
+              value={selectedCharId || ''}
+              onChange={(e) => handleCharacterChange(e.target.value as Id<'characters'>)}
+              className="w-full h-9 rounded-md border border-purple-500/40 bg-background/90 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-purple-400 text-foreground"
+            >
+              {(userCharacters || []).map((char: any) => (
+                <option key={char._id} value={char._id}>
+                  {char.name} (Lvl {char.lvl} {char.class || 'Adventurer'})
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Listing Summary */}
           <div className="p-3 rounded-lg bg-muted/20 border border-border/30 space-y-2">
             <div className="flex justify-between items-start">
@@ -197,7 +240,7 @@ export default function BidDialog({
           </div>
 
           {/* Active Character Wealth Display */}
-          {characterWealth && (
+          {effectiveWealth && (
             <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-xs">
               <div className="flex items-center gap-2">
                 <div className="p-1 rounded bg-amber-500/20 text-amber-300">
@@ -205,20 +248,20 @@ export default function BidDialog({
                 </div>
                 <div>
                   <span className="text-[10px] text-amber-200/80 block uppercase font-bold tracking-wider">
-                    {characterName ? `${characterName}'s Funds` : 'Character Funds'}
+                    {effectiveCharName ? `${effectiveCharName}'s Funds` : 'Character Funds'}
                   </span>
                   <span className="text-sm font-bold text-amber-300 font-mono">
-                    {characterWealth.totalInGold % 1 === 0
-                      ? characterWealth.totalInGold.toLocaleString()
-                      : characterWealth.totalInGold.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} GP
+                    {effectiveWealth.totalInGold % 1 === 0
+                      ? effectiveWealth.totalInGold.toLocaleString()
+                      : effectiveWealth.totalInGold.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} GP
                   </span>
                 </div>
               </div>
               <div className="text-[10px] font-mono text-muted-foreground text-right space-x-1.5">
-                {characterWealth.pp > 0 && <span className="text-purple-300">{characterWealth.pp}pp</span>}
-                <span className="text-amber-300">{characterWealth.gp}gp</span>
-                {characterWealth.sp > 0 && <span className="text-slate-300">{characterWealth.sp}sp</span>}
-                {characterWealth.cp > 0 && <span className="text-amber-600">{characterWealth.cp}cp</span>}
+                {effectiveWealth.pp > 0 && <span className="text-purple-300">{effectiveWealth.pp}pp</span>}
+                <span className="text-amber-300">{effectiveWealth.gp}gp</span>
+                {effectiveWealth.sp > 0 && <span className="text-slate-300">{effectiveWealth.sp}sp</span>}
+                {effectiveWealth.cp > 0 && <span className="text-amber-600">{effectiveWealth.cp}cp</span>}
               </div>
             </div>
           )}
@@ -288,10 +331,28 @@ export default function BidDialog({
               )}
             </div>
 
+            {/* Insufficient Funds Warning for Bid */}
+            {(() => {
+              const bidVal = parseFloat(bidAmount)
+              const maxAutoVal = enableAutoBid ? parseFloat(maxAutoBidAmount) : 0
+              const effectiveAmount = Math.max(bidVal || 0, maxAutoVal || 0)
+              if (!effectiveWealth || effectiveAmount <= 0 || effectiveAmount <= effectiveWealth.totalInGold) return null
+              return (
+                <div className="p-2 rounded-lg bg-amber-500/15 border border-amber-500/40 text-[10px] text-amber-200 flex items-start gap-1.5">
+                  <AlertCircle className="h-3.5 w-3.5 text-amber-400 shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Insufficient Funds:</strong> Your {enableAutoBid ? 'auto-bid cap' : 'bid'} of{' '}
+                    <strong className="font-mono">{effectiveAmount.toLocaleString()} GP</strong> exceeds your{' '}
+                    <strong className="font-mono">{effectiveWealth.totalInGold.toLocaleString()} GP</strong> balance.
+                  </span>
+                </div>
+              )
+            })()}
+
             <Button
               type="button"
               onClick={() => handlePlaceBid(false)}
-              disabled={isSubmitting || !characterId || listing.characterId === characterId}
+              disabled={isSubmitting || !selectedCharId || isOwnListing}
               className="w-full bg-purple-600 hover:bg-purple-700 font-bold text-xs h-10 gap-2 shadow-md"
             >
               <Coins className="h-4 w-4" />
@@ -301,12 +362,22 @@ export default function BidDialog({
 
           {/* Buyout Button */}
           {listing.buyoutPrice && (
-            <div className="pt-2">
+            <div className="pt-2 space-y-2">
+              {effectiveWealth && listing.buyoutPrice > effectiveWealth.totalInGold && (
+                <div className="p-2 rounded-lg bg-amber-500/15 border border-amber-500/40 text-[10px] text-amber-200 flex items-start gap-1.5">
+                  <AlertCircle className="h-3.5 w-3.5 text-amber-400 shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Insufficient Funds for Buyout:</strong> Price is{' '}
+                    <strong className="font-mono">{listing.buyoutPrice.toLocaleString()} GP</strong> but you have{' '}
+                    <strong className="font-mono">{effectiveWealth.totalInGold.toLocaleString()} GP</strong>.
+                  </span>
+                </div>
+              )}
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => handlePlaceBid(true)}
-                disabled={isSubmitting || !characterId || listing.characterId === characterId}
+                disabled={isSubmitting || !selectedCharId || isOwnListing}
                 className="w-full border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 font-bold text-xs flex items-center justify-center gap-1.5 h-10"
               >
                 <Zap className="h-4 w-4 text-emerald-400" />
@@ -315,7 +386,7 @@ export default function BidDialog({
             </div>
           )}
 
-          {listing.characterId === characterId && (
+          {isOwnListing && (
             <p className="text-[11px] text-amber-400 text-center italic">
               You cannot bid on your own character listing.
             </p>

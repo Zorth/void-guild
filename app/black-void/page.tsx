@@ -768,6 +768,7 @@ export default function BlackVoidPage() {
         <BettingTab
           characterId={selectedCharacterId}
           selectedChar={selectedChar}
+          characterWealth={selectedChar?.money || null}
           onOpenSendBet={() => setIsSendBetOpen(true)}
         />
       )}
@@ -777,6 +778,7 @@ export default function BlackVoidPage() {
         isOpen={isItemModalOpen}
         onClose={() => setIsItemModalOpen(false)}
         characterId={selectedCharacterId}
+        onSelectCharacter={handleSelectCharacter}
       />
 
       <ServiceListingDialog
@@ -788,6 +790,7 @@ export default function BlackVoidPage() {
         characterId={editingService?.characterId || selectedCharacterId}
         characterLevel={selectedChar?.lvl || 1}
         editingService={editingService}
+        onSelectCharacter={handleSelectCharacter}
       />
 
       <BidDialog
@@ -797,6 +800,7 @@ export default function BlackVoidPage() {
         characterId={selectedCharacterId}
         characterName={selectedChar?.name}
         characterWealth={selectedChar?.money || null}
+        onSelectCharacter={handleSelectCharacter}
       />
 
       <CharacterQuestDialog
@@ -814,6 +818,7 @@ export default function BlackVoidPage() {
           onClose={() => setIsSendBetOpen(false)}
           senderCharacterId={selectedCharacterId}
           senderName={selectedChar?.name}
+          characterWealth={selectedChar?.money || null}
           availableOpponents={bettingData?.availableOpponents || []}
         />
       )}

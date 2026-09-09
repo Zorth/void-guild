@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useMutation } from 'convex/react'
+import { useState, useEffect } from 'react'
+import { useMutation, useQuery } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Id } from '@/convex/_generated/dataModel'
 import {
@@ -15,19 +15,22 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
-import { Coins, Tag, Clock, ExternalLink, PackagePlus } from 'lucide-react'
+import { Coins, Tag, Clock, ExternalLink, PackagePlus, User } from 'lucide-react'
 
 interface ItemListingDialogProps {
   isOpen: boolean
   onClose: () => void
   characterId: Id<'characters'> | null
+  onSelectCharacter?: (id: Id<'characters'>) => void
 }
 
 export default function ItemListingDialog({
   isOpen,
   onClose,
   characterId,
+  onSelectCharacter,
 }: ItemListingDialogProps) {
+  const [selectedCharId, setSelectedCharId] = useState<Id<'characters'> | null>(characterId)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [nethysUrl, setNethysUrl] = useState('')
@@ -36,12 +39,29 @@ export default function ItemListingDialog({
   const [durationDays, setDurationDays] = useState<number>(7)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  const userCharacters = useQuery(api.blackVoid.getUserCharacters)
   const createItemListing = useMutation(api.blackVoid.createItemListing)
+
+  useEffect(() => {
+    if (characterId) {
+      setSelectedCharId(characterId)
+    } else if (userCharacters && userCharacters.length > 0 && !selectedCharId) {
+      setSelectedCharId(userCharacters[0]._id)
+    }
+  }, [characterId, userCharacters, isOpen])
+
+  const handleCharacterChange = (newId: Id<'characters'>) => {
+    setSelectedCharId(newId)
+    onSelectCharacter?.(newId)
+  }
+
+  const activeChar = userCharacters?.find((c: any) => c._id === selectedCharId)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!characterId) {
-      toast.error('Please select an active character first.')
+    const targetCharId = selectedCharId || characterId
+    if (!targetCharId) {
+      toast.error('Please select a character to list this item.')
       return
     }
 
@@ -61,7 +81,7 @@ export default function ItemListingDialog({
     setIsSubmitting(true)
     try {
       await createItemListing({
-        characterId,
+        characterId: targetCharId,
         name,
         description: description || undefined,
         nethysUrl: nethysUrl || undefined,
@@ -95,6 +115,36 @@ export default function ItemListingDialog({
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 py-3">
+          {/* Character Selector */}
+          <div className="space-y-1.5 bg-purple-950/20 border border-purple-500/30 p-2.5 rounded-lg">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold uppercase tracking-wider text-purple-300 flex items-center gap-1.5">
+                <User className="h-3.5 w-3.5 text-purple-400" />
+                Seller Character <span className="text-destructive">*</span>
+              </label>
+              {activeChar?.money && (
+                <span className="text-[11px] font-mono text-amber-300 font-semibold flex items-center gap-1">
+                  <Coins className="h-3 w-3 text-amber-400" />
+                  {activeChar.money.totalInGold % 1 === 0
+                    ? activeChar.money.totalInGold.toLocaleString()
+                    : activeChar.money.totalInGold.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}{' '}
+                  GP
+                </span>
+              )}
+            </div>
+            <select
+              value={selectedCharId || ''}
+              onChange={(e) => handleCharacterChange(e.target.value as Id<'characters'>)}
+              className="w-full h-9 rounded-md border border-purple-500/40 bg-background/90 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-purple-400 text-foreground"
+            >
+              {(userCharacters || []).map((char: any) => (
+                <option key={char._id} value={char._id}>
+                  {char.name} (Lvl {char.lvl} {char.class || 'Adventurer'})
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="space-y-1.5">
             <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
               <Tag className="h-3.5 w-3.5 text-purple-400" />
@@ -208,7 +258,7 @@ export default function ItemListingDialog({
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting || !characterId}
+              disabled={isSubmitting || !selectedCharId}
               className="bg-purple-600 hover:bg-purple-700 text-white font-semibold"
             >
               {isSubmitting ? 'Posting...' : 'Post Item Listing'}

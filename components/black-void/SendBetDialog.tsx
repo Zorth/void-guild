@@ -23,6 +23,13 @@ interface SendBetDialogProps {
   onClose: () => void
   senderCharacterId: Id<'characters'>
   senderName?: string
+  characterWealth?: {
+    cp: number
+    sp: number
+    gp: number
+    pp: number
+    totalInGold: number
+  } | null
   availableOpponents: Array<{
     _id: Id<'characters'>
     name: string
@@ -40,6 +47,7 @@ export default function SendBetDialog({
   onClose,
   senderCharacterId,
   senderName = 'Active Character',
+  characterWealth,
   availableOpponents,
 }: SendBetDialogProps) {
   const [targetType, setTargetType] = useState<'open' | 'direct'>('open')
@@ -282,6 +290,26 @@ export default function SendBetDialog({
               className="bg-background/80 border-border/60 text-xs"
             />
           </div>
+
+          {/* Insufficient Funds Warning */}
+          {(() => {
+            const wager = parseFloat(wagerAmount)
+            const hasFunds = characterWealth?.totalInGold !== undefined
+            const insufficientFunds = hasFunds && !isNaN(wager) && wager > 0 && wager > characterWealth!.totalInGold
+            if (!insufficientFunds) return null
+            return (
+              <div className="p-2.5 rounded-lg bg-amber-500/15 border border-amber-500/40 text-[11px] text-amber-200 flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                <span>
+                  <strong>Insufficient Funds:</strong> Your character has{' '}
+                  <strong className="text-amber-300 font-mono">{characterWealth!.totalInGold.toLocaleString()} GP</strong>{' '}
+                  but the wager is{' '}
+                  <strong className="text-amber-300 font-mono">{wager.toLocaleString()} GP</strong>.
+                  Ensure your character has enough gold before the bet settles.
+                </span>
+              </div>
+            )
+          })()}
 
           {/* Rule Note */}
           <div className="p-2.5 rounded-lg bg-rose-950/20 border border-rose-500/20 text-[11px] text-muted-foreground flex items-start gap-2">

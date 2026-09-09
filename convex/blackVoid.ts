@@ -1009,6 +1009,28 @@ export const getCharacterTransactions = query({
         })
     )
 
+    const characterDetails = await ctx.db
+      .query('characterDetails')
+      .withIndex('by_characterId', (q) => q.eq('characterId', args.characterId))
+      .first()
+
+    const currentMoney = {
+      pp: characterDetails?.money?.pp || 0,
+      gp: characterDetails?.money?.gp || 0,
+      sp: characterDetails?.money?.sp || 0,
+      cp: characterDetails?.money?.cp || 0,
+      totalInGold:
+        characterDetails?.money?.totalInGold !== undefined
+          ? characterDetails.money.totalInGold
+          : Math.round(
+              ((characterDetails?.money?.gp || 0) +
+                (characterDetails?.money?.pp || 0) * 10 +
+                (characterDetails?.money?.sp || 0) / 10 +
+                (characterDetails?.money?.cp || 0) / 100) *
+                100
+            ) / 100,
+    }
+
     return {
       createdItems: itemsSoldOrActive,
       wonItems: wonListings,
@@ -1018,7 +1040,71 @@ export const getCharacterTransactions = query({
       guildmasterAreaGains,
       betsWon,
       betsLost,
+      currentMoney,
       isGuildmaster,
     }
+  },
+})
+
+export const updateCharacterCurrency = mutation({
+  args: {
+    characterId: v.id('characters'),
+    pp: v.number(),
+    gp: v.number(),
+    sp: v.number(),
+    cp: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    const character = await ctx.db.get(args.characterId)
+    const isAdminUser = await isAdmin(ctx)
+    if (!character || (character.userId !== user.subject && !isAdminUser)) {
+      throw new Error('You do not own this character.')
+    }
+
+    const pp = Math.max(0, Math.floor(args.pp))
+    const gp = Math.max(0, Math.floor(args.gp))
+    const sp = Math.max(0, Math.floor(args.sp))
+    const cp = Math.max(0, Math.floor(args.cp))
+    const totalInGold = Math.round((gp + pp * 10 + sp / 10 + cp / 100) * 100) / 100
+
+    const existingDetails = await ctx.db
+      .query('characterDetails')
+      .withIndex('by_characterId', (q) => q.eq('characterId', args.characterId))
+      .first()
+
+    if (existingDetails) {
+      await ctx.db.patch(existingDetails._id, {
+        money: {
+          pp,
+          gp,
+          sp,
+          cp,
+          totalInGold,
+        },
+        lastSyncedAt: Date.now(),
+      })
+    } else {
+      await ctx.db.insert('characterDetails', {
+        characterId: args.characterId,
+        name: character.name,
+        level: character.lvl,
+        xp: character.xp,
+        class: character.class,
+        ancestry: character.ancestry,
+        money: {
+          pp,
+          gp,
+          sp,
+          cp,
+          totalInGold,
+        },
+        lastSyncedAt: Date.now(),
+      })
+    }
+
+    return { success: true, pp, gp, sp, cp, totalInGold }
   },
 })
