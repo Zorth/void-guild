@@ -9,7 +9,7 @@ import { ChevronLeft, Crown, Shield, Swords, Book } from 'lucide-react'
 import { useMemo, useEffect } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@clerk/nextjs'
-import { cn } from '@/lib/utils'
+import { cn, formatDisplayName } from '@/lib/utils'
 
 export default function StatsPage() {
     const { userId } = useAuth();
@@ -123,8 +123,8 @@ export default function StatsPage() {
                           >
                               <span className="flex items-center gap-2 min-w-0">
                                   <span className="text-muted-foreground tabular-nums shrink-0">{index + 1}.</span>
-                                  <span className={cn("font-medium truncate", isUser && "text-purple-700 dark:text-purple-300")} title={stat.displayName}>
-                                    {stat.displayName}
+                                  <span className={cn("font-medium truncate", isUser && "text-purple-700 dark:text-purple-300")} title={formatDisplayName(stat.displayName)}>
+                                    {formatDisplayName(stat.displayName)}
                                   </span>
                                   {isUser && (
                                     <span className="text-[8px] bg-purple-200 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-1 py-0.5 rounded-full uppercase tracking-wider font-bold shrink-0">You</span>
@@ -169,8 +169,8 @@ export default function StatsPage() {
                           >
                               <span className="flex items-center gap-2 min-w-0">
                                   <span className="text-muted-foreground tabular-nums shrink-0">{index + 1}.</span>
-                                  <span className={cn("font-medium truncate", isUser && "text-purple-700 dark:text-purple-300")} title={stat.displayName}>
-                                    {stat.displayName}
+                                  <span className={cn("font-medium truncate", isUser && "text-purple-700 dark:text-purple-300")} title={formatDisplayName(stat.displayName)}>
+                                    {formatDisplayName(stat.displayName)}
                                   </span>
                                   {isUser && (
                                     <span className="text-[8px] bg-purple-200 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-1 py-0.5 rounded-full uppercase tracking-wider font-bold shrink-0">You</span>

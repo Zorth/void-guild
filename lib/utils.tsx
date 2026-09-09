@@ -45,6 +45,19 @@ export function formatTime(date: Date | number | string) {
   return `${hours}:${minutes}`;
 }
 
+export function formatDisplayName(rawName?: string | null): string {
+  if (!rawName) return '';
+  const trimmed = rawName.trim();
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  if (parts.length > 1) {
+    const first = parts.slice(0, -1).join(' ');
+    const last = parts[parts.length - 1];
+    const lastInitial = last.charAt(0).toUpperCase();
+    return `${first} ${lastInitial}.`;
+  }
+  return trimmed;
+}
+
 export function formatInGameYear(year: number, eras?: any[], globalYearZero: boolean = false, options?: { useAbbreviation?: boolean, labelFirst?: boolean }) {
   if (!eras || eras.length === 0) {
     return year.toString();

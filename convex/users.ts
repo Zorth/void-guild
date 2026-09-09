@@ -3,6 +3,24 @@ import { v } from 'convex/values'
 import { isAdmin, extractClaim } from './roles'
 
 /**
+ * Formats a user display name to abbreviate the last name with a single letter and period (e.g. Jasper Goens -> Jasper G.)
+ */
+export function formatUserDisplayName(name?: string | null, username?: string | null, fallbackId?: string): string {
+  const raw = name?.trim() || username?.trim()
+  if (!raw) return fallbackId ? `User ${fallbackId.slice(-4)}` : 'Anonymous'
+
+  const parts = raw.split(/\s+/).filter(Boolean)
+  if (parts.length > 1) {
+    const first = parts.slice(0, -1).join(' ')
+    const last = parts[parts.length - 1]
+    const lastInitial = last.charAt(0).toUpperCase()
+    return `${first} ${lastInitial}.`
+  }
+
+  return raw
+}
+
+/**
  * Syncs the current user's metadata and roles from Clerk (via JWT) to the database.
  * This acts as a fallback and cache for roles in case JWT claims are missing or unreliable.
  */
@@ -26,8 +44,10 @@ export const syncUser = mutation({
     const givenName = extractClaim(identity, 'given_name')
     const familyName = extractClaim(identity, 'family_name')
     let name = identity.name
-    if (!name && givenName) {
-      name = familyName ? `${givenName} ${familyName.charAt(0).toUpperCase()}.` : givenName
+    if (name) {
+      name = formatUserDisplayName(name)
+    } else if (givenName) {
+      name = familyName ? `${givenName} ${String(familyName).trim().charAt(0).toUpperCase()}.` : givenName
     }
 
     const effectiveDiscordId =
@@ -292,10 +312,15 @@ export const getUsersByIds = query({
   handler: async (ctx, args) => {
     const users = await Promise.all(
       args.userIds.map(async (userId) => {
-        return await ctx.db
+        const user = await ctx.db
           .query('users')
           .withIndex('by_userId', (q) => q.eq('userId', userId))
           .first()
+        if (!user) return null
+        return {
+          ...user,
+          name: formatUserDisplayName(user.name, user.username, user.userId),
+        }
       })
     )
     return users.filter((u): u is NonNullable<typeof u> => u !== null)
@@ -419,7 +444,7 @@ export const getLeaderboardStats = query({
       const count = (gmCounts.get(userId) || 0) + (user?.extraSessionsRan || 0)
       return {
         userId,
-        displayName: user?.name || user?.username || `User ${userId.slice(-4)}`,
+        displayName: formatUserDisplayName(user?.name, user?.username, userId),
         count
       }
     }).filter(u => u.count > 0).sort((a, b) => b.count - a.count)
@@ -429,7 +454,7 @@ export const getLeaderboardStats = query({
       const count = (playerCounts.get(userId) || 0) + (user?.extraSessionsPlayed || 0)
       return {
         userId,
-        displayName: user?.name || user?.username || `User ${userId.slice(-4)}`,
+        displayName: formatUserDisplayName(user?.name, user?.username, userId),
         count
       }
     }).filter(u => u.count > 0).sort((a, b) => b.count - a.count)
