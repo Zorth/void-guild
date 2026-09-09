@@ -370,7 +370,7 @@ export default function AchievementsModal({ open, onOpenChange }: AchievementsMo
                       <div className="border-t border-border/30 bg-muted/10">
                         <button
                           type="button"
-                          onClick={() => toggleChainExpand(item.chainId!)}
+                          onClick={() => toggleChainExpand(chainId)}
                           className="w-full px-4 py-2 text-xs font-semibold text-purple-300 hover:text-purple-200 hover:bg-purple-500/10 flex items-center justify-between transition-colors"
                         >
                           <span className="flex items-center gap-1.5">

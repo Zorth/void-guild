@@ -593,23 +593,22 @@ export const syncAndGetAchievements = mutation({
 
     // Streak calculations
     const sortedLockedSessions = [...allLockedSessions].sort((a, b) => {
-      if (a.date && b.date) return a.date - b.date
-      if (a.date) return -1
-      if (b.date) return 1
-      return a._creationTime - b._creationTime
+      const dateA = a.date || a._creationTime
+      const dateB = b.date || b._creationTime
+      return dateA - dateB
     })
 
     let maxWorldStreak = 0
     let maxCharacterStreak = 0
 
-    const isAttendingSession = (charId: Id<'characters'>, s: typeof sortedLockedSessions[0]) => {
-      return (s.characters && s.characters.includes(charId)) || s.gmCharacter === charId
+    const isAttendingPlayerSession = (charId: Id<'characters'>, s: typeof sortedLockedSessions[0]) => {
+      return Boolean(s.characters && s.characters.includes(charId))
     }
 
     for (const char of characters) {
-      const charSessions = sortedLockedSessions.filter((s) => isAttendingSession(char._id, s))
+      const charSessions = sortedLockedSessions.filter((s) => isAttendingPlayerSession(char._id, s))
 
-      // World Streak per character
+      // World Streak per character (only counting physical player character attendance)
       let currentWorld: string | null = null
       let currentWorldStreak = 0
       for (const s of charSessions) {
@@ -625,20 +624,7 @@ export const syncAndGetAchievements = mutation({
         }
       }
 
-      // Single character session streak
-      let singleCharStreak = 0
-      for (const s of sortedLockedSessions) {
-        if (isAttendingSession(char._id, s)) {
-          singleCharStreak++
-          if (singleCharStreak > maxCharacterStreak) {
-            maxCharacterStreak = singleCharStreak
-          }
-        } else {
-          singleCharStreak = 0
-        }
-      }
-
-      // Mutual character streak with companion characters
+      // Mutual character streak with companion characters (only player characters, not GM characters)
       const companionIds = new Set<Id<'characters'>>()
       for (const s of charSessions) {
         if (s.characters) {
@@ -648,19 +634,16 @@ export const syncAndGetAchievements = mutation({
             }
           }
         }
-        if (s.gmCharacter && s.gmCharacter !== char._id) {
-          companionIds.add(s.gmCharacter)
-        }
       }
 
       for (const compId of companionIds) {
         const relevantSessions = sortedLockedSessions.filter(
-          (s) => isAttendingSession(char._id, s) || isAttendingSession(compId, s)
+          (s) => isAttendingPlayerSession(char._id, s) || isAttendingPlayerSession(compId, s)
         )
         let mutualStreak = 0
         for (const s of relevantSessions) {
-          const hasChar = isAttendingSession(char._id, s)
-          const hasComp = isAttendingSession(compId, s)
+          const hasChar = isAttendingPlayerSession(char._id, s)
+          const hasComp = isAttendingPlayerSession(compId, s)
           if (hasChar && hasComp) {
             mutualStreak++
             if (mutualStreak > maxCharacterStreak) {
@@ -763,7 +746,24 @@ export const syncAndGetAchievements = mutation({
 
     const unlockedMap = new Map<string, { unlockedAt: number; notifiedAt?: number }>()
     const unlockedAchievementIds = new Set<string>()
+
+    const STREAK_ACHIEVEMENT_IDS = new Set([
+      'character_streak_3',
+      'character_streak_5',
+      'character_streak_10',
+      'world_streak_3',
+      'world_streak_5',
+      'world_streak_10',
+    ])
+
     for (const u of existingUnlockedDocs) {
+      if (STREAK_ACHIEVEMENT_IDS.has(u.achievementId)) {
+        const def = ACHIEVEMENTS_REGISTRY.find((a) => a.id === u.achievementId)
+        if (def && !def.checkEligibility(evalData)) {
+          await ctx.db.delete(u._id)
+          continue
+        }
+      }
       unlockedMap.set(u.achievementId, { unlockedAt: u.unlockedAt, notifiedAt: u.notifiedAt })
       unlockedAchievementIds.add(u.achievementId)
     }
@@ -896,5 +896,132 @@ export const getUserUnlockedAchievementIds = query({
       .withIndex('by_userId', (q) => q.eq('userId', user.subject))
       .collect()
     return unlockedDocs.map((u) => u.achievementId)
+  },
+})
+
+export const adminRecalculateAllUserStreakAchievements = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    const userDoc = await ctx.db
+      .query('users')
+      .withIndex('by_userId', (q) => q.eq('userId', user.subject))
+      .first()
+
+    if (!userDoc?.isAdmin) {
+      throw new Error('Unauthorized')
+    }
+
+    const allSessions = await ctx.db.query('sessions').collect()
+    const allLockedSessions = allSessions.filter((s) => s.locked)
+
+    const sortedLockedSessions = [...allLockedSessions].sort((a, b) => {
+      const dateA = a.date || a._creationTime
+      const dateB = b.date || b._creationTime
+      return dateA - dateB
+    })
+
+    const isAttendingPlayerSession = (charId: Id<'characters'>, s: typeof sortedLockedSessions[0]) => {
+      return Boolean(s.characters && s.characters.includes(charId))
+    }
+
+    const allUnlocked = await ctx.db.query('unlockedAchievements').collect()
+    const STREAK_ACHIEVEMENT_IDS = new Set([
+      'character_streak_3',
+      'character_streak_5',
+      'character_streak_10',
+      'world_streak_3',
+      'world_streak_5',
+      'world_streak_10',
+    ])
+
+    const streakUnlocked = allUnlocked.filter((u) => STREAK_ACHIEVEMENT_IDS.has(u.achievementId))
+
+    const userMap = new Map<string, typeof streakUnlocked>()
+    for (const u of streakUnlocked) {
+      const list = userMap.get(u.userId) || []
+      list.push(u)
+      userMap.set(u.userId, list)
+    }
+
+    let deletedCount = 0
+
+    for (const [targetUserId, records] of userMap.entries()) {
+      const targetChars = await ctx.db
+        .query('characters')
+        .withIndex('by_userId', (q) => q.eq('userId', targetUserId))
+        .collect()
+
+      let maxWorldStreak = 0
+      let maxCharacterStreak = 0
+
+      for (const char of targetChars) {
+        const charSessions = sortedLockedSessions.filter((s) => isAttendingPlayerSession(char._id, s))
+
+        let currentWorld: string | null = null
+        let currentWorldStreak = 0
+        for (const s of charSessions) {
+          const wId = s.world ? s.world.toString() : null
+          if (wId && wId === currentWorld) {
+            currentWorldStreak++
+          } else {
+            currentWorld = wId
+            currentWorldStreak = wId ? 1 : 0
+          }
+          if (currentWorldStreak > maxWorldStreak) {
+            maxWorldStreak = currentWorldStreak
+          }
+        }
+
+        const companionIds = new Set<Id<'characters'>>()
+        for (const s of charSessions) {
+          if (s.characters) {
+            for (const cId of s.characters) {
+              if (cId !== char._id) {
+                companionIds.add(cId)
+              }
+            }
+          }
+        }
+
+        for (const compId of companionIds) {
+          const relevantSessions = sortedLockedSessions.filter(
+            (s) => isAttendingPlayerSession(char._id, s) || isAttendingPlayerSession(compId, s)
+          )
+          let mutualStreak = 0
+          for (const s of relevantSessions) {
+            const hasChar = isAttendingPlayerSession(char._id, s)
+            const hasComp = isAttendingPlayerSession(compId, s)
+            if (hasChar && hasComp) {
+              mutualStreak++
+              if (mutualStreak > maxCharacterStreak) {
+                maxCharacterStreak = mutualStreak
+              }
+            } else {
+              mutualStreak = 0
+            }
+          }
+        }
+      }
+
+      for (const record of records) {
+        let isEligible = false
+        if (record.achievementId === 'character_streak_3') isEligible = maxCharacterStreak >= 3
+        if (record.achievementId === 'character_streak_5') isEligible = maxCharacterStreak >= 5
+        if (record.achievementId === 'character_streak_10') isEligible = maxCharacterStreak >= 10
+        if (record.achievementId === 'world_streak_3') isEligible = maxWorldStreak >= 3
+        if (record.achievementId === 'world_streak_5') isEligible = maxWorldStreak >= 5
+        if (record.achievementId === 'world_streak_10') isEligible = maxWorldStreak >= 10
+
+        if (!isEligible) {
+          await ctx.db.delete(record._id)
+          deletedCount++
+        }
+      }
+    }
+
+    return { success: true, deletedCount }
   },
 })

@@ -254,6 +254,7 @@ export const getAttendingCharacterRelationships = query({
 
     const pastSessions = allSessions.filter(s => 
       s._id !== args.sessionId &&
+      Boolean(s.locked) &&
       (s.date || s._creationTime) <= currentSessionTime
     )
 
