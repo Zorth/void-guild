@@ -43,6 +43,7 @@ import AdminUserList from './AdminUserList'
 import CharacterCosmeticsTab from './CharacterCosmeticsTab'
 import InSyncPlasmaEffect from './InSyncPlasmaEffect'
 import BlazeTextParticles from './BlazeTextParticles'
+import VoidNebulaEffect from './VoidNebulaEffect'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getLevelBadgeStyle, CharacterRankIcon, getXPBarStyles, cn } from '@/lib/utils'
 import { track } from '@vercel/analytics'
@@ -239,7 +240,10 @@ export default function Characters({ filters }: { filters?: { pf: boolean; dnd: 
                       onClick={() => openDetailsDialog(character)}
                     >
                       {cosmetics.cardClassName.includes('in-sync') && <InSyncPlasmaEffect />}
-                      <div className="flex justify-between items-center w-full">
+                      {(cosmetics.cardClassName.includes('void-nebula') || character.cosmetics?.bgColor === 'void_nebula' || character.cosmetics?.bgColor === 'void-nebula-bg') && (
+                        <VoidNebulaEffect />
+                      )}
+                      <div className="flex justify-between items-center w-full relative z-10">
                         <div className="flex flex-col">
                           <div className="flex items-center gap-2">
                             <span

@@ -19,6 +19,7 @@ import { getLevelBadgeStyle, CharacterRankIcon, cn } from '@/lib/utils'
 import ProfileAvatarWithBadge from '@/components/characters/ProfileAvatarWithBadge'
 import InSyncPlasmaEffect from '@/components/characters/InSyncPlasmaEffect'
 import BlazeTextParticles from '@/components/characters/BlazeTextParticles'
+import VoidNebulaEffect from '@/components/characters/VoidNebulaEffect'
 import {
   resolveCosmeticsStyles,
   FONT_OPTIONS,
@@ -240,7 +241,10 @@ export default function CharacterCosmeticsTab({
           style={previewStyles.cardStyle}
         >
           {previewStyles.cardClassName.includes('in-sync') && <InSyncPlasmaEffect />}
-          <div className="flex items-center gap-3 min-w-0">
+          {(previewStyles.cardClassName.includes('void-nebula') || cosmetics.bgColor === 'void_nebula' || cosmetics.bgColor === 'void-nebula-bg') && (
+            <VoidNebulaEffect />
+          )}
+          <div className="flex items-center gap-3 min-w-0 relative z-10">
             <ProfileAvatarWithBadge
               imageUrl={profileImageUrl}
               name={characterName}
@@ -526,7 +530,7 @@ export default function CharacterCosmeticsTab({
                 onClick={() => handleSelectOption('bgColor', opt)}
                 title={!isUnlocked ? label : opt.name}
                 className={cn(
-                  'w-full p-3 rounded-lg text-left text-xs transition-all flex items-center justify-between border',
+                  'w-full p-3 rounded-lg text-left text-xs transition-all flex items-center justify-between border relative overflow-hidden',
                   isClassTint && opt.value,
                   isSelected
                     ? 'border-2 border-purple-500 ring-2 ring-purple-500 font-bold text-foreground'
@@ -538,9 +542,12 @@ export default function CharacterCosmeticsTab({
                   backgroundColor: !isClassTint && opt.value ? opt.value : undefined,
                 }}
               >
-                <span className="font-semibold">{opt.name}</span>
+                {(opt.id === 'void_nebula' || opt.value === 'void-nebula-bg') && isUnlocked && (
+                  <VoidNebulaEffect />
+                )}
+                <span className="font-semibold relative z-10">{opt.name}</span>
                 {!isUnlocked && (
-                  <span className="inline-flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 font-medium bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 shrink-0">
+                  <span className="inline-flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 font-medium bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 shrink-0 relative z-10">
                     <Lock className="h-3 w-3" />
                     {badgeLabel}
                   </span>

@@ -14,6 +14,7 @@ import { resolveCosmeticsStyles } from '@/lib/cosmetics'
 import ProfileAvatarWithBadge from '@/components/characters/ProfileAvatarWithBadge'
 import InSyncPlasmaEffect from '@/components/characters/InSyncPlasmaEffect'
 import BlazeTextParticles from '@/components/characters/BlazeTextParticles'
+import VoidNebulaEffect from '@/components/characters/VoidNebulaEffect'
 
 interface CharacterRelationship {
   count: number
@@ -127,7 +128,10 @@ export default function AttendingCharactersList({
                 style={cosmeticsStyles.cardStyle}
             >
               {cosmeticsStyles.cardClassName.includes('in-sync') && <InSyncPlasmaEffect />}
-              <div className="flex items-center gap-3 min-w-0">
+              {(cosmeticsStyles.cardClassName.includes('void-nebula') || char.cosmetics?.bgColor === 'void_nebula' || char.cosmetics?.bgColor === 'void-nebula-bg') && (
+                <VoidNebulaEffect />
+              )}
+              <div className="flex items-center gap-3 min-w-0 relative z-10">
                 <ProfileAvatarWithBadge
                   imageUrl={metadata?.imageUrl}
                   name={char.name}
