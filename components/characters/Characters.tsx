@@ -41,6 +41,7 @@ import CreateCharacter from './CreateCharacter'
 import AdminCharacterList from './AdminCharacterList'
 import AdminUserList from './AdminUserList'
 import CharacterCosmeticsTab from './CharacterCosmeticsTab'
+import InSyncPlasmaEffect from './InSyncPlasmaEffect'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getLevelBadgeStyle, CharacterRankIcon, getXPBarStyles, cn } from '@/lib/utils'
 import { track } from '@vercel/analytics'
@@ -222,18 +223,21 @@ export default function Characters({ filters }: { filters?: { pf: boolean; dnd: 
                   const cosmetics = resolveCosmeticsStyles(character.cosmetics)
                   const isSpecialBorder =
                     cosmetics.cardClassName.includes('-card-border') ||
-                    cosmetics.cardClassName.includes('rainbow-border')
+                    cosmetics.cardClassName.includes('rainbow-border') ||
+                    cosmetics.cardClassName.includes('void-rotating-border') ||
+                    cosmetics.cardClassName.includes('in-sync-border')
                   return (
                     <li
                       key={character._id}
                       className={cn(
-                        'flex flex-col cursor-pointer p-3 rounded-md transition-all',
+                        'flex flex-col cursor-pointer p-3 rounded-md transition-all relative overflow-visible',
                         isSpecialBorder ? 'hover:brightness-110' : 'hover:bg-muted/50 border border-transparent',
                         cosmetics.cardClassName
                       )}
                       style={cosmetics.cardStyle}
                       onClick={() => openDetailsDialog(character)}
                     >
+                      {cosmetics.cardClassName.includes('in-sync') && <InSyncPlasmaEffect />}
                       <div className="flex justify-between items-center w-full">
                         <div className="flex flex-col">
                           <div className="flex items-center gap-2">

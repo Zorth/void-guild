@@ -216,6 +216,14 @@ export const BORDER_SHAPE_OPTIONS: CosmeticOption[] = [
     value: 'rounded-lg rainbow-border',
     previewClass: 'rainbow-border rounded-lg p-1',
   },
+  {
+    id: 'in_sync_border',
+    name: 'Resonant Blaze Border',
+    unlockedByDefault: false,
+    requiredAchievementId: 'character_streak_3',
+    value: 'rounded-lg in-sync-card-border',
+    previewClass: 'in-sync-card-border rounded-lg p-1',
+  },
 ]
 
 export const PROFILE_BORDER_OPTIONS: CosmeticOption[] = [
@@ -458,7 +466,8 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
     cardClassName.includes('gold-card-border') ||
     cardClassName.includes('silver-card-border') ||
     cardClassName.includes('bronze-card-border') ||
-    cardClassName.includes('purple-card-border')
+    cardClassName.includes('purple-card-border') ||
+    cardClassName.includes('in-sync-card-border')
 
   if (bgObj?.value === 'gold-bg-tint' || cosmetics.bgColor === 'gold_tint' || cosmetics.bgColor === 'gold-bg-tint') {
     if (isGradientBorder) {

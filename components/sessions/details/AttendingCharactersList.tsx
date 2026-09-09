@@ -12,6 +12,7 @@ import { api } from '@/convex/_generated/api'
 import { toast } from 'sonner'
 import { resolveCosmeticsStyles } from '@/lib/cosmetics'
 import ProfileAvatarWithBadge from '@/components/characters/ProfileAvatarWithBadge'
+import InSyncPlasmaEffect from '@/components/characters/InSyncPlasmaEffect'
 
 interface CharacterRelationship {
   count: number
@@ -119,11 +120,12 @@ export default function AttendingCharactersList({
             <li 
                 key={char._id} 
                 className={cn(
-                    "flex items-center justify-between p-4 rounded-lg border transition-colors gap-3",
+                    "flex items-center justify-between p-4 rounded-lg border transition-colors gap-3 relative overflow-visible",
                     cosmeticsStyles.cardClassName || "bg-muted/20"
                 )}
                 style={cosmeticsStyles.cardStyle}
             >
+              {cosmeticsStyles.cardClassName.includes('in-sync') && <InSyncPlasmaEffect />}
               <div className="flex items-center gap-3 min-w-0">
                 <ProfileAvatarWithBadge
                   imageUrl={metadata?.imageUrl}

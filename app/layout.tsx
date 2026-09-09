@@ -213,6 +213,17 @@ export default function RootLayout({
                 <SessionClosedListener />
                 <AchievementListener />
                 <UserSync />
+                {/* SVG Filter for Organic Plasma Tendril Warping */}
+                <svg className="fixed pointer-events-none w-0 h-0 overflow-hidden" aria-hidden="true" style={{ position: 'absolute', width: 0, height: 0 }}>
+                  <defs>
+                    <filter id="sync-plasma-displacement" x="-30%" y="-30%" width="160%" height="160%">
+                      <feTurbulence type="fractalNoise" baseFrequency="0.04 0.03" numOctaves="4" result="noise" seed="7">
+                        <animate attributeName="baseFrequency" dur="4.5s" values="0.03 0.02; 0.06 0.07; 0.02 0.04; 0.03 0.02" repeatCount="indefinite" />
+                      </feTurbulence>
+                      <feDisplacementMap in="SourceGraphic" in2="noise" scale="8" xChannelSelector="R" yChannelSelector="G" />
+                    </filter>
+                  </defs>
+                </svg>
             </TooltipProvider>
           </ConvexClientProvider>
         </ClerkProvider>

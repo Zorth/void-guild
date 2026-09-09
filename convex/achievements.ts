@@ -321,7 +321,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     title: 'In Sync',
     description: 'Achieved a character streak of 3 consecutive sessions.',
     category: 'hidden',
-    reward: '',
+    reward: 'Resonant Blaze Card Border Cosmetic',
     chainId: 'character_streak',
     tier: 1,
     maxTier: 3,

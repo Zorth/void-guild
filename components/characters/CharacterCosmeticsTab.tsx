@@ -17,6 +17,7 @@ import { useQuery } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { getLevelBadgeStyle, CharacterRankIcon, cn } from '@/lib/utils'
 import ProfileAvatarWithBadge from '@/components/characters/ProfileAvatarWithBadge'
+import InSyncPlasmaEffect from '@/components/characters/InSyncPlasmaEffect'
 import {
   resolveCosmeticsStyles,
   FONT_OPTIONS,
@@ -225,11 +226,12 @@ export default function CharacterCosmeticsTab({
 
         <div
           className={cn(
-            'p-3 rounded-lg flex items-center justify-between gap-3 border transition-all',
+            'p-3 rounded-lg flex items-center justify-between gap-3 border transition-all relative overflow-visible',
             previewStyles.cardClassName
           )}
           style={previewStyles.cardStyle}
         >
+          {previewStyles.cardClassName.includes('in-sync') && <InSyncPlasmaEffect />}
           <div className="flex items-center gap-3 min-w-0">
             <ProfileAvatarWithBadge
               imageUrl={profileImageUrl}
@@ -447,7 +449,11 @@ export default function CharacterCosmeticsTab({
           {BORDER_SHAPE_OPTIONS.filter(isOptionVisible).map((opt) => {
             const { isUnlocked, label, badgeLabel } = getOptionLockStatus(opt)
             const isSelected = cosmetics.borderShape === opt.id || cosmetics.borderShape === opt.value
-            const isSpecialBorder = opt.value.includes('-card-border') || opt.value.includes('rainbow-border')
+            const isSpecialBorder =
+              opt.value.includes('-card-border') ||
+              opt.value.includes('rainbow-border') ||
+              opt.value.includes('void-rotating-border') ||
+              opt.value.includes('in-sync-border')
 
             return (
               <button
@@ -470,6 +476,7 @@ export default function CharacterCosmeticsTab({
                       : 'bg-muted/20 text-muted-foreground opacity-50 grayscale cursor-not-allowed'
                 )}
               >
+                {opt.id === 'in_sync_border' && isUnlocked && <InSyncPlasmaEffect />}
                 <span className="font-semibold">{opt.name}</span>
                 {!isUnlocked && (
                   <span className="inline-flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 font-medium bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 shrink-0">
