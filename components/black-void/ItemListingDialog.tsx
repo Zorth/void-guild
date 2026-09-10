@@ -39,7 +39,7 @@ export default function ItemListingDialog({
   const [durationDays, setDurationDays] = useState<number>(7)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const userCharacters = useQuery(api.blackVoid.getUserCharacters)
+  const userCharacters = useQuery(api.blackVoid.getUserCharacters, {system: 'PF'})
   const createItemListing = useMutation(api.blackVoid.createItemListing)
 
   useEffect(() => {

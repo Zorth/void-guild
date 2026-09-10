@@ -63,7 +63,7 @@ export default function BlackVoidPage() {
   const deleteServiceListing = useMutation(api.blackVoid.deleteServiceListing)
 
   // Queries
-  const userCharacters = useQuery(api.blackVoid.getUserCharacters)
+  const userCharacters = useQuery(api.blackVoid.getUserCharacters, {system: 'PF'})
   const activeItemListings = useQuery(api.blackVoid.getListings, { type: 'item', status: 'active' })
   const activeServiceListings = useQuery(api.blackVoid.getListings, { type: 'service', status: 'active' })
   const characterQuests = useQuery(api.quests.getCharacterQuests, { characterId: selectedCharacterId || undefined })

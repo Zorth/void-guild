@@ -100,7 +100,7 @@ export const listSessions = query({
         apiKey: v.optional(v.string()),
         past: v.optional(v.boolean()),
         worldId: v.optional(v.string()),
-        system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
+        system: v.union(v.literal('PF'), v.literal('DnD')),
     },
     handler: async (ctx, args) => {
         await validateKey(ctx, args.apiKey)
@@ -555,7 +555,7 @@ export const createCharacter = mutation({
         name: v.string(),
         ancestry: v.optional(v.string()),
         class: v.optional(v.string()),
-        system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
+        system: v.union(v.literal('PF'), v.literal('DnD')),
         websiteLink: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
@@ -604,7 +604,7 @@ export const updateCharacterSheet = mutation({
         apiKey: v.string(),
         characterId: v.string(),
         pathbuilderId: v.optional(v.number()),
-        system: v.optional(v.string()),
+        system: v.string(),
         name: v.optional(v.string()),
         level: v.optional(v.number()), // Note: character table lvl is NOT modified; stored as informational in details
         xp: v.optional(v.number()),    // Note: character table xp is NOT modified; stored as informational in details

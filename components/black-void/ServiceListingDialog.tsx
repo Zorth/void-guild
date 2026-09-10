@@ -49,7 +49,7 @@ export default function ServiceListingDialog({
   const [maxLevel, setMaxLevel] = useState<string>(String(characterLevel || 1))
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const userCharacters = useQuery(api.blackVoid.getUserCharacters)
+  const userCharacters = useQuery(api.blackVoid.getUserCharacters, {system: 'PF'})
   const createServiceListing = useMutation(api.blackVoid.createServiceListing)
   const updateServiceListing = useMutation(api.blackVoid.updateServiceListing)
 

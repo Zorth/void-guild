@@ -48,7 +48,7 @@ export default function BidDialog({
   const [maxAutoBidAmount, setMaxAutoBidAmount] = useState<string>('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const userCharacters = useQuery(api.blackVoid.getUserCharacters)
+  const userCharacters = useQuery(api.blackVoid.getUserCharacters, {system: 'PF'})
   const placeBid = useMutation(api.blackVoid.placeBid)
 
   useEffect(() => {

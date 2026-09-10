@@ -21,7 +21,7 @@ import { toast } from 'sonner'
 
 export default function VoidObjectiveWidget() {
   const overview = useQuery(api.voidObjectives.getVoidObjectiveOverview)
-  const userCharacters = useQuery(api.characters.listCharacters)
+  const userCharacters = useQuery(api.blackVoid.getUserCharacters, {system: 'PF'})
   const claimableRewards = useQuery(api.voidObjectives.getUserClaimableRewards)
   const claimRewardMutation = useMutation(api.voidObjectives.claimReward)
 

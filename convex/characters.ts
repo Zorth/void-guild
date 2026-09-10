@@ -89,7 +89,7 @@ export const createCharacter = mutation({
     ancestry: v.optional(v.string()),
     class: v.optional(v.string()),
     websiteLink: v.optional(v.string()),
-    system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
+    system: v.union(v.literal('PF'), v.literal('DnD')),
   },
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
@@ -126,7 +126,7 @@ export const updateCharacter = mutation({
     ancestry: v.optional(v.string()),
     class: v.optional(v.string()),
     websiteLink: v.optional(v.string()),
-    system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
+    system: v.union(v.literal('PF'), v.literal('DnD')),
     cosmetics: v.optional(v.object({
       nameFont: v.optional(v.string()),
       titleFont: v.optional(v.string()),
@@ -170,7 +170,7 @@ export const adminUpdateCharacter = mutation({
     class: v.optional(v.string()),
     websiteLink: v.optional(v.string()),
     rank: v.optional(v.string()),
-    system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
+    system: v.union(v.literal('PF'), v.literal('DnD')),
     title: v.optional(v.string()),
   },
   handler: async (ctx, args) => {

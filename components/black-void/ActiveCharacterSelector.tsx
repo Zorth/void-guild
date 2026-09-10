@@ -28,7 +28,7 @@ export default function ActiveCharacterSelector({
   onSelectCharacter,
 }: ActiveCharacterSelectorProps) {
   const [open, setOpen] = useState(false)
-  const characters = useQuery(api.blackVoid.getUserCharacters)
+  const characters = useQuery(api.blackVoid.getUserCharacters, {system: 'PF'})
 
   if (characters === undefined) {
     return <div className="h-10 w-52 bg-muted/20 animate-pulse rounded-xl border border-border/30" />

@@ -12,7 +12,7 @@ export default defineSchema({
         class: v.optional(v.string()),
         websiteLink: v.optional(v.string()),
         rank: v.optional(v.string()), // none, journeyman, guildmaster
-        system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
+        system: v.union(v.literal('PF'), v.literal('DnD')),
         cosmetics: v.optional(v.object({
             nameFont: v.optional(v.string()),
             titleFont: v.optional(v.string()),
@@ -49,7 +49,7 @@ export default defineSchema({
             username: v.string(),
         }))),
         questId: v.optional(v.id("quests")),
-        system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
+        system: v.union(v.literal('PF'), v.literal('DnD')),
         inGameDate: v.optional(v.object({
             year: v.number(),
             month: v.number(), // 0-indexed to match JS/internal logic
@@ -275,7 +275,7 @@ export default defineSchema({
     characterDetails: defineTable({
         characterId: v.id('characters'),
         pathbuilderId: v.optional(v.number()),
-        system: v.optional(v.string()), // "PF2e"
+        system: v.string(), // "PF2e"
         name: v.optional(v.string()),
         level: v.optional(v.number()),
         xp: v.optional(v.number()),
