@@ -99,8 +99,20 @@ export const getBettingData = query({
       .withIndex('by_status', (q) => q.eq('status', 'pending'))
       .collect()
 
+    // Gather user's own character IDs to exclude from open challenges
+    const userCharIds = new Set<string>()
+    if (user) {
+      const userChars = await ctx.db
+        .query('characters')
+        .withIndex('by_userId', (q) => q.eq('userId', user.subject))
+        .collect()
+      for (const c of userChars) {
+        userCharIds.add(c._id)
+      }
+    }
+
     const openChallengesRaw = allPendingRaw.filter(
-      (b) => !b.targetCharacterId && b.senderCharacterId !== args.characterId
+      (b) => !b.targetCharacterId && !userCharIds.has(b.senderCharacterId)
     )
     const openChallenges = await Promise.all(openChallengesRaw.map((b) => decorateBet(ctx, b)))
 

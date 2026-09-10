@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Id } from '@/convex/_generated/dataModel'
@@ -133,7 +133,9 @@ export default function BidDialog({
     }
   }
 
-  const isOwnListing = listing.characterId === selectedCharId
+  // Block bidding on any listing from the user's own characters
+  const userCharacterIds = useMemo(() => new Set((userCharacters || []).map((c: any) => c._id)), [userCharacters])
+  const isOwnListing = userCharacterIds.has(listing.characterId)
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -388,7 +390,7 @@ export default function BidDialog({
 
           {isOwnListing && (
             <p className="text-[11px] text-amber-400 text-center italic">
-              You cannot bid on your own character listing.
+              You cannot bid on listings from your own characters.
             </p>
           )}
         </div>

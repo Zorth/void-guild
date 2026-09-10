@@ -476,6 +476,7 @@ export default function BlackVoidPage() {
                   : 0
                 const dupeCount = itemNameCounts[item.name.toLowerCase()] || 1
                 const isCheapest = cheapestListingIds.has(item._id)
+                const isOwnItem = userCharacters?.some((c: any) => c._id === item.characterId)
 
                 return (
                   <Card
@@ -563,13 +564,17 @@ export default function BlackVoidPage() {
                         <span>{daysLeft} {daysLeft === 1 ? 'day' : 'days'} left</span>
                       </div>
 
-                      <Button
-                        size="sm"
-                        onClick={() => setBiddingListing(item)}
-                        className="bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs h-8 px-3"
-                      >
-                        Bid / Buyout
-                      </Button>
+                      {isOwnItem ? (
+                        <span className="text-[11px] text-muted-foreground italic">Your Listing</span>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={() => setBiddingListing(item)}
+                          className="bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs h-8 px-3"
+                        >
+                          Bid / Buyout
+                        </Button>
+                      )}
                     </div>
                   </Card>
                 )

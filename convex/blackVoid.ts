@@ -317,6 +317,12 @@ export const placeBid = mutation({
       throw new Error('You cannot bid on your own character listing.')
     }
 
+    // Block any character owned by the same user from bidding on their own listings
+    const listingChar = await ctx.db.get(listing.characterId)
+    if (listingChar && listingChar.userId === user.subject) {
+      throw new Error('You cannot bid on a listing from another character you own.')
+    }
+
     const now = Date.now()
     if (listing.expiresAt && now > listing.expiresAt) {
       await ctx.db.patch(args.listingId, { status: 'completed' })
