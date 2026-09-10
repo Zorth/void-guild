@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Id } from '@/convex/_generated/dataModel'
@@ -37,6 +37,7 @@ import {
   Edit2,
   Trash2,
   Dices,
+  Layers,
 } from 'lucide-react'
 import Link from 'next/link'
 import { cn, CharacterRankIcon } from '@/lib/utils'
@@ -112,6 +113,43 @@ export default function BlackVoidPage() {
 
     return true
   })
+
+  // Count how many active listings share each item name (case-insensitive)
+  const itemNameCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const item of (activeItemListings || [])) {
+      const key = (item as any).name.toLowerCase()
+      counts[key] = (counts[key] || 0) + 1
+    }
+    return counts
+  }, [activeItemListings])
+
+  // Sort: group same-named items together, cheapest effective price first within each group
+  const getEffectivePrice = (item: any) => item.winningAmount || item.buyoutPrice || item.startingBid || 0
+
+  const sortedFilteredItems = useMemo(() => {
+    return [...filteredItems].sort((a: any, b: any) => {
+      const nameA = a.name.toLowerCase()
+      const nameB = b.name.toLowerCase()
+      if (nameA !== nameB) return nameA.localeCompare(nameB)
+      return getEffectivePrice(a) - getEffectivePrice(b)
+    })
+  }, [filteredItems])
+
+  // Track which listing ID is the cheapest for each duplicate group (among filtered results)
+  const cheapestListingIds = useMemo(() => {
+    const cheapest = new Set<string>()
+    const seen: Record<string, boolean> = {}
+    for (const item of sortedFilteredItems) {
+      const key = (item as any).name.toLowerCase()
+      const count = itemNameCounts[key] || 1
+      if (count > 1 && !seen[key]) {
+        seen[key] = true
+        cheapest.add((item as any)._id)
+      }
+    }
+    return cheapest
+  }, [sortedFilteredItems, itemNameCounts])
 
   // Filter services
   const filteredServices = (activeServiceListings || []).filter((s: any) => {
@@ -420,7 +458,7 @@ export default function BlackVoidPage() {
       {/* TAB 1: AUCTION HOUSE ITEMS */}
       {activeTab === 'items' && (
         <div className="space-y-4">
-          {filteredItems.length === 0 ? (
+          {sortedFilteredItems.length === 0 ? (
             <Card className="border-dashed bg-muted/20 text-center py-16">
               <CardContent className="space-y-3">
                 <Coins className="h-10 w-10 text-muted-foreground/50 mx-auto" />
@@ -431,11 +469,13 @@ export default function BlackVoidPage() {
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredItems.map((item: any) => {
+              {sortedFilteredItems.map((item: any) => {
                 const currentBid = item.winningAmount || item.startingBid || 0
                 const daysLeft = item.expiresAt
                   ? Math.max(0, Math.ceil((item.expiresAt - Date.now()) / 86400000))
                   : 0
+                const dupeCount = itemNameCounts[item.name.toLowerCase()] || 1
+                const isCheapest = cheapestListingIds.has(item._id)
 
                 return (
                   <Card
@@ -445,9 +485,22 @@ export default function BlackVoidPage() {
                     <div className="p-4 space-y-3">
                       <div className="flex justify-between items-start gap-2">
                         <div className="space-y-0.5 min-w-0">
-                          <h3 className="font-bold text-base text-foreground truncate group-hover:text-purple-300 transition-colors">
-                            {item.name}
-                          </h3>
+                          <div className="flex items-center gap-1.5">
+                            <h3 className="font-bold text-base text-foreground truncate group-hover:text-purple-300 transition-colors">
+                              {item.name}
+                            </h3>
+                            {dupeCount > 1 && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center gap-0.5 shrink-0" title={`${dupeCount} listings of this item on the market`}>
+                                <Layers className="h-3 w-3" />
+                                ×{dupeCount}
+                              </span>
+                            )}
+                            {isCheapest && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0" title="Lowest current price for this item">
+                                Best Price
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-muted-foreground flex items-center gap-1">
                             <User className="h-3 w-3 text-purple-400 shrink-0" />
                             Seller: <span className="font-semibold text-purple-300">{item.sellerName}</span> (Lvl {item.sellerLevel})

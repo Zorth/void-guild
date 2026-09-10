@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
-import { Coins, Tag, Clock, ExternalLink, PackagePlus, User } from 'lucide-react'
+import { Coins, Tag, Clock, ExternalLink, PackagePlus, User, Copy, CheckCircle2 } from 'lucide-react'
 
 interface ItemListingDialogProps {
   isOpen: boolean
@@ -57,7 +57,21 @@ export default function ItemListingDialog({
 
   const activeChar = userCharacters?.find((c: any) => c._id === selectedCharId)
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const [lastSubmittedName, setLastSubmittedName] = useState<string | null>(null)
+
+  const resetForm = (keepItemDetails = false) => {
+    if (!keepItemDetails) {
+      setName('')
+      setDescription('')
+      setNethysUrl('')
+    }
+    setStartingBid('')
+    setBuyoutPrice('')
+    setDurationDays(7)
+    setLastSubmittedName(null)
+  }
+
+  const handleSubmit = async (e: React.FormEvent, listAnother = false) => {
     e.preventDefault()
     const targetCharId = selectedCharId || characterId
     if (!targetCharId) {
@@ -89,14 +103,18 @@ export default function ItemListingDialog({
         buyoutPrice: buyoutGp,
         durationDays,
       })
-      toast.success('Item listing posted to The Black Void!')
-      setName('')
-      setDescription('')
-      setNethysUrl('')
-      setStartingBid('')
-      setBuyoutPrice('')
-      setDurationDays(7)
-      onClose()
+
+      if (listAnother) {
+        // Keep item details, clear only prices for the next copy
+        setLastSubmittedName(name)
+        setStartingBid('')
+        setBuyoutPrice('')
+        toast.success(`Listed "${name}" — form ready for another copy!`)
+      } else {
+        toast.success('Item listing posted to The Black Void!')
+        resetForm()
+        onClose()
+      }
     } catch (error) {
       console.error(error)
       toast.error(error instanceof Error ? error.message : 'Failed to post listing')
@@ -106,8 +124,13 @@ export default function ItemListingDialog({
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px] border-purple-500/40 bg-card/95 backdrop-blur-md">
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open) {
+        resetForm()
+        onClose()
+      }
+    }}>
+      <DialogContent className="sm:max-w-[500px] border-purple-500/40 bg-card/95 backdrop-blur-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl font-bold text-purple-300">
             <PackagePlus className="h-5 w-5 text-purple-400" />
@@ -252,17 +275,43 @@ export default function ItemListingDialog({
             </span>
           </div>
 
-          <DialogFooter className="pt-2">
-            <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>
+          {/* Success Banner: just listed another copy */}
+          {lastSubmittedName && (
+            <div className="p-2.5 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-[11px] text-emerald-200 flex items-start gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+              <span>
+                <strong>&ldquo;{lastSubmittedName}&rdquo;</strong> listed successfully! Set new prices below or close the dialog.
+              </span>
+            </div>
+          )}
+
+          <DialogFooter className="pt-2 flex-col sm:flex-row gap-2">
+            <Button type="button" variant="ghost" onClick={() => {
+              resetForm()
+              onClose()
+            }} disabled={isSubmitting} className="text-xs">
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting || !selectedCharId}
-              className="bg-purple-600 hover:bg-purple-700 text-white font-semibold"
-            >
-              {isSubmitting ? 'Posting...' : 'Post Item Listing'}
-            </Button>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={(e) => handleSubmit(e, true)}
+                disabled={isSubmitting || !selectedCharId || !name.trim()}
+                className="flex-1 sm:flex-initial border-purple-500/40 text-purple-300 hover:bg-purple-500/10 font-semibold text-xs gap-1.5"
+              >
+                <Copy className="h-3.5 w-3.5" />
+                {isSubmitting ? 'Posting...' : 'Post & List Another'}
+              </Button>
+              <Button
+                type="submit"
+                disabled={isSubmitting || !selectedCharId}
+                className="flex-1 sm:flex-initial bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs gap-1.5"
+              >
+                <PackagePlus className="h-3.5 w-3.5" />
+                {isSubmitting ? 'Posting...' : 'Post & Close'}
+              </Button>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>
