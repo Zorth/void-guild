@@ -740,22 +740,9 @@ export default function SessionClient() {
                     </div>
                   </div>
                   {session.locked && (
-                    <div className="mt-4 p-3 bg-amber-100/50 border border-amber-200 rounded-md text-sm text-amber-700 font-medium flex items-center justify-between gap-3 flex-wrap">
-                        <div className="flex items-center gap-2">
-                            <LockIcon className="h-4 w-4 shrink-0" /> 
-                            <span>This session has ended. Participating characters have been awarded XP.</span>
-                        </div>
-                        {session.isOwner && (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="bg-purple-950/40 border-purple-500/30 text-purple-300 hover:bg-purple-900/50 hover:text-purple-200 text-xs font-semibold gap-1.5 h-8 shrink-0"
-                                onClick={() => setIsObjectiveContributeOpen(true)}
-                            >
-                                <Target className="h-3.5 w-3.5 text-purple-400" />
-                                {session.voidContribution ? `Edit Objective Contribution (${session.voidContribution})` : 'Add Objective Contribution'}
-                            </Button>
-                        )}
+                    <div className="mt-4 p-3 bg-amber-100/50 border border-amber-200 rounded-md text-sm text-amber-700 font-medium flex items-center gap-2">
+                        <LockIcon className="h-4 w-4 shrink-0" /> 
+                        <span>This session has ended. Participating characters have been awarded XP.</span>
                     </div>
                   )}
                 </CardHeader>

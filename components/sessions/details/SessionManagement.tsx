@@ -542,11 +542,11 @@ export default function SessionManagement({
         {session.locked && session.isOwner && onOpenObjectiveContribute && (
             <Button 
                 variant="outline" 
-                className="w-full justify-start border-purple-500/40 text-purple-300 hover:bg-purple-500/10 hover:text-purple-200 font-medium"
+                className="w-full justify-start border-purple-500/40 text-purple-300 hover:bg-purple-500/10 hover:text-purple-200 font-medium h-auto min-h-[36px] py-2 px-3 whitespace-normal text-left gap-2"
                 onClick={onOpenObjectiveContribute}
             >
-                <Target className="h-4 w-4 mr-2 text-purple-400" />
-                {session.voidContribution ? `Edit Objective Contribution (${session.voidContribution})` : 'Add Objective Contribution'}
+                <Target className="h-4 w-4 text-purple-400 shrink-0" />
+                <span>{session.voidContribution ? `Edit Objective Contribution (${session.voidContribution})` : 'Add Objective Contribution'}</span>
             </Button>
         )}
       </CardContent>

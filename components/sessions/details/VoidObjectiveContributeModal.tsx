@@ -177,7 +177,7 @@ export default function VoidObjectiveContributeModal({
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="bg-purple-600 hover:bg-purple-700 text-white font-bold"
+            className="bg-purple-600 hover:bg-purple-700 text-white font-bold h-auto min-h-[36px] py-2 whitespace-normal"
           >
             {isSubmitting ? 'Saving...' : amount > 0 ? `Save (${amount} ${unit})` : 'Clear Contribution (0)'}
           </Button>
