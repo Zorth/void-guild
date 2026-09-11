@@ -260,8 +260,17 @@ export const contributeToObjective = mutation({
       throw new Error('Only the session owner or an admin can record contributions')
     }
 
-    if (args.amount <= 0) {
-      return { success: true, updatedProgress: 0 }
+    const previousContribution = session.voidContribution ?? 0
+    const newAmount = Math.max(0, args.amount)
+    const diff = newAmount - previousContribution
+
+    if (diff === 0 && session.voidContribution === newAmount) {
+      const { monthKey } = getMonthInfo(0)
+      const objective = await ctx.db
+        .query('voidObjectives')
+        .withIndex('by_monthKey', (q) => q.eq('monthKey', monthKey))
+        .unique()
+      return { success: true, updatedProgress: objective?.currentProgress ?? 0 }
     }
 
     const { monthKey, deadline } = getMonthInfo(0)
@@ -287,8 +296,13 @@ export const contributeToObjective = mutation({
 
     if (!objective) throw new Error('Could not find or create objective')
 
-    const newProgress = objective.currentProgress + args.amount
-    await ctx.db.patch(objective._id, { currentProgress: newProgress })
+    const newProgress = Math.max(0, objective.currentProgress + diff)
+    if (newProgress !== objective.currentProgress) {
+      await ctx.db.patch(objective._id, { currentProgress: newProgress })
+    }
+    if (session.voidContribution !== newAmount) {
+      await ctx.db.patch(session._id, { voidContribution: newAmount })
+    }
 
     const gmCharId = session.gmCharacter
     const playerCharacterIds = session.characters.filter((id) => id !== gmCharId)
@@ -300,15 +314,18 @@ export const contributeToObjective = mutation({
         .unique()
 
       if (existing) {
-        await ctx.db.patch(existing._id, {
-          amount: existing.amount + args.amount,
-          lastSessionId: session._id,
-        })
-      } else {
+        const updatedCharAmount = Math.max(0, existing.amount + diff)
+        if (existing.amount !== updatedCharAmount || existing.lastSessionId !== session._id) {
+          await ctx.db.patch(existing._id, {
+            amount: updatedCharAmount,
+            lastSessionId: session._id,
+          })
+        }
+      } else if (newAmount > 0) {
         await ctx.db.insert('voidObjectiveContributions', {
           monthKey,
           characterId: charId,
-          amount: args.amount,
+          amount: newAmount,
           rewardClaimed: false,
           lastSessionId: session._id,
         })

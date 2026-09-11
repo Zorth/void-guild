@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { Pencil, CheckCircle2, Shield, Send, Bell, XCircle, Scroll, Calendar, CalendarRange, Clock, Unlock, User, Globe } from 'lucide-react'
+import { Pencil, CheckCircle2, Shield, Send, Bell, XCircle, Scroll, Calendar, CalendarRange, Clock, Unlock, User, Globe, Target } from 'lucide-react'
 import SessionDialog from '@/components/sessions/SessionDialog'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -43,6 +43,7 @@ interface SessionManagementProps {
   onUnlock: () => void
   onForceUnlock: () => void
   xpGainsPreview?: any[]
+  onOpenObjectiveContribute?: () => void
 }
 
 export default function SessionManagement({
@@ -58,7 +59,8 @@ export default function SessionManagement({
   onForceLock,
   onUnlock,
   onForceUnlock,
-  xpGainsPreview
+  xpGainsPreview,
+  onOpenObjectiveContribute
 }: SessionManagementProps) {
   const [isQuestDialogOpen, setIsQuestDialogOpen] = useState(false)
   const [isInGameDateDialogOpen, setIsInGameDateDialogOpen] = useState(false)
@@ -536,6 +538,16 @@ export default function SessionManagement({
                     )}
                 </AlertDialogContent>
             </AlertDialog>
+        )}
+        {session.locked && session.isOwner && onOpenObjectiveContribute && (
+            <Button 
+                variant="outline" 
+                className="w-full justify-start border-purple-500/40 text-purple-300 hover:bg-purple-500/10 hover:text-purple-200 font-medium"
+                onClick={onOpenObjectiveContribute}
+            >
+                <Target className="h-4 w-4 mr-2 text-purple-400" />
+                {session.voidContribution ? `Edit Objective Contribution (${session.voidContribution})` : 'Add Objective Contribution'}
+            </Button>
         )}
       </CardContent>
     </Card>

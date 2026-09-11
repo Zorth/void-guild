@@ -73,6 +73,7 @@ export default defineSchema({
             characterId: v.id("characters"),
             claimed: v.optional(v.boolean()),
         })),
+        voidContribution: v.optional(v.number()),
   }).index('by_locked', ['locked'])
     .index('by_owner', ['owner'])
     .index('by_guildmaster_cut', ['guildmasterCut.characterId']),

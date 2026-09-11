@@ -21,6 +21,7 @@ interface VoidObjectiveContributeModalProps {
   isOpen: boolean
   onClose: () => void
   sessionId: Id<'sessions'>
+  initialAmount?: number
   onConfirmed?: () => void
 }
 
@@ -28,23 +29,34 @@ export default function VoidObjectiveContributeModal({
   isOpen,
   onClose,
   sessionId,
+  initialAmount = 0,
   onConfirmed,
 }: VoidObjectiveContributeModalProps) {
   const currentObjective = useQuery(api.voidObjectives.getCurrentObjective)
   const contributeMutation = useMutation(api.voidObjectives.contributeToObjective)
 
-  const [amount, setAmount] = useState<number>(0)
+  const [amount, setAmount] = useState<number>(initialAmount)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Synchronize initialAmount when modal opens
+  const [prevOpen, setPrevOpen] = useState(false)
+  if (isOpen !== prevOpen) {
+    setPrevOpen(isOpen)
+    if (isOpen) {
+      setAmount(initialAmount)
+    }
+  }
 
   const goalMax = currentObjective?.tier3Goal ?? 50
   const currentProgress = currentObjective?.currentProgress ?? 0
   const remainingNeeded = Math.max(0, goalMax - currentProgress)
+  const maxAllowed = remainingNeeded + initialAmount
   const unit = currentObjective?.unit || 'progress'
   const title = currentObjective?.title || 'Void Objective'
 
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseInt(e.target.value, 10)
-    setAmount(isNaN(val) ? 0 : Math.max(0, Math.min(remainingNeeded, val)))
+    setAmount(isNaN(val) ? 0 : Math.max(0, Math.min(maxAllowed, val)))
   }
 
   const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -52,27 +64,29 @@ export default function VoidObjectiveContributeModal({
     if (isNaN(val)) {
       setAmount(0)
     } else {
-      setAmount(Math.max(0, Math.min(remainingNeeded, val)))
+      setAmount(Math.max(0, Math.min(maxAllowed, val)))
     }
   }
 
   const handleSubmit = async () => {
-    if (amount <= 0) {
-      onClose()
-      if (onConfirmed) onConfirmed()
-      return
-    }
-
     setIsSubmitting(true)
     try {
       await contributeMutation({
         sessionId,
         amount,
       })
-      toast.success(`Contributed ${amount} ${unit} to "${title}"!`, {
-        description: 'All non-GM characters from this session have been added to the objective contributor list.',
-        icon: '🎯',
-      })
+      toast.success(
+        amount > 0
+          ? `Set contribution to ${amount} ${unit} for "${title}"!`
+          : `Cleared contribution for "${title}"`,
+        {
+          description:
+            amount > 0
+              ? 'All non-GM characters from this session are credited as objective contributors.'
+              : 'Contribution has been removed for this session.',
+          icon: '🎯',
+        }
+      )
       onClose()
       if (onConfirmed) onConfirmed()
     } catch (err: any) {
@@ -115,7 +129,7 @@ export default function VoidObjectiveContributeModal({
                 <Input
                   type="number"
                   min={0}
-                  max={remainingNeeded}
+                  max={maxAllowed}
                   value={amount}
                   onChange={handleNumberChange}
                   className="w-24 h-8 text-right font-mono font-bold"
@@ -129,14 +143,14 @@ export default function VoidObjectiveContributeModal({
               <input
                 type="range"
                 min={0}
-                max={Math.max(1, remainingNeeded)}
+                max={Math.max(1, maxAllowed)}
                 value={amount}
                 onChange={handleSliderChange}
                 className="w-full accent-purple-500 cursor-pointer h-2 bg-muted/40 rounded-lg"
               />
               <div className="flex justify-between text-[10px] font-mono text-muted-foreground">
                 <span>0</span>
-                <span>Max: {remainingNeeded} {unit}</span>
+                <span>Max: {maxAllowed} {unit}</span>
               </div>
             </div>
           </div>
@@ -158,14 +172,14 @@ export default function VoidObjectiveContributeModal({
             }}
             disabled={isSubmitting}
           >
-            Skip (0)
+            Cancel
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting}
             className="bg-purple-600 hover:bg-purple-700 text-white font-bold"
           >
-            {isSubmitting ? 'Recording...' : amount > 0 ? `Contribute +${amount}` : 'Confirm (0)'}
+            {isSubmitting ? 'Saving...' : amount > 0 ? `Save (${amount} ${unit})` : 'Clear Contribution (0)'}
           </Button>
         </DialogFooter>
       </DialogContent>
