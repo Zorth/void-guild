@@ -69,15 +69,6 @@ export default function ActiveCharacterSelector({
               )}
               <div className="flex items-center gap-1.5 text-[10px] text-purple-300/80 truncate leading-none mt-0.5">
                 <span>Lvl {selectedChar?.lvl || 1} {selectedChar?.class ? `• ${selectedChar.class}` : ''}</span>
-                {selectedChar?.money && (
-                  <>
-                    <span>•</span>
-                    <span className="font-mono font-bold text-amber-400 flex items-center gap-0.5" title={`Wealth: ${selectedChar.money.pp}pp, ${selectedChar.money.gp}gp, ${selectedChar.money.sp}sp, ${selectedChar.money.cp}cp`}>
-                      <Coins className="h-2.5 w-2.5 text-amber-400 shrink-0 inline" />
-                      {formatMoney(selectedChar.money.totalInGold)}
-                    </span>
-                  </>
-                )}
               </div>
             </div>
           </div>
