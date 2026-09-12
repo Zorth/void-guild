@@ -1,7 +1,5 @@
-'use client'
-
 import { useState, useEffect } from 'react'
-import { useMutation, useQuery } from 'convex/react'
+import { useMutation, useQuery, useAction } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Id } from '@/convex/_generated/dataModel'
 import {
@@ -11,11 +9,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
-import { Coins, Tag, Clock, ExternalLink, PackagePlus, User, Copy, CheckCircle2 } from 'lucide-react'
+import { Coins, Tag, Clock, ExternalLink, PackagePlus, User, Copy, CheckCircle2, Briefcase, Search, Sparkles, Loader2, ChevronDown } from 'lucide-react'
 
 interface ItemListingDialogProps {
   isOpen: boolean
@@ -38,9 +41,16 @@ export default function ItemListingDialog({
   const [buyoutPrice, setBuyoutPrice] = useState<string>('')
   const [durationDays, setDurationDays] = useState<number>(7)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isInventoryOpen, setIsInventoryOpen] = useState(false)
+  const [isLookingUp, setIsLookingUp] = useState(false)
 
   const userCharacters = useQuery(api.blackVoid.getUserCharacters, {system: 'PF'})
+  const characterInventory = useQuery(
+    api.blackVoid.getCharacterInventory,
+    selectedCharId ? { characterId: selectedCharId } : 'skip'
+  )
   const createItemListing = useMutation(api.blackVoid.createItemListing)
+  const lookupNethysItem = useAction(api.blackVoid.lookupNethysItem)
 
   useEffect(() => {
     if (characterId) {
@@ -56,6 +66,65 @@ export default function ItemListingDialog({
   }
 
   const activeChar = userCharacters?.find((c: any) => c._id === selectedCharId)
+
+  const handleSelectItemFromInventory = async (itemName: string) => {
+    setName(itemName)
+    setIsInventoryOpen(false)
+    setIsLookingUp(true)
+
+    try {
+      const result = await lookupNethysItem({ itemName })
+      if (result) {
+        if (result.nethysUrl) setNethysUrl(result.nethysUrl)
+        if (result.priceInGP) {
+          setBuyoutPrice(String(result.priceInGP))
+        }
+        toast.success(`Selected "${itemName}" from inventory!`, {
+          description: result.priceInGP
+            ? `Linked to AoN & set buyout to ${result.priceInGP} GP.`
+            : `Linked to Archives of Nethys.`,
+          icon: '🎒',
+        })
+      } else {
+        toast.info(`Selected "${itemName}" from inventory.`, {
+          description: 'No matching price found on Archives of Nethys.',
+        })
+      }
+    } catch (err) {
+      console.error(err)
+      toast.info(`Selected "${itemName}" from inventory.`)
+    } finally {
+      setIsLookingUp(false)
+    }
+  }
+
+  const handleLookupNethys = async () => {
+    if (!name.trim()) {
+      toast.error('Enter an item name to look up on Archives of Nethys.')
+      return
+    }
+    setIsLookingUp(true)
+    try {
+      const result = await lookupNethysItem({ itemName: name.trim() })
+      if (result) {
+        if (result.nethysUrl) setNethysUrl(result.nethysUrl)
+        if (result.priceInGP) setBuyoutPrice(String(result.priceInGP))
+        toast.success(`Found "${result.name}" on Archives of Nethys!`, {
+          description: result.priceInGP
+            ? `Listed price: ${result.priceInGP} GP.`
+            : `AoN URL linked.`,
+          icon: '🔍',
+        })
+      } else {
+        toast.error(`No result found on Archives of Nethys for "${name}".`)
+      }
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to look up item on Archives of Nethys.')
+    } finally {
+      setIsLookingUp(false)
+    }
+  }
 
   const [lastSubmittedName, setLastSubmittedName] = useState<string | null>(null)
 
@@ -169,17 +238,85 @@ export default function ItemListingDialog({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <Tag className="h-3.5 w-3.5 text-purple-400" />
-              Item Name <span className="text-destructive">*</span>
-            </label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. +1 Striking Shortsword or Wand of Healing"
-              required
-              className="bg-muted/30 border-border/40 focus:border-purple-500"
-            />
+            <div className="flex items-center justify-between flex-wrap gap-1">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <Tag className="h-3.5 w-3.5 text-purple-400" />
+                Item Name <span className="text-destructive">*</span>
+              </label>
+
+              {characterInventory && characterInventory.length > 0 && (
+                <Popover open={isInventoryOpen} onOpenChange={setIsInventoryOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2.5 text-[11px] font-semibold border-purple-500/30 text-purple-300 hover:bg-purple-500/10 gap-1.5"
+                    >
+                      <Briefcase className="h-3 w-3 text-purple-400" />
+                      Select from Inventory ({characterInventory.length})
+                      <ChevronDown className="h-3 w-3 opacity-60" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[320px] p-2 bg-slate-950/95 border-purple-500/30 text-foreground shadow-2xl backdrop-blur-xl rounded-xl space-y-1.5">
+                    <div className="px-2 py-1 text-[10px] font-bold text-muted-foreground uppercase tracking-wider border-b border-border/30 flex justify-between items-center">
+                      <span>Character Inventory</span>
+                      <span className="text-purple-400 font-mono">{characterInventory.length} Items</span>
+                    </div>
+                    <div className="max-h-[220px] overflow-y-auto space-y-1 pt-1 scrollbar-thin">
+                      {characterInventory.map((item, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => handleSelectItemFromInventory(item.name)}
+                          className="w-full text-left p-2 rounded-lg text-xs flex items-center justify-between hover:bg-purple-950/60 text-muted-foreground hover:text-purple-200 border border-transparent hover:border-purple-500/30 transition-all group"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-semibold text-foreground truncate group-hover:text-purple-300">
+                              {item.name}
+                            </span>
+                            {item.qty > 1 && (
+                              <span className="text-[10px] font-mono font-bold bg-purple-500/20 text-purple-300 px-1.5 py-0.2 rounded border border-purple-500/30 shrink-0">
+                                ×{item.qty}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[9px] uppercase font-bold text-muted-foreground/60 shrink-0 ml-2">
+                            {item.category}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. +1 Striking Shortsword or Wand of Healing"
+                required
+                className="bg-muted/30 border-border/40 focus:border-purple-500"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleLookupNethys}
+                disabled={isLookingUp || !name.trim()}
+                className="h-9 px-3 border-blue-500/30 text-blue-300 hover:bg-blue-500/10 font-semibold text-xs shrink-0 gap-1"
+                title="Search Archives of Nethys for item URL & buyout price"
+              >
+                {isLookingUp ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3.5 w-3.5 text-blue-400" />
+                )}
+                <span className="hidden sm:inline">Lookup AoN</span>
+              </Button>
+            </div>
           </div>
 
           <div className="space-y-1.5">

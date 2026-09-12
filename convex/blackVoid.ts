@@ -1,4 +1,4 @@
-import { query, mutation, QueryCtx } from './_generated/server'
+import { query, mutation, action, QueryCtx } from './_generated/server'
 import { v } from 'convex/values'
 import { Doc, Id } from './_generated/dataModel'
 import { isAdmin } from './roles'
@@ -1124,3 +1124,201 @@ export const updateCharacterCurrency = mutation({
         return { success: true, pp, gp, sp, cp, totalInGold }
     },
 })
+
+/**
+ * Helper to extract gear/inventory items from a characterDetails document.
+ */
+export function extractInventoryItems(details: Doc<'characterDetails'> | null) {
+    if (!details) return []
+    const items: Array<{ name: string; qty: number; category: string }> = []
+
+    const gear: any = details.gear
+    if (Array.isArray(gear)) {
+        for (const item of gear) {
+            if (item?.name) {
+                items.push({
+                    name: String(item.name).trim(),
+                    qty: typeof item.qty === 'number' ? item.qty : 1,
+                    category: 'Equipment',
+                })
+            }
+        }
+    } else if (gear && typeof gear === 'object') {
+        if (Array.isArray(gear.weapons)) {
+            for (const w of gear.weapons) {
+                if (w?.name) {
+                    let fullName = String(w.name).trim()
+                    const runes: string[] = []
+                    if (w.potency) runes.push(`+${w.potency}`)
+                    if (w.striking) runes.push(String(w.striking))
+                    if (Array.isArray(w.runes)) runes.push(...w.runes.map(String))
+                    if (runes.length > 0 && !fullName.startsWith('+')) {
+                        fullName = `${runes.join(' ')} ${fullName}`
+                    }
+                    items.push({
+                        name: fullName,
+                        qty: typeof w.qty === 'number' ? w.qty : 1,
+                        category: 'Weapon',
+                    })
+                }
+            }
+        }
+        if (Array.isArray(gear.armor)) {
+            for (const a of gear.armor) {
+                if (a?.name) {
+                    let fullName = String(a.name).trim()
+                    const runes: string[] = []
+                    if (a.potency) runes.push(`+${a.potency}`)
+                    if (a.resilient) runes.push(String(a.resilient))
+                    if (Array.isArray(a.runes)) runes.push(...a.runes.map(String))
+                    if (runes.length > 0 && !fullName.startsWith('+')) {
+                        fullName = `${runes.join(' ')} ${fullName}`
+                    }
+                    items.push({
+                        name: fullName,
+                        qty: typeof a.qty === 'number' ? a.qty : 1,
+                        category: 'Armor',
+                    })
+                }
+            }
+        }
+        if (Array.isArray(gear.equipment)) {
+            for (const e of gear.equipment) {
+                if (e?.name) {
+                    items.push({
+                        name: String(e.name).trim(),
+                        qty: typeof e.qty === 'number' ? e.qty : 1,
+                        category: 'Equipment',
+                    })
+                }
+            }
+        }
+    }
+
+    if (items.length === 0 && details.rawExport) {
+        const rawEq = (details.rawExport as any).equipment || (details.rawExport as any).gear
+        if (Array.isArray(rawEq)) {
+            for (const item of rawEq) {
+                if (item?.name) {
+                    const itemName = typeof item.name === 'string' ? item.name : item.name.name
+                    if (itemName) {
+                        items.push({
+                            name: String(itemName).trim(),
+                            qty: typeof item.qty === 'number' ? item.qty : 1,
+                            category: 'Equipment',
+                        })
+                    }
+                }
+            }
+        }
+    }
+
+    return items
+}
+
+/**
+ * Get inventory items for a specific character.
+ */
+export const getCharacterInventory = query({
+    args: { characterId: v.optional(v.id('characters')) },
+    handler: async (ctx, args) => {
+        if (!args.characterId) return []
+        const user = await ctx.auth.getUserIdentity()
+        if (!user) return []
+
+        const details = await ctx.db
+            .query('characterDetails')
+            .withIndex('by_characterId', (q) => q.eq('characterId', args.characterId!))
+            .first()
+
+        return extractInventoryItems(details)
+    },
+})
+
+/**
+ * Search Archives of Nethys (AoN) for an item by name to retrieve link and price.
+ */
+export const lookupNethysItem = action({
+    args: { itemName: v.string() },
+    handler: async (ctx, args) => {
+        const queryTerm = args.itemName.trim()
+        if (!queryTerm) return null
+
+        try {
+            // Strip leading potency/runes for secondary lookup if exact search returns nothing
+            const baseName = queryTerm
+                .replace(/^\+\d+\s+/, '')
+                .replace(/^(striking|resilient|greater|major|lesser|minor)\s+/i, '')
+                .trim()
+
+            const res = await fetch('https://elasticsearch.aonprd.com/aon/_search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    query: {
+                        match: { name: queryTerm },
+                    },
+                    size: 5,
+                }),
+            })
+
+            if (!res.ok) return null
+            const data = await res.json()
+            const hits: any[] = data?.hits?.hits || []
+
+            if (hits.length === 0 && baseName !== queryTerm) {
+                const res2 = await fetch('https://elasticsearch.aonprd.com/aon/_search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        query: {
+                            match: { name: baseName },
+                        },
+                        size: 5,
+                    }),
+                })
+                if (res2.ok) {
+                    const data2 = await res2.json()
+                    const hits2 = data2?.hits?.hits || []
+                    if (hits2.length > 0) {
+                        hits.push(...hits2)
+                    }
+                }
+            }
+
+            if (hits.length === 0) return null
+
+            const targetLower = queryTerm.toLowerCase()
+            const baseLower = baseName.toLowerCase()
+
+            let bestHit = hits.find((h: any) => h._source?.name?.toLowerCase().trim() === targetLower)
+            if (!bestHit) {
+                bestHit = hits.find((h: any) => h._source?.name?.toLowerCase().trim() === baseLower)
+            }
+            if (!bestHit) {
+                bestHit = hits[0]
+            }
+
+            const source = bestHit._source
+            if (!source) return null
+
+            const fullUrl = source.url ? `https://2e.aonprd.com${source.url}` : undefined
+            let priceInGP: number | undefined = undefined
+
+            if (typeof source.price === 'number') {
+                priceInGP = Math.round((source.price / 100) * 100) / 100
+            }
+
+            return {
+                name: source.name || queryTerm,
+                nethysUrl: fullUrl,
+                priceInGP: priceInGP && priceInGP > 0 ? priceInGP : undefined,
+                priceRaw: source.price_raw as string | undefined,
+            }
+        } catch (e) {
+            console.error('Archives of Nethys lookup error:', e)
+            return null
+        }
+    },
+})
+
