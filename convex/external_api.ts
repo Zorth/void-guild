@@ -100,7 +100,7 @@ export const listSessions = query({
         apiKey: v.optional(v.string()),
         past: v.optional(v.boolean()),
         worldId: v.optional(v.string()),
-        system: v.union(v.literal('PF'), v.literal('DnD')),
+        system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
     },
     handler: async (ctx, args) => {
         await validateKey(ctx, args.apiKey)
