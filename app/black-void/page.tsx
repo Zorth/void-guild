@@ -136,20 +136,35 @@ export default function BlackVoidPage() {
     })
   }, [filteredItems])
 
-  // Track which listing ID is the cheapest for each duplicate group (among filtered results)
-  const cheapestListingIds = useMemo(() => {
-    const cheapest = new Set<string>()
-    const seen: Record<string, boolean> = {}
+  // Group filtered items by normalized name for the minimalistic table layout
+  const groupedItemData = useMemo(() => {
+    const groupsMap = new Map<string, { name: string; nethysUrl?: string; minPrice: number; listings: any[] }>()
+
     for (const item of sortedFilteredItems) {
-      const key = (item as any).name.toLowerCase()
-      const count = itemNameCounts[key] || 1
-      if (count > 1 && !seen[key]) {
-        seen[key] = true
-        cheapest.add((item as any)._id)
+      const key = item.name.trim().toLowerCase()
+      const effectivePrice = item.buyoutPrice || item.winningAmount || item.startingBid || 0
+
+      if (!groupsMap.has(key)) {
+        groupsMap.set(key, {
+          name: item.name.trim(),
+          nethysUrl: item.nethysUrl,
+          minPrice: effectivePrice,
+          listings: [item],
+        })
+      } else {
+        const grp = groupsMap.get(key)!
+        if (!grp.nethysUrl && item.nethysUrl) {
+          grp.nethysUrl = item.nethysUrl
+        }
+        if (effectivePrice > 0 && (grp.minPrice === 0 || effectivePrice < grp.minPrice)) {
+          grp.minPrice = effectivePrice
+        }
+        grp.listings.push(item)
       }
     }
-    return cheapest
-  }, [sortedFilteredItems, itemNameCounts])
+
+    return Array.from(groupsMap.values())
+  }, [sortedFilteredItems])
 
   // Filter services
   const filteredServices = (activeServiceListings || []).filter((s: any) => {
@@ -458,7 +473,7 @@ export default function BlackVoidPage() {
       {/* TAB 1: AUCTION HOUSE ITEMS */}
       {activeTab === 'items' && (
         <div className="space-y-4">
-          {sortedFilteredItems.length === 0 ? (
+          {groupedItemData.length === 0 ? (
             <Card className="border-dashed bg-muted/20 text-center py-16">
               <CardContent className="space-y-3">
                 <Coins className="h-10 w-10 text-muted-foreground/50 mx-auto" />
@@ -468,117 +483,140 @@ export default function BlackVoidPage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {sortedFilteredItems.map((item: any) => {
-                const currentBid = item.winningAmount || item.startingBid || 0
-                const daysLeft = item.expiresAt
-                  ? Math.max(0, Math.ceil((item.expiresAt - Date.now()) / 86400000))
-                  : 0
-                const dupeCount = itemNameCounts[item.name.toLowerCase()] || 1
-                const isCheapest = cheapestListingIds.has(item._id)
-                const isOwnItem = userCharacters?.some((c: any) => c._id === item.characterId)
-
-                return (
-                  <Card
-                    key={item._id}
-                    className="border-purple-500/20 bg-card/60 hover:border-purple-500/60 transition-all flex flex-col justify-between overflow-hidden group"
-                  >
-                    <div className="p-4 space-y-3">
-                      <div className="flex justify-between items-start gap-2">
-                        <div className="space-y-0.5 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <h3 className="font-bold text-base text-foreground truncate group-hover:text-purple-300 transition-colors">
-                              {item.name}
-                            </h3>
-                            {dupeCount > 1 && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center gap-0.5 shrink-0" title={`${dupeCount} listings of this item on the market`}>
-                                <Layers className="h-3 w-3" />
-                                ×{dupeCount}
-                              </span>
-                            )}
-                            {isCheapest && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0" title="Lowest current price for this item">
-                                Best Price
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground flex items-center gap-1">
-                            <User className="h-3 w-3 text-purple-400 shrink-0" />
-                            Seller: <span className="font-semibold text-purple-300">{item.sellerName}</span> (Lvl {item.sellerLevel})
-                          </p>
-                        </div>
-                        {item.nethysUrl && (
-                          <a
-                            href={item.nethysUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[11px] text-blue-400 hover:underline flex items-center gap-1 bg-blue-500/10 px-2 py-0.5 rounded shrink-0"
-                            title="View on Archives of Nethys"
-                          >
-                            AoN <ExternalLink className="h-3 w-3" />
-                          </a>
+            <div className="space-y-4">
+              {groupedItemData.map((group) => (
+                <div
+                  key={group.name}
+                  className="rounded-xl border border-purple-500/20 bg-slate-950/40 overflow-hidden shadow-md"
+                >
+                  {/* Group Header */}
+                  <div className="bg-purple-950/30 px-4 py-2.5 border-b border-purple-500/20 flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <h3 className="font-bold text-sm sm:text-base text-foreground flex items-center gap-2">
+                        {group.name}
+                        {group.listings.length > 1 && (
+                          <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-mono px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                            <Layers className="h-3 w-3" />
+                            {group.listings.length} listings
+                          </span>
                         )}
-                      </div>
-
-                      {item.description && (
-                        <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                          {item.description}
-                        </p>
-                      )}
-
-                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/20 text-xs">
-                        <div className="bg-purple-950/40 border border-purple-500/20 p-2 rounded">
-                          <span className="text-[10px] text-muted-foreground uppercase font-bold block">
-                            {item.winningAmount ? 'Current Bid' : item.startingBid ? 'Starting Bid' : 'No Starting Bid'}
-                          </span>
-                          <span className="font-bold text-amber-400 font-mono text-sm">
-                            {currentBid > 0 ? `${currentBid} GP` : 'Open'}
-                          </span>
-                        </div>
-
-                        <div className="bg-emerald-950/40 border border-emerald-500/20 p-2 rounded">
-                          <span className="text-[10px] text-muted-foreground uppercase font-bold block">
-                            Buyout Price
-                          </span>
-                          <span className="font-bold text-emerald-400 font-mono text-sm">
-                            {item.buyoutPrice ? `${item.buyoutPrice} GP` : 'No Buyout'}
-                          </span>
-                        </div>
-                      </div>
-
-                      {selectedCharacterId && item.winningBidderCharacterId === selectedCharacterId && (
-                        <div className="text-[11px] font-semibold text-purple-300 bg-purple-500/10 px-2.5 py-1 rounded border border-purple-500/30 flex items-center justify-between">
-                          <span>You are Top Bidder</span>
-                          {item.maxAutoBid && (
-                            <span className="font-mono text-purple-400 text-[10px]">
-                              Auto-Cap: {item.maxAutoBid} GP
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="p-3 bg-muted/30 border-t border-border/20 flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-1 text-muted-foreground">
-                        <Clock className="h-3.5 w-3.5 text-purple-400" />
-                        <span>{daysLeft} {daysLeft === 1 ? 'day' : 'days'} left</span>
-                      </div>
-
-                      {isOwnItem ? (
-                        <span className="text-[11px] text-muted-foreground italic">Your Listing</span>
-                      ) : (
-                        <Button
-                          size="sm"
-                          onClick={() => setBiddingListing(item)}
-                          className="bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs h-8 px-3"
+                      </h3>
+                      {group.nethysUrl && (
+                        <a
+                          href={group.nethysUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[11px] text-blue-400 hover:underline flex items-center gap-1 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded"
+                          title="View on Archives of Nethys"
                         >
-                          Bid / Buyout
-                        </Button>
+                          AoN <ExternalLink className="h-3 w-3" />
+                        </a>
                       )}
                     </div>
-                  </Card>
-                )
-              })}
+                    {group.minPrice > 0 && (
+                      <div className="text-xs text-muted-foreground flex items-center gap-1.5 font-mono">
+                        <span>Starting from:</span>
+                        <span className="font-bold text-emerald-400">{group.minPrice} GP</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Listings Table */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-muted/10 text-muted-foreground text-[10px] uppercase font-bold tracking-wider border-b border-border/20">
+                        <tr>
+                          <th className="px-4 py-2.5 min-w-[140px]">Seller</th>
+                          <th className="px-4 py-2.5 min-w-[180px]">Details</th>
+                          <th className="px-4 py-2.5 min-w-[110px]">Current Bid</th>
+                          <th className="px-4 py-2.5 min-w-[110px]">Buyout Price</th>
+                          <th className="px-4 py-2.5 min-w-[100px]">Time Left</th>
+                          <th className="px-4 py-2.5 text-right min-w-[120px]">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/10">
+                        {group.listings.map((item: any) => {
+                          const currentBid = item.winningAmount || item.startingBid || 0
+                          const daysLeft = item.expiresAt
+                            ? Math.max(0, Math.ceil((item.expiresAt - Date.now()) / 86400000))
+                            : 0
+                          const isOwnItem = userCharacters?.some((c: any) => c._id === item.characterId)
+                          const isTopBidder = selectedCharacterId && item.winningBidderCharacterId === selectedCharacterId
+
+                          return (
+                            <tr key={item._id} className="hover:bg-purple-500/5 transition-colors">
+                              {/* Seller */}
+                              <td className="px-4 py-3 align-middle font-medium">
+                                <div className="flex items-center gap-1.5">
+                                  <User className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+                                  <span className="text-purple-300 font-semibold">{item.sellerName}</span>
+                                  <span className="text-[10px] text-muted-foreground">(Lvl {item.sellerLevel})</span>
+                                </div>
+                              </td>
+
+                              {/* Details / Notes */}
+                              <td className="px-4 py-3 align-middle">
+                                <div className="space-y-1 max-w-xs">
+                                  {item.description ? (
+                                    <p className="text-muted-foreground line-clamp-1 text-[11px] leading-normal" title={item.description}>
+                                      {item.description}
+                                    </p>
+                                  ) : (
+                                    <span className="text-muted-foreground/40 italic text-[10px]">No notes</span>
+                                  )}
+                                  {isTopBidder && (
+                                    <div className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-300 bg-purple-500/20 px-1.5 py-0.5 rounded border border-purple-500/30">
+                                      <span>Top Bidder</span>
+                                      {item.maxAutoBid && <span>(Cap: {item.maxAutoBid} GP)</span>}
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* Current Bid */}
+                              <td className="px-4 py-3 align-middle font-mono">
+                                <span className={currentBid > 0 ? "font-bold text-amber-400" : "text-muted-foreground/60 italic"}>
+                                  {currentBid > 0 ? `${currentBid} GP` : 'Open'}
+                                </span>
+                              </td>
+
+                              {/* Buyout */}
+                              <td className="px-4 py-3 align-middle font-mono">
+                                <span className={item.buyoutPrice ? "font-bold text-emerald-400" : "text-muted-foreground/60 italic"}>
+                                  {item.buyoutPrice ? `${item.buyoutPrice} GP` : '—'}
+                                </span>
+                              </td>
+
+                              {/* Time Left */}
+                              <td className="px-4 py-3 align-middle text-muted-foreground whitespace-nowrap">
+                                <div className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3 text-purple-400 shrink-0" />
+                                  <span>{daysLeft} {daysLeft === 1 ? 'day' : 'days'}</span>
+                                </div>
+                              </td>
+
+                              {/* Action */}
+                              <td className="px-4 py-3 align-middle text-right">
+                                {isOwnItem ? (
+                                  <span className="text-[11px] text-muted-foreground italic">Your Listing</span>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => setBiddingListing(item)}
+                                    className="bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs h-7 px-3"
+                                  >
+                                    Bid / Buyout
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
