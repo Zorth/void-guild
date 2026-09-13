@@ -35,11 +35,13 @@ export const syncUser = mutation({
 
     const adminClaim = extractClaim(identity, 'admin')
     const gmClaim = extractClaim(identity, 'gamemaster')
+    const memberClaim = extractClaim(identity, 'isMember')
     const extraSessionsPlayed = Number(extractClaim(identity, 'extraSessionsPlayed') || 0)
     const extraSessionsRan = Number(extractClaim(identity, 'extraSessionsRan') || 0)
     
     const isAdminUser = adminClaim === true || String(adminClaim).toLowerCase() === 'true'
     const isGMUser = gmClaim === true || String(gmClaim).toLowerCase() === 'true' || isAdminUser
+    const isMemberUser = memberClaim === true || String(memberClaim).toLowerCase() === 'true'
 
     const givenName = extractClaim(identity, 'given_name')
     const familyName = extractClaim(identity, 'family_name')
@@ -66,6 +68,7 @@ export const syncUser = mutation({
       userId: identity.subject,
       isAdmin: isAdminUser,
       isGM: isGMUser,
+      isMember: isMemberUser,
       name: name || identity.name,
       username: identity.nickname || extractClaim(identity, 'nickname') || extractClaim(identity, 'username'),
       email: identity.email,
@@ -91,6 +94,7 @@ export const syncUser = mutation({
       const hasChanges =
         isDiff(userData.isAdmin, existingUser.isAdmin) ||
         isDiff(userData.isGM, existingUser.isGM) ||
+        isDiff(userData.isMember, existingUser.isMember) ||
         isDiff(userData.name, existingUser.name) ||
         isDiff(userData.username, existingUser.username) ||
         isDiff(userData.email, existingUser.email) ||

@@ -166,6 +166,7 @@ export default defineSchema({
         visitedWorld: v.optional(v.boolean()),
         visitedWiki: v.optional(v.boolean()),
         visitedLeaderboard: v.optional(v.boolean()),
+        isMember: v.optional(v.boolean()),
         discordId: v.optional(v.string()),
         discordUsername: v.optional(v.string()),
         apiKey: v.optional(v.string()),
