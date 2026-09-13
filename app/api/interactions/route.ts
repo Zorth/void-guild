@@ -391,6 +391,28 @@ export async function POST(req: Request) {
           }), { headers: { 'Content-Type': 'application/json' } });
         }
       }
+
+      if (name === 'roll') {
+        const rawSides = options?.find((opt: any) => opt.name === 'sides')?.value ?? options?.[0]?.value;
+        let sides = typeof rawSides === 'number' ? Math.floor(rawSides) : 100;
+        if (isNaN(sides) || sides < 1) {
+          sides = 100;
+        }
+
+        const rollResult = Math.floor(Math.random() * sides) + 1;
+        const userMention = interaction.member?.user?.id
+          ? `<@${interaction.member.user.id}>`
+          : interaction.user?.id
+          ? `<@${interaction.user.id}>`
+          : 'Someone';
+
+        return new Response(JSON.stringify({
+          type: 4, // CHANNEL_MESSAGE_WITH_SOURCE
+          data: {
+            content: `🎲 ${userMention} rolled **${rollResult}** (1-${sides})`,
+          },
+        }), { headers: { 'Content-Type': 'application/json' } });
+      }
     }
 
     return new Response('Interaction type not supported', { status: 400 });
