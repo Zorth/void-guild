@@ -1,4 +1,4 @@
-import { action, internalAction, internalMutation, internalQuery, query } from "./_generated/server";
+import { action, mutation, internalAction, internalMutation, internalQuery, query } from "./_generated/server";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
@@ -889,6 +889,311 @@ export const getUserActiveBets = query({
 });
 
 /**
+ * Send deathroll challenge from Discord user.
+ */
+export const createDiscordDeathrollChallenge = mutation({
+  args: {
+    discordId: v.string(),
+    senderCharacterName: v.string(),
+    targetCharacterName: v.optional(v.string()),
+    wagerAmount: v.number(),
+    deathrollValue: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_discordId", (q) => q.eq("discordId", args.discordId))
+      .first();
+
+    if (!user) {
+      throw new Error("No guild account linked. Link your account on the Guild website first.");
+    }
+
+    const userChars = await ctx.db
+      .query("characters")
+      .withIndex("by_userId", (q) => q.eq("userId", user.userId))
+      .collect();
+
+    const senderChar = userChars
+      .filter((c) => c.name.toLowerCase().includes(args.senderCharacterName.toLowerCase()))
+      .sort((a, b) => a.name.length - b.name.length)[0];
+
+    if (!senderChar) {
+      throw new Error(`Character "${args.senderCharacterName}" not found on your account.`);
+    }
+
+    let targetCharId: Id<"characters"> | undefined = undefined;
+    if (args.targetCharacterName) {
+      const allChars = await ctx.db.query("characters").collect();
+      const targetChar = allChars
+        .filter((c) => c.name.toLowerCase().includes(args.targetCharacterName!.toLowerCase()))
+        .sort((a, b) => a.name.length - b.name.length)[0];
+
+      if (!targetChar) {
+        throw new Error(`Opponent character "${args.targetCharacterName}" not found.`);
+      }
+
+      if (targetChar.userId === user.userId) {
+        throw new Error("You cannot challenge another character that you own.");
+      }
+
+      targetCharId = targetChar._id;
+    }
+
+    const wager = Math.max(1, Math.round(args.wagerAmount * 100) / 100);
+    const startVal = args.deathrollValue && args.deathrollValue >= 2 ? Math.min(1000000, Math.floor(args.deathrollValue)) : 1000;
+
+    // Check existing pending challenge
+    const existingPending = await ctx.db
+      .query("blackVoidBets")
+      .withIndex("by_senderCharacterId_and_status", (q) =>
+        q.eq("senderCharacterId", senderChar._id).eq("status", "pending")
+      )
+      .first();
+
+    if (existingPending) {
+      throw new Error(`${senderChar.name} already has an active pending challenge!`);
+    }
+
+    const betId = await ctx.db.insert("blackVoidBets", {
+      senderCharacterId: senderChar._id,
+      targetCharacterId: targetCharId,
+      wagerAmount: wager,
+      deathrollValue: startVal,
+      currentRollMax: startVal,
+      status: "pending",
+      createdAt: Date.now(),
+    });
+
+    return {
+      betId,
+      senderName: senderChar.name,
+      targetName: targetCharId ? (await ctx.db.get(targetCharId))?.name : null,
+      wager,
+      startVal,
+    };
+  },
+});
+
+/**
+ * Fetch active Black Void market listings for Discord /market command.
+ */
+export const getActiveMarketListings = query({
+  args: { query: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const rawListings = await ctx.db
+      .query("blackVoidListings")
+      .withIndex("by_status", (q) => q.eq("status", "active"))
+      .collect();
+
+    const searchLower = args.query?.toLowerCase() || "";
+    let filtered = rawListings;
+    if (searchLower) {
+      filtered = rawListings.filter(
+        (l) => l.name.toLowerCase().includes(searchLower) || (l.description && l.description.toLowerCase().includes(searchLower))
+      );
+    }
+
+    const decorated = await Promise.all(
+      filtered.slice(0, 10).map(async (l) => {
+        const seller = await ctx.db.get(l.characterId);
+        return {
+          id: l._id,
+          name: l.name,
+          type: l.type,
+          startingBid: l.startingBid,
+          buyoutPrice: l.buyoutPrice,
+          priceType: l.priceType,
+          percentage: l.percentage,
+          markupGp: l.markupGp,
+          priceDetails: l.priceDetails,
+          sellerName: seller?.name || "Unknown",
+          expiresAt: l.expiresAt,
+          nethysUrl: l.nethysUrl,
+        };
+      })
+    );
+
+    return decorated;
+  },
+});
+
+/**
+ * Fetch a Discord user's own character listings for /my-listings command.
+ */
+export const getUserMarketListings = query({
+  args: { discordId: v.string() },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_discordId", (q) => q.eq("discordId", args.discordId))
+      .first();
+
+    if (!user) return { status: "no_user" as const };
+
+    const characters = await ctx.db
+      .query("characters")
+      .withIndex("by_userId", (q) => q.eq("userId", user.userId))
+      .collect();
+
+    if (characters.length === 0) return { status: "no_characters" as const, activeListings: [], wonListings: [] };
+
+    const charIds = new Set(characters.map((c) => c._id));
+    const charMap = new Map(characters.map((c) => [c._id.toString(), c]));
+
+    const activeListings: any[] = [];
+    for (const c of characters) {
+      const cListings = await ctx.db
+        .query("blackVoidListings")
+        .withIndex("by_characterId", (q) => q.eq("characterId", c._id))
+        .collect();
+
+      for (const l of cListings) {
+        if (l.status === "active") {
+          activeListings.push({
+            id: l._id,
+            name: l.name,
+            type: l.type,
+            startingBid: l.startingBid,
+            buyoutPrice: l.buyoutPrice,
+            sellerName: c.name,
+            winningAmount: l.winningAmount,
+            expiresAt: l.expiresAt,
+          });
+        }
+      }
+    }
+
+    const wonListings: any[] = [];
+    for (const c of characters) {
+      const won = await ctx.db
+        .query("blackVoidListings")
+        .withIndex("by_winningBidderCharacterId", (q) => q.eq("winningBidderCharacterId", c._id))
+        .collect();
+
+      for (const l of won) {
+        if (l.status === "completed" && !l.buyerClaimed) {
+          wonListings.push({
+            id: l._id,
+            name: l.name,
+            buyerName: c.name,
+            winningAmount: l.winningAmount,
+          });
+        }
+      }
+    }
+
+    return {
+      status: "ok" as const,
+      activeListings,
+      wonListings,
+    };
+  },
+});
+
+/**
+ * Fetch a Discord user's unclaimed log summary for /ledger or /unclaimed command.
+ */
+export const getUserUnclaimedSummary = query({
+  args: { discordId: v.string() },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_discordId", (q) => q.eq("discordId", args.discordId))
+      .first();
+
+    if (!user) return { status: "no_user" as const };
+
+    const characters = await ctx.db
+      .query("characters")
+      .withIndex("by_userId", (q) => q.eq("userId", user.userId))
+      .collect();
+
+    if (characters.length === 0) return { status: "no_unclaimed" as const, characters: [], totalUnclaimed: 0 };
+
+    let totalUnclaimed = 0;
+    const charSummaries: any[] = [];
+
+    for (const char of characters) {
+      // 1. Sold items/services
+      const createdListings = await ctx.db
+        .query("blackVoidListings")
+        .withIndex("by_characterId", (q) => q.eq("characterId", char._id))
+        .collect();
+      const unclaimedSold = createdListings.filter((l) => l.status === "completed" && !l.sellerClaimed);
+
+      // 2. Won items
+      const wonListings = await ctx.db
+        .query("blackVoidListings")
+        .withIndex("by_winningBidderCharacterId", (q) => q.eq("winningBidderCharacterId", char._id))
+        .collect();
+      const unclaimedWon = wonListings.filter((l) => l.status === "completed" && !l.buyerClaimed);
+
+      // 3. Quests
+      const charQuests = await ctx.db
+        .query("quests")
+        .withIndex("by_characterId", (q) => q.eq("characterId", char._id))
+        .collect();
+      const unclaimedQuests = charQuests.filter((q) => q.isCompleted && (!q.paymentClaimed || (q.isSponsored && !q.reimbursementClaimed)));
+
+      // 4. GM cuts
+      let unclaimedGM: any[] = [];
+      if (char.rank === "guildmaster") {
+        const gmSessions = await ctx.db
+          .query("sessions")
+          .withIndex("by_guildmaster_cut", (q) => q.eq("guildmasterCut.characterId", char._id))
+          .collect();
+        unclaimedGM = gmSessions.filter((s) => s.guildmasterCut && !s.guildmasterCut.claimed);
+      }
+
+      // 5. Bets
+      const wonBets = await ctx.db
+        .query("blackVoidBets")
+        .withIndex("by_winnerCharacterId", (q) => q.eq("winnerCharacterId", char._id))
+        .collect();
+      const unclaimedWonBets = wonBets.filter((b) => b.status === "completed" && !b.winnerClaimed);
+
+      const lostBets = await ctx.db
+        .query("blackVoidBets")
+        .withIndex("by_loserCharacterId", (q) => q.eq("loserCharacterId", char._id))
+        .collect();
+      const unclaimedLostBets = lostBets.filter((b) => b.status === "completed" && !b.loserClaimed);
+
+      const count =
+        unclaimedSold.length +
+        unclaimedWon.length +
+        unclaimedQuests.length +
+        unclaimedGM.length +
+        unclaimedWonBets.length +
+        unclaimedLostBets.length;
+
+      if (count > 0) {
+        totalUnclaimed += count;
+        charSummaries.push({
+          characterName: char.name,
+          unclaimedCount: count,
+          soldCount: unclaimedSold.length,
+          wonCount: unclaimedWon.length,
+          questCount: unclaimedQuests.length,
+          gmCount: unclaimedGM.length,
+          betsCount: unclaimedWonBets.length + unclaimedLostBets.length,
+        });
+      }
+    }
+
+    if (totalUnclaimed === 0) {
+      return { status: "no_unclaimed" as const, characters: [], totalUnclaimed: 0 };
+    }
+
+    return {
+      status: "ok" as const,
+      characters: charSummaries,
+      totalUnclaimed,
+    };
+  },
+});
+
+/**
  * Locks and archives a Discord thread.
  */
 export const closeSessionThread = internalAction({
@@ -914,5 +1219,6 @@ export const closeSessionThread = internalAction({
     }
   },
 });
+
 
 

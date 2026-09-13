@@ -485,6 +485,259 @@ export async function POST(req: Request) {
           }), { headers: { 'Content-Type': 'application/json' } });
         }
       }
+
+      // 1. /deathroll <character> <wager> [opponent] [max_roll]
+      if (name === 'deathroll') {
+        const discordId = interaction.member?.user?.id || interaction.user?.id;
+        const senderCharName = options?.find((o: any) => o.name === 'character')?.value;
+        const wagerAmount = options?.find((o: any) => o.name === 'wager')?.value;
+        const targetCharName = options?.find((o: any) => o.name === 'opponent')?.value;
+        const startVal = options?.find((o: any) => o.name === 'max_roll')?.value;
+
+        if (!discordId) {
+          return new Response(JSON.stringify({
+            type: 4,
+            data: { content: "No guild account linked.", flags: 64 },
+          }), { headers: { 'Content-Type': 'application/json' } });
+        }
+
+        if (!senderCharName || wagerAmount === undefined) {
+          return new Response(JSON.stringify({
+            type: 4,
+            data: { content: "Please specify your character and wager amount.", flags: 64 },
+          }), { headers: { 'Content-Type': 'application/json' } });
+        }
+
+        try {
+          const res = await convex.mutation(api.discord.createDiscordDeathrollChallenge, {
+            discordId,
+            senderCharacterName: senderCharName,
+            targetCharacterName: targetCharName || undefined,
+            wagerAmount: Number(wagerAmount),
+            deathrollValue: startVal ? Number(startVal) : undefined,
+          });
+
+          const opponentStr = res.targetName ? `**${res.targetName}**` : "_Anyone_";
+          return new Response(JSON.stringify({
+            type: 4,
+            data: {
+              content: `🎲 **DEATHROLL CHALLENGE ISSUED!**\n**${res.senderName}** has challenged ${opponentStr} to a **${res.wager} GP** Deathroll starting at **${res.startVal}**!\n\n*Accept or view this challenge on the [Void Guild Market](${baseUrl}/black-void)*`,
+            },
+          }), { headers: { 'Content-Type': 'application/json' } });
+        } catch (e: any) {
+          return new Response(JSON.stringify({
+            type: 4,
+            data: { content: `⚠️ ${e?.message || "Error issuing Deathroll challenge."}`, flags: 64 },
+          }), { headers: { 'Content-Type': 'application/json' } });
+        }
+      }
+
+      // 2. /market [query]
+      if (name === 'market') {
+        const queryArg = options?.find((o: any) => o.name === 'query')?.value;
+        try {
+          const listings = await convex.query(api.discord.getActiveMarketListings, { query: queryArg });
+
+          if (!listings || listings.length === 0) {
+            return new Response(JSON.stringify({
+              type: 4,
+              data: { content: queryArg ? `No market listings matching "**${queryArg}**".` : "No active market listings currently on The Black Void." },
+            }), { headers: { 'Content-Type': 'application/json' } });
+          }
+
+          const fields = listings.map((l) => {
+            let priceInfo = "Custom Price";
+            if (l.type === 'item') {
+              const start = l.startingBid ? `${l.startingBid} GP Bid` : '';
+              const buyout = l.buyoutPrice ? `${l.buyoutPrice} GP Buyout` : '';
+              priceInfo = [start, buyout].filter(Boolean).join(' | ');
+            } else if (l.type === 'service') {
+              if (l.priceType === 'percentage') priceInfo = `${l.percentage || 0}% Fee`;
+              else if (l.priceType === 'flat') priceInfo = `+${l.markupGp || 0} GP Markup`;
+              else priceInfo = l.priceDetails || 'Custom Service';
+            }
+
+            const expires = l.expiresAt ? `<t:${Math.floor(l.expiresAt / 1000)}:R>` : 'No Limit';
+            return {
+              name: `${l.type === 'item' ? '📦' : '🛠️'} ${l.name}`,
+              value: `**Seller:** ${l.sellerName} | **Price:** ${priceInfo} | **Expires:** ${expires}`,
+              inline: false,
+            };
+          });
+
+          const embed = {
+            title: "🏴‍☠️ The Black Void - Active Market",
+            url: `${baseUrl}/black-void`,
+            description: "Here are the top active listings available on the Guild market:",
+            fields,
+            color: 0x18181b,
+            timestamp: new Date().toISOString(),
+          };
+
+          return new Response(JSON.stringify({
+            type: 4,
+            data: { embeds: [embed] },
+          }), { headers: { 'Content-Type': 'application/json' } });
+        } catch (e) {
+          return new Response(JSON.stringify({
+            type: 4,
+            data: { content: "Error fetching market listings." },
+          }), { headers: { 'Content-Type': 'application/json' } });
+        }
+      }
+
+      // 3. /my-listings (Ephemeral)
+      if (name === 'my-listings') {
+        const discordId = interaction.member?.user?.id || interaction.user?.id;
+        if (!discordId) {
+          return new Response(JSON.stringify({
+            type: 4,
+            data: { content: "No guild account linked", flags: 64 },
+          }), { headers: { 'Content-Type': 'application/json' } });
+        }
+
+        try {
+          const res = await convex.query(api.discord.getUserMarketListings, { discordId });
+
+          if (res.status === 'no_user') {
+            return new Response(JSON.stringify({
+              type: 4,
+              data: { content: "No guild account linked", flags: 64 },
+            }), { headers: { 'Content-Type': 'application/json' } });
+          }
+
+          if (res.activeListings.length === 0 && res.wonListings.length === 0) {
+            return new Response(JSON.stringify({
+              type: 4,
+              data: { content: "You have no active market listings or pending won auctions.", flags: 64 },
+            }), { headers: { 'Content-Type': 'application/json' } });
+          }
+
+          const lines = ["### 📦 Your Market Activity\n"];
+          if (res.activeListings.length > 0) {
+            lines.push("**Active Listings:**");
+            for (const l of res.activeListings) {
+              const price = l.buyoutPrice ? `${l.buyoutPrice} GP (Buyout)` : (l.startingBid ? `${l.startingBid} GP (Start)` : 'Service');
+              lines.push(`• **${l.name}** (${l.sellerName}) — ${price}`);
+            }
+          }
+
+          if (res.wonListings.length > 0) {
+            if (res.activeListings.length > 0) lines.push("");
+            lines.push("**Won Auctions (Unclaimed):**");
+            for (const w of res.wonListings) {
+              lines.push(`• **${w.name}** (${w.buyerName}) — Won for **${w.winningAmount || 0} GP**`);
+            }
+          }
+
+          return new Response(JSON.stringify({
+            type: 4,
+            data: { content: lines.join("\n"), flags: 64 },
+          }), { headers: { 'Content-Type': 'application/json' } });
+        } catch (e) {
+          return new Response(JSON.stringify({
+            type: 4,
+            data: { content: "Error fetching your listings.", flags: 64 },
+          }), { headers: { 'Content-Type': 'application/json' } });
+        }
+      }
+
+      // 9. /ledger or /unclaimed (Ephemeral - renamed to /ledger)
+      if (name === 'ledger' || name === 'unclaimed') {
+        const discordId = interaction.member?.user?.id || interaction.user?.id;
+        if (!discordId) {
+          return new Response(JSON.stringify({
+            type: 4,
+            data: { content: "No guild account linked", flags: 64 },
+          }), { headers: { 'Content-Type': 'application/json' } });
+        }
+
+        try {
+          const res = await convex.query(api.discord.getUserUnclaimedSummary, { discordId });
+
+          if (res.status === 'no_user') {
+            return new Response(JSON.stringify({
+              type: 4,
+              data: { content: "No guild account linked", flags: 64 },
+            }), { headers: { 'Content-Type': 'application/json' } });
+          }
+
+          if (res.status === 'no_unclaimed' || res.totalUnclaimed === 0) {
+            return new Response(JSON.stringify({
+              type: 4,
+              data: { content: "✨ You have no unclaimed log entries across your characters!", flags: 64 },
+            }), { headers: { 'Content-Type': 'application/json' } });
+          }
+
+          const lines = [`### 📜 Character Ledger Status (${res.totalUnclaimed} Unclaimed Log Entries)\n`];
+          for (const c of res.characters) {
+            lines.push(`• **${c.characterName}**: **${c.unclaimedCount} unclaimed** (${[
+              c.soldCount > 0 ? `${c.soldCount} sales` : null,
+              c.wonCount > 0 ? `${c.wonCount} won items` : null,
+              c.questCount > 0 ? `${c.questCount} quests` : null,
+              c.gmCount > 0 ? `${c.gmCount} GM cuts` : null,
+              c.betsCount > 0 ? `${c.betsCount} bets` : null,
+            ].filter(Boolean).join(", ")})`);
+          }
+
+          lines.push(`\n[**Open Black Void Ledger**](${baseUrl}/black-void)`);
+
+          return new Response(JSON.stringify({
+            type: 4,
+            data: { content: lines.join("\n"), flags: 64 },
+          }), { headers: { 'Content-Type': 'application/json' } });
+        } catch (e) {
+          return new Response(JSON.stringify({
+            type: 4,
+            data: { content: "Error fetching ledger status.", flags: 64 },
+          }), { headers: { 'Content-Type': 'application/json' } });
+        }
+      }
+
+      // 12. /nethys <item_name>
+      if (name === 'nethys') {
+        const itemName = options?.find((o: any) => o.name === 'item_name')?.value || options?.[0]?.value;
+
+        if (!itemName) {
+          return new Response(JSON.stringify({
+            type: 4,
+            data: { content: "Please enter an item name to search on Archives of Nethys.", flags: 64 },
+          }), { headers: { 'Content-Type': 'application/json' } });
+        }
+
+        try {
+          const result = await convex.action(api.blackVoid.lookupNethysItem, { itemName: String(itemName) });
+
+          if (!result) {
+            return new Response(JSON.stringify({
+              type: 4,
+              data: { content: `No Archives of Nethys entry found for "**${itemName}**".` },
+            }), { headers: { 'Content-Type': 'application/json' } });
+          }
+
+          const priceStr = result.priceInGP ? `**${result.priceInGP} GP**` : (result.priceRaw ? `**${result.priceRaw}**` : "_Unknown price_");
+          const linkStr = result.nethysUrl ? `[View on Archives of Nethys](${result.nethysUrl})` : "_No direct link_";
+
+          const embed = {
+            title: `📚 Archives of Nethys: ${result.name}`,
+            url: result.nethysUrl || undefined,
+            description: `**Standard Price:** ${priceStr}\n\n🔗 ${linkStr}`,
+            color: 0x9333ea,
+            timestamp: new Date().toISOString(),
+            footer: { text: "Pathfinder 2e Archives of Nethys Lookup" }
+          };
+
+          return new Response(JSON.stringify({
+            type: 4,
+            data: { embeds: [embed] },
+          }), { headers: { 'Content-Type': 'application/json' } });
+        } catch (e) {
+          return new Response(JSON.stringify({
+            type: 4,
+            data: { content: "Error searching Archives of Nethys." },
+          }), { headers: { 'Content-Type': 'application/json' } });
+        }
+      }
     }
 
     return new Response('Interaction type not supported', { status: 400 });
@@ -494,3 +747,4 @@ export async function POST(req: Request) {
     return new Response('Internal Server Error', { status: 500 });
   }
 }
+
