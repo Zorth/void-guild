@@ -1425,6 +1425,524 @@ export const placeBlackVoidBid = mutation({
     },
 })
 
+// --- BLACK VOID CHARACTER LOG & CLAIM ENDPOINTS ---
+
+export const getBlackVoidCharacterLog = query({
+    args: {
+        apiKey: v.optional(v.string()),
+        characterId: v.string(),
+    },
+    handler: async (ctx, args) => {
+        await validateKey(ctx, args.apiKey)
+        const charId = ctx.db.normalizeId('characters', args.characterId)
+        if (!charId) throw new Error('Invalid character ID')
+
+        const character = await ctx.db.get(charId)
+        if (!character) return null
+
+        // 1. Listings created by this character
+        const createdListingsRaw = await ctx.db
+            .query('blackVoidListings')
+            .withIndex('by_characterId', (q) => q.eq('characterId', charId))
+            .collect()
+
+        const createdItems = createdListingsRaw.filter((l) => l.type === 'item')
+        const servicesOffered = createdListingsRaw.filter((l) => l.type === 'service')
+
+        // 2. Listings won by this character
+        const wonListings = await ctx.db
+            .query('blackVoidListings')
+            .withIndex('by_winningBidderCharacterId', (q) => q.eq('winningBidderCharacterId', charId))
+            .collect()
+
+        // 3. Quests associated with character
+        const characterQuests = await ctx.db
+            .query('quests')
+            .withIndex('by_characterId', (q) => q.eq('characterId', charId))
+            .collect()
+
+        const sponsoredQuestReimbursements = await Promise.all(
+            characterQuests
+                .filter((q) => q.isCompleted && q.isSponsored)
+                .map(async (q) => {
+                    let worldName = 'The Void'
+                    if (q.worldId) {
+                        const w = await ctx.db.get(q.worldId)
+                        if (w) worldName = w.name
+                    }
+                    return {
+                        _id: q._id,
+                        name: q.name,
+                        reward: q.reward,
+                        sponsoredAmount: q.sponsoredAmount || '20% of reward',
+                        netCost: q.netCost,
+                        worldName,
+                        completedAt: q.completedAt || q._creationTime,
+                        reimbursementClaimed: !!q.reimbursementClaimed,
+                    }
+                })
+        )
+
+        const completedQuestsToPay = await Promise.all(
+            characterQuests
+                .filter((q) => q.isCompleted)
+                .map(async (q) => {
+                    let worldName = 'The Void'
+                    if (q.worldId) {
+                        const w = await ctx.db.get(q.worldId)
+                        if (w) worldName = w.name
+                    }
+                    const actualToPay = q.netCost || q.reward || 'Custom reward'
+                    return {
+                        _id: q._id,
+                        name: q.name,
+                        worldName,
+                        reward: q.reward || 'Custom',
+                        actualToPay,
+                        isSponsored: !!q.isSponsored,
+                        sponsoredAmount: q.sponsoredAmount,
+                        netCost: q.netCost,
+                        completedAt: q.completedAt || q._creationTime,
+                        paymentClaimed: !!q.paymentClaimed,
+                    }
+                })
+        )
+
+        // 4. Guildmaster Area Gains
+        const isGuildmaster = character.rank === 'guildmaster'
+        let guildmasterAreaGains: Array<{
+            _id: Id<'sessions'>
+            sessionId: Id<'sessions'>
+            name: string
+            worldName: string
+            level: number
+            reward: string
+            guildmasterCut: string
+            completedAt: number
+            reimbursementClaimed: boolean
+        }> = []
+
+        if (isGuildmaster) {
+            const gmSessions = await ctx.db
+                .query('sessions')
+                .withIndex('by_guildmaster_cut', (q) => q.eq('guildmasterCut.characterId', charId))
+                .collect()
+
+            for (const sess of gmSessions) {
+                let worldName = 'The Void'
+                if (sess.world) {
+                    const w = await ctx.db.get(sess.world)
+                    if (w) worldName = w.name
+                }
+
+                const lootList = sess.loot || []
+                const attendingCount = (sess.characters || []).length
+                const totalLootValue = lootList.reduce((sum, item) => {
+                    const baseVal = item.isGood ? item.valueGP : item.valueGP / 2
+                    const itemTotal = item.isPerCharacter ? baseVal * attendingCount : baseVal
+                    return sum + itemTotal
+                }, 0)
+
+                const cutVal = Math.round(totalLootValue * 0.2 * 100) / 100
+                const total_cp = Math.round(cutVal * 100)
+                const gp = Math.floor(total_cp / 100)
+                const sp = Math.floor((total_cp % 100) / 10)
+                const cp = total_cp % 10
+                const parts = []
+                if (gp > 0) parts.push(`${gp} GP`)
+                if (sp > 0) parts.push(`${sp} SP`)
+                if (cp > 0) parts.push(`${cp} CP`)
+                const formattedCut = parts.length > 0 ? parts.join(' ') : '0 GP'
+
+                guildmasterAreaGains.push({
+                    _id: sess._id,
+                    sessionId: sess._id,
+                    name: `Session Loot Compensation (${worldName})`,
+                    worldName,
+                    level: sess.level || 0,
+                    reward: `${totalLootValue.toLocaleString()} GP Total Loot`,
+                    guildmasterCut: `${formattedCut} (20% Extra)`,
+                    completedAt: sess.date || sess._creationTime,
+                    reimbursementClaimed: !!sess.guildmasterCut?.claimed,
+                })
+            }
+        }
+
+        // 5. Bets (Deathroll)
+        const wonBetsRaw = await ctx.db
+            .query('blackVoidBets')
+            .withIndex('by_winnerCharacterId', (q) => q.eq('winnerCharacterId', charId))
+            .collect()
+
+        const betsWon = await Promise.all(
+            wonBetsRaw
+                .filter((b) => b.status === 'completed')
+                .map(async (b) => {
+                    const opponentId = b.senderCharacterId === charId ? b.acceptedByCharacterId : b.senderCharacterId
+                    const opponent = opponentId ? await ctx.db.get(opponentId) : null
+                    return {
+                        _id: b._id,
+                        wagerAmount: b.wagerAmount,
+                        deathrollValue: b.deathrollValue,
+                        opponentName: opponent?.name || 'Opponent',
+                        lossReason: b.lossReason || 'rolled_zero',
+                        rollsCount: b.rolls?.length || 0,
+                        completedAt: b.updatedAt || b.createdAt,
+                        winnerClaimed: !!b.winnerClaimed,
+                    }
+                })
+        )
+
+        const lostBetsRaw = await ctx.db
+            .query('blackVoidBets')
+            .withIndex('by_loserCharacterId', (q) => q.eq('loserCharacterId', charId))
+            .collect()
+
+        const betsLost = await Promise.all(
+            lostBetsRaw
+                .filter((b) => b.status === 'completed')
+                .map(async (b) => {
+                    const opponentId = b.winnerCharacterId
+                    const opponent = opponentId ? await ctx.db.get(opponentId) : null
+                    return {
+                        _id: b._id,
+                        wagerAmount: b.wagerAmount,
+                        deathrollValue: b.deathrollValue,
+                        opponentName: opponent?.name || 'Opponent',
+                        lossReason: b.lossReason || 'rolled_zero',
+                        rollsCount: b.rolls?.length || 0,
+                        completedAt: b.updatedAt || b.createdAt,
+                        loserClaimed: !!b.loserClaimed,
+                    }
+                })
+        )
+
+        const characterDetails = await ctx.db
+            .query('characterDetails')
+            .withIndex('by_characterId', (q) => q.eq('characterId', charId))
+            .first()
+
+        const currentMoney = {
+            pp: characterDetails?.money?.pp || 0,
+            gp: characterDetails?.money?.gp || 0,
+            sp: characterDetails?.money?.sp || 0,
+            cp: characterDetails?.money?.cp || 0,
+            totalInGold:
+                characterDetails?.money?.totalInGold !== undefined
+                    ? characterDetails.money.totalInGold
+                    : Math.round(
+                        ((characterDetails?.money?.gp || 0) +
+                            (characterDetails?.money?.pp || 0) * 10 +
+                            (characterDetails?.money?.sp || 0) / 10 +
+                            (characterDetails?.money?.cp || 0) / 100) *
+                        100
+                    ) / 100,
+        }
+
+        // Count unclaimed log entries
+        const unclaimedItems = createdItems.filter((i) => i.status === 'completed' && !i.sellerClaimed).length
+        const unclaimedWon = wonListings.filter((w) => w.status === 'completed' && !w.buyerClaimed).length
+        const unclaimedServices = servicesOffered.filter((s) => s.status === 'completed' && !s.sellerClaimed).length
+        const unclaimedSponsored = sponsoredQuestReimbursements.filter((q) => !q.reimbursementClaimed).length
+        const unclaimedQuests = completedQuestsToPay.filter((q) => !q.paymentClaimed).length
+        const unclaimedGM = guildmasterAreaGains.filter((g) => !g.reimbursementClaimed).length
+        const unclaimedBetsWon = betsWon.filter((b) => !b.winnerClaimed).length
+        const unclaimedBetsLost = betsLost.filter((b) => !b.loserClaimed).length
+
+        const unclaimedCount =
+            unclaimedItems +
+            unclaimedWon +
+            unclaimedServices +
+            unclaimedSponsored +
+            unclaimedQuests +
+            unclaimedGM +
+            unclaimedBetsWon +
+            unclaimedBetsLost
+
+        return {
+            characterId: charId,
+            characterName: character.name,
+            currentMoney,
+            isGuildmaster,
+            unclaimedCount,
+            createdItems,
+            wonItems: wonListings,
+            servicesOffered,
+            sponsoredQuestReimbursements,
+            completedQuestsToPay,
+            guildmasterAreaGains,
+            betsWon,
+            betsLost,
+        }
+    },
+})
+
+export const toggleBlackVoidSellerClaimed = mutation({
+    args: {
+        apiKey: v.string(),
+        listingId: v.string(),
+    },
+    handler: async (ctx, args) => {
+        const user = await requireUser(ctx, args.apiKey)
+        const lId = ctx.db.normalizeId('blackVoidListings', args.listingId)
+        if (!lId) throw new Error('Invalid listing ID')
+
+        const listing = await ctx.db.get(lId)
+        if (!listing) throw new Error('Listing not found')
+
+        const char = await ctx.db.get(listing.characterId)
+        if (!char || (char.userId !== user.userId && !user.isAdmin)) {
+            throw new Error('Unauthorized: You do not own this character')
+        }
+
+        const newClaimed = !listing.sellerClaimed
+        await ctx.db.patch(lId, { sellerClaimed: newClaimed })
+        return { success: true, sellerClaimed: newClaimed }
+    },
+})
+
+export const toggleBlackVoidBuyerClaimed = mutation({
+    args: {
+        apiKey: v.string(),
+        listingId: v.string(),
+    },
+    handler: async (ctx, args) => {
+        const user = await requireUser(ctx, args.apiKey)
+        const lId = ctx.db.normalizeId('blackVoidListings', args.listingId)
+        if (!lId) throw new Error('Invalid listing ID')
+
+        const listing = await ctx.db.get(lId)
+        if (!listing) throw new Error('Listing not found')
+        if (!listing.winningBidderCharacterId) throw new Error('No winning bidder on listing')
+
+        const char = await ctx.db.get(listing.winningBidderCharacterId)
+        if (!char || (char.userId !== user.userId && !user.isAdmin)) {
+            throw new Error('Unauthorized: You do not own this character')
+        }
+
+        const newClaimed = !listing.buyerClaimed
+        await ctx.db.patch(lId, { buyerClaimed: newClaimed })
+        return { success: true, buyerClaimed: newClaimed }
+    },
+})
+
+export const toggleBlackVoidQuestClaimed = mutation({
+    args: {
+        apiKey: v.string(),
+        questId: v.string(),
+        type: v.union(v.literal('reimbursement'), v.literal('payment')),
+    },
+    handler: async (ctx, args) => {
+        const user = await requireUser(ctx, args.apiKey)
+        const qId = ctx.db.normalizeId('quests', args.questId)
+        if (!qId) throw new Error('Invalid quest ID')
+
+        const quest = await ctx.db.get(qId)
+        if (!quest) throw new Error('Quest not found')
+
+        if (quest.characterId) {
+            const char = await ctx.db.get(quest.characterId)
+            if (!char || (char.userId !== user.userId && !user.isAdmin)) {
+                throw new Error('Unauthorized: You do not own this character')
+            }
+        } else if (quest.owner !== user.userId && !user.isAdmin) {
+            throw new Error('Unauthorized')
+        }
+
+        if (args.type === 'reimbursement') {
+            const newVal = !quest.reimbursementClaimed
+            await ctx.db.patch(qId, { reimbursementClaimed: newVal })
+            return { success: true, reimbursementClaimed: newVal }
+        } else {
+            const newVal = !quest.paymentClaimed
+            await ctx.db.patch(qId, { paymentClaimed: newVal })
+            return { success: true, paymentClaimed: newVal }
+        }
+    },
+})
+
+export const toggleBlackVoidGuildmasterClaimed = mutation({
+    args: {
+        apiKey: v.string(),
+        sessionId: v.string(),
+    },
+    handler: async (ctx, args) => {
+        const user = await requireUser(ctx, args.apiKey)
+        const sId = ctx.db.normalizeId('sessions', args.sessionId)
+        if (!sId) throw new Error('Invalid session ID')
+
+        const session = await ctx.db.get(sId)
+        if (!session || !session.guildmasterCut?.characterId) {
+            throw new Error('Session has no Guildmaster cut recorded')
+        }
+
+        const char = await ctx.db.get(session.guildmasterCut.characterId)
+        if (!char || (char.userId !== user.userId && !user.isAdmin)) {
+            throw new Error('Unauthorized: You do not own this character')
+        }
+
+        const currentClaimed = !!session.guildmasterCut.claimed
+        await ctx.db.patch(sId, {
+            guildmasterCut: {
+                ...session.guildmasterCut,
+                claimed: !currentClaimed,
+            },
+        })
+        return { success: true, guildmasterClaimed: !currentClaimed }
+    },
+})
+
+export const toggleBlackVoidBetWinnerClaimed = mutation({
+    args: {
+        apiKey: v.string(),
+        betId: v.string(),
+    },
+    handler: async (ctx, args) => {
+        const user = await requireUser(ctx, args.apiKey)
+        const bId = ctx.db.normalizeId('blackVoidBets', args.betId)
+        if (!bId) throw new Error('Invalid bet ID')
+
+        const bet = await ctx.db.get(bId)
+        if (!bet) throw new Error('Bet not found')
+        if (!bet.winnerCharacterId) throw new Error('Bet has no winner')
+
+        const char = await ctx.db.get(bet.winnerCharacterId)
+        if (!char || (char.userId !== user.userId && !user.isAdmin)) {
+            throw new Error('Unauthorized: You do not own this character')
+        }
+
+        const newClaimed = !bet.winnerClaimed
+        await ctx.db.patch(bId, { winnerClaimed: newClaimed })
+        return { success: true, winnerClaimed: newClaimed }
+    },
+})
+
+export const toggleBlackVoidBetLoserClaimed = mutation({
+    args: {
+        apiKey: v.string(),
+        betId: v.string(),
+    },
+    handler: async (ctx, args) => {
+        const user = await requireUser(ctx, args.apiKey)
+        const bId = ctx.db.normalizeId('blackVoidBets', args.betId)
+        if (!bId) throw new Error('Invalid bet ID')
+
+        const bet = await ctx.db.get(bId)
+        if (!bet) throw new Error('Bet not found')
+        if (!bet.loserCharacterId) throw new Error('Bet has no loser')
+
+        const char = await ctx.db.get(bet.loserCharacterId)
+        if (!char || (char.userId !== user.userId && !user.isAdmin)) {
+            throw new Error('Unauthorized: You do not own this character')
+        }
+
+        const newClaimed = !bet.loserClaimed
+        await ctx.db.patch(bId, { loserClaimed: newClaimed })
+        return { success: true, loserClaimed: newClaimed }
+    },
+})
+
+export const markAllBlackVoidLogClaimed = mutation({
+    args: {
+        apiKey: v.string(),
+        characterId: v.string(),
+    },
+    handler: async (ctx, args) => {
+        const user = await requireUser(ctx, args.apiKey)
+        const charId = ctx.db.normalizeId('characters', args.characterId)
+        if (!charId) throw new Error('Invalid character ID')
+
+        const char = await ctx.db.get(charId)
+        if (!char || (char.userId !== user.userId && !user.isAdmin)) {
+            throw new Error('Unauthorized: You do not own this character')
+        }
+
+        // Mark seller listings
+        const createdListings = await ctx.db
+            .query('blackVoidListings')
+            .withIndex('by_characterId', (q) => q.eq('characterId', charId))
+            .collect()
+
+        for (const listing of createdListings) {
+            if (listing.status === 'completed' && !listing.sellerClaimed) {
+                await ctx.db.patch(listing._id, { sellerClaimed: true })
+            }
+        }
+
+        // Mark buyer won listings
+        const wonListings = await ctx.db
+            .query('blackVoidListings')
+            .withIndex('by_winningBidderCharacterId', (q) => q.eq('winningBidderCharacterId', charId))
+            .collect()
+
+        for (const listing of wonListings) {
+            if (listing.status === 'completed' && !listing.buyerClaimed) {
+                await ctx.db.patch(listing._id, { buyerClaimed: true })
+            }
+        }
+
+        // Mark quests
+        const characterQuests = await ctx.db
+            .query('quests')
+            .withIndex('by_characterId', (q) => q.eq('characterId', charId))
+            .collect()
+
+        for (const q of characterQuests) {
+            if (q.isCompleted) {
+                const patch: any = {}
+                if (q.isSponsored && !q.reimbursementClaimed) patch.reimbursementClaimed = true
+                if (!q.paymentClaimed) patch.paymentClaimed = true
+                if (Object.keys(patch).length > 0) await ctx.db.patch(q._id, patch)
+            }
+        }
+
+        // Mark GM area gains
+        if (char.rank === 'guildmaster') {
+            const gmSessions = await ctx.db
+                .query('sessions')
+                .withIndex('by_guildmaster_cut', (q) => q.eq('guildmasterCut.characterId', charId))
+                .collect()
+
+            for (const sess of gmSessions) {
+                if (sess.guildmasterCut && !sess.guildmasterCut.claimed) {
+                    await ctx.db.patch(sess._id, {
+                        guildmasterCut: {
+                            ...sess.guildmasterCut,
+                            claimed: true,
+                        },
+                    })
+                }
+            }
+        }
+
+        // Mark won bets
+        const wonBets = await ctx.db
+            .query('blackVoidBets')
+            .withIndex('by_winnerCharacterId', (q) => q.eq('winnerCharacterId', charId))
+            .collect()
+
+        for (const bet of wonBets) {
+            if (bet.status === 'completed' && !bet.winnerClaimed) {
+                await ctx.db.patch(bet._id, { winnerClaimed: true })
+            }
+        }
+
+        // Mark lost bets
+        const lostBets = await ctx.db
+            .query('blackVoidBets')
+            .withIndex('by_loserCharacterId', (q) => q.eq('loserCharacterId', charId))
+            .collect()
+
+        for (const bet of lostBets) {
+            if (bet.status === 'completed' && !bet.loserClaimed) {
+                await ctx.db.patch(bet._id, { loserClaimed: true })
+            }
+        }
+
+        return { success: true }
+    },
+})
+
 // --- AVAILABILITY ENDPOINTS ---
 
 export const getAvailability = query({
