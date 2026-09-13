@@ -14,9 +14,9 @@ import {
   DialogFooter,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { FormEvent, useState } from 'react'
+import { FormEvent, useMemo, useState } from 'react'
 import { Doc } from '@/convex/_generated/dataModel'
-import { Shield } from 'lucide-react'
+import { Search, Shield, User } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 
 export default function AdminCharacterList() {
@@ -25,6 +25,7 @@ export default function AdminCharacterList() {
   const allCharacters = useQuery(api.characters.listAllCharacters, !!isAdmin ? undefined : "skip")
   const adminUpdateCharacter = useMutation(api.characters.adminUpdateCharacter)
 
+  const [searchQuery, setSearchQuery] = useState('')
   const [selectedCharacter, setSelectedCharacter] = useState<Doc<'characters'> | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editData, setEditData] = useState({
@@ -39,6 +40,41 @@ export default function AdminCharacterList() {
     system: 'PF' as 'PF' | 'DnD',
   })
 
+  // Simple fuzzy scoring function
+  const filteredCharacters = useMemo(() => {
+    if (!allCharacters) return []
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return allCharacters
+
+    const searchTokens = q.split(/\s+/).filter(Boolean)
+
+    return allCharacters.filter((char: any) => {
+      const name = (char.name || '').toLowerCase()
+      const title = (char.title || '').toLowerCase()
+      const ancestry = (char.ancestry || '').toLowerCase()
+      const cls = (char.class || '').toLowerCase()
+      const ownerName = (char.ownerName || '').toLowerCase()
+      const ownerUsername = (char.ownerUsername || '').toLowerCase()
+      const ownerEmail = (char.ownerEmail || '').toLowerCase()
+
+      const searchableText = `${name} ${title} ${ancestry} ${cls} ${ownerName} ${ownerUsername} ${ownerEmail}`
+
+      // Check fuzzy match: every token must match somewhere in the text, or sub-sequence matching
+      return searchTokens.every((token) => {
+        if (searchableText.includes(token)) return true
+        
+        // Subsequence matching for fuzzy typo tolerance
+        let tokenIdx = 0
+        for (let i = 0; i < searchableText.length && tokenIdx < token.length; i++) {
+          if (searchableText[i] === token[tokenIdx]) {
+            tokenIdx++
+          }
+        }
+        return tokenIdx === token.length
+      })
+    })
+  }, [allCharacters, searchQuery])
+
   if (isAdmin === undefined) {
     return <Skeleton className="h-9 w-40" />
   }
@@ -46,8 +82,6 @@ export default function AdminCharacterList() {
   if (!isAdmin) {
     return null
   }
-
-
 
   function openEditDialog(character: Doc<'characters'>) {
     setSelectedCharacter(character)
@@ -83,23 +117,39 @@ export default function AdminCharacterList() {
           <Shield className="h-4 w-4" /> All Characters (Admin)
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>All Characters</DialogTitle>
           <DialogDescription>
             Admin view: Edit any character&apos;s details, including level and XP.
           </DialogDescription>
         </DialogHeader>
+
+        {/* Search Bar */}
+        <div className="relative pt-2 pb-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search characters or account names..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
         
-        <div className="overflow-auto flex-grow py-4">
-          <div className="space-y-4">
+        <div className="overflow-auto flex-grow py-2">
+          <div className="space-y-3">
             {allCharacters === undefined ? (
               <div className="space-y-3">
                 <Skeleton className="h-16 w-full" />
                 <Skeleton className="h-16 w-full" />
                 <Skeleton className="h-16 w-full" />
               </div>
-            ) : allCharacters.map((char) => (
+            ) : filteredCharacters.length === 0 ? (
+              <div className="text-center py-8 text-sm text-muted-foreground">
+                No characters found matching &quot;{searchQuery}&quot;
+              </div>
+            ) : filteredCharacters.map((char: any) => (
               <Card key={char._id} className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => openEditDialog(char)}>
                 <CardContent className="p-4 flex justify-between items-center">
                   <div>
@@ -112,6 +162,12 @@ export default function AdminCharacterList() {
                       <p className="text-xs text-amber-400/90 italic font-medium">{char.title}</p>
                     )}
                     <p className="text-xs text-muted-foreground">{char.ancestry} {char.class}</p>
+                    {char.ownerName && (
+                      <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground/80">
+                        <User className="h-3 w-3 inline text-muted-foreground" />
+                        <span className="font-medium text-foreground/80">{char.ownerName}</span>
+                      </div>
+                    )}
                   </div>
                   <div className="text-right whitespace-nowrap">
                     <p className="text-sm font-semibold">Lvl {char.lvl}</p>

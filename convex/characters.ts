@@ -39,7 +39,32 @@ export const listAllCharacters = query({
       throw new Error('Only admins can list all characters')
     }
     const characters = await ctx.db.query('characters').collect()
-    return characters.sort((a, b) => a.name.localeCompare(b.name))
+    
+    // Fetch user details for each character
+    const userIds = Array.from(new Set(characters.map((c) => c.userId)))
+    const usersMap = new Map<string, any>()
+    await Promise.all(
+      userIds.map(async (uId) => {
+        const u = await ctx.db
+          .query('users')
+          .withIndex('by_userId', (q) => q.eq('userId', uId))
+          .first()
+        if (u) usersMap.set(uId, u)
+      })
+    )
+
+    const charactersWithOwners = characters.map((c) => {
+      const owner = usersMap.get(c.userId)
+      const ownerName = owner ? (owner.name || owner.username || owner.email || 'Unknown User') : 'Unknown User'
+      return {
+        ...c,
+        ownerName,
+        ownerUsername: owner?.username || null,
+        ownerEmail: owner?.email || null,
+      }
+    })
+
+    return charactersWithOwners.sort((a, b) => a.name.localeCompare(b.name))
   },
 })
 
