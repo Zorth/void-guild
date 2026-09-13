@@ -802,6 +802,93 @@ export const updateSessionThreadId = internalMutation({
 });
 
 /**
+ * Fetches active bets for a user identified by their Discord account ID.
+ */
+export const getUserActiveBets = query({
+  args: { discordId: v.string() },
+  handler: async (ctx, args) => {
+    // 1. Find user by discordId
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_discordId", (q) => q.eq("discordId", args.discordId))
+      .first();
+
+    if (!user) {
+      return { status: "no_user" as const };
+    }
+
+    // 2. Find all characters belonging to this user
+    const characters = await ctx.db
+      .query("characters")
+      .withIndex("by_userId", (q) => q.eq("userId", user.userId))
+      .collect();
+
+    if (characters.length === 0) {
+      return { status: "no_bets" as const, myTurnBets: [], otherTurnBets: [] };
+    }
+
+    const charIds = new Set(characters.map((c) => c._id));
+    const charMap = new Map(characters.map((c) => [c._id.toString(), c]));
+
+    // 3. Query all accepted (active) bets
+    const allAccepted = await ctx.db
+      .query("blackVoidBets")
+      .withIndex("by_status", (q) => q.eq("status", "accepted"))
+      .collect();
+
+    // Filter bets involving any of the user's characters
+    const userBets = allAccepted.filter(
+      (b) => charIds.has(b.senderCharacterId) || (b.acceptedByCharacterId && charIds.has(b.acceptedByCharacterId))
+    );
+
+    if (userBets.length === 0) {
+      return { status: "no_bets" as const, myTurnBets: [], otherTurnBets: [] };
+    }
+
+    const myTurnBets: any[] = [];
+    const otherTurnBets: any[] = [];
+
+    for (const b of userBets) {
+      const isSender = charIds.has(b.senderCharacterId);
+      const myChar = isSender
+        ? charMap.get(b.senderCharacterId.toString())
+        : (b.acceptedByCharacterId ? charMap.get(b.acceptedByCharacterId.toString()) : null);
+
+      const opponentCharId = isSender ? b.acceptedByCharacterId : b.senderCharacterId;
+      const opponentChar = opponentCharId ? await ctx.db.get(opponentCharId) : null;
+
+      const isMyTurn = b.currentTurnCharacterId && charIds.has(b.currentTurnCharacterId);
+
+      const lastRoll = b.rolls && b.rolls.length > 0 ? b.rolls[b.rolls.length - 1] : null;
+      const currentDeathrollValue = lastRoll ? lastRoll.roll : (b.currentRollMax || b.deathrollValue);
+
+      const betInfo = {
+        id: b._id,
+        wagerAmount: b.wagerAmount,
+        deathrollValue: currentDeathrollValue,
+        myCharacterName: myChar?.name || "Your Character",
+        opponentCharacterName: opponentChar?.name || "Opponent",
+        isMyTurn,
+        lastRoll,
+        updatedAt: b.updatedAt || b.createdAt,
+      };
+
+      if (isMyTurn) {
+        myTurnBets.push(betInfo);
+      } else {
+        otherTurnBets.push(betInfo);
+      }
+    }
+
+    return {
+      status: "ok" as const,
+      myTurnBets,
+      otherTurnBets,
+    };
+  },
+});
+
+/**
  * Locks and archives a Discord thread.
  */
 export const closeSessionThread = internalAction({
@@ -827,3 +914,5 @@ export const closeSessionThread = internalAction({
     }
   },
 });
+
+

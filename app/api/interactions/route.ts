@@ -413,6 +413,78 @@ export async function POST(req: Request) {
           },
         }), { headers: { 'Content-Type': 'application/json' } });
       }
+
+      if (name === 'bets') {
+        const discordId = interaction.member?.user?.id || interaction.user?.id;
+
+        if (!discordId) {
+          return new Response(JSON.stringify({
+            type: 4,
+            data: {
+              content: "No guild account linked",
+              flags: 64, // EPHEMERAL
+            },
+          }), { headers: { 'Content-Type': 'application/json' } });
+        }
+
+        try {
+          const res = await convex.query(api.discord.getUserActiveBets, { discordId });
+
+          if (res.status === 'no_user') {
+            return new Response(JSON.stringify({
+              type: 4,
+              data: {
+                content: "No guild account linked",
+                flags: 64, // EPHEMERAL
+              },
+            }), { headers: { 'Content-Type': 'application/json' } });
+          }
+
+          if (res.status === 'no_bets' || (res.myTurnBets.length === 0 && res.otherTurnBets.length === 0)) {
+            return new Response(JSON.stringify({
+              type: 4,
+              data: {
+                content: "no active bets",
+                flags: 64, // EPHEMERAL
+              },
+            }), { headers: { 'Content-Type': 'application/json' } });
+          }
+
+          const lines: string[] = ["### 🎲 Your Active Deathroll Bets\n"];
+
+          if (res.myTurnBets.length > 0) {
+            lines.push("**🎯 Your Turn:**");
+            for (const b of res.myTurnBets) {
+              lines.push(`• **${b.myCharacterName}** vs **${b.opponentCharacterName}** — Wager: **${b.wagerAmount} GP** | Current Max: **${b.deathrollValue}** (Waiting for your roll)`);
+            }
+          }
+
+          if (res.otherTurnBets.length > 0) {
+            if (res.myTurnBets.length > 0) lines.push("");
+            lines.push("**⏳ Opponent's Turn:**");
+            for (const b of res.otherTurnBets) {
+              lines.push(`• **${b.myCharacterName}** vs **${b.opponentCharacterName}** — Wager: **${b.wagerAmount} GP** | Current Max: **${b.deathrollValue}** (Waiting for ${b.opponentCharacterName})`);
+            }
+          }
+
+          return new Response(JSON.stringify({
+            type: 4,
+            data: {
+              content: lines.join("\n"),
+              flags: 64, // EPHEMERAL (Only visible to sender)
+            },
+          }), { headers: { 'Content-Type': 'application/json' } });
+        } catch (e) {
+          console.error("[Discord] Convex Error:", e);
+          return new Response(JSON.stringify({
+            type: 4,
+            data: {
+              content: "Error fetching active bets.",
+              flags: 64,
+            },
+          }), { headers: { 'Content-Type': 'application/json' } });
+        }
+      }
     }
 
     return new Response('Interaction type not supported', { status: 400 });
