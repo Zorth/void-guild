@@ -203,18 +203,21 @@ export function ApiKeyDialog({ open, onOpenChange }: { open?: boolean, onOpenCha
                     <div className="border-t border-border pt-4 space-y-3">
                         <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-bold">Client Integrations</p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                            <div className="flex items-center justify-between p-2.5 rounded-md border border-border/80 bg-muted/10 opacity-80">
+                            <a
+                                href="https://github.com/Zorth/guild-obsidian/releases"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center justify-between p-2.5 rounded-md border border-border bg-muted/20 hover:bg-muted/50 hover:border-purple-500/40 transition-colors group"
+                            >
                                 <div className="flex items-center gap-2.5 min-w-0">
                                     <Puzzle className="h-4 w-4 text-purple-400 shrink-0" />
                                     <div className="min-w-0">
-                                        <div className="text-xs font-semibold truncate">Obsidian Plugin</div>
+                                        <div className="text-xs font-semibold group-hover:text-purple-300 transition-colors truncate">Obsidian Plugin</div>
                                         <div className="text-[10px] text-muted-foreground truncate">Sync campaign notes & characters</div>
                                     </div>
                                 </div>
-                                <span className="text-[9px] px-1.5 py-0.5 rounded font-medium bg-purple-500/20 text-purple-300 border border-purple-500/30 uppercase tracking-wide shrink-0">
-                                    Coming Soon
-                                </span>
-                            </div>
+                                <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-purple-300 shrink-0" />
+                            </a>
 
                             <div className="flex items-center justify-between p-2.5 rounded-md border border-border/80 bg-muted/10 opacity-80">
                                 <div className="flex items-center gap-2.5 min-w-0">

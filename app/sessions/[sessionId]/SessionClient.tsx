@@ -90,6 +90,7 @@ export default function SessionClient() {
   const allCharacters = useQuery(api.characters.listAllCharacters, isAdmin ? undefined : "skip")
   const worldQuests = useQuery(api.quests.getQuestsByWorld, session?.world ? { worldId: session.world } : "skip")
   const currentObjective = useQuery(api.voidObjectives.getCurrentObjective)
+  const eligibility = useQuery(api.sessions.checkSessionEligibility, session?._id ? { sessionId: session._id } : "skip")
 
   const currentWorldDate = useMemo(() => {
     if (!world?.calendar) return null;
@@ -390,8 +391,6 @@ export default function SessionClient() {
   }
 
   const calendarLink = getGoogleCalendarLink()
-
-  const eligibility = useQuery(api.sessions.checkSessionEligibility, { sessionId: session._id });
 
   const rightColumnContent = (
     <div className="space-y-8">
