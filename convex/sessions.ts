@@ -2,7 +2,7 @@ import { query, mutation, QueryCtx } from './_generated/server'
 import { v } from 'convex/values'
 import { Doc, Id } from './_generated/dataModel'
 import { internal } from './_generated/api'
-import { isAdmin, isGameMaster } from './roles'
+import { isAdmin, isGameMaster, extractClaim } from './roles'
 
 /**
  * XP gain based on session level and character level.
@@ -627,6 +627,114 @@ export const deleteSession = mutation({
   },
 })
 
+/**
+ * Helper to check if a user is eligible to join a session given their membership status
+ * and recent session participation.
+ *
+ * Rules:
+ * 1. If user is a member (isMember claim = true / user.isMember = true) -> Unrestricted.
+ * 2. If user is a Voidmaster (isAdmin or isGM) who ran at least 1 session in the past 3 months -> Unrestricted.
+ * 3. Free non-members -> Can join max 1 session per calendar month.
+ */
+export async function checkUserMonthlySessionEligibility(
+  ctx: QueryCtx,
+  userId: string,
+  targetSessionDate?: number
+): Promise<{ eligible: boolean; reason?: string; isFreeTier?: boolean }> {
+  const identity = await ctx.auth.getUserIdentity()
+  
+  // 1. Check isMember claim from identity or database
+  const memberClaim = identity ? extractClaim(identity, 'isMember') : undefined
+  const isMemberClaim = memberClaim === true || String(memberClaim).toLowerCase() === 'true'
+
+  const userRecord = await ctx.db
+    .query('users')
+    .withIndex('by_userId', (q) => q.eq('userId', userId))
+    .first()
+
+  const isMember = isMemberClaim || Boolean(userRecord?.isMember)
+  if (isMember) {
+    return { eligible: true, isFreeTier: false }
+  }
+
+  // 2. Check if Voidmaster (isAdmin / isGM) who ran 1+ session in past 3 months (90 days)
+  const isGM = await isGameMaster(ctx)
+  if (isGM) {
+    const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000
+    const recentGMSessions = await ctx.db
+      .query('sessions')
+      .withIndex('by_owner', (q) => q.eq('owner', userId))
+      .collect()
+
+    const hasActiveGMSessionInPast3Months = recentGMSessions.some(
+      (s) => (s.date || s._creationTime) >= ninetyDaysAgo
+    )
+
+    if (hasActiveGMSessionInPast3Months) {
+      return { eligible: true, isFreeTier: false }
+    }
+  }
+
+  // 3. Free non-member: Check limit of 1 session per calendar month
+  // Determine target month & year (use session date if set, otherwise current date)
+  const targetDate = targetSessionDate ? new Date(targetSessionDate) : new Date()
+  const targetYear = targetDate.getFullYear()
+  const targetMonth = targetDate.getMonth() // 0-indexed
+
+  // Fetch all characters owned by this user
+  const userCharacters = await ctx.db
+    .query('characters')
+    .withIndex('by_userId', (q) => q.eq('userId', userId))
+    .collect()
+
+  const userCharIds = new Set(userCharacters.map((c) => c._id))
+
+  // Fetch all sessions and filter to those in the target month where user's characters participated/joined
+  const allSessions = await ctx.db.query('sessions').collect()
+
+  const sessionsInTargetMonth = allSessions.filter((s) => {
+    // Only check non-cancelled / non-planning sessions with characters
+    if (!s.characters || s.characters.length === 0) return false
+
+    // Check if user has a character in this session
+    const hasUserChar = s.characters.some((id) => userCharIds.has(id))
+    if (!hasUserChar) return false
+
+    // Check if session date falls in the target calendar month
+    const sDate = s.date ? new Date(s.date) : new Date(s._creationTime)
+    return sDate.getFullYear() === targetYear && sDate.getMonth() === targetMonth
+  })
+
+  if (sessionsInTargetMonth.length >= 1) {
+    const monthName = targetDate.toLocaleString('en-US', { month: 'long' })
+    return {
+      eligible: false,
+      isFreeTier: true,
+      reason: `Free tier users can sign up for 1 session per calendar month. You are already signed up for a session in ${monthName} ${targetYear}. Upgrade to a Tarragon Kobold Membership (€10/mo) or run a session as a Voidmaster for unlimited play!`,
+    }
+  }
+
+  return { eligible: true, isFreeTier: true }
+}
+
+export const checkSessionEligibility = query({
+  args: {
+    sessionId: v.optional(v.id('sessions')),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) return { eligible: false, reason: 'Not authenticated', isFreeTier: false }
+
+    let targetDate: number | undefined = undefined
+    if (args.sessionId) {
+      const session = await ctx.db.get(args.sessionId)
+      if (session?.date) targetDate = session.date
+    }
+
+    return await checkUserMonthlySessionEligibility(ctx, user.subject, targetDate)
+  },
+})
+
 export const joinSession = mutation({
   args: {
     sessionId: v.id('sessions'),
@@ -638,6 +746,12 @@ export const joinSession = mutation({
 
     const session = await ctx.db.get(args.sessionId)
     if (!session) throw new Error('Session not found')
+
+    // Enforce monthly session limit for non-members / inactive GMs
+    const eligibility = await checkUserMonthlySessionEligibility(ctx, user.subject, session.date)
+    if (!eligibility.eligible) {
+      throw new Error(eligibility.reason || 'Monthly session limit reached for free accounts.')
+    }
 
     if (session.locked) {
       throw new Error('This session is locked. You cannot join or leave.')

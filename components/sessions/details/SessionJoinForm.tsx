@@ -19,6 +19,7 @@ interface SessionJoinFormProps {
   onLeave?: (characterId: Id<'characters'>) => void
   isJoining?: boolean
   leavingCharacterId?: string | null
+  eligibility?: { eligible: boolean; reason?: string; isFreeTier?: boolean } | null
 }
 
 export default function SessionJoinForm({
@@ -34,19 +35,27 @@ export default function SessionJoinForm({
   onJoin,
   onLeave,
   isJoining,
-  leavingCharacterId
+  leavingCharacterId,
+  eligibility,
 }: SessionJoinFormProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          {hasUserCharacterInSession ? (
-            <>
-              <UserCheck className="h-5 w-5 text-emerald-500" />
-              Joined Session
-            </>
-          ) : (
-            'Join Session'
+        <CardTitle className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            {hasUserCharacterInSession ? (
+              <>
+                <UserCheck className="h-5 w-5 text-emerald-500" />
+                Joined Session
+              </>
+            ) : (
+              'Join Session'
+            )}
+          </div>
+          {eligibility?.isFreeTier && (
+            <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+              🎁 Free Monthly Session
+            </span>
           )}
         </CardTitle>
       </CardHeader>
@@ -98,6 +107,11 @@ export default function SessionJoinForm({
           <div className="text-sm text-destructive italic text-center p-4 bg-destructive/5 rounded-md">
             This session is currently full.
           </div>
+        ) : eligibility?.eligible === false ? (
+          <div className="text-xs text-amber-700 dark:text-amber-300 p-4 bg-amber-500/10 border border-amber-500/30 rounded-md space-y-2">
+            <p className="font-bold text-sm">Monthly Session Limit Reached</p>
+            <p className="leading-relaxed">{eligibility.reason}</p>
+          </div>
         ) : availableCharacters.length === 0 ? (
           <div className="text-sm text-muted-foreground italic text-center p-4 bg-muted/10 rounded-md flex flex-col items-center gap-2">
             {userCharactersCount === 0 ? (
@@ -113,6 +127,11 @@ export default function SessionJoinForm({
           </div>
         ) : (
           <div className="space-y-4">
+            {eligibility?.isFreeTier && (
+              <div className="text-[11px] text-muted-foreground/90 p-2.5 bg-emerald-500/5 border border-emerald-500/20 rounded-md">
+                🎁 <span className="font-semibold text-emerald-600 dark:text-emerald-400">Free Session:</span> Signing up will use your <b>1 free session</b> for this month. Soon, playing additional sessions per month will require a <span className="font-semibold text-primary">Tarragon Kobold Membership (€10/mo)</span> or active Voidmaster GM status.
+              </div>
+            )}
             <div className="flex flex-col gap-2">
               <label className="text-sm font-medium">Select Character</label>
               <select

@@ -148,6 +148,8 @@ export default function SessionClient() {
 
   const currentInterestedPlayers = optimisticInterestedPlayers ?? session?.interestedPlayers ?? []
 
+  const isOwnerOrAdmin = Boolean(session?.isOwner || isAdmin)
+
   const userCharacterIds = useMemo(() => {
     return new Set(userCharacters?.map(c => c._id) ?? [])
   }, [userCharacters])
@@ -389,7 +391,7 @@ export default function SessionClient() {
 
   const calendarLink = getGoogleCalendarLink()
 
-  const isOwnerOrAdmin = session.isOwner || !!isAdmin;
+  const eligibility = useQuery(api.sessions.checkSessionEligibility, { sessionId: session._id });
 
   const rightColumnContent = (
     <div className="space-y-8">
@@ -449,6 +451,7 @@ export default function SessionClient() {
                   onLeave={handleLeave}
                   isJoining={isJoining}
                   leavingCharacterId={leavingCharacterId}
+                  eligibility={eligibility}
                 />
           </Authenticated>
 
