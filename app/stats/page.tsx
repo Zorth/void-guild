@@ -66,26 +66,35 @@ export default function StatsPage() {
                         isUser && "bg-purple-50/50 dark:bg-purple-900/10 rounded-md"
                       )}
                     >
-                      <span className="flex items-center gap-2 min-w-0">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
                         <span className="text-muted-foreground tabular-nums shrink-0">{index + 1}.</span>
-                        <span className={cn("font-medium truncate", isUser && "text-purple-700 dark:text-purple-300")} title={char.name}>
-                          {char.name}
-                        </span>
-                        {isUser && (
-                          <span className="text-[8px] bg-purple-200 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-1 py-0.5 rounded-full uppercase tracking-wider font-bold shrink-0">You</span>
-                        )}
-                        <a 
-                            href={`https://void.tarragon.be/Player-Characters/${char.name.replace(/\s+/g, '-')}`} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-muted-foreground hover:text-purple-500 shrink-0"
-                            onClick={() => {
-                              recordWikiVisit().then(() => syncAndGetAchievements()).catch(console.error);
-                            }}
-                        >
-                            <Book size={14} />
-                        </a>
-                      </span>
+                        <div className="flex flex-col min-w-0">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className={cn("font-medium truncate", isUser && "text-purple-700 dark:text-purple-300")} title={char.name}>
+                              {char.name}
+                            </span>
+                            {isUser && (
+                              <span className="text-[8px] bg-purple-200 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-1 py-0.5 rounded-full uppercase tracking-wider font-bold shrink-0">You</span>
+                            )}
+                            <a 
+                                href={`https://void.tarragon.be/Player-Characters/${char.name.replace(/\s+/g, '-')}`} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-muted-foreground hover:text-purple-500 shrink-0"
+                                onClick={() => {
+                                  recordWikiVisit().then(() => syncAndGetAchievements()).catch(console.error);
+                                }}
+                            >
+                                <Book size={14} />
+                            </a>
+                          </div>
+                          {char.title && (
+                            <span className="text-xs text-muted-foreground/80 truncate italic leading-tight">
+                              {char.title}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                       <span className={cn("font-bold text-sm sm:text-base shrink-0 sm:ml-auto whitespace-nowrap", isUser && "text-purple-600 dark:text-purple-400")}>Lvl {char.lvl}</span>
                     </li>
                   );

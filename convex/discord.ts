@@ -291,16 +291,39 @@ export const syncSessionToDiscord = internalAction({
           headers: { Authorization: `Bot ${botToken}` },
         });
         
-        let appliedTags: string[] = ["1322271502950993940"];
+        let appliedTags: string[] = [];
         if (channelResponse.ok) {
           const channel = await channelResponse.json();
-          const tags = channel.available_tags || [];
-          const systemTag = tags.find((t: any) => 
+          const tags: Array<{ id: string; name: string }> = channel.available_tags || [];
+          
+          // Match system tag (Pathfinder / D&D)
+          const systemTag = tags.find((t) => 
             t.name.toLowerCase().includes(session.system?.toLowerCase() || 'none')
           );
-          if (systemTag && !appliedTags.includes(systemTag.id)) {
+          if (systemTag) {
             appliedTags.push(systemTag.id);
           }
+
+          // Match default / session tag if present
+          const sessionTag = tags.find((t) => 
+            t.name.toLowerCase().includes('session') || t.name.toLowerCase().includes('void')
+          );
+          if (sessionTag && !appliedTags.includes(sessionTag.id)) {
+            appliedTags.push(sessionTag.id);
+          }
+        }
+
+        const threadBody: Record<string, any> = {
+          name: threadName,
+          auto_archive_duration: 1440, // 1 day
+          message: {
+            content: messageContent,
+            embeds: [embed],
+          },
+        };
+
+        if (appliedTags.length > 0) {
+          threadBody.applied_tags = appliedTags;
         }
 
         const response = await fetch(`${DISCORD_API_BASE}/channels/${forumChannelId}/threads`, {
@@ -309,15 +332,7 @@ export const syncSessionToDiscord = internalAction({
             Authorization: `Bot ${botToken}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            name: threadName,
-            auto_archive_duration: 1440, // 1 day
-            applied_tags: appliedTags,
-            message: {
-              content: messageContent,
-              embeds: [embed],
-            },
-          }),
+          body: JSON.stringify(threadBody),
         });
 
         if (response.ok) {
