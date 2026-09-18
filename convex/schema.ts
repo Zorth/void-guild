@@ -433,6 +433,12 @@ export default defineSchema({
     }).index('by_monthKey_character', ['monthKey', 'characterId'])
       .index('by_monthKey', ['monthKey'])
       .index('by_character', ['characterId']),
+    sessionClaimedLogs: defineTable({
+        sessionId: v.id('sessions'),
+        characterId: v.id('characters'),
+        claimedMoneyAmount: v.number(), // Amount of GP claimed for money cut at the time of claim
+        claimedAt: v.number(),
+    }).index('by_session_character', ['sessionId', 'characterId']),
 })
 
 

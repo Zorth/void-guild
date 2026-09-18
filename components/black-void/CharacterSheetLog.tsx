@@ -88,6 +88,7 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
   const toggleQuestClaimed = useMutation(api.quests.toggleQuestReimbursementClaimed)
   const togglePaymentClaimed = useMutation(api.quests.toggleQuestPaymentClaimed)
   const toggleSessionCutClaimed = useMutation(api.sessions.toggleGuildmasterCutClaimed)
+  const toggleSessionMoneyClaimed = useMutation(api.sessions.toggleSessionMoneyClaimed)
   const toggleBetWinnerClaimed = useMutation(api.blackVoidBets.toggleBetWinnerClaimed)
   const toggleBetLoserClaimed = useMutation(api.blackVoidBets.toggleBetLoserClaimed)
   const markAllClaimed = useMutation(api.blackVoid.markAllCharacterTransactionsClaimed)
@@ -101,6 +102,7 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
     sponsoredQuestReimbursements = [],
     completedQuestsToPay = [],
     guildmasterAreaGains = [],
+    sessionRewards = [],
     betsWon = [],
     betsLost = [],
     currentMoney,
@@ -143,6 +145,16 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
     [isGuildmaster, guildmasterAreaGains]
   )
 
+  const pendingSessionMoneyGains = useMemo(
+    () => sessionRewards.filter((s: any) => s.pendingMoneyAdjustmentGP > 0),
+    [sessionRewards]
+  )
+
+  const pendingSessionMoneyDeductions = useMemo(
+    () => sessionRewards.filter((s: any) => s.pendingMoneyAdjustmentGP < 0),
+    [sessionRewards]
+  )
+
   const pendingWonBets = useMemo(
     () => betsWon.filter((bet: any) => !bet.winnerClaimed),
     [betsWon]
@@ -159,11 +171,13 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
     for (const item of pendingSoldItems) income += parseGpAmount(item.winningAmount)
     for (const q of pendingSponsoredQuests) income += parseGpAmount(q.sponsoredAmount)
     for (const g of pendingGuildmasterGains) income += parseGpAmount(g.guildmasterCut)
+    for (const s of pendingSessionMoneyGains) income += s.pendingMoneyAdjustmentGP
     for (const b of pendingWonBets) income += b.wagerAmount
 
     let expense = 0
     for (const item of pendingWonItems) expense += parseGpAmount(item.winningAmount)
     for (const q of pendingQuestsToPay) expense += parseGpAmount(q.actualToPay)
+    for (const s of pendingSessionMoneyDeductions) expense += Math.abs(s.pendingMoneyAdjustmentGP)
     for (const b of pendingLostBets) expense += b.wagerAmount
 
     const count =
@@ -172,6 +186,8 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
       pendingSponsoredQuests.length +
       pendingQuestsToPay.length +
       pendingGuildmasterGains.length +
+      pendingSessionMoneyGains.length +
+      pendingSessionMoneyDeductions.length +
       pendingWonBets.length +
       pendingLostBets.length
 
@@ -181,7 +197,17 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
       netPendingGold: Math.round((income - expense) * 100) / 100,
       totalPendingCount: count,
     }
-  }, [pendingSoldItems, pendingWonItems, pendingSponsoredQuests, pendingQuestsToPay, pendingGuildmasterGains, pendingWonBets, pendingLostBets])
+  }, [
+    pendingSoldItems,
+    pendingWonItems,
+    pendingSponsoredQuests,
+    pendingQuestsToPay,
+    pendingGuildmasterGains,
+    pendingSessionMoneyGains,
+    pendingSessionMoneyDeductions,
+    pendingWonBets,
+    pendingLostBets,
+  ])
 
   // Manual currency calculated total
   const calculatedManualGold = useMemo(() => {
@@ -253,6 +279,15 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
       }
     } catch {
       toast.error('Failed to update regional gains status')
+    }
+  }
+
+  const handleToggleSessionMoneyClaimed = async (sessionId: Id<'sessions'>, currentNetMoneyGP: number) => {
+    try {
+      await toggleSessionMoneyClaimed({ sessionId, characterId, currentNetMoneyGP })
+      toast.success('Updated session money cut log state!')
+    } catch {
+      toast.error('Failed to update session money status')
     }
   }
 
@@ -467,13 +502,51 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
               )}
 
               {/* 2. Pending Gold Income */}
-              {(pendingSoldItems.length > 0 || pendingSponsoredQuests.length > 0 || pendingGuildmasterGains.length > 0 || pendingWonBets.length > 0) && (
+              {(pendingSoldItems.length > 0 || pendingSponsoredQuests.length > 0 || pendingGuildmasterGains.length > 0 || pendingSessionMoneyGains.length > 0 || pendingWonBets.length > 0) && (
                 <div className="space-y-2">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
                     <ArrowDownLeft className="h-4 w-4 shrink-0" />
                     Pending Gold Income (+{formatGpAmount(totalPendingIncome)})
                   </h4>
                   <div className="grid gap-2">
+                    {pendingSessionMoneyGains.map((sess: any) => (
+                      <div
+                        key={sess._id}
+                        className="p-2.5 rounded-md border border-emerald-500/30 bg-emerald-950/15 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 text-xs"
+                      >
+                        <div className="flex items-start sm:items-center gap-2 min-w-0">
+                          <Coins className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5 sm:mt-0" />
+                          <div className="min-w-0 break-words">
+                            <span className="font-bold text-foreground">
+                              {sess.isMoneyClaimed ? 'Session Gold Cut Adjustment' : 'Session Gold Cut'}
+                            </span>
+                            <span className="text-muted-foreground block sm:inline sm:ml-2">
+                              ({sess.worldName})
+                              {sess.isMoneyClaimed && (
+                                <span className="text-[10px] text-emerald-400 ml-1">
+                                  [Adjusted from {sess.previousClaimedAmount} GP to {sess.currentNetMoneyGP} GP]
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-border/20">
+                          <span className="font-mono font-bold text-emerald-300">
+                            +{formatGpAmount(sess.pendingMoneyAdjustmentGP)}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleToggleSessionMoneyClaimed(sess.sessionId, sess.currentNetMoneyGP)}
+                            className="h-7 px-2.5 text-[11px] border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-300 gap-1"
+                          >
+                            <CheckCheck className="h-3 w-3" />
+                            {sess.isMoneyClaimed ? 'Mark Adjusted' : 'Mark Added'}
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+
                     {pendingWonBets.map((bet: any) => (
                       <div
                         key={bet._id}
@@ -588,13 +661,47 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
               )}
 
               {/* 3. Pending Gold Expenses */}
-              {(pendingWonItems.length > 0 || pendingQuestsToPay.length > 0 || pendingLostBets.length > 0) && (
+              {(pendingWonItems.length > 0 || pendingQuestsToPay.length > 0 || pendingSessionMoneyDeductions.length > 0 || pendingLostBets.length > 0) && (
                 <div className="space-y-2">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
                     <ArrowUpRight className="h-4 w-4 shrink-0" />
                     Pending Gold Expenses (-{formatGpAmount(totalPendingExpense)})
                   </h4>
                   <div className="grid gap-2">
+                    {pendingSessionMoneyDeductions.map((sess: any) => (
+                      <div
+                        key={sess._id}
+                        className="p-2.5 rounded-md border border-amber-500/30 bg-amber-950/15 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 text-xs"
+                      >
+                        <div className="flex items-start sm:items-center gap-2 min-w-0">
+                          <Coins className="h-4 w-4 text-amber-400 shrink-0 mt-0.5 sm:mt-0" />
+                          <div className="min-w-0 break-words">
+                            <span className="font-bold text-foreground">Session Gold Cut Adjustment</span>
+                            <span className="text-muted-foreground block sm:inline sm:ml-2">
+                              ({sess.worldName})
+                              <span className="text-[10px] text-amber-400 ml-1">
+                                [Claimed item reduced cut from {sess.previousClaimedAmount} GP to {sess.currentNetMoneyGP} GP]
+                              </span>
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-border/20">
+                          <span className="font-mono font-bold text-amber-300">
+                            -{formatGpAmount(Math.abs(sess.pendingMoneyAdjustmentGP))}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleToggleSessionMoneyClaimed(sess.sessionId, sess.currentNetMoneyGP)}
+                            className="h-7 px-2.5 text-[11px] border-amber-500/30 hover:bg-amber-500/20 text-amber-300 gap-1"
+                          >
+                            <CheckCheck className="h-3 w-3" />
+                            Mark Deducted
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+
                     {pendingLostBets.map((bet: any) => (
                       <div
                         key={bet._id}
@@ -1052,6 +1159,139 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
                 })}
               </div>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 5b. Session Rewards & Loot Ledger */}
+      {sessionRewards.length > 0 && (
+        <Card className="border-indigo-500/30 bg-card/60 overflow-hidden">
+          <CardHeader className="p-3.5 sm:p-5 border-b border-border/20">
+            <CardTitle className="text-sm sm:text-base font-bold flex flex-wrap items-center justify-between gap-2 text-indigo-300">
+              <span className="flex items-center gap-2">
+                <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-400 shrink-0" />
+                <span>Session Rewards & Loot Ledger</span>
+              </span>
+              <span className="text-[11px] text-muted-foreground font-normal">
+                Attended Locked Sessions
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-3.5 sm:p-5">
+            <div className="space-y-3">
+              {sessionRewards.map((sess: any) => {
+                const isClaimed = sess.isMoneyClaimed
+                const netMoney = sess.currentNetMoneyGP
+
+                return (
+                  <div
+                    key={sess._id}
+                    className={cn(
+                      "p-3 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 sm:gap-3 transition-all",
+                      isClaimed && sess.pendingMoneyAdjustmentGP === 0
+                        ? "bg-emerald-950/20 border-emerald-500/30"
+                        : isClaimed && sess.pendingMoneyAdjustmentGP !== 0
+                        ? "bg-amber-950/20 border-amber-500/35"
+                        : "bg-indigo-950/20 border-indigo-500/30"
+                    )}
+                  >
+                    <div className="space-y-1.5 min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-xs sm:text-sm text-foreground break-words">
+                          {sess.sessionName}
+                        </span>
+                        <span className="text-[10px] uppercase font-bold bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded">
+                          {sess.worldName}
+                        </span>
+                      </div>
+
+                      {/* Claimed Loot Items */}
+                      {sess.claimedItems && sess.claimedItems.length > 0 ? (
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground font-medium">Claimed Items:</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {sess.claimedItems.map((item: any, idx: number) => {
+                              const val = item.isGood ? item.valueGP : item.valueGP / 2
+                              return (
+                                <span
+                                  key={item.id || idx}
+                                  className="inline-flex items-center gap-1 text-[11px] bg-background/60 border border-indigo-500/30 px-2 py-0.5 rounded text-indigo-200"
+                                >
+                                  <Package className="h-3 w-3 text-indigo-400 shrink-0" />
+                                  {item.link ? (
+                                    <a
+                                      href={item.link}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="underline hover:text-indigo-100"
+                                    >
+                                      {item.name}
+                                    </a>
+                                  ) : (
+                                    <span>{item.name}</span>
+                                  )}
+                                  <span className="text-amber-300 font-mono text-[10px]">({val} GP)</span>
+                                </span>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic">No loot items claimed from this session.</p>
+                      )}
+
+                      <p className="text-xs text-muted-foreground break-words">
+                        Base Share:{' '}
+                        <strong className="text-amber-300 font-mono">{sess.sharePerPlayer} GP</strong>
+                        {sess.userClaimedValue > 0 && (
+                          <>
+                            {' '}• Claimed Items Value:{' '}
+                            <strong className="text-rose-300 font-mono">-{sess.userClaimedValue} GP</strong>
+                          </>
+                        )}{' '}
+                        • Net GP Share:{' '}
+                        <strong className={cn("font-mono font-bold", netMoney >= 0 ? "text-emerald-300" : "text-rose-300")}>
+                          {netMoney >= 0 ? `+${netMoney}` : netMoney} GP
+                        </strong>
+                        {sess.isMoneyClaimed && sess.pendingMoneyAdjustmentGP !== 0 && (
+                          <span className="block mt-0.5 text-[11px] font-medium text-amber-300">
+                            {sess.pendingMoneyAdjustmentGP < 0 ? (
+                              <>⚠️ Adjustment Needed: <strong className="text-rose-300 font-mono">{sess.pendingMoneyAdjustmentGP} GP</strong> (Claimed item reduced cut from {sess.previousClaimedAmount} GP)</>
+                            ) : (
+                              <>⚠️ Adjustment Needed: <strong className="text-emerald-300 font-mono">+{sess.pendingMoneyAdjustmentGP} GP</strong> (Unclaimed item increased cut from {sess.previousClaimedAmount} GP)</>
+                            )}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+
+                    <div className="self-end sm:self-auto shrink-0 pt-1 sm:pt-0">
+                      <label className="flex items-center gap-2 cursor-pointer bg-background/60 hover:bg-background px-2.5 py-1.5 rounded-md border border-indigo-500/30 text-xs">
+                        <Checkbox
+                          checked={isClaimed && sess.pendingMoneyAdjustmentGP === 0}
+                          onCheckedChange={() => handleToggleSessionMoneyClaimed(sess.sessionId, netMoney)}
+                          className="border-indigo-400 data-[state=checked]:bg-emerald-600"
+                        />
+                        <span className={cn(
+                          "font-medium text-[11px]",
+                          isClaimed && sess.pendingMoneyAdjustmentGP === 0
+                            ? "text-emerald-300"
+                            : sess.pendingMoneyAdjustmentGP !== 0 && isClaimed
+                            ? "text-amber-300"
+                            : "text-muted-foreground"
+                        )}>
+                          {isClaimed
+                            ? sess.pendingMoneyAdjustmentGP !== 0
+                              ? 'Adjust on Sheet'
+                              : 'Money Added ✓'
+                            : 'Add Money to Sheet'}
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </CardContent>
         </Card>
       )}

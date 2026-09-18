@@ -785,6 +785,58 @@ export const markAllCharacterTransactionsClaimed = mutation({
             }
         }
 
+        // 7. Claim session money cuts
+        const attendedSessions = await ctx.db
+            .query('sessions')
+            .withIndex('by_locked', (q) => q.eq('locked', true))
+            .collect()
+
+        for (const sess of attendedSessions) {
+            const characters = sess.characters || []
+            if (!characters.includes(args.characterId)) continue
+
+            const existingLog = await ctx.db
+                .query('sessionClaimedLogs')
+                .withIndex('by_session_character', (q) =>
+                    q.eq('sessionId', sess._id).eq('characterId', args.characterId)
+                )
+                .first()
+
+            const lootList = sess.loot || []
+            const attendingCount = characters.length
+            const totalLootValue = lootList.reduce((sum, item) => {
+                const baseVal = item.isGood ? item.valueGP : item.valueGP / 2
+                const itemTotal = item.isPerCharacter ? baseVal * attendingCount : baseVal
+                return sum + itemTotal
+            }, 0)
+
+            const sharePerPlayer = totalLootValue / attendingCount
+            const characterClaimedItems = lootList.filter((item) => item.claimedBy === args.characterId)
+            const userClaimedValue = characterClaimedItems.reduce((sum, item) => {
+                const val = item.isGood ? item.valueGP : item.valueGP / 2
+                return sum + val
+            }, 0)
+            const currentNetMoneyGP = Math.round((sharePerPlayer - userClaimedValue) * 100) / 100
+
+            if (existingLog) {
+                if (existingLog.claimedMoneyAmount !== currentNetMoneyGP) {
+                    await ctx.db.patch(existingLog._id, {
+                        claimedMoneyAmount: currentNetMoneyGP,
+                        claimedAt: Date.now(),
+                    })
+                    count++
+                }
+            } else {
+                await ctx.db.insert('sessionClaimedLogs', {
+                    sessionId: sess._id,
+                    characterId: args.characterId,
+                    claimedMoneyAmount: currentNetMoneyGP,
+                    claimedAt: Date.now(),
+                })
+                count++
+            }
+        }
+
         return { success: true, count }
     },
 })
@@ -975,6 +1027,85 @@ export const getCharacterTransactions = query({
                 })
         )
 
+        // 5.5 Session Rewards (Claimed Loot Items & Net GP Cuts)
+        const lockedSessions = await ctx.db
+            .query('sessions')
+            .withIndex('by_locked', (q) => q.eq('locked', true))
+            .collect()
+        const attendedSessions = lockedSessions.filter(
+            (s) => Array.isArray(s.characters) && s.characters.includes(args.characterId!)
+        )
+
+        const sessionRewards = await Promise.all(
+            attendedSessions.map(async (sess) => {
+                let worldName = 'The Void'
+                if (sess.world) {
+                    const w = await ctx.db.get(sess.world)
+                    if (w) worldName = w.name
+                }
+
+                const lootList = sess.loot || []
+                const attendingCount = (sess.characters || []).length || 1
+
+                // Total session loot value
+                const totalLootValue = lootList.reduce((sum, item) => {
+                    const baseVal = item.isGood ? item.valueGP : item.valueGP / 2
+                    const itemTotal = item.isPerCharacter ? baseVal * attendingCount : baseVal
+                    return sum + itemTotal
+                }, 0)
+
+                const sharePerPlayer = totalLootValue / attendingCount
+
+                // Items claimed by THIS character
+                const characterClaimedItems = lootList.filter((item) => item.claimedBy === args.characterId)
+
+                // Total GP value of items claimed by THIS character
+                const userClaimedValue = characterClaimedItems.reduce((sum, item) => {
+                    const val = item.isGood ? item.valueGP : item.valueGP / 2
+                    return sum + val
+                }, 0)
+
+                // Net GP cut (Share minus value of claimed items)
+                const currentNetMoneyGP = Math.round((sharePerPlayer - userClaimedValue) * 100) / 100
+
+                // Check claimed log record
+                const claimedLog = await ctx.db
+                    .query('sessionClaimedLogs')
+                    .withIndex('by_session_character', (q) =>
+                        q.eq('sessionId', sess._id).eq('characterId', args.characterId!)
+                    )
+                    .first()
+
+                const isMoneyClaimed = Boolean(claimedLog)
+                const previousClaimedAmount = claimedLog ? claimedLog.claimedMoneyAmount : 0
+                // Outstanding diff: if money was already marked added, any reduction in cut shows as pending adjustment
+                const pendingMoneyAdjustmentGP = isMoneyClaimed
+                    ? Math.round((currentNetMoneyGP - previousClaimedAmount) * 100) / 100
+                    : currentNetMoneyGP
+
+                return {
+                    _id: sess._id,
+                    sessionId: sess._id,
+                    sessionName: `Session: ${worldName}`,
+                    worldName,
+                    completedAt: sess.date || sess._creationTime,
+                    claimedItems: characterClaimedItems.map((item) => ({
+                        id: item.id,
+                        name: item.name,
+                        valueGP: item.valueGP,
+                        isGood: item.isGood,
+                        link: item.link,
+                    })),
+                    sharePerPlayer: Math.round(sharePerPlayer * 100) / 100,
+                    userClaimedValue: Math.round(userClaimedValue * 100) / 100,
+                    currentNetMoneyGP,
+                    isMoneyClaimed,
+                    previousClaimedAmount,
+                    pendingMoneyAdjustmentGP,
+                }
+            })
+        )
+
         // 6. Completed Bets (Deathroll)
         const wonBetsRaw = await ctx.db
             .query('blackVoidBets')
@@ -1053,6 +1184,7 @@ export const getCharacterTransactions = query({
             sponsoredQuestReimbursements: completedSponsoredQuests,
             completedQuestsToPay,
             guildmasterAreaGains,
+            sessionRewards,
             betsWon,
             betsLost,
             currentMoney,

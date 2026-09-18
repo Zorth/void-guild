@@ -1404,6 +1404,51 @@ export const toggleGuildmasterCutClaimed = mutation({
   },
 })
 
+export const toggleSessionMoneyClaimed = mutation({
+  args: {
+    sessionId: v.id('sessions'),
+    characterId: v.id('characters'),
+    currentNetMoneyGP: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    const character = await ctx.db.get(args.characterId)
+    const isAdminUser = await isAdmin(ctx)
+    if (!character || (character.userId !== user.subject && !isAdminUser)) {
+      throw new Error('You do not own this character')
+    }
+
+    const existingLog = await ctx.db
+      .query('sessionClaimedLogs')
+      .withIndex('by_session_character', (q) =>
+        q.eq('sessionId', args.sessionId).eq('characterId', args.characterId)
+      )
+      .first()
+
+    if (existingLog) {
+      if (existingLog.claimedMoneyAmount !== args.currentNetMoneyGP) {
+        // Outstanding adjustment: update to the new current net money amount
+        await ctx.db.patch(existingLog._id, {
+          claimedMoneyAmount: args.currentNetMoneyGP,
+          claimedAt: Date.now(),
+        })
+      } else {
+        // Already fully claimed with no diff: toggle off
+        await ctx.db.delete(existingLog._id)
+      }
+    } else {
+      await ctx.db.insert('sessionClaimedLogs', {
+        sessionId: args.sessionId,
+        characterId: args.characterId,
+        claimedMoneyAmount: args.currentNetMoneyGP,
+        claimedAt: Date.now(),
+      })
+    }
+  },
+})
+
 export const getSessionState = query({
     args: { sessionId: v.id('sessions') },
     handler: async (ctx, args) => {
