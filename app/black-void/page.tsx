@@ -211,7 +211,7 @@ export default function BlackVoidPage() {
           </span>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap shrink-0 sm:ml-auto pr-0.5">
           {selectedChar?.money && (
             <div
               className="h-11 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 flex items-center gap-2 shadow-md shrink-0"

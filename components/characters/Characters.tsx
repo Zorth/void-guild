@@ -254,11 +254,11 @@ export default function Characters({ filters }: { filters?: { pf: boolean; dnd: 
                       {(cosmetics.cardClassName.includes('crimson-particle') || character.cosmetics?.bgColor === 'crimson_particles' || character.cosmetics?.bgColor === 'crimson-particle-bg') && (
                         <TintParticlesEffect variant="crimson" />
                       )}
-                      <div className="flex justify-between items-center w-full relative z-10">
-                        <div className="flex flex-col">
-                          <div className="flex items-center gap-2">
+                      <div className="flex justify-between items-center w-full relative z-10 min-w-0">
+                        <div className="flex flex-col min-w-0 flex-1 mr-2">
+                          <div className="flex items-center gap-2 min-w-0">
                             <span
-                              className={cn('font-medium relative', cosmetics.nameClassName)}
+                              className={cn('font-medium relative truncate', cosmetics.nameClassName)}
                               style={cosmetics.nameStyle}
                             >
                               {cosmetics.nameClassName?.includes('blaze-fire-text') && <BlazeTextParticles />}
@@ -272,19 +272,19 @@ export default function Characters({ filters }: { filters?: { pf: boolean; dnd: 
                                 e.stopPropagation()
                                 recordWikiVisit().then(() => syncAndGetAchievements()).catch(console.error)
                               }}
-                              className="text-muted-foreground hover:text-purple-500"
+                              className="text-muted-foreground hover:text-purple-500 shrink-0"
                             >
                               <Book size={16} />
                             </a>
                           </div>
                           {character.title && (
-                            <span className={cn('relative', cosmetics.titleClassName)} style={cosmetics.titleStyle}>
+                            <span className={cn('relative truncate text-xs', cosmetics.titleClassName)} style={cosmetics.titleStyle}>
                               {cosmetics.titleClassName?.includes('blaze-fire-text') && <BlazeTextParticles />}
                               {character.title}
                             </span>
                           )}
                           <span
-                            className={cn('relative', cosmetics.subtitleClassName)}
+                            className={cn('relative truncate text-xs', cosmetics.subtitleClassName)}
                             style={cosmetics.subtitleStyle}
                           >
                             {cosmetics.subtitleClassName?.includes('blaze-fire-text') && <BlazeTextParticles />}
@@ -295,14 +295,14 @@ export default function Characters({ filters }: { filters?: { pf: boolean; dnd: 
                               href={character.websiteLink}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-[10px] text-blue-500 hover:underline"
+                              className="text-[10px] text-blue-500 hover:underline truncate max-w-full block break-all"
                               onClick={(e) => e.stopPropagation()}
                             >
                               {character.websiteLink}
                             </a>
                           )}
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 shrink-0">
                           <div className="flex flex-col items-end">
                             <div className="flex items-center gap-1">
                               <CharacterRankIcon rank={character.rank} />

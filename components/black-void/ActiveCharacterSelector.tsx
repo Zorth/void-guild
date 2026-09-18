@@ -75,7 +75,7 @@ export default function ActiveCharacterSelector({
           <ChevronDown className="h-3.5 w-3.5 text-purple-400 shrink-0 opacity-70 ml-1" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[300px] p-2 bg-slate-950/95 border-purple-500/30 text-foreground shadow-2xl backdrop-blur-xl rounded-xl space-y-1">
+      <PopoverContent align="end" sideOffset={6} className="w-[300px] p-2 bg-slate-950/95 border-purple-500/30 text-foreground shadow-2xl backdrop-blur-xl rounded-xl space-y-1">
         <div className="px-2 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider border-b border-border/30 flex items-center justify-between">
           <span>Active Character</span>
           <span className="text-purple-400 font-mono">{characters.length} Available</span>
