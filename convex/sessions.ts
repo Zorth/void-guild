@@ -705,12 +705,15 @@ export async function checkUserMonthlySessionEligibility(
     return sDate.getFullYear() === targetYear && sDate.getMonth() === targetMonth
   })
 
+  // In the future: free non-members will be limited to 1 session per calendar month.
+  // Since memberships cannot be bought yet, sessions are not hard-blocked.
+  // We provide an informational note about the upcoming membership model.
   if (sessionsInTargetMonth.length >= 1) {
     const monthName = targetDate.toLocaleString('en-US', { month: 'long' })
     return {
-      eligible: false,
+      eligible: true,
       isFreeTier: true,
-      reason: `Free tier users can sign up for 1 session per calendar month. You are already signed up for a session in ${monthName} ${targetYear}. Upgrade to a Tarragon Kobold Membership (€10/mo) or run a session as a Voidmaster for unlimited play!`,
+      reason: `You already have ${sessionsInTargetMonth.length} session${sessionsInTargetMonth.length > 1 ? 's' : ''} in ${monthName} ${targetYear}. In the future, free tier will include 1 session/month and additional sessions will require a Tarragon Kobold Membership or Voidmaster GM status.`,
     }
   }
 
