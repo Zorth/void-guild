@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { useState, useEffect, useMemo } from 'react'
 import { Id, Doc } from '@/convex/_generated/dataModel'
 import Link from 'next/link'
-import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, Unlock, Globe, Scroll, Trophy, Menu, User, Target } from 'lucide-react'
+import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, Unlock, Globe, Scroll, Trophy, Menu, User, Target, UserPlus } from 'lucide-react'
 import { useAuth, SignInButton } from '@clerk/nextjs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatDate, formatTime as formatTimeUtil, getLevelBadgeStyle, getDualLevelBadgeStyle, CharacterRankIcon } from '@/lib/utils'
@@ -78,6 +78,7 @@ export default function SessionClient() {
   const forceLockSession = useMutation(api.sessions.forceLockSession)
   const forceUnlockSession = useMutation(api.sessions.forceUnlockSession)
   const adminAddCharacterToSession = useMutation(api.sessions.adminAddCharacterToSession)
+  const inviteCharacterToSession = useMutation(api.sessions.inviteCharacterToSession)
   const selectQuest = useMutation(api.sessions.selectQuest)
   const expressInterest = useMutation(api.sessions.expressInterest)
   const withdrawInterest = useMutation(api.sessions.withdrawInterest)
@@ -104,6 +105,10 @@ export default function SessionClient() {
 
   const [selectedCharacterId, setSelectedCharacterId] = useState<Id<'characters'> | ''>('')
   const [selectedAdminCharacterId, setSelectedAdminCharacterId] = useState<Id<'characters'> | ''>('')
+  const [selectedInviteCharacterId, setSelectedInviteCharacterId] = useState<Id<'characters'> | ''>('')
+  const [inviteSearchQuery, setInviteSearchQuery] = useState('')
+  const [isInviting, setIsInviting] = useState(false)
+  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false)
   const [isJoining, setIsJoining] = useState(false)
   const [isExpressingInterest, setIsExpressingInterest] = useState(false)
   const [leavingCharacterId, setLeavingCharacterId] = useState<string | null>(null)
@@ -372,6 +377,47 @@ export default function SessionClient() {
     }
   }
 
+  const canInvite = !session.locked && (
+    Boolean(isAdmin) || 
+    (Boolean(session.isPrivate) && (Boolean(session.isOwner) || hasUserCharacterInSession))
+  )
+
+  const availableInviteCharacters = useQuery(
+    api.sessions.getAvailableCharactersToInvite,
+    canInvite && session?._id ? { sessionId: session._id } : "skip"
+  )
+
+  const filteredInviteCharacters = useMemo(() => {
+    if (!availableInviteCharacters) return []
+    if (!inviteSearchQuery.trim()) return availableInviteCharacters
+    const q = inviteSearchQuery.toLowerCase()
+    return availableInviteCharacters.filter(c =>
+      c.name.toLowerCase().includes(q) ||
+      (c.class && c.class.toLowerCase().includes(q)) ||
+      (c.ownerName && c.ownerName.toLowerCase().includes(q)) ||
+      (c.rank && c.rank.toLowerCase().includes(q))
+    )
+  }, [availableInviteCharacters, inviteSearchQuery])
+
+  const handleInviteCharacter = async () => {
+    if (!selectedInviteCharacterId || !session) return
+    setIsInviting(true)
+    try {
+      await inviteCharacterToSession({
+        sessionId: session._id,
+        characterId: selectedInviteCharacterId as Id<'characters'>,
+      })
+      toast.success("Character invited to session!")
+      setSelectedInviteCharacterId('')
+      setInviteSearchQuery('')
+      setIsInviteDialogOpen(false)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to invite character')
+    } finally {
+      setIsInviting(false)
+    }
+  }
+
   const availableCharacters = (userCharacters ?? []).filter(char => 
     !session.characters.includes(char._id) && char.system === session.system
   )
@@ -397,7 +443,7 @@ export default function SessionClient() {
       {!session.isOwner && (
         <>
           <Authenticated>
-            {!hasUserCharacterInSession && (
+            {!hasUserCharacterInSession && !session.isPrivate && (
                 <Card className={session.planning ? "border-purple-200 bg-purple-50/20" : ""}>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-lg">
@@ -439,6 +485,7 @@ export default function SessionClient() {
                 <SessionJoinForm 
                   sessionLocked={session.locked}
                   sessionPlanning={session.planning}
+                  sessionIsPrivate={session.isPrivate}
                   isFull={isFull}
                   availableCharacters={availableCharacters}
                   userCharactersCount={userCharacters?.length ?? 0}
@@ -645,7 +692,7 @@ export default function SessionClient() {
 
         {/* Central pillar area */}
         <main className="w-full max-w-2xl mx-auto lg:mx-0 lg:col-start-1 2xl:col-start-2 space-y-8 pb-12">
-              <Card className={session.locked ? "border-amber-200 bg-amber-50/10" : session.planning ? "border-purple-200 bg-purple-50/10" : ""}>
+              <Card className={session.locked ? "border-amber-200 bg-amber-50/10" : session.isPrivate ? "border-amber-500/30 bg-amber-500/5" : session.planning ? "border-purple-200 bg-purple-50/10" : ""}>
                 <CardHeader>
                   <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                     <div className="space-y-4 flex-grow w-full">
@@ -654,6 +701,12 @@ export default function SessionClient() {
                             <span className="break-words">{session.worldName}</span>
                             <div className="flex items-center gap-2 shrink-0">
                                 {session.locked && <LockIcon className="h-5 w-5 text-amber-500" />}
+                                {session.isPrivate && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-bold text-amber-500 border border-amber-500/30 shadow-xs uppercase tracking-wider">
+                                        <LockIcon className="h-3 w-3" />
+                                        Private
+                                    </span>
+                                )}
                                 {session.planning && <div className="text-[10px] bg-purple-600 text-white px-2 py-0.5 rounded-full uppercase tracking-widest font-black shadow-sm">Planning</div>}
                                 <a 
                                     href={`https://void.tarragon.be/Session-Reports/${session.date ? new Date(session.date).toISOString().slice(0, 10) : 'TBD'}-${session.worldName.replace(/\s+/g, '-')}`} 
@@ -741,6 +794,17 @@ export default function SessionClient() {
                         {session.attendingCharacters.length} / {session.maxPlayers} Players
                     </div>
                   </div>
+                  {session.isPrivate && (
+                    <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-md text-sm text-amber-600 dark:text-amber-400 font-medium flex items-start gap-2.5">
+                        <LockIcon className="h-4 w-4 shrink-0 mt-0.5 text-amber-500" /> 
+                        <div className="space-y-0.5">
+                            <span className="font-bold">Private Session (Invite-Only)</span>
+                            <p className="text-xs text-muted-foreground font-normal">
+                                This session is reserved for a Journeyman or Guildmaster rank-up quest. Only the Voidmaster or attending players can invite characters.
+                            </p>
+                        </div>
+                    </div>
+                  )}
                   {session.locked && (
                     <div className="mt-4 p-3 bg-amber-100/50 border border-amber-200 rounded-md text-sm text-amber-700 font-medium flex items-center gap-2">
                         <LockIcon className="h-4 w-4 shrink-0" /> 
@@ -866,49 +930,83 @@ export default function SessionClient() {
 
                 <CardContent>
                   <h3 className="text-xl font-semibold mb-4 flex items-center justify-between">
-                    Attending Characters
-                    {isAdmin && (
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" size="sm" className="ml-2 h-7 w-7 p-0">
-                            +
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-[425px]">
-                          <DialogHeader>
-                            <DialogTitle>Admin: Add Character</DialogTitle>
-                            <DialogDescription>Select a character to add to this session.</DialogDescription>
-                          </DialogHeader>
-                          <div className="grid gap-4 py-4">
-                            {session.locked ? (
-                              <p className="text-sm text-muted-foreground italic text-center p-4 bg-muted/30 rounded-md">This session has ended.</p>
-                            ) : isFull ? (
-                              <p className="text-sm text-destructive italic text-center p-4 bg-destructive/5 rounded-md">This session is full, cannot add more.</p>
-                            ) : allCharacters && allCharacters.length > 0 ? (
-                              <div className="space-y-4">
-                                <div className="flex flex-col gap-2">
-                                  <label htmlFor="admin-character-select" className="text-sm font-medium">Select Character</label>
-                                  <select
-                                    id="admin-character-select"
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                    value={selectedAdminCharacterId}
-                                    onChange={(e) => setSelectedAdminCharacterId(e.target.value as Id<'characters'>)}
+                    <span>Attending Characters</span>
+                    <div className="flex items-center gap-2">
+                      {canInvite && (
+                        <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" size="sm" className="gap-1.5 text-xs font-semibold">
+                              <UserPlus className="h-3.5 w-3.5" />
+                              Invite Character
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="sm:max-w-[425px]">
+                            <DialogHeader>
+                              <DialogTitle className="flex items-center gap-2">
+                                <UserPlus className="h-4 w-4 text-primary" />
+                                Invite Character
+                              </DialogTitle>
+                              <DialogDescription>
+                                {session.isPrivate 
+                                  ? "Invite a character to join this private Journeyman or Guildmaster rank-up quest."
+                                  : "Select a character to add to this session."}
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="grid gap-4 py-4">
+                              {session.locked ? (
+                                <p className="text-sm text-muted-foreground italic text-center p-4 bg-muted/30 rounded-md">This session has ended.</p>
+                              ) : isFull ? (
+                                <p className="text-sm text-destructive italic text-center p-4 bg-destructive/5 rounded-md">This session is full, cannot add more players.</p>
+                              ) : availableInviteCharacters && availableInviteCharacters.length > 0 ? (
+                                <div className="space-y-4">
+                                  <div className="space-y-1.5">
+                                    <label htmlFor="invite-search" className="text-xs font-medium text-muted-foreground">Search Characters</label>
+                                    <input
+                                      id="invite-search"
+                                      type="text"
+                                      placeholder="Filter by name, class, or player..."
+                                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                      value={inviteSearchQuery}
+                                      onChange={(e) => setInviteSearchQuery(e.target.value)}
+                                    />
+                                  </div>
+                                  <div className="flex flex-col gap-1.5">
+                                    <label htmlFor="invite-character-select" className="text-sm font-medium">Select Character</label>
+                                    <select
+                                      id="invite-character-select"
+                                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                      value={selectedInviteCharacterId}
+                                      onChange={(e) => setSelectedInviteCharacterId(e.target.value as Id<'characters'>)}
+                                    >
+                                      <option value="">-- Choose a character ({filteredInviteCharacters.length} available) --</option>
+                                      {filteredInviteCharacters.map((char) => {
+                                        const rankStr = char.rank && char.rank !== 'none' ? ` [${char.rank.toUpperCase()}]` : '';
+                                        return (
+                                          <option key={char._id} value={char._id}>
+                                            {char.name} (Lvl {char.lvl} {char.class || 'Unknown'}{rankStr}) - {char.ownerName}
+                                          </option>
+                                        );
+                                      })}
+                                    </select>
+                                  </div>
+                                  <Button 
+                                    className="w-full" 
+                                    disabled={!selectedInviteCharacterId || isInviting} 
+                                    onClick={handleInviteCharacter}
                                   >
-                                    <option value="">-- Choose a character --</option>
-                                    {adminAvailableCharacters.map((char) => (
-                                      <option key={char._id} value={char._id}>{char.name} (Lvl {char.lvl})</option>
-                                    ))}
-                                  </select>
+                                    {isInviting ? 'Inviting...' : 'Invite Character'}
+                                  </Button>
                                 </div>
-                                <Button className="w-full" disabled={!selectedAdminCharacterId} onClick={handleAdminAddCharacter}>Add Character (Admin)</Button>
-                              </div>
-                            ) : (
-                              <p className="text-sm text-muted-foreground italic text-center p-4 bg-muted/10 rounded-md">No characters available to add.</p>
-                            )}
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                    )}
+                              ) : availableInviteCharacters === undefined ? (
+                                <p className="text-sm text-muted-foreground italic text-center p-4 bg-muted/10 rounded-md">Loading characters...</p>
+                              ) : (
+                                <p className="text-sm text-muted-foreground italic text-center p-4 bg-muted/10 rounded-md">No eligible characters available to invite.</p>
+                              )}
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                      )}
+                    </div>
                   </h3>
                   <AttendingCharactersList 
                     sessionId={session._id}

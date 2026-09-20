@@ -585,6 +585,9 @@ function FiveDayOverview({ sessions, userCharacterIds }: { sessions: SessionWith
                                                             {typeof displayLevel === 'number' ? `Lvl ${displayLevel}` : displayLevel}
                                                         </span>
                                                     )}
+                                                    {session.isPrivate && (
+                                                        <Lock className="h-3 w-3 text-amber-500 shrink-0 ml-auto" />
+                                                    )}
                                                 </div>
                                                 <span className="font-semibold text-xs leading-tight truncate text-foreground group-hover:text-primary transition-colors">
                                                     {session.worldName}
@@ -984,6 +987,12 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
                                     </Tooltip>
                                   )}
                               </div>
+                              {session.isPrivate && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-500 border border-amber-500/30 uppercase tracking-wider">
+                                  <Lock className="h-2.5 w-2.5" />
+                                  Private
+                                </span>
+                              )}
                               {isPlanning && <div className="text-[10px] bg-purple-600 text-white px-2 py-0.5 rounded-full uppercase tracking-widest font-black shadow-sm">Planning</div>}
                               {!isPlanning && session.characters.length >= session.maxPlayers && (
                                 <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800 uppercase tracking-wider">

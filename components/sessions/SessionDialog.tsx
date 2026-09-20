@@ -39,6 +39,7 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
   const [location, setLocation] = useState(session?.location || '')
   const [system, setSystem] = useState<'PF' | 'DnD'>(session?.system || 'PF')
   const [planning, setPlanning] = useState(session?.planning || false)
+  const [isPrivate, setIsPrivate] = useState(session?.isPrivate || false)
   const [isOpen, setIsOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -75,6 +76,7 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
         setLocation(session.location || '')
         setSystem(session.system || 'PF')
         setPlanning(session.planning || false)
+        setIsPrivate(session.isPrivate || false)
       } else {
         setDate('')
         setTime('')
@@ -85,6 +87,7 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
         setLocation('')
         setSystem('PF')
         setPlanning(false)
+        setIsPrivate(false)
       }
     }
   }
@@ -145,8 +148,9 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
           location: locationVal,
           system: system,
           planning: planning,
+          isPrivate: isPrivate,
         })
-        track('session_updated', { worldName: worldName?.name, system, planning });
+        track('session_updated', { worldName: worldName?.name, system, planning, isPrivate });
       } else {
         // Trigger particle effect at the mouse position for new sessions
         if ('clientX' in event.nativeEvent) {
@@ -164,8 +168,9 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
           location: locationVal,
           system: system,
           planning: planning,
+          isPrivate: isPrivate,
         })
-        track('session_created', { worldName: worldName?.name, system, planning });
+        track('session_created', { worldName: worldName?.name, system, planning, isPrivate });
       }
       setIsOpen(false)
     } finally {
@@ -212,6 +217,27 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
                 </label>
                 <p className="text-[10px] text-muted-foreground">
                     Gauge interest before setting a firm date. Signups will be disabled.
+                </p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2 bg-muted/30 p-3 rounded-lg border border-amber-500/20">
+            <input 
+              type="checkbox" 
+              id="private-toggle" 
+              className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+              checked={isPrivate}
+              onChange={(e) => setIsPrivate(e.target.checked)}
+            />
+            <div className="grid gap-1.5 leading-none">
+                <label
+                    htmlFor="private-toggle"
+                    className="text-sm font-bold leading-none cursor-pointer flex items-center gap-1.5 text-amber-600 dark:text-amber-400"
+                >
+                    <span>🔒 Private Session (Invite-Only)</span>
+                </label>
+                <p className="text-[10px] text-muted-foreground">
+                    Used for Journeyman or Guildmaster rank-up quests. Signups are restricted to invited characters.
                 </p>
             </div>
           </div>

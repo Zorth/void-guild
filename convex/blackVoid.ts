@@ -5,10 +5,10 @@ import { isAdmin } from './roles'
 
 // Helper function to decorate a listing with character info
 async function decorateListing(ctx: QueryCtx, listing: Doc<'blackVoidListings'>) {
-    const seller = await ctx.db.get('characters', listing.characterId)
+    const seller = await ctx.db.get(listing.characterId)
     let winningBidder: Doc<'characters'> | null = null
     if (listing.winningBidderCharacterId) {
-        winningBidder = await ctx.db.get('characters', listing.winningBidderCharacterId)
+        winningBidder = await ctx.db.get(listing.winningBidderCharacterId)
     }
 
     // Count total bids
@@ -23,6 +23,7 @@ async function decorateListing(ctx: QueryCtx, listing: Doc<'blackVoidListings'>)
         sellerLevel: seller?.lvl || 1,
         sellerClass: seller?.class,
         sellerAncestry: seller?.ancestry,
+        sellerUserId: seller?.userId || null,
         winningBidderName: winningBidder?.name || null,
         totalBids: bids.length,
     }
@@ -338,7 +339,12 @@ export const placeBid = mutation({
             throw new Error('This listing has expired.')
         }
 
-        // 1. Enforce positive integers and 2-sig-fig rounding
+        // Check if listing is buyout only
+        if (!args.isBuyout && listing.startingBid === undefined) {
+            throw new Error('This listing is Buyout Only and does not accept bids.')
+        }
+
+        // 1. Enforce positive integers and 2-sig-fig rounding for bids
         const rawAmount = Math.max(1, Math.round(args.amount))
         const amount = roundToTwoSigFigs(rawAmount)
 
@@ -352,7 +358,10 @@ export const placeBid = mutation({
                 (amount >= listing.buyoutPrice || maxAutoBid >= listing.buyoutPrice))
 
         if (isBuyoutTriggered) {
-            const finalAmount = listing.buyoutPrice ? roundToTwoSigFigs(listing.buyoutPrice) : amount
+            if (listing.buyoutPrice === undefined) {
+                throw new Error('This listing does not have a buyout option.')
+            }
+            const finalAmount = listing.buyoutPrice
 
             await ctx.db.insert('blackVoidBids', {
                 listingId: args.listingId,
@@ -457,7 +466,7 @@ export const placeBid = mutation({
             }
 
             if (listing.buyoutPrice !== undefined && newWinningAmount >= listing.buyoutPrice) {
-                const buyoutAmt = roundToTwoSigFigs(listing.buyoutPrice)
+                const buyoutAmt = listing.buyoutPrice
                 await ctx.db.insert('blackVoidBids', {
                     listingId: args.listingId,
                     characterId: args.characterId,
@@ -520,7 +529,7 @@ export const placeBid = mutation({
             }
 
             if (listing.buyoutPrice !== undefined && newWinningAmount >= listing.buyoutPrice) {
-                const buyoutAmt = roundToTwoSigFigs(listing.buyoutPrice)
+                const buyoutAmt = listing.buyoutPrice
                 await ctx.db.insert('blackVoidBids', {
                     listingId: args.listingId,
                     characterId: currentWinnerId,

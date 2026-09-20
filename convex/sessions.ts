@@ -222,6 +222,7 @@ export const getPublicSession = query({
         .map(c => ({ name: c.name, lvl: c.lvl })),
       interestedCount: (session.interestedPlayers || []).length,
       planning: session.planning,
+      isPrivate: session.isPrivate,
       location: session.location,
     };
   },
@@ -513,6 +514,7 @@ export const createSession = mutation({
     location: v.optional(v.string()),
     system: v.union(v.literal('PF'), v.literal('DnD')),
     planning: v.optional(v.boolean()),
+    isPrivate: v.optional(v.boolean()),
     questId: v.optional(v.id('quests')),
   },
   handler: async (ctx, args) => {
@@ -547,6 +549,7 @@ export const createSession = mutation({
       owner: identity.subject,
       system: args.system,
       planning: args.planning,
+      isPrivate: args.isPrivate,
       questId: args.questId,
     })
 
@@ -570,6 +573,7 @@ export const updateSession = mutation({
     location: v.optional(v.string()),
     system: v.union(v.literal('PF'), v.literal('DnD')),
     planning: v.optional(v.boolean()),
+    isPrivate: v.optional(v.boolean()),
     questId: v.optional(v.id('quests')),
   },
   handler: async (ctx, args) => {
@@ -596,6 +600,7 @@ export const updateSession = mutation({
       location: args.location,
       system: args.system,
       planning: args.planning,
+      isPrivate: args.isPrivate,
       questId: args.questId,
     })
 
@@ -760,6 +765,10 @@ export const joinSession = mutation({
       throw new Error('This session is locked. You cannot join or leave.')
     }
 
+    if (session.isPrivate) {
+      throw new Error('This session is private (invite-only). You must be invited by the Voidmaster or an attending player.')
+    }
+
     if (session.planning) {
         throw new Error('This session is in planning and cannot be joined yet.')
     }
@@ -850,6 +859,136 @@ export const adminAddCharacterToSession = mutation({
           sessionId: args.sessionId
       })
     },
+})
+
+export const inviteCharacterToSession = mutation({
+  args: {
+    sessionId: v.id('sessions'),
+    characterId: v.id('characters'),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    const session = await ctx.db.get(args.sessionId)
+    if (!session) throw new Error('Session not found')
+
+    const isAdminUser = await isAdmin(ctx)
+    const isOwner = session.owner === user.subject
+
+    // Check if the caller has a character in the session
+    const userCharacters = await ctx.db
+      .query('characters')
+      .withIndex('by_userId', (q) => q.eq('userId', user.subject))
+      .collect()
+    const userCharIds = new Set(userCharacters.map((c) => c._id))
+    const isAttending = session.characters.some((id) => userCharIds.has(id))
+
+    if (!isOwner && !isAdminUser && !isAttending) {
+      throw new Error('Only the Voidmaster, an attending player, or an admin can invite characters to this session.')
+    }
+
+    if (session.locked) {
+      throw new Error('This session is locked. You cannot invite characters.')
+    }
+
+    if (session.characters.length >= session.maxPlayers) {
+      throw new Error('This session is full.')
+    }
+
+    if (session.characters.includes(args.characterId)) {
+      return // Character already in session
+    }
+
+    const character = await ctx.db.get(args.characterId)
+    if (!character) throw new Error('Character not found')
+
+    if (character.system !== session.system) {
+      throw new Error(`This is a ${session.system} session, but this character is ${character.system}.`)
+    }
+
+    // Check if that player already has another character in this session
+    const sessionChars = await Promise.all(
+      session.characters.map((id) => ctx.db.get(id))
+    )
+    const hasUserCharacterAlready = sessionChars.some(
+      (c) => c && c.userId === character.userId
+    )
+    if (hasUserCharacterAlready) {
+      throw new Error('That player already has a character in this session.')
+    }
+
+    await ctx.db.patch(args.sessionId, {
+      characters: [...session.characters, args.characterId],
+      interestedPlayers: (session.interestedPlayers || []).filter(
+        (p) => p.userId !== character.userId
+      ),
+    })
+
+    await ctx.scheduler.runAfter(0, internal.discord.syncSessionToDiscord, {
+      sessionId: args.sessionId,
+    })
+  },
+})
+
+export const getAvailableCharactersToInvite = query({
+  args: { sessionId: v.id('sessions') },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) return []
+
+    const session = await ctx.db.get(args.sessionId)
+    if (!session) return []
+
+    const isAdminUser = await isAdmin(ctx)
+    const isOwner = session.owner === user.subject
+    const userCharacters = await ctx.db
+      .query('characters')
+      .withIndex('by_userId', (q) => q.eq('userId', user.subject))
+      .collect()
+    const userCharIds = new Set(userCharacters.map((c) => c._id))
+    const isAttending = session.characters.some((id) => userCharIds.has(id))
+
+    if (!isOwner && !isAdminUser && !isAttending) {
+      return []
+    }
+
+    const allChars = await ctx.db.query('characters').collect()
+    const sessionCharSet = new Set(session.characters)
+
+    // Filter characters matching system and not already in this session
+    const matching = allChars.filter(
+      (c) => c.system === session.system && !sessionCharSet.has(c._id)
+    )
+
+    // Resolve owner usernames/names for easier identification
+    const userIds = Array.from(new Set(matching.map((c) => c.userId)))
+    const usersMap = new Map<string, string>()
+    await Promise.all(
+      userIds.map(async (uId) => {
+        const u = await ctx.db
+          .query('users')
+          .withIndex('by_userId', (q) => q.eq('userId', uId))
+          .first()
+        if (u) {
+          usersMap.set(uId, u.name || u.username || 'Unknown')
+        }
+      })
+    )
+
+    return matching
+      .map((c) => ({
+        _id: c._id,
+        name: c.name,
+        lvl: c.lvl,
+        class: c.class,
+        system: c.system,
+        rank: c.rank,
+        title: c.title,
+        ownerName: usersMap.get(c.userId) || 'Unknown Player',
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  },
 })
 
 export const leaveSession = mutation({

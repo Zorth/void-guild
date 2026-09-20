@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useMutation, useQuery } from 'convex/react'
+import { useAuth, SignInButton } from '@clerk/nextjs'
 import { api } from '@/convex/_generated/api'
 import { Id } from '@/convex/_generated/dataModel'
 import {
@@ -14,8 +15,9 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
-import { Coins, Zap, ExternalLink, User, Bot, HelpCircle, AlertCircle } from 'lucide-react'
+import { Coins, Zap, ExternalLink, User, Bot, HelpCircle, AlertCircle, Loader2, ShieldAlert, Award } from 'lucide-react'
 import { roundToTwoSigFigs, getNextValidBid } from '@/lib/blackVoidUtils'
+import Link from 'next/link'
 
 interface BidDialogProps {
   isOpen: boolean
@@ -42,32 +44,66 @@ export default function BidDialog({
   characterWealth,
   onSelectCharacter,
 }: BidDialogProps) {
+  const { userId, isSignedIn } = useAuth()
   const [selectedCharId, setSelectedCharId] = useState<Id<'characters'> | null>(characterId)
   const [bidAmount, setBidAmount] = useState<string>('')
   const [enableAutoBid, setEnableAutoBid] = useState<boolean>(false)
   const [maxAutoBidAmount, setMaxAutoBidAmount] = useState<string>('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const userCharacters = useQuery(api.blackVoid.getUserCharacters, {system: 'PF'})
+  const userCharacters = useQuery(api.blackVoid.getUserCharacters, { system: 'PF' })
   const placeBid = useMutation(api.blackVoid.placeBid)
 
+  const hasBidding = listing ? (listing.startingBid !== undefined || (listing.winningAmount && listing.winningAmount > 0)) : false
+  const isBuyoutOnly = listing ? (listing.startingBid === undefined && listing.buyoutPrice !== undefined) : false
+
+  const currentHighest = listing?.winningAmount || 0
+  const startingBid = listing?.startingBid || 0
+  const minRequired = currentHighest > 0 ? getNextValidBid(currentHighest) : startingBid || 1
+
+  // Synchronize active character and prefill minimum bid whenever dialog opens or listing changes
   useEffect(() => {
-    if (characterId) {
-      setSelectedCharId(characterId)
-    } else if (userCharacters && userCharacters.length > 0 && !selectedCharId) {
-      setSelectedCharId(userCharacters[0]._id)
+    if (isOpen && listing) {
+      if (characterId) {
+        setSelectedCharId(characterId)
+      } else if (userCharacters && userCharacters.length > 0) {
+        setSelectedCharId((prev) => {
+          if (prev && userCharacters.some((c: any) => c._id === prev)) return prev
+          return userCharacters[0]._id
+        })
+      }
+
+      if (hasBidding) {
+        const curHighest = listing.winningAmount || 0
+        const startBid = listing.startingBid || 0
+        const minReq = curHighest > 0 ? getNextValidBid(curHighest) : startBid || 1
+        setBidAmount(String(minReq))
+      } else {
+        setBidAmount('')
+      }
+      setMaxAutoBidAmount('')
+      setEnableAutoBid(false)
     }
-  }, [characterId, userCharacters, isOpen])
+  }, [isOpen, listing?._id, characterId, userCharacters, hasBidding])
 
   if (!listing) return null
 
-  const activeChar = userCharacters?.find((c: any) => c._id === selectedCharId)
+  // Resolve active character
+  const activeCharId = selectedCharId || characterId || userCharacters?.[0]?._id || null
+  const activeChar = userCharacters?.find((c: any) => c._id === activeCharId)
   const effectiveWealth = activeChar?.money || characterWealth
   const effectiveCharName = activeChar?.name || characterName
 
-  const currentHighest = listing.winningAmount || 0
-  const startingBid = listing.startingBid || 0
-  const minRequired = currentHighest > 0 ? getNextValidBid(currentHighest) : startingBid || 1
+  // Block bidding on own listings
+  const userCharacterIds = new Set((userCharacters || []).map((c: any) => c._id))
+  const isOwnListing = Boolean(
+    (userId && listing.sellerUserId === userId) ||
+    (listing.characterId && userCharacterIds.has(listing.characterId))
+  )
+
+  const isCurrentTopBidder = Boolean(
+    activeCharId && listing.winningBidderCharacterId === activeCharId
+  )
 
   const parsedBid = parseFloat(bidAmount)
   const roundedBidPreview = !isNaN(parsedBid) && parsedBid > 0 ? roundToTwoSigFigs(parsedBid) : null
@@ -81,13 +117,26 @@ export default function BidDialog({
   }
 
   const handlePlaceBid = async (isBuyout: boolean) => {
-    const targetCharId = selectedCharId || characterId
+    if (!isSignedIn) {
+      toast.error('Please sign in to place a bid or buy out items.')
+      return
+    }
+
+    const targetCharId = activeCharId
     if (!targetCharId) {
       toast.error('Please select an active character to place a bid.')
       return
     }
 
-    let amount = isBuyout ? listing.buyoutPrice : parseFloat(bidAmount)
+    if (isOwnListing) {
+      toast.error('You cannot bid on or buy out your own listing.')
+      return
+    }
+
+    // Default to minRequired if bidAmount wasn't explicitly typed
+    const rawBidVal = parseFloat(bidAmount)
+    const effectiveBid = !isNaN(rawBidVal) && rawBidVal > 0 ? rawBidVal : minRequired
+    const amount = isBuyout ? listing.buyoutPrice : effectiveBid
 
     if (!isBuyout && (!amount || amount < minRequired)) {
       toast.error(`Bid must be at least ${minRequired} GP.`)
@@ -133,47 +182,84 @@ export default function BidDialog({
     }
   }
 
-  // Block bidding on any listing from the user's own characters
-  const userCharacterIds = useMemo(() => new Set((userCharacters || []).map((c: any) => c._id)), [userCharacters])
-  const isOwnListing = userCharacterIds.has(listing.characterId)
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px] border-purple-500/40 bg-card/95 backdrop-blur-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-lg font-bold text-purple-300">
-            <Coins className="h-5 w-5 text-amber-400" />
-            Place Bid / Auto-Bid
+            {isBuyoutOnly ? (
+              <>
+                <Zap className="h-5 w-5 text-emerald-400" />
+                Buy Out Listing
+              </>
+            ) : (
+              <>
+                <Coins className="h-5 w-5 text-amber-400" />
+                Place Bid / Auto-Bid
+              </>
+            )}
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          {/* Character Selector */}
-          <div className="space-y-1.5 bg-purple-950/20 border border-purple-500/30 p-2.5 rounded-lg">
-            <label className="text-xs font-bold uppercase tracking-wider text-purple-300 flex items-center gap-1.5">
-              <User className="h-3.5 w-3.5 text-purple-400" />
-              Bidding Character
-            </label>
-            <select
-              value={selectedCharId || ''}
-              onChange={(e) => handleCharacterChange(e.target.value as Id<'characters'>)}
-              className="w-full h-9 rounded-md border border-purple-500/40 bg-background/90 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-purple-400 text-foreground"
-            >
-              {(userCharacters || []).map((char: any) => (
-                <option key={char._id} value={char._id}>
-                  {char.name} (Lvl {char.lvl} {char.class || 'Adventurer'})
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Character Selector or Auth Notice */}
+          {!isSignedIn ? (
+            <div className="p-3.5 rounded-xl bg-purple-950/40 border border-purple-500/30 text-center space-y-2.5">
+              <AlertCircle className="h-5 w-5 text-purple-400 mx-auto" />
+              <p className="text-xs text-purple-200">
+                You must sign in to place bids or purchase items on The Black Void.
+              </p>
+              <SignInButton mode="modal">
+                <Button size="sm" className="bg-purple-600 hover:bg-purple-700 text-xs font-bold px-4">
+                  Sign In
+                </Button>
+              </SignInButton>
+            </div>
+          ) : userCharacters === undefined ? (
+            <div className="h-14 rounded-lg bg-purple-950/20 border border-purple-500/30 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
+              Loading your characters...
+            </div>
+          ) : userCharacters.length === 0 ? (
+            <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-center space-y-2">
+              <User className="h-5 w-5 text-amber-400 mx-auto" />
+              <p className="text-xs text-amber-200 font-medium">
+                No active Pathfinder character found.
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                You must create or import a character to bid or buy items.
+              </p>
+              <Button asChild size="sm" variant="outline" className="border-amber-500/40 text-amber-300 text-xs font-semibold">
+                <Link href="/characters">Go to Characters</Link>
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-1.5 bg-purple-950/20 border border-purple-500/30 p-2.5 rounded-lg">
+              <label className="text-xs font-bold uppercase tracking-wider text-purple-300 flex items-center gap-1.5">
+                <User className="h-3.5 w-3.5 text-purple-400" />
+                Bidding / Buying Character
+              </label>
+              <select
+                value={activeCharId || ''}
+                onChange={(e) => handleCharacterChange(e.target.value as Id<'characters'>)}
+                className="w-full h-9 rounded-md border border-purple-500/40 bg-background/90 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-purple-400 text-foreground"
+              >
+                {userCharacters.map((char: any) => (
+                  <option key={char._id} value={char._id}>
+                    {char.name} (Lvl {char.lvl} {char.class || 'Adventurer'})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Listing Summary */}
           <div className="p-3 rounded-lg bg-muted/20 border border-border/30 space-y-2">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="font-bold text-base text-foreground">{listing.name}</h3>
+            <div className="flex justify-between items-start gap-2">
+              <div className="min-w-0">
+                <h3 className="font-bold text-base text-foreground truncate">{listing.name}</h3>
                 <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                  <User className="h-3 w-3" /> Seller: {listing.sellerName} (Lvl {listing.sellerLevel})
+                  <User className="h-3 w-3 shrink-0" /> Seller: {listing.sellerName} (Lvl {listing.sellerLevel})
                 </p>
               </div>
               {listing.nethysUrl && (
@@ -199,12 +285,18 @@ export default function BidDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="p-3 rounded-md bg-purple-950/30 border border-purple-500/20 text-center">
               <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider block">
-                Current Winning Bid
+                {isBuyoutOnly ? 'Listing Type' : 'Current Winning Bid'}
               </span>
               <span className="text-xl font-bold text-amber-400 font-mono">
-                {currentHighest > 0 ? `${currentHighest} GP` : startingBid > 0 ? `${startingBid} GP (Start)` : 'No bids'}
+                {isBuyoutOnly
+                  ? 'Buyout Only'
+                  : currentHighest > 0
+                  ? `${currentHighest} GP`
+                  : startingBid > 0
+                  ? `${startingBid} GP (Start)`
+                  : 'No bids'}
               </span>
-              {listing.winningBidderName && (
+              {!isBuyoutOnly && listing.winningBidderName && (
                 <span className="text-[10px] text-purple-300 block truncate mt-0.5">
                   by {listing.winningBidderName}
                 </span>
@@ -224,22 +316,38 @@ export default function BidDialog({
             </div>
           </div>
 
-          {/* Explanation Banner */}
-          <div className="p-3 rounded-lg bg-purple-950/40 border border-purple-500/30 space-y-1.5 text-xs">
-            <div className="flex items-center gap-1.5 font-bold text-purple-300">
-              <Bot className="h-4 w-4 text-purple-400 shrink-0" />
-              Auto-Bidding & 2-Significant-Digit Rounding
+          {/* Top Bidder Badge */}
+          {isCurrentTopBidder && (
+            <div className="p-2.5 rounded-lg bg-purple-950/60 border border-purple-500/40 text-xs flex items-center gap-2">
+              <Award className="h-4 w-4 text-purple-400 shrink-0" />
+              <div>
+                <span className="font-bold text-purple-200">You are the current top bidder!</span>
+                <span className="text-[11px] text-purple-300/80 block">
+                  Winning bid: <strong className="font-mono">{currentHighest} GP</strong>
+                  {listing.maxAutoBid && <> • Auto-bid cap: <strong className="font-mono">{listing.maxAutoBid} GP</strong></>}
+                </span>
+              </div>
             </div>
-            <p className="text-[11px] text-purple-200/90 leading-relaxed">
-              Auto-bidding automatically increases your bid up to your maximum cap whenever another player bids on this item.
-            </p>
-            <div className="text-[10px] text-purple-300/80 border-t border-purple-500/20 pt-1.5 flex items-start gap-1">
-              <HelpCircle className="h-3 w-3 text-purple-400 shrink-0 mt-0.5" />
-              <span>
-                All bids use whole GP numbers rounded to <strong>2 significant figures</strong> (e.g., 1–99 GP in 1 GP steps; 100–990 GP in 10 GP steps; 1,000+ GP in 100 GP steps). Amounts like 101 or 1,010 GP are rounded to 100 or 1,000 GP.
-              </span>
+          )}
+
+          {/* Auto-Bid Explanation Banner (only if bidding is supported) */}
+          {hasBidding && !isBuyoutOnly && (
+            <div className="p-3 rounded-lg bg-purple-950/40 border border-purple-500/30 space-y-1.5 text-xs">
+              <div className="flex items-center gap-1.5 font-bold text-purple-300">
+                <Bot className="h-4 w-4 text-purple-400 shrink-0" />
+                Auto-Bidding & 2-Significant-Digit Rounding
+              </div>
+              <p className="text-[11px] text-purple-200/90 leading-relaxed">
+                Auto-bidding automatically increases your bid up to your maximum cap whenever another player bids on this item.
+              </p>
+              <div className="text-[10px] text-purple-300/80 border-t border-purple-500/20 pt-1.5 flex items-start gap-1">
+                <HelpCircle className="h-3 w-3 text-purple-400 shrink-0 mt-0.5" />
+                <span>
+                  All bids use whole GP numbers rounded to <strong>2 significant figures</strong> (e.g. 1–99 GP in 1 GP steps; 100–990 GP in 10 GP steps; 1,000+ GP in 100 GP steps).
+                </span>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Active Character Wealth Display */}
           {effectiveWealth && (
@@ -255,7 +363,8 @@ export default function BidDialog({
                   <span className="text-sm font-bold text-amber-300 font-mono">
                     {effectiveWealth.totalInGold % 1 === 0
                       ? effectiveWealth.totalInGold.toLocaleString()
-                      : effectiveWealth.totalInGold.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} GP
+                      : effectiveWealth.totalInGold.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}{' '}
+                    GP
                   </span>
                 </div>
               </div>
@@ -268,103 +377,137 @@ export default function BidDialog({
             </div>
           )}
 
-          {/* Bid Form */}
-          <div className="space-y-3 pt-2 border-t border-border/20">
-            <div className="space-y-1">
-              <div className="flex justify-between items-center text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                <span>Initial Bid (Min {minRequired} GP)</span>
-                {roundedBidPreview !== null && (
-                  <span className="text-amber-400 font-mono text-[11px] normal-case">
-                    Rounded: <strong>{roundedBidPreview} GP</strong>
+          {/* Own Listing Notice */}
+          {isOwnListing && (
+            <div className="p-2.5 rounded-lg bg-amber-500/15 border border-amber-500/40 text-xs text-amber-200 flex items-center gap-2">
+              <ShieldAlert className="h-4 w-4 text-amber-400 shrink-0" />
+              <span>This is your listing. You cannot bid on or buy out your own items.</span>
+            </div>
+          )}
+
+          {/* SECTION 1: BID FORM (Only when bidding is supported) */}
+          {hasBidding && !isBuyoutOnly && (
+            <div className="space-y-3 pt-2 border-t border-border/20">
+              <div className="space-y-1">
+                <div className="flex justify-between items-center text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  <span>
+                    {isCurrentTopBidder ? `Increase Bid (Min ${minRequired} GP)` : `Initial Bid (Min ${minRequired} GP)`}
                   </span>
+                  {roundedBidPreview !== null && (
+                    <span className="text-amber-400 font-mono text-[11px] normal-case">
+                      Rounded: <strong>{roundedBidPreview} GP</strong>
+                    </span>
+                  )}
+                </div>
+                <Input
+                  type="number"
+                  min={minRequired}
+                  step="1"
+                  value={bidAmount}
+                  onChange={(e) => setBidAmount(e.target.value)}
+                  placeholder={`Min ${minRequired} GP`}
+                  className="bg-muted/30 font-mono text-sm"
+                />
+              </div>
+
+              {/* Auto-Bid Toggle & Cap Input */}
+              <div className="p-3 rounded-lg bg-muted/20 border border-purple-500/20 space-y-2">
+                <label className="flex items-center gap-2 text-xs font-bold text-purple-200 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={enableAutoBid}
+                    onChange={(e) => {
+                      setEnableAutoBid(e.target.checked)
+                      if (e.target.checked && !maxAutoBidAmount) {
+                        setMaxAutoBidAmount(bidAmount || String(minRequired))
+                      }
+                    }}
+                    className="rounded border-purple-500 text-purple-600 focus:ring-purple-500 h-4 w-4"
+                  />
+                  Enable Maximum Auto-Bid Cap
+                </label>
+
+                {enableAutoBid && (
+                  <div className="space-y-1 pt-1">
+                    <div className="flex justify-between items-center text-xs text-muted-foreground">
+                      <span className="font-semibold text-purple-300">Max Cap You Are Willing To Pay</span>
+                      {roundedMaxPreview !== null && (
+                        <span className="text-purple-300 font-mono text-[11px]">
+                          Rounded: <strong>{roundedMaxPreview} GP</strong>
+                        </span>
+                      )}
+                    </div>
+                    <Input
+                      type="number"
+                      min={parsedBid || minRequired}
+                      step="1"
+                      value={maxAutoBidAmount}
+                      onChange={(e) => setMaxAutoBidAmount(e.target.value)}
+                      placeholder={`Max Cap (e.g. ${Math.max(100, (parsedBid || minRequired) * 2)} GP)`}
+                      className="bg-purple-950/30 border-purple-500/40 font-mono text-sm"
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      The system will automatically bid the minimum necessary amount up to this cap.
+                    </p>
+                  </div>
                 )}
               </div>
-              <Input
-                type="number"
-                min={minRequired}
-                step="1"
-                value={bidAmount}
-                onChange={(e) => setBidAmount(e.target.value)}
-                placeholder={`Min ${minRequired} GP`}
-                className="bg-muted/30 font-mono text-sm"
-              />
-            </div>
 
-            {/* Auto-Bid Toggle & Cap Input */}
-            <div className="p-3 rounded-lg bg-muted/20 border border-purple-500/20 space-y-2">
-              <label className="flex items-center gap-2 text-xs font-bold text-purple-200 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={enableAutoBid}
-                  onChange={(e) => {
-                    setEnableAutoBid(e.target.checked)
-                    if (e.target.checked && !maxAutoBidAmount && bidAmount) {
-                      setMaxAutoBidAmount(bidAmount)
-                    }
-                  }}
-                  className="rounded border-purple-500 text-purple-600 focus:ring-purple-500 h-4 w-4"
-                />
-                Enable Maximum Auto-Bid Cap
-              </label>
-
-              {enableAutoBid && (
-                <div className="space-y-1 pt-1">
-                  <div className="flex justify-between items-center text-xs text-muted-foreground">
-                    <span className="font-semibold text-purple-300">Max Cap You Are Willing To Pay</span>
-                    {roundedMaxPreview !== null && (
-                      <span className="text-purple-300 font-mono text-[11px]">
-                        Rounded: <strong>{roundedMaxPreview} GP</strong>
-                      </span>
-                    )}
+              {/* Insufficient Funds Warning for Bid */}
+              {(() => {
+                const bidVal = parseFloat(bidAmount) || minRequired
+                const maxAutoVal = enableAutoBid ? parseFloat(maxAutoBidAmount) : 0
+                const effectiveAmount = Math.max(bidVal || 0, maxAutoVal || 0)
+                if (!effectiveWealth || effectiveAmount <= 0 || effectiveAmount <= effectiveWealth.totalInGold) return null
+                return (
+                  <div className="p-2 rounded-lg bg-amber-500/15 border border-amber-500/40 text-[10px] text-amber-200 flex items-start gap-1.5">
+                    <AlertCircle className="h-3.5 w-3.5 text-amber-400 shrink-0 mt-0.5" />
+                    <span>
+                      <strong>Insufficient Funds:</strong> Your {enableAutoBid ? 'auto-bid cap' : 'bid'} of{' '}
+                      <strong className="font-mono">{effectiveAmount.toLocaleString()} GP</strong> exceeds your{' '}
+                      <strong className="font-mono">{effectiveWealth.totalInGold.toLocaleString()} GP</strong> balance.
+                    </span>
                   </div>
-                  <Input
-                    type="number"
-                    min={parsedBid || minRequired}
-                    step="1"
-                    value={maxAutoBidAmount}
-                    onChange={(e) => setMaxAutoBidAmount(e.target.value)}
-                    placeholder={`Max Cap (e.g. ${Math.max(100, (parsedBid || minRequired) * 2)} GP)`}
-                    className="bg-purple-950/30 border-purple-500/40 font-mono text-sm"
-                  />
-                  <p className="text-[10px] text-muted-foreground">
-                    The system will automatically bid the minimum necessary amount up to this cap.
-                  </p>
+                )
+              })()}
+
+              <Button
+                type="button"
+                onClick={() => handlePlaceBid(false)}
+                disabled={isSubmitting || !activeCharId || isOwnListing || !isSignedIn}
+                className="w-full bg-purple-600 hover:bg-purple-700 font-bold text-xs h-10 gap-2 shadow-md cursor-pointer disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Coins className="h-4 w-4" />
+                )}
+                {isCurrentTopBidder
+                  ? enableAutoBid
+                    ? 'Update Auto-Bid Cap'
+                    : 'Increase Bid'
+                  : enableAutoBid
+                  ? 'Place Auto-Bid'
+                  : 'Place Bid'}
+              </Button>
+            </div>
+          )}
+
+          {/* SECTION 2: BUYOUT (When buyout is available) */}
+          {listing.buyoutPrice && (
+            <div className={hasBidding && !isBuyoutOnly ? "pt-2 space-y-2" : "space-y-3 pt-2 border-t border-border/20"}>
+              {isBuyoutOnly && (
+                <div className="p-3 rounded-lg bg-emerald-950/30 border border-emerald-500/30 text-xs text-emerald-300 flex items-start gap-2">
+                  <Zap className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold block">Instant Buyout Listing</span>
+                    <span className="text-[11px] text-emerald-200/80">
+                      This item does not accept incremental bids and is available for immediate purchase at {listing.buyoutPrice} GP.
+                    </span>
+                  </div>
                 </div>
               )}
-            </div>
 
-            {/* Insufficient Funds Warning for Bid */}
-            {(() => {
-              const bidVal = parseFloat(bidAmount)
-              const maxAutoVal = enableAutoBid ? parseFloat(maxAutoBidAmount) : 0
-              const effectiveAmount = Math.max(bidVal || 0, maxAutoVal || 0)
-              if (!effectiveWealth || effectiveAmount <= 0 || effectiveAmount <= effectiveWealth.totalInGold) return null
-              return (
-                <div className="p-2 rounded-lg bg-amber-500/15 border border-amber-500/40 text-[10px] text-amber-200 flex items-start gap-1.5">
-                  <AlertCircle className="h-3.5 w-3.5 text-amber-400 shrink-0 mt-0.5" />
-                  <span>
-                    <strong>Insufficient Funds:</strong> Your {enableAutoBid ? 'auto-bid cap' : 'bid'} of{' '}
-                    <strong className="font-mono">{effectiveAmount.toLocaleString()} GP</strong> exceeds your{' '}
-                    <strong className="font-mono">{effectiveWealth.totalInGold.toLocaleString()} GP</strong> balance.
-                  </span>
-                </div>
-              )
-            })()}
-
-            <Button
-              type="button"
-              onClick={() => handlePlaceBid(false)}
-              disabled={isSubmitting || !selectedCharId || isOwnListing}
-              className="w-full bg-purple-600 hover:bg-purple-700 font-bold text-xs h-10 gap-2 shadow-md"
-            >
-              <Coins className="h-4 w-4" />
-              {enableAutoBid ? 'Place Auto-Bid' : 'Place Bid'}
-            </Button>
-          </div>
-
-          {/* Buyout Button */}
-          {listing.buyoutPrice && (
-            <div className="pt-2 space-y-2">
               {effectiveWealth && listing.buyoutPrice > effectiveWealth.totalInGold && (
                 <div className="p-2 rounded-lg bg-amber-500/15 border border-amber-500/40 text-[10px] text-amber-200 flex items-start gap-1.5">
                   <AlertCircle className="h-3.5 w-3.5 text-amber-400 shrink-0 mt-0.5" />
@@ -375,23 +518,26 @@ export default function BidDialog({
                   </span>
                 </div>
               )}
+
               <Button
                 type="button"
-                variant="outline"
+                variant={isBuyoutOnly ? 'default' : 'outline'}
                 onClick={() => handlePlaceBid(true)}
-                disabled={isSubmitting || !selectedCharId || isOwnListing}
-                className="w-full border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 font-bold text-xs flex items-center justify-center gap-1.5 h-10"
+                disabled={isSubmitting || !activeCharId || isOwnListing || !isSignedIn}
+                className={`w-full font-bold text-xs flex items-center justify-center gap-1.5 h-10 cursor-pointer disabled:cursor-not-allowed ${
+                  isBuyoutOnly
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md'
+                    : 'border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10'
+                }`}
               >
-                <Zap className="h-4 w-4 text-emerald-400" />
+                {isSubmitting ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
+                ) : (
+                  <Zap className="h-4 w-4 text-emerald-400" />
+                )}
                 Buy Out Now for {listing.buyoutPrice} GP
               </Button>
             </div>
-          )}
-
-          {isOwnListing && (
-            <p className="text-[11px] text-amber-400 text-center italic">
-              You cannot bid on listings from your own characters.
-            </p>
           )}
         </div>
 

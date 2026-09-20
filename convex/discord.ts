@@ -117,6 +117,7 @@ export const syncSessionToDiscord = internalAction({
     // Format: (DD/MM) The Void: <WorldName> [Lvl X] [<signupCharacters>/<MaxCharacters>]
     // OR: (PLANNING) The Void: <WorldName> [Lvl X] [<interestCount> Interested]
     const isPlanning = session.planning || !session.date;
+    const isPrivate = Boolean(session.isPrivate);
     
     let levelStr = (session.level && session.level > 0) ? `[Lvl ${session.level}]` : "[Lvl ?]";
     if (session.selectedQuest) {
@@ -125,10 +126,15 @@ export const syncSessionToDiscord = internalAction({
     
     const interestCount = (session.interestedPlayers || []).length;
     const interestStr = interestCount > 0 ? ` (+${interestCount})` : "";
+    const privateTag = isPrivate ? " [PRIVATE]" : "";
 
-    const threadName = isPlanning 
-      ? `(PLANNING) The Void: ${session.worldName} ${levelStr} [${interestCount} Interested]`
-      : `(${dateStr}) The Void: ${session.worldName} ${levelStr} [${session.attendingCharacters.length}/${session.maxPlayers}${interestStr}]`;
+    let threadName = isPlanning 
+      ? `(PLANNING) The Void: ${session.worldName}${privateTag} ${levelStr} [${interestCount} Interested]`
+      : `(${dateStr}) The Void: ${session.worldName}${privateTag} ${levelStr} [${session.attendingCharacters.length}/${session.maxPlayers}${interestStr}]`;
+
+    if (threadName.length > 100) {
+      threadName = threadName.substring(0, 97) + "...";
+    }
 
     const unixTimestamp = session.date ? Math.floor(session.date / 1000) : null;
     const dateInfo = (isPlanning || !unixTimestamp) 
@@ -208,7 +214,18 @@ export const syncSessionToDiscord = internalAction({
 
     const inGameDateInfo = formatInGameDate(session.inGameDate, eras, yearZeroExists);
 
+    const privateBanner = isPrivate
+      ? `🔒 **PRIVATE SESSION (INVITE-ONLY)**\n*This session is reserved for a Journeyman or Guildmaster rank-up quest. Signups are invite-only by the Voidmaster or attending players.*\n\n`
+      : "";
+
+    const callToAction = isPrivate
+      ? `*🔒 This is a private, invite-only session for a Journeyman or Guildmaster rank-up quest. Contact the Voidmaster or attending players to be invited.*`
+      : (isPlanning 
+        ? `*This session is currently in the planning phase. Click the link above to **show your interest** and make it easier for everyone to pick a date by filling in the Planning tab!*`
+        : `*Click the link above to **sign up with your character**! Voidmasters encourage you to use this thread to discuss your plans and prepare for this session!*`);
+
     const messageContent = `# ${systemEmoji} [${session.worldName}](${worldLink})\n` +
+      privateBanner +
       `**System**: ${systemName}\n` +
       `**Level**: ${levelInfo}\n` +
       `**Location**: ${locationInfo}\n` +
@@ -216,9 +233,7 @@ export const syncSessionToDiscord = internalAction({
       (inGameDateInfo ? `**In-Game Date**: ${inGameDateInfo}\n` : "") +
       questContent + "\n" +
       `[**VIEW SESSION ON GUILD**]( ${sessionLink} )\n\n` +
-      (isPlanning 
-        ? `*This session is currently in the planning phase. Click the link above to **show your interest** and make it easier for everyone to pick a date by filling in the Planning tab!*`
-        : `*Click the link above to **sign up with your character**! Voidmasters encourage you to use this thread to discuss your plans and prepare for this session!*`);
+      callToAction;
 
     // Truncate messageContent if it somehow still exceeds 2000 chars (Discord limit)
     const finalMessageContent = messageContent.length > 2000 
@@ -232,7 +247,9 @@ export const syncSessionToDiscord = internalAction({
           const titleStr = c.title ? ` *"${c.title}"*` : "";
           return `• **${c.name}**${titleStr} (Lvl ${c.lvl} ${c.class})${ping}`;
         }).join("\n")
-      : (isPlanning ? "_Signups not yet open._" : "_No characters signed up yet._");
+      : (isPlanning 
+          ? (isPrivate ? "_No characters invited yet (Invite-Only)._" : "_Signups not yet open._")
+          : (isPrivate ? "_No characters invited yet (Invite-Only)._" : "_No characters signed up yet._"));
     
     const interestList = (session.interestedPlayers && session.interestedPlayers.length > 0)
       ? session.interestedPlayers.map(p => {
@@ -241,16 +258,20 @@ export const syncSessionToDiscord = internalAction({
         }).join("\n")
       : "_No interest expressed yet._";
 
+    const embedFields = [
+      { name: isPrivate ? "Invited Characters" : "Current Signups", value: signupList, inline: false },
+    ];
+    if (!isPrivate) {
+      embedFields.push({ name: "Interested Players", value: interestList, inline: false });
+    }
+
     const embed = {
-      title: "Session Participants",
-      fields: [
-        { name: "Current Signups", value: signupList, inline: false },
-        { name: "Interested Players", value: interestList, inline: false },
-      ],
-      color: session.system === 'PF' ? 0xde2e2e : 0xe81123,
+      title: isPrivate ? "Session Participants (Private / Invite-Only)" : "Session Participants",
+      fields: embedFields,
+      color: isPrivate ? 0xd97706 : (session.system === 'PF' ? 0xde2e2e : 0xe81123),
       url: sessionLink,
       timestamp: new Date().toISOString(),
-      footer: { text: "Void Guild Session Tracker" }
+      footer: { text: isPrivate ? "Void Guild Session Tracker • Private Session" : "Void Guild Session Tracker" }
     };
 
     // 2. If we have a thread ID, update the first message and thread name
@@ -435,15 +456,27 @@ export const sendSessionNotification = action({
     let embedDescription = "";
     let embedColor = 5814783; // Blueish
 
+    const isPrivate = Boolean(session.isPrivate);
+
     if (args.type === 'new') {
-      embedTitle = `New Session Alert: ${session.worldName}`;
+      embedTitle = isPrivate
+        ? `🔒 Private Session Alert: ${session.worldName}`
+        : `New Session Alert: ${session.worldName}`;
       embedDescription = session.date 
-        ? `A new session for "${session.worldName}" has been announced for ${dateInfo}!`
-        : `A new session for "${session.worldName}" is now in the planning phase! Express interest on the website to help pick a date.`;
+        ? (isPrivate 
+            ? `A new private (invite-only) rank-up session for "${session.worldName}" has been announced for ${dateInfo}!`
+            : `A new session for "${session.worldName}" has been announced for ${dateInfo}!`)
+        : (isPrivate
+            ? `A new private (invite-only) rank-up session for "${session.worldName}" is now in planning!`
+            : `A new session for "${session.worldName}" is now in the planning phase! Express interest on the website to help pick a date.`);
     } else if (args.type === 'remind' && session.date) {
       const spotsLeft = session.maxPlayers - session.attendingCharacters.length;
-      embedTitle = `Reminder: ${session.worldName}`;
-      embedDescription = `There are still ${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} left! The session starts on ${dateInfo}.`;
+      embedTitle = isPrivate 
+        ? `🔒 Private Session Reminder: ${session.worldName}`
+        : `Reminder: ${session.worldName}`;
+      embedDescription = isPrivate
+        ? `There are still ${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} left in this private rank-up quest! The session starts on ${dateInfo}.`
+        : `There are still ${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} left! The session starts on ${dateInfo}.`;
       embedColor = 16776960; // Yellow
     } else if (args.type === 'cancel' && session.date) {
       embedTitle = `SESSION CANCELLED: ${session.worldName}`;
@@ -458,7 +491,7 @@ export const sendSessionNotification = action({
       : null;
 
     const interestCount = (session.interestedPlayers || []).length;
-    const playersValue = `${session.attendingCharacters.length}/${session.maxPlayers}` + (interestCount > 0 ? ` (+${interestCount} interested)` : "");
+    const playersValue = `${session.attendingCharacters.length}/${session.maxPlayers}` + (!isPrivate && interestCount > 0 ? ` (+${interestCount} interested)` : "");
 
     const { eras, yearZeroExists } = (() => {
       if (!session.worldCalendar) return { eras: [], yearZeroExists: false }
@@ -478,11 +511,12 @@ export const sendSessionNotification = action({
     const embed: any = {
       title: embedTitle,
       description: embedDescription,
-      color: embedColor,
+      color: isPrivate ? 0xd97706 : embedColor,
       fields: [
         { name: 'System', value: session.system === 'PF' ? '<:Pathfinder:1322734594864320522> Pathfinder 2e' : '<:DnD:1322734981524754473> D&D 5e', inline: true },
         { name: 'Level', value: levelInfo, inline: true },
         { name: 'Players', value: playersValue, inline: true },
+        ...(isPrivate ? [{ name: 'Access', value: '🔒 Invite-Only (Journeyman/Guildmaster Quest)', inline: true }] : []),
         { name: 'Date & Time', value: dateInfo, inline: false },
       ],
       timestamp: new Date().toISOString(),

@@ -3,11 +3,12 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Doc, Id } from '@/convex/_generated/dataModel'
-import { Loader2, LogOut, UserCheck } from 'lucide-react'
+import { Loader2, LogOut, UserCheck, Lock } from 'lucide-react'
 
 interface SessionJoinFormProps {
   sessionLocked: boolean
   sessionPlanning?: boolean
+  sessionIsPrivate?: boolean
   isFull: boolean
   availableCharacters: Doc<'characters'>[]
   userCharactersCount: number
@@ -25,6 +26,7 @@ interface SessionJoinFormProps {
 export default function SessionJoinForm({
   sessionLocked,
   sessionPlanning,
+  sessionIsPrivate,
   isFull,
   availableCharacters,
   userCharactersCount,
@@ -47,6 +49,11 @@ export default function SessionJoinForm({
               <>
                 <UserCheck className="h-5 w-5 text-emerald-500" />
                 Joined Session
+              </>
+            ) : sessionIsPrivate ? (
+              <>
+                <Lock className="h-5 w-5 text-amber-500" />
+                Private Session
               </>
             ) : (
               'Join Session'
@@ -96,6 +103,16 @@ export default function SessionJoinForm({
             This session is currently in the <b>planning phase</b> and cannot be joined yet.
             <p className="mt-2 not-italic text-xs text-muted-foreground font-medium">
               Express interest above to let the GM know you want to play!
+            </p>
+          </div>
+        ) : sessionIsPrivate ? (
+          <div className="text-sm text-amber-600 dark:text-amber-400 p-4 bg-amber-500/10 rounded-md border border-amber-500/20 text-center space-y-2">
+            <div className="flex items-center justify-center gap-1.5 font-bold">
+              <Lock className="h-4 w-4 text-amber-500" />
+              Private Session (Invite-Only)
+            </div>
+            <p className="text-xs text-muted-foreground">
+              This session is reserved for a Journeyman or Guildmaster rank-up quest. You must be invited by the Voidmaster or an attending player to join.
             </p>
           </div>
         ) : isFull ? (

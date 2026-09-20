@@ -40,10 +40,12 @@ import {
   Layers,
 } from 'lucide-react'
 import Link from 'next/link'
+import { useAuth } from '@clerk/nextjs'
 import { cn, CharacterRankIcon } from '@/lib/utils'
 import { motion } from 'framer-motion'
 
 export default function BlackVoidPage() {
+  const { userId } = useAuth()
   const [activeTab, setActiveTab] = useState<'items' | 'services' | 'quests' | 'log' | 'gambling'>('items')
   const [selectedCharacterId, setSelectedCharacterId] = useState<Id<'characters'> | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -540,7 +542,10 @@ export default function BlackVoidPage() {
                           const daysLeft = item.expiresAt
                             ? Math.max(0, Math.ceil((item.expiresAt - Date.now()) / 86400000))
                             : 0
-                          const isOwnItem = userCharacters?.some((c: any) => c._id === item.characterId)
+                          const isOwnItem = Boolean(
+                            (userId && item.sellerUserId === userId) ||
+                            userCharacters?.some((c: any) => c._id === item.characterId)
+                          )
                           const isTopBidder = selectedCharacterId && item.winningBidderCharacterId === selectedCharacterId
 
                           return (
@@ -603,9 +608,18 @@ export default function BlackVoidPage() {
                                   <Button
                                     size="sm"
                                     onClick={() => setBiddingListing(item)}
-                                    className="bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs h-7 px-3"
+                                    className={cn(
+                                      "text-white font-semibold text-xs h-7 px-3 cursor-pointer",
+                                      !item.startingBid && item.buyoutPrice
+                                        ? "bg-emerald-600 hover:bg-emerald-700"
+                                        : "bg-purple-600 hover:bg-purple-700"
+                                    )}
                                   >
-                                    Bid / Buyout
+                                    {!item.startingBid && item.buyoutPrice
+                                      ? 'Buyout'
+                                      : item.startingBid && !item.buyoutPrice
+                                      ? 'Bid'
+                                      : 'Bid / Buyout'}
                                   </Button>
                                 )}
                               </td>
