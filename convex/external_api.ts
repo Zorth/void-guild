@@ -934,8 +934,9 @@ export const updateReputation = mutation({
 
         const existing = await ctx.db
             .query('reputations')
-            .withIndex('by_world_character', (q) => q.eq('worldId', wId).eq('characterId', cId))
-            .filter((q) => q.eq(q.field('factionName'), args.factionName))
+            .withIndex('by_world_character_faction', (q) => 
+                q.eq('worldId', wId).eq('characterId', cId).eq('factionName', args.factionName)
+            )
             .first()
 
         if (existing) {

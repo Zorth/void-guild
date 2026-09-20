@@ -528,6 +528,80 @@ export default function WorldCalendar({
         return currentTotal >= startTotal && currentTotal <= endTotal
     }
 
+    const months = calendar?.static_data?.months || []
+    const currentMonth = months[viewMonth] || months[0]
+
+    // Lane calculation for sessions
+    const sessionLanes = useMemo(() => {
+        if (!calendar || !sessions || !currentMonth) return []
+        
+        // 1. Get sessions for current viewYear/viewMonth
+        const monthSessions = sessions.filter(s => {
+            if (!s.inGameDate) return false
+            
+            const start = s.inGameDate
+            const end = {
+                year: start.endYear ?? start.year,
+                month: start.endMonth ?? start.month,
+                day: start.endDay ?? start.day
+            }
+            
+            const viewStartTotal = (viewYear * 10000) + (viewMonth * 100) + 1
+            const viewEndTotal = (viewYear * 10000) + (viewMonth * 100) + (currentMonth.length || 31)
+            
+            const sessionStartTotal = (start.year * 10000) + (start.month * 100) + start.day
+            const sessionEndTotal = (end.year * 10000) + (end.month * 100) + end.day
+            
+            return sessionStartTotal <= viewEndTotal && sessionEndTotal >= viewStartTotal
+        })
+
+        // 2. Sort sessions: earliest start, then longest duration
+        monthSessions.sort((a, b) => {
+            const startA = (a.inGameDate!.year * 10000) + (a.inGameDate!.month * 100) + a.inGameDate!.day
+            const startB = (b.inGameDate!.year * 10000) + (b.inGameDate!.month * 100) + b.inGameDate!.day
+            if (startA !== startB) return startA - startB
+            
+            const durA = ((a.inGameDate!.endYear ?? a.inGameDate!.year) * 10000 + (a.inGameDate!.endMonth ?? a.inGameDate!.month) * 100 + (a.inGameDate!.endDay ?? a.inGameDate!.day)) - startA
+            const durB = ((b.inGameDate!.endYear ?? b.inGameDate!.year) * 10000 + (b.inGameDate!.endMonth ?? b.inGameDate!.month) * 100 + (b.inGameDate!.endDay ?? b.inGameDate!.day)) - startB
+            return durB - durA
+        })
+
+        // 3. Assign lanes
+        const lanes: { session: CalendarSession, lane: number }[] = []
+        const dayOccupancy: Record<number, Set<number>> = {} // day -> Set of lanes
+
+        monthSessions.forEach(session => {
+            let lane = 0
+            const startDay = (session.inGameDate!.year < viewYear || (session.inGameDate!.year === viewYear && session.inGameDate!.month < viewMonth)) ? 1 : session.inGameDate!.day
+            const endDay = ((session.inGameDate!.endYear ?? session.inGameDate!.year) > viewYear || ((session.inGameDate!.endYear ?? session.inGameDate!.year) === viewYear && (session.inGameDate!.endMonth ?? session.inGameDate!.month) > viewMonth)) ? currentMonth.length : (session.inGameDate!.endDay ?? session.inGameDate!.day)
+
+            while (true) {
+                let collision = false
+                for (let d = startDay; d <= endDay; d++) {
+                    if (dayOccupancy[d]?.has(lane)) {
+                        collision = true
+                        break
+                    }
+                }
+                if (!collision) break
+                lane++
+            }
+
+            for (let d = startDay; d <= endDay; d++) {
+                if (!dayOccupancy[d]) dayOccupancy[d] = new Set()
+                dayOccupancy[d].add(lane)
+            }
+            lanes.push({ session, lane })
+        })
+
+        return lanes
+    }, [calendar, sessions, viewYear, viewMonth, currentMonth])
+
+    const maxLane = useMemo(() => {
+        if (sessionLanes.length === 0) return -1
+        return Math.max(...sessionLanes.map(sl => sl.lane))
+    }, [sessionLanes])
+
     if (!isOwner && !isVisible) return null
 
     const isValid = calendar && 
@@ -614,80 +688,6 @@ export default function WorldCalendar({
             </Card>
         )
     }
-
-    const months = calendar.static_data.months
-    const currentMonth = months[viewMonth] || months[0]
-
-    // Lane calculation for sessions
-    const sessionLanes = useMemo(() => {
-        if (!calendar || !sessions) return []
-        
-        // 1. Get sessions for current viewYear/viewMonth
-        const monthSessions = sessions.filter(s => {
-            if (!s.inGameDate) return false
-            
-            const start = s.inGameDate
-            const end = {
-                year: start.endYear ?? start.year,
-                month: start.endMonth ?? start.month,
-                day: start.endDay ?? start.day
-            }
-            
-            const viewStartTotal = (viewYear * 10000) + (viewMonth * 100) + 1
-            const viewEndTotal = (viewYear * 10000) + (viewMonth * 100) + (currentMonth.length || 31)
-            
-            const sessionStartTotal = (start.year * 10000) + (start.month * 100) + start.day
-            const sessionEndTotal = (end.year * 10000) + (end.month * 100) + end.day
-            
-            return sessionStartTotal <= viewEndTotal && sessionEndTotal >= viewStartTotal
-        })
-
-        // 2. Sort sessions: earliest start, then longest duration
-        monthSessions.sort((a, b) => {
-            const startA = (a.inGameDate!.year * 10000) + (a.inGameDate!.month * 100) + a.inGameDate!.day
-            const startB = (b.inGameDate!.year * 10000) + (b.inGameDate!.month * 100) + b.inGameDate!.day
-            if (startA !== startB) return startA - startB
-            
-            const durA = ((a.inGameDate!.endYear ?? a.inGameDate!.year) * 10000 + (a.inGameDate!.endMonth ?? a.inGameDate!.month) * 100 + (a.inGameDate!.endDay ?? a.inGameDate!.day)) - startA
-            const durB = ((b.inGameDate!.endYear ?? b.inGameDate!.year) * 10000 + (b.inGameDate!.endMonth ?? b.inGameDate!.month) * 100 + (b.inGameDate!.endDay ?? b.inGameDate!.day)) - startB
-            return durB - durA
-        })
-
-        // 3. Assign lanes
-        const lanes: { session: CalendarSession, lane: number }[] = []
-        const dayOccupancy: Record<number, Set<number>> = {} // day -> Set of lanes
-
-        monthSessions.forEach(session => {
-            let lane = 0
-            const startDay = (session.inGameDate!.year < viewYear || (session.inGameDate!.year === viewYear && session.inGameDate!.month < viewMonth)) ? 1 : session.inGameDate!.day
-            const endDay = ((session.inGameDate!.endYear ?? session.inGameDate!.year) > viewYear || ((session.inGameDate!.endYear ?? session.inGameDate!.year) === viewYear && (session.inGameDate!.endMonth ?? session.inGameDate!.month) > viewMonth)) ? currentMonth.length : (session.inGameDate!.endDay ?? session.inGameDate!.day)
-
-            while (true) {
-                let collision = false
-                for (let d = startDay; d <= endDay; d++) {
-                    if (dayOccupancy[d]?.has(lane)) {
-                        collision = true
-                        break
-                    }
-                }
-                if (!collision) break
-                lane++
-            }
-
-            for (let d = startDay; d <= endDay; d++) {
-                if (!dayOccupancy[d]) dayOccupancy[d] = new Set()
-                dayOccupancy[d].add(lane)
-            }
-            lanes.push({ session, lane })
-        })
-
-        return lanes
-    }, [calendar, sessions, viewYear, viewMonth, currentMonth])
-
-    const maxLane = useMemo(() => {
-        if (sessionLanes.length === 0) return -1
-        return Math.max(...sessionLanes.map(sl => sl.lane))
-    }, [sessionLanes])
 
     const isCurrentMonth = viewYear === calendar.dynamic_data.year && viewMonth === calendar.dynamic_data.month
     const weekdays = calendar.static_data.weekdays || ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5", "Day 6", "Day 7"]

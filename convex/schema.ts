@@ -77,6 +77,7 @@ export default defineSchema({
         voidContribution: v.optional(v.number()),
   }).index('by_locked', ['locked'])
     .index('by_owner', ['owner'])
+    .index('by_world', ['world'])
     .index('by_guildmaster_cut', ['guildmasterCut.characterId']),
     worlds: defineTable({
         name: v.string(),
@@ -92,13 +93,16 @@ export default defineSchema({
         calendarVisible: v.optional(v.boolean()),
         description: v.optional(v.string()),
         mapEmbed: v.optional(v.string()),
-    }).index('by_owner', ['owner']),
+    }).index('by_owner', ['owner'])
+      .index('by_name', ['name']),
     reputations: defineTable({
         worldId: v.id('worlds'),
         characterId: v.id('characters'),
         factionName: v.string(),
         value: v.number(),
-    }).index('by_world_character', ['worldId', 'characterId']).index('by_world_faction', ['worldId', 'factionName']),
+    }).index('by_world_character', ['worldId', 'characterId'])
+      .index('by_world_faction', ['worldId', 'factionName'])
+      .index('by_world_character_faction', ['worldId', 'characterId', 'factionName']),
     availability: defineTable({
         userId: v.string(),
         date: v.number(), // Start of day timestamp

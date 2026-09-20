@@ -2,6 +2,7 @@ import { query, mutation } from './_generated/server'
 import { v } from 'convex/values'
 import { Doc } from './_generated/dataModel'
 import { computeEffectiveLevel } from './sessions'
+import { isAdmin } from './roles'
 
 export const getWorldByOwner = query({
   args: {},
@@ -12,7 +13,7 @@ export const getWorldByOwner = query({
     }
     const world = await ctx.db
       .query('worlds')
-      .filter((q) => q.eq(q.field('owner'), user.subject))
+      .withIndex('by_owner', (q) => q.eq('owner', user.subject))
       .first()
     return world
   },
@@ -27,19 +28,33 @@ export const createWorld = mutation({
     if (!user) {
       throw new Error('Not authenticated')
     }
+    const name = args.name.trim()
+    if (!name) {
+      throw new Error('World name cannot be empty.')
+    }
+
     // Check if the user already owns a world
     const existingWorld = await ctx.db
       .query('worlds')
-      .filter((q) => q.eq(q.field('owner'), user.subject))
+      .withIndex('by_owner', (q) => q.eq('owner', user.subject))
       .first()
     if (existingWorld) {
       throw new Error('You can only own one world.')
     }
 
+    // Check if a world with this name already exists
+    const existingName = await ctx.db
+      .query('worlds')
+      .withIndex('by_name', (q) => q.eq('name', name))
+      .first()
+    if (existingName) {
+      throw new Error('A world with this name already exists.')
+    }
+
     await ctx.db.insert('worlds', {
-      name: args.name,
+      name,
       owner: user.subject,
-      link: undefined, // Initially no link
+      link: undefined,
     })
   },
 })
@@ -55,10 +70,29 @@ export const renameWorld = mutation({
       throw new Error('Not authenticated')
     }
     const world = await ctx.db.get(args.worldId)
-    if (!world || world.owner !== user.subject) {
+    const isAdminUser = await isAdmin(ctx)
+    if (!world || (world.owner !== user.subject && !isAdminUser)) {
       throw new Error('World not found or you do not have permission to rename it.')
     }
-    await ctx.db.patch(args.worldId, { name: args.newName })
+
+    const newName = args.newName.trim()
+    if (!newName) {
+      throw new Error('World name cannot be empty.')
+    }
+    if (world.name === newName) {
+      return
+    }
+
+    // Ensure no name collision with other worlds
+    const existingName = await ctx.db
+      .query('worlds')
+      .withIndex('by_name', (q) => q.eq('name', newName))
+      .first()
+    if (existingName && existingName._id !== args.worldId) {
+      throw new Error('A world with this name already exists.')
+    }
+
+    await ctx.db.patch(args.worldId, { name: newName })
   },
 })
 
@@ -74,7 +108,7 @@ export const getWorldByName = query({
   handler: async (ctx, args) => {
     return await ctx.db
       .query('worlds')
-      .filter((q) => q.eq(q.field('name'), args.name))
+      .withIndex('by_name', (q) => q.eq('name', args.name))
       .first()
   },
 })
@@ -84,7 +118,7 @@ export const getSessionsByWorld = query({
   handler: async (ctx, args) => {
     const sessions = await ctx.db
       .query('sessions')
-      .filter((q) => q.eq(q.field('world'), args.worldId))
+      .withIndex('by_world', (q) => q.eq('world', args.worldId))
       .collect()
 
     const sessionsWithDetails = await Promise.all(
@@ -124,19 +158,21 @@ export const getReputationData = query({
     const user = await ctx.auth.getUserIdentity()
     const world = await ctx.db
       .query('worlds')
-      .filter((q) => q.eq(q.field('name'), args.worldName))
+      .withIndex('by_name', (q) => q.eq('name', args.worldName))
       .first()
     
     if (!world) return null
 
-    const isOwner = user?.subject === world.owner
+    const isAdminUser = user ? await isAdmin(ctx) : false
+    const isOwner = user?.subject === world.owner || isAdminUser
     const isVisible = world.reputationVisible ?? false
 
-    // If reputation is not visible and user is not owner, return only basic info
+    // If reputation is not visible and user is not owner/admin, return only basic info
     if (!isVisible && !isOwner) {
         return { 
             worldId: world._id,
             factions: [], 
+            factionGroups: [],
             reputations: [], 
             isOwner, 
             isVisible 
@@ -164,7 +200,8 @@ export const renameFaction = mutation({
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
     const world = await ctx.db.get(args.worldId)
-    if (!world || world.owner !== user?.subject) {
+    const isAdminUser = await isAdmin(ctx)
+    if (!world || (world.owner !== user?.subject && !isAdminUser)) {
       throw new Error('Unauthorized')
     }
 
@@ -215,7 +252,8 @@ export const editFactionGroup = mutation({
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
     const world = await ctx.db.get(args.worldId)
-    if (!world || world.owner !== user?.subject) {
+    const isAdminUser = await isAdmin(ctx)
+    if (!world || (world.owner !== user?.subject && !isAdminUser)) {
       throw new Error('Unauthorized')
     }
 
@@ -241,9 +279,19 @@ export const reorderFactions = mutation({
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
     const world = await ctx.db.get(args.worldId)
-    if (!world || world.owner !== user?.subject) {
+    const isAdminUser = await isAdmin(ctx)
+    if (!world || (world.owner !== user?.subject && !isAdminUser)) {
       throw new Error('Unauthorized')
     }
+
+    const currentFactions = world.factions ?? []
+    if (
+      currentFactions.length === args.factions.length &&
+      currentFactions.every((f, i) => f === args.factions[i])
+    ) {
+      return
+    }
+
     await ctx.db.patch(args.worldId, {
       factions: args.factions,
     })
@@ -255,12 +303,22 @@ export const renameFactionGroup = mutation({
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
     const world = await ctx.db.get(args.worldId)
-    if (!world || world.owner !== user?.subject) {
+    const isAdminUser = await isAdmin(ctx)
+    if (!world || (world.owner !== user?.subject && !isAdminUser)) {
       throw new Error('Unauthorized')
     }
 
+    const oldName = args.oldName.trim()
+    const newName = args.newName.trim()
+    if (!newName) throw new Error('Group name cannot be empty')
+    if (oldName === newName) return
+
     const groups = world.factionGroups ?? []
-    const newGroups = groups.map(g => g.name === args.oldName ? { ...g, name: args.newName } : g)
+    if (groups.some(g => g.name === newName)) {
+      throw new Error('A group with this name already exists')
+    }
+
+    const newGroups = groups.map(g => g.name === oldName ? { ...g, name: newName } : g)
 
     await ctx.db.patch(args.worldId, {
       factionGroups: newGroups,
@@ -273,7 +331,8 @@ export const updateFactionGroupMembers = mutation({
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
     const world = await ctx.db.get(args.worldId)
-    if (!world || world.owner !== user?.subject) {
+    const isAdminUser = await isAdmin(ctx)
+    if (!world || (world.owner !== user?.subject && !isAdminUser)) {
       throw new Error('Unauthorized')
     }
 
@@ -295,17 +354,21 @@ export const addFactionGroup = mutation({
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
     const world = await ctx.db.get(args.worldId)
-    if (!world || world.owner !== user?.subject) {
+    const isAdminUser = await isAdmin(ctx)
+    if (!world || (world.owner !== user?.subject && !isAdminUser)) {
       throw new Error('Unauthorized')
     }
 
+    const name = args.name.trim()
+    if (!name) throw new Error('Group name cannot be empty')
+
     const groups = world.factionGroups ?? []
-    if (groups.some(g => g.name === args.name)) {
+    if (groups.some(g => g.name === name)) {
       throw new Error('Group already exists')
     }
 
     await ctx.db.patch(args.worldId, {
-      factionGroups: [...groups, { name: args.name, factions: args.factions }],
+      factionGroups: [...groups, { name, factions: args.factions }],
     })
   },
 })
@@ -315,7 +378,8 @@ export const removeFactionGroup = mutation({
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
     const world = await ctx.db.get(args.worldId)
-    if (!world || world.owner !== user?.subject) {
+    const isAdminUser = await isAdmin(ctx)
+    if (!world || (world.owner !== user?.subject && !isAdminUser)) {
       throw new Error('Unauthorized')
     }
 
@@ -331,17 +395,21 @@ export const addFaction = mutation({
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
     const world = await ctx.db.get(args.worldId)
-    if (!world || world.owner !== user?.subject) {
+    const isAdminUser = await isAdmin(ctx)
+    if (!world || (world.owner !== user?.subject && !isAdminUser)) {
       throw new Error('Unauthorized')
     }
 
+    const name = args.name.trim()
+    if (!name) throw new Error('Faction name cannot be empty')
+
     const factions = world.factions ?? []
-    if (factions.includes(args.name)) {
+    if (factions.includes(name)) {
       throw new Error('Faction already exists')
     }
 
     await ctx.db.patch(args.worldId, {
-      factions: [...factions, args.name],
+      factions: [...factions, name],
     })
   },
 })
@@ -351,13 +419,21 @@ export const removeFaction = mutation({
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
     const world = await ctx.db.get(args.worldId)
-    if (!world || world.owner !== user?.subject) {
+    const isAdminUser = await isAdmin(ctx)
+    if (!world || (world.owner !== user?.subject && !isAdminUser)) {
       throw new Error('Unauthorized')
     }
 
     const factions = world.factions ?? []
+    const groups = world.factionGroups ?? []
+    const newGroups = groups.map(g => ({
+      ...g,
+      factions: g.factions.filter((f) => f !== args.name)
+    }))
+
     await ctx.db.patch(args.worldId, {
       factions: factions.filter((f) => f !== args.name),
+      factionGroups: newGroups,
     })
 
     // Also remove all reputation entries for this faction in this world
@@ -382,20 +458,24 @@ export const setReputation = mutation({
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
     const world = await ctx.db.get(args.worldId)
-    if (!world || world.owner !== user?.subject) {
+    const isAdminUser = await isAdmin(ctx)
+    if (!world || (world.owner !== user?.subject && !isAdminUser)) {
       throw new Error('Unauthorized')
     }
 
     const existing = await ctx.db
       .query('reputations')
-      .withIndex('by_world_character', (q) => q.eq('worldId', args.worldId).eq('characterId', args.characterId))
-      .filter((q) => q.eq(q.field('factionName'), args.factionName))
+      .withIndex('by_world_character_faction', (q) => 
+        q.eq('worldId', args.worldId).eq('characterId', args.characterId).eq('factionName', args.factionName)
+      )
       .first()
 
     if (existing) {
-      await ctx.db.patch(existing._id, {
-        value: args.value,
-      })
+      if (existing.value !== args.value) {
+        await ctx.db.patch(existing._id, {
+          value: args.value,
+        })
+      }
     } else {
       await ctx.db.insert('reputations', {
         worldId: args.worldId,
@@ -415,16 +495,20 @@ export const updateReputation = mutation({
     delta: v.number() 
   },
   handler: async (ctx, args) => {
+    if (args.delta === 0) return
+
     const user = await ctx.auth.getUserIdentity()
     const world = await ctx.db.get(args.worldId)
-    if (!world || world.owner !== user?.subject) {
+    const isAdminUser = await isAdmin(ctx)
+    if (!world || (world.owner !== user?.subject && !isAdminUser)) {
       throw new Error('Unauthorized')
     }
 
     const existing = await ctx.db
       .query('reputations')
-      .withIndex('by_world_character', (q) => q.eq('worldId', args.worldId).eq('characterId', args.characterId))
-      .filter((q) => q.eq(q.field('factionName'), args.factionName))
+      .withIndex('by_world_character_faction', (q) => 
+        q.eq('worldId', args.worldId).eq('characterId', args.characterId).eq('factionName', args.factionName)
+      )
       .first()
 
     if (existing) {
@@ -447,7 +531,8 @@ export const toggleReputationVisibility = mutation({
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
     const world = await ctx.db.get(args.worldId)
-    if (!world || world.owner !== user?.subject) {
+    const isAdminUser = await isAdmin(ctx)
+    if (!world || (world.owner !== user?.subject && !isAdminUser)) {
       throw new Error('Unauthorized')
     }
 
@@ -462,13 +547,16 @@ export const updateWorldDescription = mutation({
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
     const world = await ctx.db.get(args.worldId)
-    if (!world || world.owner !== user?.subject) {
+    const isAdminUser = await isAdmin(ctx)
+    if (!world || (world.owner !== user?.subject && !isAdminUser)) {
       throw new Error('Unauthorized')
     }
 
-    await ctx.db.patch(args.worldId, {
-      description: args.description,
-    })
+    if (world.description !== args.description) {
+      await ctx.db.patch(args.worldId, {
+        description: args.description,
+      })
+    }
   },
 })
 
@@ -477,13 +565,16 @@ export const updateWorldMap = mutation({
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
     const world = await ctx.db.get(args.worldId)
-    if (!world || world.owner !== user?.subject) {
+    const isAdminUser = await isAdmin(ctx)
+    if (!world || (world.owner !== user?.subject && !isAdminUser)) {
       throw new Error('Unauthorized')
     }
 
-    await ctx.db.patch(args.worldId, {
-      mapEmbed: args.mapEmbed,
-    })
+    if (world.mapEmbed !== args.mapEmbed) {
+      await ctx.db.patch(args.worldId, {
+        mapEmbed: args.mapEmbed,
+      })
+    }
   },
 })
 
@@ -492,7 +583,8 @@ export const toggleCalendarVisibility = mutation({
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
     const world = await ctx.db.get(args.worldId)
-    if (!world || world.owner !== user?.subject) {
+    const isAdminUser = await isAdmin(ctx)
+    if (!world || (world.owner !== user?.subject && !isAdminUser)) {
       throw new Error('Unauthorized')
     }
 
@@ -507,12 +599,15 @@ export const updateWorldCalendar = mutation({
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
     const world = await ctx.db.get(args.worldId)
-    if (!world || world.owner !== user?.subject) {
+    const isAdminUser = await isAdmin(ctx)
+    if (!world || (world.owner !== user?.subject && !isAdminUser)) {
       throw new Error('Unauthorized')
     }
 
-    await ctx.db.patch(args.worldId, {
-      calendar: args.calendar,
-    })
+    if (world.calendar !== args.calendar) {
+      await ctx.db.patch(args.worldId, {
+        calendar: args.calendar,
+      })
+    }
   },
 })

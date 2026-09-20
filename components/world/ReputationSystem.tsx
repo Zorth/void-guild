@@ -136,7 +136,7 @@ export default function ReputationSystem({
     titleOverride
 }: ReputationSystemProps) {
     const data = useQuery(api.worlds.getReputationData, { worldName })
-    const sessions = useQuery(api.worlds.getSessionsByWorld, { worldId })
+    const sessions = useQuery(api.worlds.getSessionsByWorld, charactersInSession ? "skip" : (worldId ? { worldId } : "skip"))
     const toggleVisibility = useMutation(api.worlds.toggleReputationVisibility)
     const addFaction = useMutation(api.worlds.addFaction)
     const removeFaction = useMutation(api.worlds.removeFaction)
@@ -195,6 +195,14 @@ export default function ReputationSystem({
     const isOwner = data?.isOwner ?? false
     const isVisible = data?.isVisible ?? false
 
+    const repMap = useMemo(() => {
+        const map = new Map<string, number>()
+        reputations.forEach(r => {
+            map.set(`${r.characterId}:${r.factionName}`, r.value)
+        })
+        return map
+    }, [reputations])
+
     const activeGroup = factionGroups.find(g => g.name === groupFilter)
     const rawDisplayedFactions = groupFilter === 'all' ? factions : (activeGroup?.factions || [])
 
@@ -209,7 +217,7 @@ export default function ReputationSystem({
     }, [rawDisplayedFactions, factionSort])
 
     const getRepValue = (charId: Id<'characters'>, faction: string) => {
-        return reputations.find(r => r.characterId === charId && r.factionName === faction)?.value ?? 0
+        return repMap.get(`${charId}:${faction}`) ?? 0
     }
 
     const sortedCharacters = useMemo(() => {
@@ -237,11 +245,15 @@ export default function ReputationSystem({
             }
             return 0
         })
-    }, [charactersRaw, characterSort, reputations])
+    }, [charactersRaw, characterSort, repMap])
 
     const handleAddFaction = async () => {
         const name = newFactionName.trim()
         if (!name) return
+        if (factions.includes(name)) {
+            toast.error('Faction already exists.')
+            return
+        }
         try {
             await addFaction({ worldId, name })
             setNewFactionName('')
@@ -260,6 +272,10 @@ export default function ReputationSystem({
         }
         if (trimmed === oldName) {
             setEditingFactionName(null)
+            return
+        }
+        if (factions.includes(trimmed)) {
+            toast.error('A faction with this name already exists.')
             return
         }
         try {
@@ -307,6 +323,10 @@ export default function ReputationSystem({
     const handleAddGroup = async () => {
         const name = newGroupName.trim()
         if (!name) return
+        if (factionGroups.some(g => g.name === name)) {
+            toast.error('Group already exists.')
+            return
+        }
         try {
             await addFactionGroup({ worldId, name, factions: newGroupFactions })
             setNewGroupName('')
@@ -322,6 +342,10 @@ export default function ReputationSystem({
         const trimmed = editGroupName.trim()
         if (!trimmed) {
             toast.error('Group name cannot be empty.')
+            return
+        }
+        if (trimmed !== oldName && factionGroups.some(g => g.name === trimmed)) {
+            toast.error('A group with this name already exists.')
             return
         }
         try {
