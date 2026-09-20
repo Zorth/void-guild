@@ -195,6 +195,19 @@ export default function ReputationSystem({
     const isOwner = data?.isOwner ?? false
     const isVisible = data?.isVisible ?? false
 
+    const activeGroup = factionGroups.find(g => g.name === groupFilter)
+    const rawDisplayedFactions = groupFilter === 'all' ? factions : (activeGroup?.factions || [])
+
+    const displayedFactions = useMemo(() => {
+        if (factionSort === 'alpha-asc') {
+            return [...rawDisplayedFactions].sort((a, b) => a.localeCompare(b))
+        }
+        if (factionSort === 'alpha-desc') {
+            return [...rawDisplayedFactions].sort((a, b) => b.localeCompare(a))
+        }
+        return rawDisplayedFactions
+    }, [rawDisplayedFactions, factionSort])
+
     const getRepValue = (charId: Id<'characters'>, faction: string) => {
         return reputations.find(r => r.characterId === charId && r.factionName === faction)?.value ?? 0
     }
@@ -340,19 +353,6 @@ export default function ReputationSystem({
 
     if (data !== undefined && !isOwner && !isVisible) return null
     if (!data || !sessions) return null
-
-    const activeGroup = factionGroups.find(g => g.name === groupFilter)
-    const rawDisplayedFactions = groupFilter === 'all' ? factions : (activeGroup?.factions || [])
-
-    const displayedFactions = useMemo(() => {
-        if (factionSort === 'alpha-asc') {
-            return [...rawDisplayedFactions].sort((a, b) => a.localeCompare(b))
-        }
-        if (factionSort === 'alpha-desc') {
-            return [...rawDisplayedFactions].sort((a, b) => b.localeCompare(a))
-        }
-        return rawDisplayedFactions
-    }, [rawDisplayedFactions, factionSort])
 
     return (
         <Card className="flex flex-col bg-card/50 relative group border-border/40 gap-0 py-0 overflow-hidden mt-8">
