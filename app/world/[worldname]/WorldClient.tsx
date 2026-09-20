@@ -301,8 +301,14 @@ export default function WorldClient() {
 
   const allFilteredSessions = useMemo(() => {
     if (!sessions) return []
+    const now = Date.now()
+    const isPastSession = (s: { locked?: boolean; date?: number; planning?: boolean }) => {
+        if (s.locked) return true
+        if (s.date && !s.planning && s.date < (now - 4 * 60 * 60 * 1000)) return true
+        return false
+    }
     const filtered = sessions.filter(s => {
-        const matchesTab = activeTab === 'past' ? s.locked : !s.locked;
+        const matchesTab = activeTab === 'past' ? isPastSession(s) : !isPastSession(s);
         if (!matchesTab) return false;
         if (s.system === 'PF' && !pfFilter) return false;
         if (s.system === 'DnD' && !dndFilter) return false;

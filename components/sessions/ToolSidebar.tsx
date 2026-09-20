@@ -16,6 +16,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 
@@ -23,6 +24,97 @@ interface InitiativeItem {
     id: string;
     name: string;
     counter?: number;
+}
+
+interface InitiativeCounterCellProps {
+    item: InitiativeItem
+    onUpdate: (id: string, delta: number) => void
+    onSet: (id: string, value: number) => void
+}
+
+function InitiativeCounterCell({ item, onUpdate, onSet }: InitiativeCounterCellProps) {
+    const value = item.counter || 0
+    const [editValue, setEditValue] = useState(value.toString())
+    const [isPopoverOpen, setIsPopoverOpen] = useState(false)
+
+    useEffect(() => {
+        if (!isPopoverOpen) {
+            setEditValue(value.toString())
+        }
+    }, [value, isPopoverOpen])
+
+    const handleManualSet = () => {
+        const newVal = parseInt(editValue)
+        if (!isNaN(newVal)) {
+            onSet(item.id, newVal)
+            setIsPopoverOpen(false)
+        }
+    }
+
+    const numberDisplay = (
+        <span className={cn(
+            "min-w-[22px] px-1 py-0.5 text-center text-[10px] font-black tabular-nums rounded border border-transparent transition-all cursor-pointer hover:border-primary/30 hover:bg-primary/5",
+            value > 0 ? "text-blue-500" : value < 0 ? "text-red-500" : "text-muted-foreground"
+        )}>
+            {value}
+        </span>
+    )
+
+    return (
+        <div 
+            className="flex items-center gap-1 bg-muted/50 rounded-md p-0.5 border border-border/50" 
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+        >
+            <button 
+                onClick={() => onUpdate(item.id, -1)}
+                className="h-6 w-6 flex items-center justify-center hover:bg-destructive/10 hover:text-destructive rounded transition-all text-xs font-black"
+                title="Decrease"
+            >
+                -
+            </button>
+
+            <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+                <PopoverTrigger asChild>
+                    <button 
+                        onClick={() => {
+                            setEditValue(value.toString())
+                            setIsPopoverOpen(true)
+                        }}
+                        title="Click to edit value directly"
+                    >
+                        {numberDisplay}
+                    </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-24 p-2 z-50" align="center" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex flex-col gap-2">
+                        <Input
+                            type="number"
+                            className="h-7 text-xs text-center px-1"
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleManualSet()
+                                if (e.key === 'Escape') setIsPopoverOpen(false)
+                            }}
+                            autoFocus
+                        />
+                        <Button size="sm" className="h-6 text-[10px]" onClick={handleManualSet}>
+                            Save
+                        </Button>
+                    </div>
+                </PopoverContent>
+            </Popover>
+
+            <button 
+                onClick={() => onUpdate(item.id, 1)}
+                className="h-6 w-6 flex items-center justify-center hover:bg-primary/10 hover:text-primary rounded transition-all text-xs font-black"
+                title="Increase"
+            >
+                +
+            </button>
+        </div>
+    )
 }
 
 interface FantasyCalendarJSON {
@@ -412,6 +504,14 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
         pushState({ initiative: newItems })
     }
 
+    const setCounter = (id: string, value: number) => {
+        const newItems = items.map(item => 
+            item.id === id ? { ...item, counter: value } : item
+        )
+        setItems(newItems)
+        pushState({ initiative: newItems })
+    }
+
     const handleReorder = (newItems: InitiativeItem[]) => {
         setItems(newItems)
         // Keep currentIndex tracking the same character across reorders if possible
@@ -720,26 +820,11 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
                                         <GripVertical className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors shrink-0" />
                                         <span className="flex-grow truncate font-medium select-none">{item.name}</span>
                                         
-                                        <div className="flex items-center gap-1 bg-muted/50 rounded-md p-0.5 border border-border/50" onClick={(e) => e.stopPropagation()}>
-                                            <button 
-                                                onClick={() => updateCounter(item.id, -1)}
-                                                className="h-6 w-6 flex items-center justify-center hover:bg-destructive/10 hover:text-destructive rounded transition-all text-xs font-black"
-                                            >
-                                                -
-                                            </button>
-                                            <span className={cn(
-                                                "min-w-[20px] text-center text-[10px] font-black tabular-nums",
-                                                (item.counter || 0) > 0 ? "text-blue-500" : (item.counter || 0) < 0 ? "text-red-500" : "text-muted-foreground"
-                                            )}>
-                                                {item.counter || 0}
-                                            </span>
-                                            <button 
-                                                onClick={() => updateCounter(item.id, 1)}
-                                                className="h-6 w-6 flex items-center justify-center hover:bg-primary/10 hover:text-primary rounded transition-all text-xs font-black"
-                                            >
-                                                +
-                                            </button>
-                                        </div>
+                                        <InitiativeCounterCell 
+                                            item={item} 
+                                            onUpdate={updateCounter} 
+                                            onSet={setCounter} 
+                                        />
 
                                         <button 
                                             onClick={(e) => { e.stopPropagation(); removeItem(item.id); }} 

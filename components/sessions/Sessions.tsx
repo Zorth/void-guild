@@ -618,6 +618,17 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
     scheduled: false,
     interested: false,
   })
+
+  // Sync tab from URL query param if present (e.g. /?tab=past or /sessions)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab');
+      if (tab === 'past' || tab === 'planning' || tab === 'upcoming') {
+        setActiveTab(tab);
+      }
+    }
+  }, []);
   
   // Use a query that returns planning sessions if in the planning tab
   const sessionsRaw = useQuery(
@@ -665,10 +676,12 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
 
     if (activeFilters.owned) filtered = filtered.filter(s => s.isOwner);
     if (activeFilters.signedUp) filtered = filtered.filter(s => s.characters.some(id => userCharacterIds.has(id)));
-    if (activeFilters.notFull) filtered = filtered.filter(s => s.characters.length < s.maxPlayers);
-    if (activeFilters.planning) filtered = filtered.filter(s => !!s.planning);
-    if (activeFilters.scheduled) filtered = filtered.filter(s => !s.planning);
-    if (activeFilters.interested) filtered = filtered.filter(s => s.interestedPlayers?.some(p => p.userId === userId));
+    if (activeTab !== 'past') {
+      if (activeFilters.notFull) filtered = filtered.filter(s => s.characters.length < s.maxPlayers);
+      if (activeFilters.planning) filtered = filtered.filter(s => !!s.planning);
+      if (activeFilters.scheduled) filtered = filtered.filter(s => !s.planning);
+      if (activeFilters.interested) filtered = filtered.filter(s => s.interestedPlayers?.some(p => p.userId === userId));
+    }
 
     return filtered;
   }, [sessionsRaw, filters, activeTab, activeFilters, userCharacterIds, userId]);
@@ -923,7 +936,7 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
                       >
                         <Link
                           href={`/sessions/${session._id}`}
-                          className="flex-grow min-w-0 flex justify-between items-start"
+                          className="flex-grow min-w-0 flex justify-between items-center group/link"
                         >
                           <div className="flex flex-col min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
@@ -1041,21 +1054,31 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
                                 return null;
                             })()}
                           </div>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground/30 group-hover/link:text-primary transition-colors shrink-0 ml-2 self-center" />
                         </Link>
                         {activeTab === 'past' && session.date && (
-                          <Button 
-                            type="button"
-                            variant="outline" 
-                            size="sm" 
-                            className="h-8 text-xs px-2 shrink-0 self-center z-10"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              recordWikiVisit().then(() => syncAndGetAchievements()).catch(console.error);
-                              window.open(`https://void.tarragon.be/Session-Reports/${new Date(session.date!).toISOString().slice(0, 10)}-${session.worldName.replace(/\s+/g, '-')}`, '_blank');
-                            }}
-                          >
-                            <Book size={16} />
-                          </Button>
+                          <Tooltip delayDuration={150}>
+                            <TooltipTrigger asChild>
+                              <Button 
+                                type="button"
+                                variant="outline" 
+                                size="sm" 
+                                className="h-8 text-xs px-2 shrink-0 self-center z-10 gap-1 hover:border-primary/50"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  recordWikiVisit().then(() => syncAndGetAchievements()).catch(console.error);
+                                  window.open(`https://void.tarragon.be/Session-Reports/${new Date(session.date!).toISOString().slice(0, 10)}-${session.worldName.replace(/\s+/g, '-')}`, '_blank');
+                                }}
+                                title="Open Wiki Session Report"
+                              >
+                                <Book size={15} />
+                                <span className="hidden sm:inline text-[10px] font-medium">Wiki</span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              Open Wiki Session Report (External)
+                            </TooltipContent>
+                          </Tooltip>
                         )}
                       </motion.li>
                     )

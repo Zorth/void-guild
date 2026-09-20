@@ -88,10 +88,26 @@ export const listSessions = query({
       return []
     }
 
-    const sessions = await ctx.db
+    const now = Date.now()
+    // A session is past if it is explicitly locked OR if its date is in the past (over 4 hours ago) and not in planning
+    const isPastSession = (s: { locked?: boolean; date?: number; planning?: boolean }) => {
+      if (s.locked) return true
+      if (s.date && !s.planning && s.date < (now - 4 * 60 * 60 * 1000)) return true
+      return false
+    }
+
+    const lockedSessions = await ctx.db
       .query('sessions')
-      .filter((q) => q.eq(q.field('locked'), args.past))
+      .withIndex('by_locked', (q) => q.eq('locked', true))
       .collect()
+
+    const unlockedSessions = await ctx.db
+      .query('sessions')
+      .withIndex('by_locked', (q) => q.eq('locked', false))
+      .collect()
+
+    const allSessions = [...lockedSessions, ...unlockedSessions]
+    const sessions = allSessions.filter(s => args.past ? isPastSession(s) : !isPastSession(s))
 
     const sessionsWithDetails = await Promise.all(
       sessions.map(async (session) => {
@@ -132,10 +148,25 @@ export const listSessions = query({
 export const publicListSessions = query({
   args: { past: v.boolean() },
   handler: async (ctx, args) => {
-    const sessions = await ctx.db
+    const now = Date.now()
+    const isPastSession = (s: { locked?: boolean; date?: number; planning?: boolean }) => {
+      if (s.locked) return true
+      if (s.date && !s.planning && s.date < (now - 4 * 60 * 60 * 1000)) return true
+      return false
+    }
+
+    const lockedSessions = await ctx.db
       .query('sessions')
-      .filter((q) => q.eq(q.field('locked'), args.past))
+      .withIndex('by_locked', (q) => q.eq('locked', true))
       .collect()
+
+    const unlockedSessions = await ctx.db
+      .query('sessions')
+      .withIndex('by_locked', (q) => q.eq('locked', false))
+      .collect()
+
+    const allSessions = [...lockedSessions, ...unlockedSessions]
+    const sessions = allSessions.filter(s => args.past ? isPastSession(s) : !isPastSession(s))
 
     const sessionsWithDetails = await Promise.all(
       sessions.map(async (session) => {

@@ -168,13 +168,24 @@ export const renameFaction = mutation({
       throw new Error('Unauthorized')
     }
 
+    const oldName = args.oldName.trim()
+    const newName = args.newName.trim()
+    if (!newName) {
+      throw new Error('Faction name cannot be empty')
+    }
+    if (oldName === newName) return
+
     const factions = world.factions ?? []
-    const newFactions = factions.map(f => f === args.oldName ? args.newName : f)
+    if (factions.includes(newName)) {
+      throw new Error('A faction with this name already exists')
+    }
+
+    const newFactions = factions.map(f => f === oldName ? newName : f)
 
     const groups = world.factionGroups ?? []
     const newGroups = groups.map(g => ({
       ...g,
-      factions: g.factions.map(f => f === args.oldName ? args.newName : f)
+      factions: g.factions.map(f => f === oldName ? newName : f)
     }))
 
     await ctx.db.patch(args.worldId, {
@@ -185,12 +196,57 @@ export const renameFaction = mutation({
     // Update all reputations for this faction in this world
     const reps = await ctx.db
       .query('reputations')
-      .withIndex('by_world_faction', (q) => q.eq('worldId', args.worldId).eq('factionName', args.oldName))
+      .withIndex('by_world_faction', (q) => q.eq('worldId', args.worldId).eq('factionName', oldName))
       .collect()
 
     for (const rep of reps) {
-      await ctx.db.patch(rep._id, { factionName: args.newName })
+      await ctx.db.patch(rep._id, { factionName: newName })
     }
+  },
+})
+
+export const editFactionGroup = mutation({
+  args: {
+    worldId: v.id('worlds'),
+    oldName: v.string(),
+    newName: v.string(),
+    factions: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    const world = await ctx.db.get(args.worldId)
+    if (!world || world.owner !== user?.subject) {
+      throw new Error('Unauthorized')
+    }
+
+    const oldName = args.oldName.trim()
+    const newName = args.newName.trim()
+    if (!newName) throw new Error('Group name cannot be empty')
+
+    const groups = world.factionGroups ?? []
+    if (newName !== oldName && groups.some(g => g.name === newName)) {
+      throw new Error('A group with this name already exists')
+    }
+
+    const newGroups = groups.map(g => g.name === oldName ? { name: newName, factions: args.factions } : g)
+
+    await ctx.db.patch(args.worldId, {
+      factionGroups: newGroups,
+    })
+  },
+})
+
+export const reorderFactions = mutation({
+  args: { worldId: v.id('worlds'), factions: v.array(v.string()) },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    const world = await ctx.db.get(args.worldId)
+    if (!world || world.owner !== user?.subject) {
+      throw new Error('Unauthorized')
+    }
+    await ctx.db.patch(args.worldId, {
+      factions: args.factions,
+    })
   },
 })
 
