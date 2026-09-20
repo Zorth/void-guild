@@ -179,6 +179,28 @@ export default function SessionClient() {
     session && userCharacterInSessionId ? { sessionId: session._id, userCharacterId: userCharacterInSessionId } : "skip"
   )
 
+  const canInvite = Boolean(session && !session.locked && (
+    Boolean(isAdmin) || 
+    (Boolean(session.isPrivate) && (Boolean(session.isOwner) || hasUserCharacterInSession))
+  ))
+
+  const availableInviteCharacters = useQuery(
+    api.sessions.getAvailableCharactersToInvite,
+    canInvite && session?._id ? { sessionId: session._id } : "skip"
+  )
+
+  const filteredInviteCharacters = useMemo(() => {
+    if (!availableInviteCharacters) return []
+    if (!inviteSearchQuery.trim()) return availableInviteCharacters
+    const q = inviteSearchQuery.toLowerCase()
+    return availableInviteCharacters.filter(c =>
+      c.name.toLowerCase().includes(q) ||
+      (c.class && c.class.toLowerCase().includes(q)) ||
+      (c.ownerName && c.ownerName.toLowerCase().includes(q)) ||
+      (c.rank && c.rank.toLowerCase().includes(q))
+    )
+  }, [availableInviteCharacters, inviteSearchQuery])
+
   const isLoading = session === undefined || 
                     isAdmin === undefined || 
                     (isAdmin && allCharacters === undefined);
@@ -376,28 +398,6 @@ export default function SessionClient() {
       toast.error('Failed to send session details to Discord.')
     }
   }
-
-  const canInvite = !session.locked && (
-    Boolean(isAdmin) || 
-    (Boolean(session.isPrivate) && (Boolean(session.isOwner) || hasUserCharacterInSession))
-  )
-
-  const availableInviteCharacters = useQuery(
-    api.sessions.getAvailableCharactersToInvite,
-    canInvite && session?._id ? { sessionId: session._id } : "skip"
-  )
-
-  const filteredInviteCharacters = useMemo(() => {
-    if (!availableInviteCharacters) return []
-    if (!inviteSearchQuery.trim()) return availableInviteCharacters
-    const q = inviteSearchQuery.toLowerCase()
-    return availableInviteCharacters.filter(c =>
-      c.name.toLowerCase().includes(q) ||
-      (c.class && c.class.toLowerCase().includes(q)) ||
-      (c.ownerName && c.ownerName.toLowerCase().includes(q)) ||
-      (c.rank && c.rank.toLowerCase().includes(q))
-    )
-  }, [availableInviteCharacters, inviteSearchQuery])
 
   const handleInviteCharacter = async () => {
     if (!selectedInviteCharacterId || !session) return
