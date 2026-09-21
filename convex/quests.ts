@@ -16,6 +16,7 @@ export const createQuest = mutation({
     tags: v.optional(v.array(v.string())),
     characterId: v.optional(v.id('characters')),
     isSuggested: v.optional(v.boolean()),
+    isHidden: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
@@ -150,6 +151,7 @@ export const updateQuest = mutation({
     rewardOther: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
     characterId: v.optional(v.id('characters')),
+    isHidden: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
@@ -368,6 +370,40 @@ export const rejectSuggestedQuest = mutation({
   },
 })
 
+export const toggleQuestHidden = mutation({
+  args: {
+    questId: v.id('quests'),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    const quest = await ctx.db.get(args.questId)
+    if (!quest) throw new Error('Quest not found')
+
+    const isAdminUser = await isAdmin(ctx)
+    let isWorldOwner = false
+    if (quest.worldId) {
+      const world = await ctx.db.get(quest.worldId)
+      isWorldOwner = world?.owner === user.subject
+    } else {
+      // For worldless quests, only admin can toggle hidden
+      isWorldOwner = isAdminUser
+    }
+
+    if (!isWorldOwner && !isAdminUser) {
+      throw new Error('Only the world owner or an admin can hide/unhide quests.')
+    }
+
+    const nextHidden = !quest.isHidden
+    await ctx.db.patch(args.questId, {
+      isHidden: nextHidden,
+    })
+
+    return nextHidden
+  },
+})
+
 export const getSuggestedQuestsByWorld = query({
   args: { worldId: v.id('worlds') },
   handler: async (ctx, args) => {
@@ -464,8 +500,21 @@ export const getQuestsByWorld = query({
       questMap.set(q._id, q)
     }
 
+    const user = await ctx.auth.getUserIdentity()
+    const isAdminUser = await isAdmin(ctx)
+    let isWorldOwner = false
+    if (args.worldId && user) {
+      const world = await ctx.db.get(args.worldId)
+      isWorldOwner = world?.owner === user.subject
+    }
+
     // Exclude completed quests and pending suggestions (pending suggestions are reviewed by world owner first)
-    const activeQuests = Array.from(questMap.values()).filter(q => !q.isCompleted && !q.isSuggested)
+    // Also exclude hidden quests unless the user is the world owner or an admin
+    const activeQuests = Array.from(questMap.values()).filter(q => {
+      if (q.isCompleted || q.isSuggested) return false
+      if (q.isHidden && !isWorldOwner && !isAdminUser) return false
+      return true
+    })
     
     const questsWithChar = await Promise.all(
       activeQuests.map(async (q) => {

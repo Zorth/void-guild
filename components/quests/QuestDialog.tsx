@@ -15,13 +15,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
-import { Scroll, Sword, Trophy, User, Hash, Coins, Sparkles, Globe } from 'lucide-react'
+import { Scroll, Sword, Trophy, User, Hash, Coins, Sparkles, Globe, EyeOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface QuestDialogProps {
   isOpen: boolean
   onClose: () => void
   worldId?: Id<'worlds'>
+  isWorldOwner?: boolean
   quest?: {
     _id: Id<'quests'>
     name: string
@@ -36,10 +37,11 @@ interface QuestDialogProps {
     rewardOther?: string
     tags?: string[]
     worldId?: Id<'worlds'>
+    isHidden?: boolean
   }
 }
 
-export default function QuestDialog({ isOpen, onClose, worldId, quest }: QuestDialogProps) {
+export default function QuestDialog({ isOpen, onClose, worldId, isWorldOwner = false, quest }: QuestDialogProps) {
   const [name, setName] = useState('')
   const [levelPF, setLevelPF] = useState<number | null>(null)
   const [levelDnD, setLevelDnD] = useState<number | null>(null)
@@ -50,6 +52,7 @@ export default function QuestDialog({ isOpen, onClose, worldId, quest }: QuestDi
   const [rewardOther, setRewardOther] = useState<string>('')
   const [tagsString, setTagsString] = useState('')
   const [isGlobal, setIsGlobal] = useState(false)
+  const [isHidden, setIsHidden] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const isAdmin = useQuery(api.sessions.isAdminQuery)
@@ -69,6 +72,7 @@ export default function QuestDialog({ isOpen, onClose, worldId, quest }: QuestDi
       setRewardOther(quest.rewardOther || (!quest.rewardMoneyGP && quest.reward ? quest.reward : ''))
       setTagsString(quest.tags?.join(', ') || '')
       setIsGlobal(!quest.worldId)
+      setIsHidden(Boolean(quest.isHidden))
     } else {
       setName('')
       setLevelPF(null)
@@ -80,6 +84,7 @@ export default function QuestDialog({ isOpen, onClose, worldId, quest }: QuestDi
       setRewardOther('')
       setTagsString('')
       setIsGlobal(!worldId)
+      setIsHidden(false)
     }
   }, [quest, isOpen, worldId])
 
@@ -111,6 +116,7 @@ export default function QuestDialog({ isOpen, onClose, worldId, quest }: QuestDi
           rewardOther: rewardOther.trim() || undefined,
           tags,
           worldId: targetWorldId,
+          isHidden,
         })
         toast.success('Quest updated successfully!')
       } else {
@@ -125,6 +131,7 @@ export default function QuestDialog({ isOpen, onClose, worldId, quest }: QuestDi
           rewardOther: rewardOther.trim() || undefined,
           tags,
           worldId: targetWorldId,
+          isHidden,
         })
         toast.success('Quest created successfully!')
       }
@@ -174,6 +181,23 @@ export default function QuestDialog({ isOpen, onClose, worldId, quest }: QuestDi
               <label htmlFor="isGlobalQuest" className="text-xs font-semibold text-foreground cursor-pointer flex items-center gap-1.5 select-none">
                 <Globe className="h-3.5 w-3.5 text-blue-400 shrink-0" />
                 <span>Global Quest (Shared across all campaign worlds)</span>
+              </label>
+            </div>
+          )}
+
+          {/* World Owner or Admin: Hidden Quest Checkbox */}
+          {(isWorldOwner || isAdmin) && (
+            <div className="flex items-center gap-2.5 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <input
+                type="checkbox"
+                id="isHiddenQuest"
+                checked={isHidden}
+                onChange={(e) => setIsHidden(e.target.checked)}
+                className="h-4 w-4 rounded border-border text-amber-500 focus:ring-amber-500 cursor-pointer accent-amber-500 shrink-0"
+              />
+              <label htmlFor="isHiddenQuest" className="text-xs font-semibold text-foreground cursor-pointer flex items-center gap-1.5 select-none">
+                <EyeOff className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                <span>Hidden Quest (Hidden from regular players on world, session, and Discord)</span>
               </label>
             </div>
           )}

@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { 
   Scroll, Sword, Trophy, User, Hash, Plus, Pencil, Trash2, 
-  ChevronDown, ChevronUp, MapPin, Tag, Crown, Check, X, Sparkles, Globe
+  ChevronDown, ChevronUp, MapPin, Tag, Crown, Check, X, Sparkles, Globe,
+  SlidersHorizontal, Eye, EyeOff, RotateCcw
 } from 'lucide-react'
 import { useAuth } from '@clerk/nextjs'
 import QuestDialog from './QuestDialog'
@@ -17,6 +18,12 @@ import { cn, getLevelBadgeStyle, getDualLevelBadgeStyle, CharacterRankIcon } fro
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useState, useMemo } from 'react'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import { Input } from '@/components/ui/input'
 
 interface QuestListProps {
   worldId?: Id<'worlds'>
@@ -24,6 +31,13 @@ interface QuestListProps {
   isSidebar?: boolean
   filters?: { pf: boolean, dnd: boolean }
 }
+
+const LEVEL_TIERS = [
+  { label: 'Tier 1 (1–4)', min: 1, max: 4 },
+  { label: 'Tier 2 (5–10)', min: 5, max: 10 },
+  { label: 'Tier 3 (11–16)', min: 11, max: 16 },
+  { label: 'Tier 4 (17–20)', min: 17, max: 20 },
+]
 
 export default function QuestList({ worldId, worldOwner, isSidebar = false, filters }: QuestListProps) {
   const { userId } = useAuth()
@@ -36,31 +50,62 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
   const deleteQuest = useMutation(api.quests.deleteQuest)
   const approveSuggestedQuest = useMutation(api.quests.approveSuggestedQuest)
   const rejectSuggestedQuest = useMutation(api.quests.rejectSuggestedQuest)
+  const toggleQuestHidden = useMutation(api.quests.toggleQuestHidden)
 
   const isWorldOwner = userId === worldOwner || !!isAdmin
 
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingQuest, setEditingQuest] = useState<any>(null)
   const [expandedQuestId, setExpandedQuestId] = useState<Id<'quests'> | null>(null)
+  const [minLevel, setMinLevel] = useState<number | ''>('')
+  const [maxLevel, setMaxLevel] = useState<number | ''>('')
+  const [includeTbd, setIncludeTbd] = useState<boolean>(true)
+  const [isFilterOpen, setIsFilterOpen] = useState(false)
+
+  const isLevelFilterActive = minLevel !== '' || maxLevel !== ''
 
   const quests = useMemo(() => {
     if (!questsRaw) return undefined;
-    if (!filters) return questsRaw;
 
     return questsRaw.filter(q => {
-        const levelPF = q.levelPF ?? (q.levelDnD === undefined ? q.level : undefined);
-        const levelDnD = q.levelDnD;
+      const levelPF = q.levelPF ?? (q.levelDnD === undefined ? q.level : undefined);
+      const levelDnD = q.levelDnD;
 
-        const hasPF = levelPF !== undefined;
-        const hasDnD = levelDnD !== undefined;
+      const hasPF = levelPF !== undefined;
+      const hasDnD = levelDnD !== undefined;
 
-        if (filters.pf && hasPF) return true;
-        if (filters.dnd && hasDnD) return true;
-        if (!hasPF && !hasDnD) return true; // TBD quests always show
+      // System filter (if supplied via props)
+      if (filters) {
+        let systemMatches = false;
+        if (filters.pf && hasPF) systemMatches = true;
+        if (filters.dnd && hasDnD) systemMatches = true;
+        if (!hasPF && !hasDnD) systemMatches = true; // TBD quests always match system filter
+        if (!systemMatches) return false;
+      }
 
-        return false;
+      // Level range filter
+      if (isLevelFilterActive) {
+        const levels: number[] = [];
+        if (levelPF !== undefined && levelPF > 0) levels.push(levelPF);
+        if (levelDnD !== undefined && levelDnD > 0) levels.push(levelDnD);
+
+        const isTbd = levels.length === 0;
+
+        if (isTbd) {
+          return includeTbd;
+        }
+
+        const min = minLevel !== '' ? Number(minLevel) : 1;
+        const max = maxLevel !== '' ? Number(maxLevel) : 20;
+
+        // Matches if any defined system level is within range [min, max]
+        const inRange = levels.some(lvl => lvl >= min && lvl <= max);
+        if (!inRange) return false;
+      }
+
+      return true;
     });
-  }, [questsRaw, filters]);
+  }, [questsRaw, filters, isLevelFilterActive, minLevel, maxLevel, includeTbd]);
 
   const handleApproveSuggestion = async (questId: Id<'quests'>) => {
     try {
@@ -79,6 +124,16 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
       toast.error('Failed to reject quest')
     }
   }
+
+  const handleToggleHidden = async (questId: Id<'quests'>, currentHidden: boolean) => {
+    try {
+      await toggleQuestHidden({ questId })
+      toast.success(currentHidden ? 'Quest is now visible to everyone' : 'Quest is now hidden from players')
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to toggle quest visibility')
+    }
+  }
+
   const handleCreate = () => {
     setEditingQuest(null)
     setIsDialogOpen(true)
@@ -100,23 +155,171 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
     }
   }
 
+  const clearLevelFilter = () => {
+    setMinLevel('')
+    setMaxLevel('')
+    setIncludeTbd(true)
+  }
+
+  const setTierFilter = (min: number, max: number) => {
+    if (minLevel === min && maxLevel === max) {
+      clearLevelFilter()
+    } else {
+      setMinLevel(min)
+      setMaxLevel(max)
+    }
+  }
+
   if (quests === undefined) {
     return <div className="p-4 text-center text-muted-foreground">Loading quests...</div>
   }
 
   return (
     <div className={cn("flex flex-col gap-4", isSidebar ? "" : "w-full")}>
-      <div className="flex items-center justify-between px-1">
-        <h3 className={cn("font-bold flex items-center gap-2", isSidebar ? "text-sm" : "text-lg")}>
-          <Scroll className={cn("text-primary", isSidebar ? "h-3.5 w-3.5" : "h-5 w-5")} />
-          Available Quests
-        </h3>
-        {!isSidebar && (
-            <Button size="sm" onClick={handleCreate} className="h-8 gap-1">
-                <Plus className="h-3.5 w-3.5" />
-                Post Quest
+      <div className="flex items-center justify-between px-1 gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <h3 className={cn("font-bold flex items-center gap-2", isSidebar ? "text-sm" : "text-lg")}>
+            <Scroll className={cn("text-primary", isSidebar ? "h-3.5 w-3.5" : "h-5 w-5")} />
+            Available Quests
+          </h3>
+          {isLevelFilterActive && (
+            <span className="text-[10px] bg-primary/20 text-primary border border-primary/30 px-1.5 py-0.5 rounded-full font-semibold">
+              Lvl {minLevel !== '' ? minLevel : 1}–{maxLevel !== '' ? maxLevel : 20}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <Popover open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+            <PopoverTrigger asChild>
+              <Button 
+                variant={isLevelFilterActive ? "secondary" : "outline"} 
+                size="sm" 
+                className={cn(
+                  "h-8 gap-1.5 text-xs px-2.5",
+                  isLevelFilterActive && "border-primary/50 text-primary font-bold shadow-xs"
+                )}
+                title="Filter quests by level range"
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                <span className={cn(isSidebar ? "hidden" : "hidden sm:inline")}>Level Filter</span>
+                {isLevelFilterActive && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72 p-3 space-y-3 bg-popover/95 backdrop-blur-xs border-border/80 text-xs" align="end">
+              <div className="flex items-center justify-between border-b pb-2">
+                <span className="font-bold flex items-center gap-1.5">
+                  <SlidersHorizontal className="h-3.5 w-3.5 text-primary" />
+                  Filter by Level Range
+                </span>
+                {isLevelFilterActive && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={clearLevelFilter} 
+                    className="h-6 text-[10px] px-1.5 text-muted-foreground hover:text-foreground"
+                  >
+                    <RotateCcw className="h-2.5 w-2.5 mr-1" />
+                    Reset
+                  </Button>
+                )}
+              </div>
+
+              {/* Quick Preset Tiers */}
+              <div className="space-y-1.5">
+                <div className="text-[11px] font-medium text-muted-foreground">Presets</div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {LEVEL_TIERS.map(tier => {
+                    const isSelected = minLevel === tier.min && maxLevel === tier.max
+                    return (
+                      <Button
+                        key={tier.label}
+                        type="button"
+                        variant={isSelected ? "secondary" : "outline"}
+                        size="sm"
+                        onClick={() => setTierFilter(tier.min, tier.max)}
+                        className={cn(
+                          "h-7 text-[10px] justify-center px-1.5",
+                          isSelected && "border-primary/50 text-primary font-bold bg-primary/15"
+                        )}
+                      >
+                        {tier.label}
+                      </Button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Custom Min / Max Range */}
+              <div className="space-y-1.5 pt-1 border-t">
+                <div className="text-[11px] font-medium text-muted-foreground">Custom Range</div>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 space-y-1">
+                    <label className="text-[10px] text-muted-foreground">Min Level</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={20}
+                      placeholder="1"
+                      value={minLevel}
+                      onChange={(e) => setMinLevel(e.target.value === '' ? '' : Math.max(1, Math.min(20, Number(e.target.value))))}
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                  <span className="text-muted-foreground mt-4">–</span>
+                  <div className="flex-1 space-y-1">
+                    <label className="text-[10px] text-muted-foreground">Max Level</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={20}
+                      placeholder="20"
+                      value={maxLevel}
+                      onChange={(e) => setMaxLevel(e.target.value === '' ? '' : Math.max(1, Math.min(20, Number(e.target.value))))}
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Include TBD Quests checkbox */}
+              <div className="flex items-center gap-2 pt-1 border-t">
+                <input
+                  type="checkbox"
+                  id="includeTbdQuests"
+                  checked={includeTbd}
+                  onChange={(e) => setIncludeTbd(e.target.checked)}
+                  className="rounded border-border bg-background h-3.5 w-3.5 text-primary focus:ring-primary"
+                />
+                <label htmlFor="includeTbdQuests" className="text-[11px] text-muted-foreground cursor-pointer select-none">
+                  Include TBD / unranked quests
+                </label>
+              </div>
+
+              {isLevelFilterActive && (
+                <div className="pt-1 flex justify-end">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={clearLevelFilter} 
+                    className="h-6 text-[10px] text-destructive hover:bg-destructive/10"
+                  >
+                    Clear Filter
+                  </Button>
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
+
+          {!isSidebar && (
+            <Button size="sm" onClick={handleCreate} className="h-8 gap-1 text-xs">
+              <Plus className="h-3.5 w-3.5" />
+              Post Quest
             </Button>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Suggested Quests from Guildmasters (Visible to World Owner and Admin) */}
@@ -247,6 +450,15 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
                                     <span className={cn(isSidebar ? "inline" : "sm:hidden")}>Global</span>
                                 </span>
                             )}
+                            {quest.isHidden && (
+                                <span 
+                                  className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0 shadow-xs"
+                                  title="Hidden from players (Only visible to world owner & admins)"
+                                >
+                                    <EyeOff className="h-2.5 w-2.5 text-amber-400" />
+                                    <span>Hidden</span>
+                                </span>
+                            )}
                             {isCharacterQuest && (
                                 <span 
                                   className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 shrink-0 shadow-xs"
@@ -285,10 +497,24 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
                   <div className="flex items-center gap-1 shrink-0">
                     {canEdit && (
                         <div className="flex items-center gap-1 mr-2" onClick={(e) => e.stopPropagation()}>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(quest)}>
+                            {isWorldOwner && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className={cn(
+                                    "h-7 w-7", 
+                                    quest.isHidden ? "text-amber-400 hover:text-amber-300 hover:bg-amber-500/10" : "text-muted-foreground hover:text-foreground"
+                                  )} 
+                                  onClick={() => handleToggleHidden(quest._id, Boolean(quest.isHidden))}
+                                  title={quest.isHidden ? "Unhide quest (make visible to players)" : "Hide quest from players"}
+                                >
+                                    {quest.isHidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                                </Button>
+                            )}
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(quest)} title="Edit quest">
                                 <Pencil className="h-3.5 w-3.5" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDelete(quest._id)}>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDelete(quest._id)} title="Delete quest">
                                 <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                         </div>
@@ -401,6 +627,7 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
         isOpen={isDialogOpen} 
         onClose={() => setIsDialogOpen(false)} 
         worldId={worldId}
+        isWorldOwner={isWorldOwner}
         quest={editingQuest}
       />
     </div>

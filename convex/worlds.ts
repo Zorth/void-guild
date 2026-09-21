@@ -116,6 +116,11 @@ export const getWorldByName = query({
 export const getSessionsByWorld = query({
   args: { worldId: v.id('worlds') },
   handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    const isAdminUser = await isAdmin(ctx)
+    const world = await ctx.db.get(args.worldId)
+    const isWorldOwner = world?.owner === user?.subject
+
     const sessions = await ctx.db
       .query('sessions')
       .withIndex('by_world', (q) => q.eq('world', args.worldId))
@@ -126,7 +131,10 @@ export const getSessionsByWorld = query({
         const characterDocs = await Promise.all(
           session.characters.map((id) => ctx.db.get(id))
         )
-        const questDoc = session.questId ? await ctx.db.get(session.questId) : null
+        let questDoc = session.questId ? await ctx.db.get(session.questId) : null
+        if (questDoc?.isHidden && !isWorldOwner && !isAdminUser) {
+          questDoc = null
+        }
         return {
           ...session,
           level: computeEffectiveLevel(session, questDoc),

@@ -605,7 +605,13 @@ export const getInternalSessionDetails = internalQuery({
     let selectedQuest = null;
     if (session.questId) {
         selectedQuest = await ctx.db.get(session.questId);
+        // If the selected quest was marked hidden, do not reveal it on Discord
+        if (selectedQuest?.isHidden) {
+          selectedQuest = null;
+        }
     }
+
+    const availableQuests = [...quests, ...worldlessQuests].filter(q => !q.isHidden && !q.isCompleted && !q.isSuggested);
 
     return {
       ...session,
@@ -614,7 +620,7 @@ export const getInternalSessionDetails = internalQuery({
       attendingCharacters: attendingCharacters.filter((c): c is any => c !== null),
       interestedPlayers,
       gmCharacterName: gmCharacter?.name || null,
-      quests: [...quests, ...worldlessQuests],
+      quests: availableQuests,
       selectedQuest,
     };
   },

@@ -134,7 +134,11 @@ export const listSessions = query({
           (session.characters || []).map((id) => ctx.db.get(id))
         )
         const worldDoc = session.world ? await ctx.db.get(session.world as Id<'worlds'>) : null
-        const questDoc = session.questId ? await ctx.db.get(session.questId) : null
+        let questDoc = session.questId ? await ctx.db.get(session.questId) : null
+        const isWorldOwner = worldDoc && user.subject === worldDoc.owner
+        if (questDoc?.isHidden && !isWorldOwner && !isAdminUser) {
+          questDoc = null
+        }
         return {
           ...session,
           level: computeEffectiveLevel(session, questDoc),
@@ -195,7 +199,10 @@ export const publicListSessions = query({
           (session.characters || []).map((id) => ctx.db.get(id))
         )
         const worldDoc = session.world ? await ctx.db.get(session.world as Id<'worlds'>) : null
-        const questDoc = session.questId ? await ctx.db.get(session.questId) : null
+        let questDoc = session.questId ? await ctx.db.get(session.questId) : null
+        if (questDoc?.isHidden) {
+          questDoc = null
+        }
         return {
           ...session,
           level: computeEffectiveLevel(session, questDoc),
@@ -463,10 +470,14 @@ export const getSession = query({
     }
 
     const worldDoc = session.world ? await ctx.db.get(session.world as Id<'worlds'>) : null
+    const isWorldOwner = worldDoc && user?.subject === worldDoc.owner
     
     let quest = null
     if (session.questId) {
         quest = await ctx.db.get(session.questId)
+        if (quest?.isHidden && !isWorldOwner && !isAdminUser) {
+          quest = null
+        }
     }
 
     return {

@@ -147,6 +147,7 @@ export default defineSchema({
         isSuggested: v.optional(v.boolean()), // True if suggested to a world owner by a Guildmaster
         suggestionStatus: v.optional(v.union(v.literal('pending'), v.literal('approved'), v.literal('rejected'))), // Approval status
         isCompleted: v.optional(v.boolean()),
+        isHidden: v.optional(v.boolean()), // Hidden from regular players by world owner
         completedSessionId: v.optional(v.id("sessions")),
         completedAt: v.optional(v.number()),
     }).index('by_worldId', ['worldId'])
