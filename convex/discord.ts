@@ -242,7 +242,7 @@ export const syncSessionToDiscord = internalAction({
 
     // Format the list of signed-up characters and interested players for the embed fields
     const signupList = session.attendingCharacters.length > 0
-      ? session.attendingCharacters.map(c => {
+      ? session.attendingCharacters.map((c: any) => {
           const ping = c.discordId ? ` (<@${c.discordId}>)` : "";
           const titleStr = c.title ? ` *"${c.title}"*` : "";
           return `• **${c.name}**${titleStr} (Lvl ${c.lvl} ${c.class})${ping}`;
@@ -252,7 +252,7 @@ export const syncSessionToDiscord = internalAction({
           : (isPrivate ? "_No characters invited yet (Invite-Only)._" : "_No characters signed up yet._"));
     
     const interestList = (session.interestedPlayers && session.interestedPlayers.length > 0)
-      ? session.interestedPlayers.map(p => {
+      ? session.interestedPlayers.map((p: any) => {
           const ping = p.discordId ? ` (<@${p.discordId}>)` : "";
           return `• **${p.username}**${ping}`;
         }).join("\n")

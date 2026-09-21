@@ -1,13 +1,24 @@
 'use client'
 
 import Link from 'next/link'
-import { Book, Trash2, Loader2, Sparkles, Flame, Trophy, Star, Users, ExternalLink, Globe, Medal, Crown } from 'lucide-react'
+import { useState } from 'react'
+import { Book, Trash2, Loader2, Sparkles, Flame, Trophy, Star, Users, ExternalLink, Globe, Medal, Crown, Quote } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/textarea'
 import { Doc, Id } from '@/convex/_generated/dataModel'
 import { cn, getLevelBadgeStyle, CharacterRankIcon } from '@/lib/utils'
 import { UserMetadata } from '@/app/stats/actions'
-import { useQuery, useMutation } from 'convex/react'
+import { useQuery, useMutation, useAction } from 'convex/react'
+import { useUser } from '@clerk/nextjs'
 import { api } from '@/convex/_generated/api'
 import { toast } from 'sonner'
 import { resolveCosmeticsStyles } from '@/lib/cosmetics'
@@ -92,12 +103,78 @@ export default function AttendingCharactersList({
       toast.error(err.message || 'Failed to give commendation')
     }
   }
+
+  const { user } = useUser()
+  const sessionQuotes = useQuery(
+    api.quotes.getSessionQuotes,
+    sessionId ? { sessionId } : 'skip'
+  )
+  const logQuoteAction = useAction(api.quotes.logQuote)
+  const deleteQuoteMutation = useMutation(api.quotes.deleteQuote)
+
+  const [quoteDialogOpen, setQuoteDialogOpen] = useState(false)
+  const [selectedCharForQuote, setSelectedCharForQuote] = useState<Doc<'characters'> | null>(null)
+  const [quoteText, setQuoteText] = useState('')
+  const [isSubmittingQuote, setIsSubmittingQuote] = useState(false)
+  const [isDeletingQuoteId, setIsDeletingQuoteId] = useState<Id<'quotes'> | null>(null)
+
+  const handleOpenQuoteDialog = (char: Doc<'characters'>) => {
+    setSelectedCharForQuote(char)
+    setQuoteText('')
+    setQuoteDialogOpen(true)
+  }
+
+  const handleLogQuote = async () => {
+    if (!sessionId || !selectedCharForQuote) return
+    const trimmed = quoteText.trim()
+    if (!trimmed) {
+      toast.error('Please enter a quote')
+      return
+    }
+
+    setIsSubmittingQuote(true)
+    try {
+      const res = await logQuoteAction({
+        sessionId,
+        characterId: selectedCharForQuote._id,
+        quote: trimmed,
+      })
+
+      if (res.postedToDiscord) {
+        toast.success(`Quote logged and sent to #ouroubouros-inn!`)
+      } else if (res.error) {
+        toast.info(`Quote logged, but Discord notification failed: ${res.error}`)
+      } else {
+        toast.success(`Quote logged for ${selectedCharForQuote.name}!`)
+      }
+      setQuoteText('')
+      setQuoteDialogOpen(false)
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to log quote')
+    } finally {
+      setIsSubmittingQuote(false)
+    }
+  }
+
+  const handleDeleteQuote = async (quoteId: Id<'quotes'>) => {
+    setIsDeletingQuoteId(quoteId)
+    try {
+      await deleteQuoteMutation({ quoteId })
+      toast.success('Quote removed')
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to remove quote')
+    } finally {
+      setIsDeletingQuoteId(null)
+    }
+  }
+
   if (characters.length === 0) {
     return <p className="text-muted-foreground italic">No characters have joined this session yet.</p>
   }
 
   return (
-    <ul className="grid grid-cols-1 gap-3">
+    <>
+      <ul className="grid grid-cols-1 gap-3">
       {characters.map((char) => {
         const isUserCharacter = userCharacterIds.has(char._id)
         const canRemove = !sessionLocked && !sessionPlanning && (isSessionOwner || isUserCharacter)
@@ -397,6 +474,22 @@ export default function AttendingCharactersList({
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                {sessionId && (
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full border border-border/40 bg-muted/30 text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-all shrink-0 focus:outline-none"
+                    onClick={() => handleOpenQuoteDialog(char)}
+                    title={`Log a quote by ${char.name}`}
+                  >
+                    <Quote className="h-3 w-3 text-muted-foreground" />
+                    <span className="hidden sm:inline">Quote</span>
+                    {(sessionQuotes?.filter((q) => q.characterId === char._id).length ?? 0) > 0 && (
+                      <span className="ml-0.5 px-1.5 py-0.2 bg-primary/20 text-primary rounded-full text-[8px]">
+                        {sessionQuotes?.filter((q) => q.characterId === char._id).length}
+                      </span>
+                    )}
+                  </button>
+                )}
                 {canCommend && (
                   <Popover>
                     <PopoverTrigger asChild>
@@ -594,7 +687,148 @@ export default function AttendingCharactersList({
             </li>
         )
       })}
-    </ul>
+      </ul>
+
+      <Dialog
+        open={quoteDialogOpen}
+        onOpenChange={(open) => {
+          setQuoteDialogOpen(open)
+          if (!open) {
+            setSelectedCharForQuote(null)
+            setQuoteText('')
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Quote className="h-4 w-4 text-primary" />
+              <span>Log Quote for {selectedCharForQuote?.name}</span>
+            </DialogTitle>
+            <DialogDescription>
+              Log a memorable quote spoken by this character during this session. It will be posted to the #ouroubouros-inn Discord channel.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Textarea
+                placeholder={`"I didn't roll a natural 1, reality itself made a mistake."`}
+                value={quoteText}
+                onChange={(e) => setQuoteText(e.target.value)}
+                onKeyDown={(e) => {
+                  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                    e.preventDefault()
+                    handleLogQuote()
+                  }
+                }}
+                rows={3}
+                className="resize-none"
+                disabled={isSubmittingQuote}
+                autoFocus
+              />
+              {quoteText.trim() && (
+                <div className="rounded-md border border-border/40 bg-muted/30 p-2.5 text-xs space-y-1">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Discord Callout Preview
+                  </div>
+                  <div className="border-l-2 border-primary/60 pl-2 italic text-foreground/90 font-serif">
+                    {quoteText.trim()}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground pt-0.5">
+                    — <span className="font-semibold text-foreground">{selectedCharForQuote?.name}</span> in <span className="underline">Session</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {selectedCharForQuote && (() => {
+              const charQuotes = sessionQuotes?.filter((q) => q.characterId === selectedCharForQuote._id) ?? []
+              if (charQuotes.length === 0) return null
+
+              return (
+                <div className="space-y-2 pt-2 border-t border-border/40">
+                  <div className="text-xs font-semibold text-muted-foreground">
+                    Session Quotes ({charQuotes.length})
+                  </div>
+                  <div className="max-h-40 overflow-y-auto space-y-2 pr-1">
+                    {charQuotes.map((q) => {
+                      const canDeleteQuote = 
+                        q.userId === user?.id || 
+                        isSessionOwner || 
+                        isGM || 
+                        userCharacterIds.has(selectedCharForQuote._id)
+
+                      return (
+                        <div
+                          key={q._id}
+                          className="group flex items-start justify-between gap-2 p-2 rounded-md bg-muted/20 border border-border/30 text-xs"
+                        >
+                          <div className="space-y-0.5 min-w-0">
+                            <p className="italic text-foreground/90 break-words">
+                              "{q.quote}"
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">
+                              {new Date(q._creationTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                          {canDeleteQuote && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteQuote(q._id)}
+                              disabled={isDeletingQuoteId === q._id}
+                              className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-destructive/10 shrink-0"
+                              title="Delete quote"
+                            >
+                              {isDeletingQuoteId === q._id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-3 w-3" />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setQuoteDialogOpen(false)}
+              disabled={isSubmittingQuote}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleLogQuote}
+              disabled={isSubmittingQuote || !quoteText.trim()}
+              className="gap-1.5"
+            >
+              {isSubmittingQuote ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Posting...
+                </>
+              ) : (
+                <>
+                  <Quote className="h-3.5 w-3.5" />
+                  Log & Send to Discord
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 

@@ -21,6 +21,7 @@ import type * as http from "../http.js";
 import type * as migrations from "../migrations.js";
 import type * as planning from "../planning.js";
 import type * as quests from "../quests.js";
+import type * as quotes from "../quotes.js";
 import type * as roles from "../roles.js";
 import type * as sessions from "../sessions.js";
 import type * as users from "../users.js";
@@ -47,6 +48,7 @@ declare const fullApi: ApiFromModules<{
   migrations: typeof migrations;
   planning: typeof planning;
   quests: typeof quests;
+  quotes: typeof quotes;
   roles: typeof roles;
   sessions: typeof sessions;
   users: typeof users;

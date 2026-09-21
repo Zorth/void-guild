@@ -103,6 +103,14 @@ export default defineSchema({
     }).index('by_world_character', ['worldId', 'characterId'])
       .index('by_world_faction', ['worldId', 'factionName'])
       .index('by_world_character_faction', ['worldId', 'characterId', 'factionName']),
+    quotes: defineTable({
+        sessionId: v.id('sessions'),
+        characterId: v.id('characters'),
+        quote: v.string(),
+        userId: v.optional(v.string()),
+    }).index('by_session', ['sessionId'])
+      .index('by_character', ['characterId'])
+      .index('by_session_character', ['sessionId', 'characterId']),
     availability: defineTable({
         userId: v.string(),
         date: v.number(), // Start of day timestamp
