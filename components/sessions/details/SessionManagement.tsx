@@ -391,7 +391,7 @@ export default function SessionManagement({
                             <span className="font-bold">New Session Alert</span>
                         </Button>
                         <p className="text-[11px] text-muted-foreground px-1">
-                            Announce this session for the first time to the community.
+                            Ping the system role in this session's Discord forum thread.
                         </p>
                     </div>
 

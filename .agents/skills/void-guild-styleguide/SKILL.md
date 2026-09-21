@@ -79,6 +79,9 @@ This document establishes the official code architecture, design system, compone
    - **Management & Deletion**: Users can view session quotes in the quote dialog and delete quotes they authored, quotes for their own characters, or any quote if they are session GM/owner or admin.
 
 5. **Discord Integration Standards**:
+   - **Session Notifications**:
+     - **New Session Alert**: Posts directly inside the session's Discord forum post/thread (`session.discordThreadId`) and pings the role (`@VoidPathfinder` or `@VoidDungeonsAndDragons`). It automatically creates the forum post if not already present.
+     - **Reminders & Cancellations**: Reminders are posted to `#ouroubouros-inn` (`DISCORD_CHANNEL_ID`). Cancellations are posted to both the forum thread and `#ouroubouros-inn`.
    - **Plain Markdown Format**: When broadcasting quotes to Discord (`#ouroubouros-inn` via `DISCORD_CHANNEL_ID`), format content in plain markdown with a `> ` blockquote callout rather than rich embeds:
      ```markdown
      > “{quote}”
