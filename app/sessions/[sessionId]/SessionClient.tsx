@@ -181,7 +181,8 @@ export default function SessionClient() {
 
   const canInvite = Boolean(session && !session.locked && (
     Boolean(isAdmin) || 
-    (Boolean(session.isPrivate) && (Boolean(session.isOwner) || hasUserCharacterInSession))
+    Boolean(session.isOwner) ||
+    (!session.isPrivate && hasUserCharacterInSession)
   ))
 
   const availableInviteCharacters = useQuery(
@@ -407,7 +408,7 @@ export default function SessionClient() {
         sessionId: session._id,
         characterId: selectedInviteCharacterId as Id<'characters'>,
       })
-      toast.success("Character invited to session!")
+      toast.success(session.isPrivate ? "Character added to private session!" : "Character invited to session!")
       setSelectedInviteCharacterId('')
       setInviteSearchQuery('')
       setIsInviteDialogOpen(false)
@@ -798,9 +799,9 @@ export default function SessionClient() {
                     <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-md text-sm text-amber-600 dark:text-amber-400 font-medium flex items-start gap-2.5">
                         <LockIcon className="h-4 w-4 shrink-0 mt-0.5 text-amber-500" /> 
                         <div className="space-y-0.5">
-                            <span className="font-bold">Private Session (Invite-Only)</span>
+                            <span className="font-bold">Private Session (Unlisted)</span>
                             <p className="text-xs text-muted-foreground font-normal">
-                                This session is reserved for a Journeyman or Guildmaster rank-up quest. Only the Voidmaster or attending players can invite characters.
+                                This session is private and not listed in the public session list. Players and characters can only join when added manually by the session&apos;s owner.
                             </p>
                         </div>
                     </div>
@@ -937,18 +938,18 @@ export default function SessionClient() {
                           <DialogTrigger asChild>
                             <Button variant="outline" size="sm" className="gap-1.5 text-xs font-semibold">
                               <UserPlus className="h-3.5 w-3.5" />
-                              Invite Character
+                              {session.isPrivate ? "Add Character" : "Invite Character"}
                             </Button>
                           </DialogTrigger>
                           <DialogContent className="sm:max-w-[425px]">
                             <DialogHeader>
                               <DialogTitle className="flex items-center gap-2">
                                 <UserPlus className="h-4 w-4 text-primary" />
-                                Invite Character
+                                {session.isPrivate ? "Add Character to Session" : "Invite Character"}
                               </DialogTitle>
                               <DialogDescription>
                                 {session.isPrivate 
-                                  ? "Invite a character to join this private Journeyman or Guildmaster rank-up quest."
+                                  ? "Search and select a character to add them manually to this private session."
                                   : "Select a character to add to this session."}
                               </DialogDescription>
                             </DialogHeader>

@@ -109,10 +109,10 @@ export default function SessionJoinForm({
           <div className="text-sm text-amber-600 dark:text-amber-400 p-4 bg-amber-500/10 rounded-md border border-amber-500/20 text-center space-y-2">
             <div className="flex items-center justify-center gap-1.5 font-bold">
               <Lock className="h-4 w-4 text-amber-500" />
-              Private Session (Invite-Only)
+              Private Session (Unlisted)
             </div>
             <p className="text-xs text-muted-foreground">
-              This session is reserved for a Journeyman or Guildmaster rank-up quest. You must be invited by the Voidmaster or an attending player to join.
+              This session is private and not listed in the session list. Players and characters can only join when added manually by the session&apos;s owner.
             </p>
           </div>
         ) : isFull ? (

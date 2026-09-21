@@ -107,7 +107,26 @@ export const listSessions = query({
       .collect()
 
     const allSessions = [...lockedSessions, ...unlockedSessions]
-    const sessions = allSessions.filter(s => args.past ? isPastSession(s) : !isPastSession(s))
+
+    // Fetch caller's characters and admin status to evaluate private session visibility
+    const userCharacters = await ctx.db
+      .query('characters')
+      .withIndex('by_userId', (q) => q.eq('userId', user.subject))
+      .collect()
+    const userCharIds = new Set(userCharacters.map((c) => c._id))
+    const isAdminUser = await isAdmin(ctx)
+
+    // Private sessions are unlisted and hidden from general session lists unless the user
+    // is the session owner, has a character in the session, or is an admin.
+    const visibleSessions = allSessions.filter((s) => {
+      if (!s.isPrivate) return true
+      if (user.subject === s.owner) return true
+      if (isAdminUser) return true
+      if (s.characters && s.characters.some((id) => userCharIds.has(id))) return true
+      return false
+    })
+
+    const sessions = visibleSessions.filter(s => args.past ? isPastSession(s) : !isPastSession(s))
 
     const sessionsWithDetails = await Promise.all(
       sessions.map(async (session) => {
@@ -165,8 +184,10 @@ export const publicListSessions = query({
       .withIndex('by_locked', (q) => q.eq('locked', false))
       .collect()
 
+    // Public list strictly excludes private sessions
     const allSessions = [...lockedSessions, ...unlockedSessions]
-    const sessions = allSessions.filter(s => args.past ? isPastSession(s) : !isPastSession(s))
+    const publicSessions = allSessions.filter(s => !s.isPrivate)
+    const sessions = publicSessions.filter(s => args.past ? isPastSession(s) : !isPastSession(s))
 
     const sessionsWithDetails = await Promise.all(
       sessions.map(async (session) => {
@@ -580,7 +601,7 @@ export const createSession = mutation({
       owner: identity.subject,
       system: args.system,
       planning: args.planning,
-      isPrivate: args.isPrivate,
+      isPrivate: args.isPrivate ?? false,
       questId: args.questId,
     })
 
@@ -631,13 +652,42 @@ export const updateSession = mutation({
       location: args.location,
       system: args.system,
       planning: args.planning,
-      isPrivate: args.isPrivate,
+      isPrivate: args.isPrivate ?? false,
       questId: args.questId,
     })
 
     await ctx.scheduler.runAfter(0, internal.discord.syncSessionToDiscord, {
         sessionId: args.sessionId
     })
+  },
+})
+
+export const toggleSessionPrivacy = mutation({
+  args: { sessionId: v.id('sessions') },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    const session = await ctx.db.get(args.sessionId)
+    if (!session) throw new Error('Session not found')
+
+    const isAdminUser = await isAdmin(ctx)
+    if (session.owner !== user.subject && !isAdminUser) {
+      throw new Error('Only the session owner or an admin can change session privacy.')
+    }
+
+    if (session.locked) {
+      throw new Error('Cannot change privacy of a locked session.')
+    }
+
+    const newIsPrivate = !session.isPrivate
+    await ctx.db.patch(args.sessionId, { isPrivate: newIsPrivate })
+
+    await ctx.scheduler.runAfter(0, internal.discord.syncSessionToDiscord, {
+      sessionId: args.sessionId,
+    })
+
+    return newIsPrivate
   },
 })
 
@@ -797,7 +847,7 @@ export const joinSession = mutation({
     }
 
     if (session.isPrivate) {
-      throw new Error('This session is private (invite-only). You must be invited by the Voidmaster or an attending player.')
+      throw new Error("This session is private and unlisted. Characters can only be added manually by the session's owner.")
     }
 
     if (session.planning) {
@@ -915,8 +965,14 @@ export const inviteCharacterToSession = mutation({
     const userCharIds = new Set(userCharacters.map((c) => c._id))
     const isAttending = session.characters.some((id) => userCharIds.has(id))
 
-    if (!isOwner && !isAdminUser && !isAttending) {
-      throw new Error('Only the Voidmaster, an attending player, or an admin can invite characters to this session.')
+    if (session.isPrivate) {
+      if (!isOwner && !isAdminUser) {
+        throw new Error("Only the session's owner can manually add characters to a private session.")
+      }
+    } else {
+      if (!isOwner && !isAdminUser && !isAttending) {
+        throw new Error('Only the session owner, an attending player, or an admin can invite characters to this session.')
+      }
     }
 
     if (session.locked) {
@@ -980,8 +1036,14 @@ export const getAvailableCharactersToInvite = query({
     const userCharIds = new Set(userCharacters.map((c) => c._id))
     const isAttending = session.characters.some((id) => userCharIds.has(id))
 
-    if (!isOwner && !isAdminUser && !isAttending) {
-      return []
+    if (session.isPrivate) {
+      if (!isOwner && !isAdminUser) {
+        return []
+      }
+    } else {
+      if (!isOwner && !isAdminUser && !isAttending) {
+        return []
+      }
     }
 
     const allChars = await ctx.db.query('characters').collect()
@@ -1086,6 +1148,10 @@ export const expressInterest = mutation({
 
     const session = await ctx.db.get(args.sessionId)
     if (!session) throw new Error('Session not found')
+
+    if (session.isPrivate) {
+      throw new Error('Cannot express interest in a private session.')
+    }
 
     const interestedPlayers = session.interestedPlayers || []
     if (interestedPlayers.some(p => p.userId === user.subject)) {

@@ -103,8 +103,16 @@ export const listSessions = query({
         system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
     },
     handler: async (ctx, args) => {
-        await validateKey(ctx, args.apiKey)
+        const user = await validateKey(ctx, args.apiKey)
         let sessions = await ctx.db.query('sessions').collect()
+
+        // Private sessions are hidden from public list unless requester is owner or admin
+        sessions = sessions.filter((s) => {
+            if (!s.isPrivate) return true
+            if (!user) return false
+            if (user.isAdmin || user.userId === s.owner) return true
+            return false
+        })
 
         if (args.past !== undefined) {
             sessions = sessions.filter((s) => s.locked === args.past)

@@ -105,6 +105,12 @@ This document establishes the official code architecture, design system, compone
 11. **Effective Session Level**:
     - Never assume `session.level` is directly populated. Always evaluate effective session level using `computeEffectiveLevel(session, quest)` so XP calculations and lock readiness correctly respect levels inherited from attached quests.
 
+12. **Private & Unlisted Sessions**:
+    - **Default Public & Backwards Compatibility**: Sessions default to public (`isPrivate: false`). Any session with `isPrivate === undefined` is treated as public.
+    - **Unlisted Visibility**: Private sessions are excluded from the main public session list, calendar overview, and public API queries. They are only visible in lists to the session owner, players with attending characters in that session, and administrators.
+    - **Manual Owner Adding**: Players cannot self-join or express interest in private sessions (`joinSession` and `expressInterest` throw an error). Characters can ONLY be added manually by the session's owner (or an admin) via the "Add Character" action.
+    - **Easy Privacy Toggling**: Session owners can toggle a session between Public and Private with a single click via `toggleSessionPrivacy` in `SessionManagement.tsx`, or through the `SessionDialog` edit form.
+
 ---
 
 ## 4. Streaks, Relationships & Achievement Rules

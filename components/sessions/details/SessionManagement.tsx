@@ -2,10 +2,13 @@
 
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { Pencil, CheckCircle2, Shield, Send, Bell, XCircle, Scroll, Calendar, CalendarRange, Clock, Unlock, User, Globe, Target } from 'lucide-react'
+import { Pencil, CheckCircle2, Shield, Send, Bell, XCircle, Scroll, Calendar, CalendarRange, Clock, Unlock, User, Globe, Target, Lock, Loader2 } from 'lucide-react'
 import SessionDialog from '@/components/sessions/SessionDialog'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
+import { useMutation } from 'convex/react'
+import { api } from '@/convex/_generated/api'
+import { toast } from 'sonner'
 import {
     AlertDialog,
     AlertDialogAction,
@@ -64,6 +67,24 @@ export default function SessionManagement({
 }: SessionManagementProps) {
   const [isQuestDialogOpen, setIsQuestDialogOpen] = useState(false)
   const [isInGameDateDialogOpen, setIsInGameDateDialogOpen] = useState(false)
+  const togglePrivacy = useMutation(api.sessions.toggleSessionPrivacy)
+  const [isTogglingPrivacy, setIsTogglingPrivacy] = useState(false)
+
+  const handleTogglePrivacy = async () => {
+    setIsTogglingPrivacy(true)
+    try {
+      const isNowPrivate = await togglePrivacy({ sessionId: session._id })
+      if (isNowPrivate) {
+        toast.success('Session is now Private and unlisted!')
+      } else {
+        toast.success('Session is now Public and listed!')
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to toggle privacy')
+    } finally {
+      setIsTogglingPrivacy(false)
+    }
+  }
 
   const { eras, yearZeroExists } = useMemo(() => {
     if (!worldCalendar) return { eras: [], yearZeroExists: false }
@@ -418,6 +439,25 @@ export default function SessionManagement({
             }
             hasWorld={true}
         />
+
+        <Button
+            variant="outline"
+            className="w-full justify-start gap-2"
+            disabled={session.locked || isTogglingPrivacy}
+            onClick={handleTogglePrivacy}
+        >
+            {isTogglingPrivacy ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin text-muted-foreground" />
+            ) : session.isPrivate ? (
+                <Globe className="h-4 w-4 mr-2 text-emerald-500" />
+            ) : (
+                <Lock className="h-4 w-4 mr-2 text-amber-500" />
+            )}
+            <span>{session.isPrivate ? 'Make Public (List Session)' : 'Make Private (Unlist Session)'}</span>
+            <span className="text-[10px] text-muted-foreground ml-auto">
+                {session.isPrivate ? 'Private' : 'Public'}
+            </span>
+        </Button>
 
         {!session.locked ? (
             <AlertDialog>

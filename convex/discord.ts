@@ -215,11 +215,11 @@ export const syncSessionToDiscord = internalAction({
     const inGameDateInfo = formatInGameDate(session.inGameDate, eras, yearZeroExists);
 
     const privateBanner = isPrivate
-      ? `🔒 **PRIVATE SESSION (INVITE-ONLY)**\n*This session is reserved for a Journeyman or Guildmaster rank-up quest. Signups are invite-only by the Voidmaster or attending players.*\n\n`
+      ? `🔒 **PRIVATE SESSION (UNLISTED)**\n*This session is private and not listed in the public session list. Characters can only join when added manually by the session owner.*\n\n`
       : "";
 
     const callToAction = isPrivate
-      ? `*🔒 This is a private, invite-only session for a Journeyman or Guildmaster rank-up quest. Contact the Voidmaster or attending players to be invited.*`
+      ? `*🔒 This is a private, unlisted session. Characters can only be added manually by the session owner.*`
       : (isPlanning 
         ? `*This session is currently in the planning phase. Click the link above to **show your interest** and make it easier for everyone to pick a date by filling in the Planning tab!*`
         : `*Click the link above to **sign up with your character**! Voidmasters encourage you to use this thread to discuss your plans and prepare for this session!*`);
@@ -464,10 +464,10 @@ export const sendSessionNotification = action({
         : `New Session Alert: ${session.worldName}`;
       embedDescription = session.date 
         ? (isPrivate 
-            ? `A new private (invite-only) rank-up session for "${session.worldName}" has been announced for ${dateInfo}!`
+            ? `A new private (unlisted) session for "${session.worldName}" has been created for ${dateInfo}!`
             : `A new session for "${session.worldName}" has been announced for ${dateInfo}!`)
         : (isPrivate
-            ? `A new private (invite-only) rank-up session for "${session.worldName}" is now in planning!`
+            ? `A new private (unlisted) session for "${session.worldName}" is now in planning!`
             : `A new session for "${session.worldName}" is now in the planning phase! Express interest on the website to help pick a date.`);
     } else if (args.type === 'remind' && session.date) {
       const spotsLeft = session.maxPlayers - session.attendingCharacters.length;
@@ -475,7 +475,7 @@ export const sendSessionNotification = action({
         ? `🔒 Private Session Reminder: ${session.worldName}`
         : `Reminder: ${session.worldName}`;
       embedDescription = isPrivate
-        ? `There are still ${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} left in this private rank-up quest! The session starts on ${dateInfo}.`
+        ? `There are still ${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} left in this private session! The session starts on ${dateInfo}.`
         : `There are still ${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} left! The session starts on ${dateInfo}.`;
       embedColor = 16776960; // Yellow
     } else if (args.type === 'cancel' && session.date) {
@@ -516,7 +516,7 @@ export const sendSessionNotification = action({
         { name: 'System', value: session.system === 'PF' ? '<:Pathfinder:1322734594864320522> Pathfinder 2e' : '<:DnD:1322734981524754473> D&D 5e', inline: true },
         { name: 'Level', value: levelInfo, inline: true },
         { name: 'Players', value: playersValue, inline: true },
-        ...(isPrivate ? [{ name: 'Access', value: '🔒 Invite-Only (Journeyman/Guildmaster Quest)', inline: true }] : []),
+        ...(isPrivate ? [{ name: 'Access', value: '🔒 Private (Owner Added Only)', inline: true }] : []),
         { name: 'Date & Time', value: dateInfo, inline: false },
       ],
       timestamp: new Date().toISOString(),

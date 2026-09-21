@@ -225,7 +225,7 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
             <input 
               type="checkbox" 
               id="private-toggle" 
-              className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+              className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
               checked={isPrivate}
               onChange={(e) => setIsPrivate(e.target.checked)}
             />
@@ -234,10 +234,10 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
                     htmlFor="private-toggle"
                     className="text-sm font-bold leading-none cursor-pointer flex items-center gap-1.5 text-amber-600 dark:text-amber-400"
                 >
-                    <span>🔒 Private Session (Invite-Only)</span>
+                    <span>🔒 Private Session (Unlisted)</span>
                 </label>
                 <p className="text-[10px] text-muted-foreground">
-                    Used for Journeyman or Guildmaster rank-up quests. Signups are restricted to invited characters.
+                    Private sessions are not listed in the public session list. Players can only join when added manually by you.
                 </p>
             </div>
           </div>
