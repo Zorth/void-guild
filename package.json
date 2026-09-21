@@ -18,7 +18,7 @@
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "convex": "^1.35.1",
+    "convex": "^1.46.0",
     "discord-interactions": "^4.4.0",
     "framer-motion": "^12.38.0",
     "lucide-react": "^0.577.0",

@@ -33,14 +33,12 @@ function WorldDescription({
   worldId, 
   initialDescription, 
   isOwner,
-  hasMap,
-  onAddMap
+  worldName
 }: { 
   worldId: any, 
   initialDescription: string, 
   isOwner: boolean,
-  hasMap: boolean,
-  onAddMap: () => void
+  worldName: string
 }) {
   const [isEditing, setIsEditing] = useState(false)
   const [description, setDescription] = useState(initialDescription)
@@ -59,17 +57,15 @@ function WorldDescription({
           World Overview
         </CardTitle>
         <div className="flex items-center gap-2">
-          {isOwner && !hasMap && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="gap-2 transition-opacity h-7 px-2 text-muted-foreground hover:text-primary"
-              onClick={onAddMap}
-            >
-              <Map className="h-3.5 w-3.5" />
-              Add Map
-            </Button>
-          )}
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="gap-2 transition-opacity h-7 px-2 text-muted-foreground hover:text-primary"
+            onClick={() => toast.info("Interactive map system coming soon!")}
+          >
+            <Map className="h-3.5 w-3.5" />
+            Open map
+          </Button>
           {isOwner && (
             <Button 
               variant="ghost" 
@@ -115,88 +111,6 @@ function WorldDescription({
   )
 }
 
-function WorldMap({ 
-  worldId, 
-  initialMapUrl, 
-  isOwner,
-  isEditing,
-  setIsEditing
-}: { 
-  worldId: any, 
-  initialMapUrl?: string, 
-  isOwner: boolean,
-  isEditing: boolean,
-  setIsEditing: (val: boolean) => void
-}) {
-  const [mapUrl, setMapUrl] = useState(initialMapUrl || '')
-  const updateMap = useMutation(api.worlds.updateWorldMap)
-
-  useEffect(() => {
-    setMapUrl(initialMapUrl || '')
-  }, [initialMapUrl])
-
-  const handleSave = async () => {
-    await updateMap({ worldId, mapEmbed: mapUrl })
-    setIsEditing(false)
-  }
-
-  if (!initialMapUrl && !isEditing) return null;
-
-  return (
-    <Card className="md:col-span-2 flex flex-col bg-card/50 relative group border-border/40 gap-0 py-0 overflow-hidden">
-      <CardHeader className="flex flex-row items-center justify-between px-6 py-2 border-b border-border/50 pb-2">
-        <CardTitle className="text-lg font-bold flex items-center gap-2">
-          <Map className="h-4 w-4 text-primary" />
-          World Map
-        </CardTitle>
-        <div className="flex items-center gap-2">
-          {isOwner && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="gap-2 transition-opacity h-7 px-2"
-              onClick={() => setIsEditing(!isEditing)}
-            >
-              <Settings className="h-3.5 w-3.5" />
-              {isEditing ? "Cancel" : "Edit"}
-            </Button>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent className="px-6 py-4">
-        {isEditing ? (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Google Maps Embed URL</span>
-            </div>
-            <Input 
-              className="text-xs bg-muted/30"
-              value={mapUrl}
-              onChange={(e) => setMapUrl(e.target.value)}
-              placeholder="Paste Google Maps embed URL here..."
-            />
-            <div className="flex justify-end gap-2">
-              <Button size="sm" onClick={handleSave}>Save Map</Button>
-            </div>
-          </div>
-        ) : (
-          <div className="aspect-video w-full rounded-md overflow-hidden border border-border/50">
-            <iframe 
-              src={initialMapUrl} 
-              width="100%" 
-              height="100%" 
-              style={{ border: 0 }} 
-              allowFullScreen={true} 
-              loading="lazy" 
-              referrerPolicy="no-referrer-when-downgrade"
-            />
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
-
 export default function WorldClient() {
   const params = useParams()
   const worldName = decodeURIComponent(params.worldname as string)
@@ -223,7 +137,6 @@ export default function WorldClient() {
   const { pfFilter, dndFilter, setPfFilter, setDndFilter } = useSystemFilters()
   const [sessionsLimit, setSessionsLimit] = useState(5)
   const [isEditingName, setIsEditingName] = useState(false)
-  const [isEditingMap, setIsEditingMap] = useState(false)
   const [newName, setNewName] = useState('')
   const [viewMode, setViewMode] = useState<'reputation' | 'calendar'>('reputation')
 
@@ -643,15 +556,7 @@ export default function WorldClient() {
             worldId={world._id} 
             initialDescription={world.description || ''} 
             isOwner={userId === world.owner} 
-            hasMap={!!world.mapEmbed}
-            onAddMap={() => setIsEditingMap(true)}
-          />
-          <WorldMap 
-            worldId={world._id} 
-            initialMapUrl={world.mapEmbed} 
-            isOwner={userId === world.owner} 
-            isEditing={isEditingMap}
-            setIsEditing={setIsEditingMap}
+            worldName={world.name}
           />
 
           {showSwitcher && (
