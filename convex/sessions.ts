@@ -214,8 +214,20 @@ export const listUserJoinedSessions = query({
       .collect()
     
     const userCharacterIds = new Set(userCharacters.map(c => c._id))
+    if (userCharacterIds.size === 0) return []
 
-    const allSessions = await ctx.db.query('sessions').collect()
+    const unlockedSessions = await ctx.db
+      .query('sessions')
+      .withIndex('by_locked', (q) => q.eq('locked', false))
+      .collect()
+
+    const recentLockedSessions = await ctx.db
+      .query('sessions')
+      .withIndex('by_locked', (q) => q.eq('locked', true))
+      .order('desc')
+      .take(15)
+
+    const allSessions = [...unlockedSessions, ...recentLockedSessions]
     
     return allSessions.filter(session => 
         session.characters.some(charId => userCharacterIds.has(charId))
@@ -272,9 +284,12 @@ export const getAttendingCharacterRelationships = query({
     const myCharacter = await ctx.db.get(args.userCharacterId)
     if (!myCharacter || myCharacter.userId !== user.subject) return {}
 
-    const allSessions = await ctx.db.query('sessions').collect()
+    const lockedSessions = await ctx.db
+      .query('sessions')
+      .withIndex('by_locked', (q) => q.eq('locked', true))
+      .collect()
     
-    allSessions.sort((a, b) => {
+    lockedSessions.sort((a, b) => {
       const dateA = a.date || a._creationTime
       const dateB = b.date || b._creationTime
       return dateA - dateB
@@ -282,13 +297,12 @@ export const getAttendingCharacterRelationships = query({
 
     const currentSessionTime = currentSession.date || currentSession._creationTime
 
-    const pastSessions = allSessions.filter(s => 
+    const pastSessions = lockedSessions.filter(s => 
       s._id !== args.sessionId &&
-      Boolean(s.locked) &&
       (s.date || s._creationTime) <= currentSessionTime
     )
 
-    const worldIds = Array.from(new Set(allSessions.map(s => s.world).filter((w): w is Id<'worlds'> => Boolean(w))))
+    const worldIds = Array.from(new Set(lockedSessions.map(s => s.world).filter((w): w is Id<'worlds'> => Boolean(w))))
     const worlds = await Promise.all(worldIds.map(id => ctx.db.get(id)))
     const worldMap = new Map<string, string>()
     worlds.forEach(w => {
@@ -765,6 +779,9 @@ export async function checkUserMonthlySessionEligibility(
     .collect()
 
   const userCharIds = new Set(userCharacters.map((c) => c._id))
+  if (userCharIds.size === 0) {
+    return { eligible: true, isFreeTier: true }
+  }
 
   // Fetch all sessions and filter to those in the target month where user's characters participated/joined
   const allSessions = await ctx.db.query('sessions').collect()

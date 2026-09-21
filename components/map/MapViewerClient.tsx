@@ -61,11 +61,14 @@ export default function MapViewerClient() {
   const [activeTool, setActiveTool] = useState<'view' | 'add_pin' | 'add_area' | 'reveal_hex' | 'hide_hex' | 'grid_note'>('view')
 
   // Pan & Zoom viewport state
+  const viewportRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(1)
   const [position, setPosition] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
   const dragStartRef = useRef({ x: 0, y: 0 })
+  const [naturalDimensions, setNaturalDimensions] = useState<{ width: number; height: number } | null>(null)
+  const hasAutoFittedRef = useRef(false)
 
   // Touch pinch zoom state
   const touchDistanceRef = useRef<number | null>(null)
@@ -193,7 +196,7 @@ export default function MapViewerClient() {
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault()
     const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85
-    setScale((prevScale) => Math.min(Math.max(prevScale * zoomFactor, 0.4), 5))
+    setScale((prevScale) => Math.min(Math.max(prevScale * zoomFactor, 0.05), 8))
   }
 
   // Mouse pan handlers
@@ -240,7 +243,7 @@ export default function MapViewerClient() {
         e.touches[0].clientY - e.touches[1].clientY
       )
       const delta = dist / touchDistanceRef.current
-      setScale((prevScale) => Math.min(Math.max(prevScale * delta, 0.4), 5))
+      setScale((prevScale) => Math.min(Math.max(prevScale * delta, 0.05), 8))
       touchDistanceRef.current = dist
     } else if (e.touches.length === 1 && isDragging) {
       setPosition({
@@ -256,11 +259,10 @@ export default function MapViewerClient() {
   }
 
   // Zoom controls
-  const handleZoomIn = () => setScale((s) => Math.min(s * 1.25, 5))
-  const handleZoomOut = () => setScale((s) => Math.max(s * 0.8, 0.4))
+  const handleZoomIn = () => setScale((s) => Math.min(s * 1.25, 8))
+  const handleZoomOut = () => setScale((s) => Math.max(s * 0.8, 0.05))
   const handleResetZoom = () => {
-    setScale(1)
-    setPosition({ x: 0, y: 0 })
+    fitMapToViewport()
   }
 
   // Click on Canvas coordinate solver (0 - 100%)
@@ -299,8 +301,55 @@ export default function MapViewerClient() {
   }
 
   // Grid / Hex Cell Calculation
-  const mapWidth = currentMap?.width || 2000
-  const mapHeight = currentMap?.height || 2000
+  // Priority: if naturalDimensions detected and currentMap is on default 2000x2000, use natural dimensions.
+  const mapWidth = (currentMap?.width && currentMap.width !== 2000)
+    ? currentMap.width
+    : (naturalDimensions?.width || currentMap?.width || 2000)
+  const mapHeight = (currentMap?.height && currentMap.height !== 2000)
+    ? currentMap.height
+    : (naturalDimensions?.height || currentMap?.height || 2000)
+
+  const fitMapToViewport = (w = mapWidth, h = mapHeight) => {
+    if (!viewportRef.current || !w || !h) return
+    const vw = viewportRef.current.clientWidth || window.innerWidth
+    const vh = viewportRef.current.clientHeight || (window.innerHeight - 60)
+    const scaleX = (vw - 48) / w
+    const scaleY = (vh - 48) / h
+    const fitScale = Math.min(scaleX, scaleY, 1)
+    const safeScale = Math.max(fitScale, 0.05)
+    setScale(Number(safeScale.toFixed(4)))
+    setPosition({ x: 0, y: 0 })
+  }
+
+  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget
+    const nw = img.naturalWidth
+    const nh = img.naturalHeight
+    if (nw && nh && (nw !== naturalDimensions?.width || nh !== naturalDimensions?.height)) {
+      setNaturalDimensions({ width: nw, height: nh })
+      if (!hasAutoFittedRef.current) {
+        hasAutoFittedRef.current = true
+        fitMapToViewport(nw, nh)
+      }
+      // If the map is still stored with default 2000x2000 square dimensions, persist real dimensions
+      if (currentMap && isOwner && (currentMap.width === 2000 && currentMap.height === 2000)) {
+        updateMapSettingsMutation({
+          mapId: currentMap._id,
+          width: nw,
+          height: nh,
+        }).catch(console.error)
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (currentMap && !hasAutoFittedRef.current) {
+      hasAutoFittedRef.current = true
+      const timer = setTimeout(() => fitMapToViewport(), 100)
+      return () => clearTimeout(timer)
+    }
+  }, [currentMap?._id])
+
   const gridSize = currentMap?.gridSize || 100
   const gridType = currentMap?.gridType || 'none'
   const isExplorationMap = currentMap?.isExplorationMap || false
@@ -852,6 +901,7 @@ export default function MapViewerClient() {
 
       {/* CANVAS CONTAINER */}
       <div
+        ref={viewportRef}
         className="w-full h-full cursor-grab active:cursor-grabbing flex items-center justify-center overflow-hidden"
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
@@ -876,8 +926,9 @@ export default function MapViewerClient() {
             <img
               src={currentMap.imageUrl}
               alt={currentMap.name}
-              className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
+              className="absolute inset-0 w-full h-full object-contain select-none pointer-events-none"
               draggable={false}
+              onLoad={handleImageLoad}
             />
           ) : (
             <div className="absolute inset-0 w-full h-full bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-700 font-bold text-2xl">
@@ -943,39 +994,48 @@ export default function MapViewerClient() {
           {/* GRID OVERLAY (HEX OR SQUARE) */}
           {gridType !== 'none' && (
             <div
-              className="absolute inset-0 pointer-events-auto grid"
+              className="absolute inset-0 pointer-events-auto overflow-hidden"
               style={{
                 transform: `translate(${currentMap?.gridOffsetX || 0}px, ${currentMap?.gridOffsetY || 0}px)`,
-                gridTemplateColumns: `repeat(${cols}, ${gridSize}px)`,
-                gridTemplateRows: `repeat(${rows}, ${gridSize}px)`,
               }}
             >
-              {Array.from({ length: rows }).map((_, r) =>
-                Array.from({ length: cols }).map((_, c) => {
-                  const cellKey = `${c},${r}`
-                  const isRevealed = revealedSet.has(cellKey)
-                  const hasNote = !!notesMap[cellKey]
+              {Array.from({ length: rows }).map((_, r) => (
+                <div
+                  key={`grid-row-${r}`}
+                  className="flex"
+                  style={{
+                    marginLeft: gridType === 'hex' && r % 2 === 1 ? `${gridSize * 0.5}px` : '0px',
+                    marginTop: gridType === 'hex' && r > 0 ? `-${gridSize * 0.25}px` : '0px',
+                  }}
+                >
+                  {Array.from({ length: cols }).map((_, c) => {
+                    const cellKey = `${c},${r}`
+                    const isRevealed = revealedSet.has(cellKey)
+                    const hasNote = !!notesMap[cellKey]
 
-                  return (
-                    <div
-                      key={cellKey}
-                      style={{
-                        clipPath: gridType === 'hex' ? 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' : undefined,
-                      }}
-                      className={`relative border border-white/10 transition-colors ${
-                        isExplorationMap && !isRevealed
-                          ? 'bg-slate-950/95 backdrop-blur-md'
-                          : 'hover:bg-white/5'
-                      }`}
-                      onClick={(e) => handleCellClick(cellKey, e)}
-                    >
-                      {hasNote && (
-                        <div className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-amber-400 shadow-glow" title="Has Note" />
-                      )}
-                    </div>
-                  )
-                })
-              )}
+                    return (
+                      <div
+                        key={cellKey}
+                        style={{
+                          width: `${gridSize}px`,
+                          height: `${gridSize}px`,
+                          clipPath: gridType === 'hex' ? 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' : undefined,
+                        }}
+                        className={`relative shrink-0 border border-white/10 transition-colors ${
+                          isExplorationMap && !isRevealed
+                            ? 'bg-slate-950/95 backdrop-blur-md'
+                            : 'hover:bg-white/5'
+                        }`}
+                        onClick={(e) => handleCellClick(cellKey, e)}
+                      >
+                        {hasNote && (
+                          <div className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-amber-400 shadow-glow" title="Has Note" />
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              ))}
             </div>
           )}
 
@@ -1250,6 +1310,44 @@ export default function MapViewerClient() {
                 onChange={(e) => setSettingsDraft({ ...settingsDraft, imageUrl: e.target.value })}
               />
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="font-bold text-muted-foreground">Width (px)</label>
+                <Input
+                  type="number"
+                  value={settingsDraft.width}
+                  onChange={(e) => setSettingsDraft({ ...settingsDraft, width: Number(e.target.value) })}
+                />
+              </div>
+              <div>
+                <label className="font-bold text-muted-foreground">Height (px)</label>
+                <Input
+                  type="number"
+                  value={settingsDraft.height}
+                  onChange={(e) => setSettingsDraft({ ...settingsDraft, height: Number(e.target.value) })}
+                />
+              </div>
+            </div>
+            {naturalDimensions && (
+              <div className="flex items-center justify-between text-xs bg-muted/40 p-2 rounded-md border border-border/50">
+                <span className="text-muted-foreground">
+                  Detected Image Size: <strong className="text-foreground">{naturalDimensions.width} × {naturalDimensions.height} px</strong>
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setSettingsDraft({
+                    ...settingsDraft,
+                    width: naturalDimensions.width,
+                    height: naturalDimensions.height,
+                  })}
+                >
+                  Use Detected Size
+                </Button>
+              </div>
+            )}
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="font-bold text-muted-foreground">Grid Type</label>
