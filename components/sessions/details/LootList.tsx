@@ -202,10 +202,17 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
     return (
         <div className="flex flex-col gap-4 w-full">
             <div className="flex items-center justify-between px-1">
-                <h3 className="font-bold flex items-center gap-2 text-lg">
-                    <Coins className="text-primary h-5 w-5" />
-                    Loot
-                </h3>
+                <div className="flex items-center gap-2">
+                    <h3 className="font-bold flex items-center gap-2 text-lg">
+                        <Coins className="text-primary h-5 w-5" />
+                        Loot
+                    </h3>
+                    {!session.locked && (
+                        <span className="text-[10px] bg-blue-500/15 text-blue-400 border border-blue-500/30 px-1.5 py-0.5 rounded-full font-semibold">
+                            Pre-Session
+                        </span>
+                    )}
+                </div>
                 {session.canManage && (
                     <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
                         <DialogTrigger asChild>

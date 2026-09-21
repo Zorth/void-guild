@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { useState, useEffect, useMemo } from 'react'
 import { Id, Doc } from '@/convex/_generated/dataModel'
 import Link from 'next/link'
-import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, Unlock, Globe, Scroll, Trophy, Menu, User, Target, UserPlus } from 'lucide-react'
+import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, Unlock, Globe, Scroll, Trophy, Menu, User, Target, UserPlus, Coins } from 'lucide-react'
 import { useAuth, SignInButton } from '@clerk/nextjs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatDate, formatTime as formatTimeUtil, getLevelBadgeStyle, getDualLevelBadgeStyle, CharacterRankIcon } from '@/lib/utils'
@@ -115,6 +115,7 @@ export default function SessionClient() {
   const [optimisticInterestedPlayers, setOptimisticInterestedPlayers] = useState<{ userId: string; username: string }[] | null>(null)
   const [isJoinSuccessDialogOpen, setIsJoinSuccessDialogOpen] = useState(false)
   const [isObjectiveContributeOpen, setIsObjectiveContributeOpen] = useState(false)
+  const [sidebarTab, setSidebarTab] = useState<'quests' | 'loot'>('quests')
 
   const userIds = useMemo(() => {
     if (!session) return [];
@@ -549,7 +550,37 @@ export default function SessionClient() {
           />
       )}
 
-      {session.locked ? (
+      {!session.locked && (
+        <div className="flex justify-center -mb-2">
+          <div className="bg-muted p-1 rounded-full border border-border/50 flex gap-1 shadow-sm w-full max-w-[280px]">
+            <Button 
+              variant={sidebarTab === 'quests' ? "secondary" : "ghost"} 
+              size="sm" 
+              className="rounded-full h-8 px-3 text-xs font-bold gap-1.5 flex-1"
+              onClick={() => setSidebarTab('quests')}
+            >
+              <Scroll className="h-3.5 w-3.5 text-primary" />
+              Quests
+            </Button>
+            <Button 
+              variant={sidebarTab === 'loot' ? "secondary" : "ghost"} 
+              size="sm" 
+              className="rounded-full h-8 px-3 text-xs font-bold gap-1.5 flex-1"
+              onClick={() => setSidebarTab('loot')}
+            >
+              <Coins className="h-3.5 w-3.5 text-primary" />
+              Loot
+              {session.loot && session.loot.length > 0 && (
+                <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.2 rounded-full font-bold">
+                  {session.loot.length}
+                </span>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {session.locked || sidebarTab === 'loot' ? (
         <LootList 
           session={session as any} 
           userCharacterIds={userCharacterIds} 
