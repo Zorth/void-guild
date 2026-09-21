@@ -30,3 +30,17 @@ All backend queries, mutations, and actions must comply with Convex system limit
 - Always derive identity via `ctx.auth.getUserIdentity()`.
 - Use `identity.tokenIdentifier` for database lookups and security checks.
 - Never rely on client-supplied `userId` parameters for access control.
+
+---
+
+## Core Domain Modules & Tables
+
+* **`quotes.ts`**: Character quotes in sessions (`quotes` table indexed by `by_session`, `by_character`, `by_session_character`) and Discord `#ouroubouros-inn` integration.
+* **`worlds.ts`**: Campaign worlds, calendar configs, faction lists, and faction groups (`worlds` table).
+* **`reputations` (in `schema.ts`)**: Character faction standing indexed by `by_world_character`, `by_world_faction`, `by_world_character_faction`.
+* **`sessions.ts`**: Game sessions, attending characters, effective level evaluation, relationship streaks, initiative tracker.
+* **`blackVoid.ts`**: Economy marketplace, proxy bidding with 2-sig-fig increments, downtime services, financial ledgers, Guildmaster cuts.
+* **`quests.ts`**: Dual-system (`PF` / `DnD`) quests, character-issued quests, and Guild sponsorship payback.
+* **`achievements.ts`**: Event-driven achievements, cosmetics unlocks, and character-based world streaks.
+* **`external_api.ts`**: High-performance REST query/mutation resolvers supporting public GETs and key-authenticated mutations.
+

@@ -39,8 +39,25 @@ All backend code in `convex/` must strictly adhere to the following platform res
 
 ---
 
-## 3. Code Quality & Verification
+## 3. Frontend & React Standards
+
+* **Strict Rules of Hooks**: NEVER invoke React hooks (`useState`, `useQuery`, `useMutation`, `useAction`, `useUser`, `useEffect`, etc.) conditionally or after early returns (e.g. `if (characters.length === 0) return ...`). Always place all hook initializations at the top level of the component.
+* **Component Modularity**: Keep container files under 400 lines; extract dialog tabs and complex forms into dedicated subcomponents.
+* **Dark Theme Standard**: Void Guild operates exclusively in dark mode (`.dark`). Never introduce light theme toggles or overrides.
+
+---
+
+## 4. Discord & Third-Party Integrations
+
+* **Channel Targeting**: Use `process.env.DISCORD_CHANNEL_ID` for `#ouroubouros-inn` activity feed / character quotes, and `process.env.DISCORD_FORUM_CHANNEL_ID` for session forum threads.
+* **Plain Markdown & Embed Suppression**: Quote broadcasts must be formatted in plain markdown using a blockquote callout (`> “quote”\n— **Name** in [World](url)`). Always set `flags: 4` (`SUPPRESS_EMBEDS`) in the Discord API payload to suppress automatic URL link preview cards.
+* **Resilient Execution**: External API calls inside Convex actions should handle errors gracefully and never roll back successful local database mutations.
+
+---
+
+## 5. Code Quality & Verification
 
 * **Strict TypeScript**: Run `npx tsc --noEmit` before declaring any task complete. 0 errors allowed.
+* **Production Build**: Run `npm run build` to ensure static page generation and Next.js bundle succeed cleanly.
 * **Single-Source Docstrings**: Preserve existing comments and docstrings.
 * **Error Handling**: Log and address root causes—never wrap failing logic in empty `catch` blocks or dummy fallbacks.

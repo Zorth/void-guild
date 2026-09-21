@@ -33,6 +33,7 @@ https://guild.tarragon.be/api/external/v1
 *   **GET** `/sessions?past=true|false&worldId=...&system=PF|DnD` - List all sessions with filters.
 *   **GET** `/session/:sessionId` - Get detailed session info including attending characters, GM character, and quest.
 *   **GET** `/session/:sessionId/characters` - List attending characters in a session.
+*   **GET** `/session/:sessionId/quotes` - List character quotes logged in a session.
 *   **GET** `/session/:sessionId/state` - Get live initiative and clock state.
 *   **POST** `/session` - Create a new session (GM/Admin). Body: `{ date?, level?, maxPlayers, system, location?, planning?, worldId? }`.
 *   **POST** `/session/:sessionId/loot` - Add loot item to a session (Owner/Admin). Body: `{ name, valueGP, isGood, isPerCharacter?, link?, quantity? }`.

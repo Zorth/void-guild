@@ -43,6 +43,7 @@ function getApiDocsResponse() {
             { method: "GET", path: "/sessions", description: "List sessions with filters", queryParams: ["past=true|false", "worldId=string", "system=PF|DnD"] },
             { method: "GET", path: "/session/:id", description: "Get detailed session info" },
             { method: "GET", path: "/session/:id/characters", description: "List attending characters in a session" },
+            { method: "GET", path: "/session/:id/quotes", description: "List character quotes logged in a session" },
             { method: "GET", path: "/session/:id/state", description: "Get live initiative and clock state" },
             { method: "POST", path: "/session", description: "Create a session (GM/Admin)" },
             { method: "POST", path: "/session/:id/loot", description: "Add loot item to session" },
@@ -112,6 +113,9 @@ export async function GET(
         case 'session':
             if (subresource === 'characters') {
                 return handleResponse(convex.query(api.external_api.getSessionCharacters, { apiKey, sessionId: id }));
+            }
+            if (subresource === 'quotes') {
+                return handleResponse(convex.query(api.quotes.getSessionQuotes, { sessionId: id as any }));
             }
             if (subresource === 'state') {
                 return handleResponse(convex.query(api.external_api.getSessionState, { apiKey, sessionId: id }));
