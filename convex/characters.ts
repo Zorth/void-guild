@@ -365,8 +365,9 @@ export const getCharacterProfile = query({
 
     const isAttending = (s: typeof allSessions[0]) => {
       return (
-        (Array.isArray(s.characters) && s.characters.includes(args.characterId)) ||
-        s.gmCharacter === args.characterId
+        Array.isArray(s.characters) &&
+        s.characters.includes(args.characterId) &&
+        s.gmCharacter !== args.characterId
       )
     }
 
@@ -414,10 +415,16 @@ export const getCharacterProfile = query({
 
     // Attendance streak: consecutive locked sessions in the guild that this character attended
     // from the latest locked session backwards
+    // Sessions where this character was the GM are ignored (do not break streak and do not increment streak)
     const sortedLocked = allSessions.filter((s) => Boolean(s.locked))
     let attendanceStreak = 0
     for (let i = sortedLocked.length - 1; i >= 0; i--) {
-      if (isAttending(sortedLocked[i])) {
+      const s = sortedLocked[i]
+      if (s.gmCharacter === args.characterId) {
+        // Ignored: GM session doesn't count for player streak, but also doesn't break it
+        continue
+      }
+      if (isAttending(s)) {
         attendanceStreak += 1
       } else {
         break
