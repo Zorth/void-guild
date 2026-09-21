@@ -33,7 +33,9 @@ export default function VoidObjectiveContributeModal({
   onConfirmed,
 }: VoidObjectiveContributeModalProps) {
   const currentObjective = useQuery(api.voidObjectives.getCurrentObjective)
+  const session = useQuery(api.sessions.getSession, { sessionId })
   const contributeMutation = useMutation(api.voidObjectives.contributeToObjective)
+  const setPendingMutation = useMutation(api.voidObjectives.setPendingObjectiveContribution)
 
   const [amount, setAmount] = useState<number>(initialAmount)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -68,25 +70,46 @@ export default function VoidObjectiveContributeModal({
     }
   }
 
+  const isSessionLocked = session?.locked ?? true
+
   const handleSubmit = async () => {
     setIsSubmitting(true)
     try {
-      await contributeMutation({
-        sessionId,
-        amount,
-      })
-      toast.success(
-        amount > 0
-          ? `Set contribution to ${amount} ${unit} for "${title}"!`
-          : `Cleared contribution for "${title}"`,
-        {
-          description:
-            amount > 0
-              ? 'All non-GM characters from this session are credited as objective contributors.'
-              : 'Contribution has been removed for this session.',
-          icon: '🎯',
-        }
-      )
+      if (isSessionLocked) {
+        await contributeMutation({
+          sessionId,
+          amount,
+        })
+        toast.success(
+          amount > 0
+            ? `Set contribution to ${amount} ${unit} for "${title}"!`
+            : `Cleared contribution for "${title}"`,
+          {
+            description:
+              amount > 0
+                ? 'All non-GM characters from this session are credited as objective contributors.'
+                : 'Contribution has been removed for this session.',
+            icon: '🎯',
+          }
+        )
+      } else {
+        await setPendingMutation({
+          sessionId,
+          amount,
+        })
+        toast.success(
+          amount > 0
+            ? `Pending contribution set to ${amount} ${unit} for "${title}"!`
+            : `Cleared pending contribution for "${title}"`,
+          {
+            description:
+              amount > 0
+                ? 'This will be applied to the Void Objective when this session is closed/locked.'
+                : 'Pending contribution cleared for this session.',
+            icon: '🎯',
+          }
+        )
+      }
       onClose()
       if (onConfirmed) onConfirmed()
     } catch (err: any) {
@@ -158,7 +181,9 @@ export default function VoidObjectiveContributeModal({
           <div className="p-2.5 bg-muted/30 rounded-lg border border-border/40 text-[11px] text-muted-foreground flex items-start gap-2">
             <Users className="h-4 w-4 text-purple-400 shrink-0 mt-0.5" />
             <span>
-              Any amount above 0 automatically credits all participating (non-GM) characters in this session as contributors. They will receive the reward tier when the month ends!
+              {isSessionLocked
+                ? "Any amount above 0 automatically credits all participating (non-GM) characters in this session as contributors. They will receive the reward tier when the month ends!"
+                : "This session is currently open. Setting a contribution will save it as pending and submit it to the Void Objective when this session is closed/locked."}
             </span>
           </div>
         </div>

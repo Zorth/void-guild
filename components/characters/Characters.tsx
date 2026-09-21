@@ -23,24 +23,13 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
 import { FormEvent, useState, useMemo } from 'react'
-import { Doc } from '@/convex/_generated/dataModel'
+import { Doc, Id } from '@/convex/_generated/dataModel'
 import Sessions from '@/components/sessions/Sessions'
 import CreateCharacter from './CreateCharacter'
 import AdminCharacterList from './AdminCharacterList'
 import AdminUserList from './AdminUserList'
-import CharacterCosmeticsTab from './CharacterCosmeticsTab'
+import CharacterDetailsDialog from './CharacterDetailsDialog'
 import InSyncPlasmaEffect from './InSyncPlasmaEffect'
 import BlazeTextParticles from './BlazeTextParticles'
 import VoidNebulaEffect from './VoidNebulaEffect'
@@ -53,7 +42,6 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import {
   resolveCosmeticsStyles,
-  CharacterCosmetics,
 } from '@/lib/cosmetics'
 
 export default function Characters({ filters }: { filters?: { pf: boolean; dnd: boolean } }) {
@@ -77,30 +65,8 @@ export default function Characters({ filters }: { filters?: { pf: boolean; dnd: 
     })
   }, [charactersRaw, filters])
 
-  const [selectedCharacter, setSelectedCharacter] = useState<Doc<'characters'> | null>(null)
+  const [selectedCharacterId, setSelectedCharacterId] = useState<Id<'characters'> | null>(null)
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<'general' | 'cosmetics'>('general')
-
-  const [editedCharacterData, setEditedCharacterData] = useState({
-    name: '',
-    ancestry: '',
-    class: '',
-    websiteLink: '',
-    system: 'PF' as 'PF' | 'DnD',
-  })
-
-  const [editedCosmetics, setEditedCosmetics] = useState<CharacterCosmetics>({
-    nameFont: 'default',
-    titleFont: 'default',
-    subtitleFont: 'default',
-    nameColor: '',
-    titleColor: '',
-    subtitleColor: '',
-    borderShape: 'default',
-    borderColor: '',
-    profileBorder: 'default',
-    bgColor: 'default',
-  })
 
   const [showCreateWorldDialog, setShowCreateWorldDialog] = useState(false)
   const [newWorldName, setNewWorldName] = useState('')
@@ -141,56 +107,8 @@ export default function Characters({ filters }: { filters?: { pf: boolean; dnd: 
     }
   }
 
-  async function handleUpdateCharacter(event: FormEvent) {
-    event.preventDefault()
-    if (!selectedCharacter) return
-    setIsSubmitting(true)
-    try {
-      await updateCharacter({
-        characterId: selectedCharacter._id,
-        ...editedCharacterData,
-        cosmetics: editedCosmetics,
-      })
-      track('character_updated', { name: editedCharacterData.name })
-      toast.success('Character updated successfully!')
-      setIsDetailsDialogOpen(false)
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to update character')
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  async function handleDeleteCharacter() {
-    if (!selectedCharacter) return
-    const name = selectedCharacter.name
-    await deleteCharacter({ characterId: selectedCharacter._id })
-    track('character_deleted', { name })
-    setIsDetailsDialogOpen(false)
-  }
-
   function openDetailsDialog(character: Doc<'characters'>) {
-    setSelectedCharacter(character)
-    setEditedCharacterData({
-      name: character.name,
-      ancestry: character.ancestry ?? '',
-      class: character.class ?? '',
-      websiteLink: character.websiteLink ?? '',
-      system: (character.system as 'PF' | 'DnD') ?? 'PF',
-    })
-    setEditedCosmetics({
-      nameFont: character.cosmetics?.nameFont || 'default',
-      titleFont: character.cosmetics?.titleFont || 'default',
-      subtitleFont: character.cosmetics?.subtitleFont || 'default',
-      nameColor: character.cosmetics?.nameColor || '',
-      titleColor: character.cosmetics?.titleColor || '',
-      subtitleColor: character.cosmetics?.subtitleColor || '',
-      borderShape: character.cosmetics?.borderShape || 'default',
-      borderColor: character.cosmetics?.borderColor || '',
-      profileBorder: character.cosmetics?.profileBorder || 'default',
-      bgColor: character.cosmetics?.bgColor || 'default',
-    })
-    setActiveTab('general')
+    setSelectedCharacterId(character._id)
     track('character_details_expanded', { name: character.name })
     setIsDetailsDialogOpen(true)
   }
@@ -443,182 +361,14 @@ export default function Characters({ filters }: { filters?: { pf: boolean; dnd: 
 
       <Sessions filters={filters} />
 
-      {selectedCharacter && (
-        <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center justify-between">
-                <span>{selectedCharacter.name}</span>
-              </DialogTitle>
-              <DialogDescription className="flex items-center gap-2 mt-1">
-                <CharacterRankIcon rank={selectedCharacter.rank} />
-                {selectedCharacter.system && (
-                  <img
-                    src={selectedCharacter.system === 'PF' ? '/PFVoid.svg' : '/DnDVoid.svg'}
-                    alt={selectedCharacter.system}
-                    className="h-4 w-4"
-                  />
-                )}
-                <span
-                  className="inline-flex align-middle justify-center w-14 rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap"
-                  style={getLevelBadgeStyle(selectedCharacter.lvl)}
-                >
-                  Lvl {selectedCharacter.lvl}
-                </span>
-                <span>{selectedCharacter.xp} XP</span>
-              </DialogDescription>
-            </DialogHeader>
-
-            {/* Navigation Tabs */}
-            <div className="flex border-b border-border mb-4">
-              <button
-                type="button"
-                className={cn(
-                  'px-4 py-2 text-sm font-semibold border-b-2 transition-colors',
-                  activeTab === 'general'
-                    ? 'border-purple-500 text-purple-600 dark:text-purple-400'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                )}
-                onClick={() => setActiveTab('general')}
-              >
-                General Info
-              </button>
-              <button
-                type="button"
-                className={cn(
-                  'px-4 py-2 text-sm font-semibold border-b-2 transition-colors flex items-center gap-1.5',
-                  activeTab === 'cosmetics'
-                    ? 'border-purple-500 text-purple-600 dark:text-purple-400'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                )}
-                onClick={() => setActiveTab('cosmetics')}
-              >
-                <Sparkles className="h-4 w-4" />
-                Cosmetics & Calling Card
-              </button>
-            </div>
-
-            <form onSubmit={handleUpdateCharacter} className="flex flex-col gap-4">
-              {activeTab === 'general' ? (
-                <>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-sm font-medium">System</label>
-                    <select
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      value={editedCharacterData.system}
-                      onChange={(e) =>
-                        setEditedCharacterData({
-                          ...editedCharacterData,
-                          system: e.target.value as 'PF' | 'DnD',
-                        })
-                      }
-                    >
-                      <option value="PF">Pathfinder</option>
-                      <option value="DnD">Dungeons & Dragons</option>
-                    </select>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-sm font-medium">Character Name</label>
-                    <Input
-                      value={editedCharacterData.name}
-                      onChange={(e) =>
-                        setEditedCharacterData({ ...editedCharacterData, name: e.target.value })
-                      }
-                      placeholder="Character Name"
-                      required
-                    />
-                  </div>
-                  {selectedCharacter.title && (
-                    <div className="flex flex-col gap-2">
-                      <label className="text-sm font-medium flex items-center justify-between">
-                        <span>Title</span>
-                        <span className="text-[10px] text-muted-foreground font-normal">(Admin set)</span>
-                      </label>
-                      <Input
-                        value={selectedCharacter.title}
-                        disabled
-                        className="bg-muted/50 italic text-amber-400/90 font-medium"
-                      />
-                    </div>
-                  )}
-                  <div className="flex flex-col gap-2">
-                    <label className="text-sm font-medium">Ancestry</label>
-                    <Input
-                      value={editedCharacterData.ancestry}
-                      onChange={(e) =>
-                        setEditedCharacterData({ ...editedCharacterData, ancestry: e.target.value })
-                      }
-                      placeholder="Ancestry"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-sm font-medium">Class</label>
-                    <Input
-                      value={editedCharacterData.class}
-                      onChange={(e) =>
-                        setEditedCharacterData({ ...editedCharacterData, class: e.target.value })
-                      }
-                      placeholder="Class"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-sm font-medium">Website Link</label>
-                    <Input
-                      value={editedCharacterData.websiteLink}
-                      onChange={(e) =>
-                        setEditedCharacterData({
-                          ...editedCharacterData,
-                          websiteLink: e.target.value,
-                        })
-                      }
-                      placeholder="Website Link"
-                    />
-                  </div>
-                </>
-              ) : (
-                <CharacterCosmeticsTab
-                  characterId={selectedCharacter._id}
-                  characterName={editedCharacterData.name}
-                  title={selectedCharacter.title}
-                  ancestry={editedCharacterData.ancestry}
-                  characterClass={editedCharacterData.class}
-                  characterLvl={selectedCharacter.lvl}
-                  characterRank={selectedCharacter.rank}
-                  cosmetics={editedCosmetics}
-                  onChangeCosmetics={setEditedCosmetics}
-                  unlockedAchievementIds={unlockedAchievementIds}
-                  isAdmin={Boolean(isAdmin)}
-                />
-              )}
-
-              <DialogFooter className="mt-4">
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button type="button" variant="destructive">Delete</Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This will permanently delete {selectedCharacter.name}.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleDeleteCharacter}>
-                        Delete
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? 'Updating...' : 'Update Character'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-      )}
+      <CharacterDetailsDialog
+        characterId={selectedCharacterId}
+        isOpen={isDetailsDialogOpen}
+        onClose={() => {
+          setIsDetailsDialogOpen(false)
+          setSelectedCharacterId(null)
+        }}
+      />
       {/* Create World Dialog */}
       {isGM && (
         <Dialog open={showCreateWorldDialog} onOpenChange={setShowCreateWorldDialog}>

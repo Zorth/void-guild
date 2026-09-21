@@ -28,6 +28,7 @@ import BlazeTextParticles from '@/components/characters/BlazeTextParticles'
 import VoidNebulaEffect from '@/components/characters/VoidNebulaEffect'
 import InfernoFireEffect from '@/components/characters/InfernoFireEffect'
 import TintParticlesEffect from '@/components/characters/TintParticlesEffect'
+import CharacterDetailsDialog from '@/components/characters/CharacterDetailsDialog'
 
 interface CharacterRelationship {
   count: number
@@ -114,6 +115,7 @@ export default function AttendingCharactersList({
 
   const [quoteDialogOpen, setQuoteDialogOpen] = useState(false)
   const [selectedCharForQuote, setSelectedCharForQuote] = useState<Doc<'characters'> | null>(null)
+  const [characterDetailsId, setCharacterDetailsId] = useState<Id<'characters'> | null>(null)
   const [quoteText, setQuoteText] = useState('')
   const [isSubmittingQuote, setIsSubmittingQuote] = useState(false)
   const [isDeletingQuoteId, setIsDeletingQuoteId] = useState<Id<'quotes'> | null>(null)
@@ -220,21 +222,34 @@ export default function AttendingCharactersList({
                 <TintParticlesEffect variant="crimson" />
               )}
               <div className="flex items-center gap-3 min-w-0 relative z-10">
-                <ProfileAvatarWithBadge
-                  imageUrl={metadata?.imageUrl}
-                  name={char.name}
-                  cosmetics={char.cosmetics}
-                  profileRingClassName={cosmeticsStyles.profileRingClassName}
-                  rankNumber={characterRanks?.[char._id]}
-                  streak={rel?.streak}
-                  size="lg"
-                />
+                <button
+                  type="button"
+                  onClick={() => setCharacterDetailsId(char._id)}
+                  className="shrink-0 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 rounded-full"
+                  title={`View ${char.name}'s Profile`}
+                >
+                  <ProfileAvatarWithBadge
+                    imageUrl={metadata?.imageUrl}
+                    name={char.name}
+                    cosmetics={char.cosmetics}
+                    profileRingClassName={cosmeticsStyles.profileRingClassName}
+                    rankNumber={characterRanks?.[char._id]}
+                    streak={rel?.streak}
+                    size="lg"
+                  />
+                </button>
                 <div className="min-w-0">
                     <div className="font-bold flex items-center flex-wrap gap-2">
-                        <span className={cn("break-words relative", cosmeticsStyles.nameClassName)} style={cosmeticsStyles.nameStyle}>
+                        <button
+                          type="button"
+                          onClick={() => setCharacterDetailsId(char._id)}
+                          className={cn("break-words relative text-left hover:underline focus:outline-none cursor-pointer", cosmeticsStyles.nameClassName)}
+                          style={cosmeticsStyles.nameStyle}
+                          title={`View ${char.name}'s Profile`}
+                        >
                           {cosmeticsStyles.nameClassName?.includes('blaze-fire-text') && <BlazeTextParticles />}
                           {char.name}
-                        </span>
+                        </button>
                         {isUserCharacter && <span className="text-[10px] bg-purple-200 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded-full uppercase tracking-wider font-bold shrink-0">You</span>}
                         {/* Book Icon */}
                         <a
@@ -828,6 +843,12 @@ export default function AttendingCharactersList({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <CharacterDetailsDialog
+        characterId={characterDetailsId}
+        isOpen={Boolean(characterDetailsId)}
+        onClose={() => setCharacterDetailsId(null)}
+      />
     </>
   )
 }

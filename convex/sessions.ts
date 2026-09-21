@@ -3,6 +3,7 @@ import { v } from 'convex/values'
 import { Doc, Id } from './_generated/dataModel'
 import { internal } from './_generated/api'
 import { isAdmin, isGameMaster, extractClaim } from './roles'
+import { applyContributionHelper } from './voidObjectives'
 
 /**
  * XP gain based on session level and character level.
@@ -1289,6 +1290,12 @@ export const lockSession = mutation({
       }
 
       await ctx.db.patch(args.sessionId, { locked: true, xpGains })
+
+      // Apply pending void contribution if any directly within mutation transaction
+      const pendingAmount = session.pendingVoidContribution ?? session.voidContribution
+      if (typeof pendingAmount === 'number' && pendingAmount > 0) {
+        await applyContributionHelper(ctx, session, pendingAmount)
+      }
     }
 })
 
@@ -1351,6 +1358,12 @@ export const forceLockSession = mutation({
       }
 
       await ctx.db.patch(args.sessionId, { locked: true, xpGains: [] })
+
+      // Apply pending void contribution if any directly within mutation transaction
+      const pendingAmount = session.pendingVoidContribution ?? session.voidContribution
+      if (typeof pendingAmount === 'number' && pendingAmount > 0) {
+        await applyContributionHelper(ctx, session, pendingAmount)
+      }
     }
 })
 

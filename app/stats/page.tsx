@@ -6,10 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { ChevronLeft, Crown, Shield, Swords, Book } from 'lucide-react'
-import { useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@clerk/nextjs'
 import { cn, formatDisplayName } from '@/lib/utils'
+import { Id } from '@/convex/_generated/dataModel'
+import CharacterDetailsDialog from '@/components/characters/CharacterDetailsDialog'
 
 export default function StatsPage() {
     const { userId } = useAuth();
@@ -18,6 +20,7 @@ export default function StatsPage() {
     const recordLeaderboardVisit = useMutation(api.users.recordLeaderboardVisit);
     const recordWikiVisit = useMutation(api.users.recordWikiVisit);
     const syncAndGetAchievements = useMutation(api.achievements.syncAndGetAchievements);
+    const [characterDetailsId, setCharacterDetailsId] = useState<Id<'characters'> | null>(null);
 
     useEffect(() => {
       if (userId) {
@@ -70,9 +73,14 @@ export default function StatsPage() {
                         <span className="text-muted-foreground tabular-nums shrink-0">{index + 1}.</span>
                         <div className="flex flex-col min-w-0">
                           <div className="flex items-center gap-2 min-w-0">
-                            <span className={cn("font-medium truncate", isUser && "text-purple-700 dark:text-purple-300")} title={char.name}>
+                            <button
+                              type="button"
+                              onClick={() => setCharacterDetailsId(char._id)}
+                              className={cn("font-medium truncate text-left hover:underline cursor-pointer focus:outline-none", isUser && "text-purple-700 dark:text-purple-300")}
+                              title={`View ${char.name}'s Profile`}
+                            >
                               {char.name}
-                            </span>
+                            </button>
                             {isUser && (
                               <span className="text-[8px] bg-purple-200 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-1 py-0.5 rounded-full uppercase tracking-wider font-bold shrink-0">You</span>
                             )}
@@ -202,6 +210,12 @@ export default function StatsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <CharacterDetailsDialog
+        characterId={characterDetailsId}
+        isOpen={Boolean(characterDetailsId)}
+        onClose={() => setCharacterDetailsId(null)}
+      />
     </div>
   )
 }

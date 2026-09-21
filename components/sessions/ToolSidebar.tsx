@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import { Reorder, AnimatePresence, motion } from 'framer-motion'
-import { ChevronLeft, ChevronRight, Plus, X, GripVertical, Sword, Clock, Play, Pause, Minus, CalendarDays, Calendar as CalendarIcon, Info, ArrowLeft, ArrowRight, Flag, CheckCircle2, ExternalLink, Sun, Moon } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, X, GripVertical, Sword, Clock, Play, Pause, Minus, CalendarDays, Calendar as CalendarIcon, Info, ArrowLeft, ArrowRight, Flag, CheckCircle2, ExternalLink, Sun, Moon, Eye, Pencil, Check, Target, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn, formatInGameYear } from '@/lib/utils'
@@ -172,6 +172,18 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
     const updateInGameDate = useMutation(api.sessions.updateInGameDate)
     const updateWorldCalendar = useMutation(api.worlds.updateWorldCalendar)
 
+    // Character perceptions for attending characters
+    const characterIds = useMemo(() => {
+        return characters.map(c => c.id as Id<'characters'>)
+    }, [characters])
+    const perceptions = useQuery(api.characters.getCharacterPerceptions, { characterIds })
+
+    // Void Objective queries and mutations
+    const currentObjective = useQuery(api.voidObjectives.getCurrentObjective)
+    const setPendingContribution = useMutation(api.voidObjectives.setPendingObjectiveContribution)
+    const [isSavingContribution, setIsSavingContribution] = useState(false)
+    const [objectiveContributionInput, setObjectiveContributionInput] = useState<number | null>(null)
+
     // Live state from Convex
     const liveState = useQuery(api.sessions.getSessionState, { sessionId })
     const updateState = useMutation(api.sessions.updateSessionState)
@@ -201,6 +213,8 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
     const [round, setRound] = useState(1)
     const [isAdding, setIsAdding] = useState(false)
     const [newName, setNewName] = useState('')
+    const [editingItemId, setEditingItemId] = useState<string | null>(null)
+    const [editingItemName, setEditingItemName] = useState('')
 
     // --- Time State ---
     const [timeSeconds, setTimeSeconds] = useState(9 * 3600) // Default to 09:00:00 (32400 seconds)
@@ -657,6 +671,14 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
         setIsAdding(false)
     }
 
+    const renameItem = (id: string, nextName: string) => {
+        const trimmed = nextName.trim()
+        if (!trimmed) return
+        const newItems = items.map(item => item.id === id ? { ...item, name: trimmed } : item)
+        setItems(newItems)
+        pushState({ initiative: newItems })
+    }
+
     const removeItem = (id: string) => {
         const indexToRemove = items.findIndex(item => item.id === id)
         if (indexToRemove === -1) return
@@ -818,7 +840,116 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
                                         )}
                                     >
                                         <GripVertical className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors shrink-0" />
-                                        <span className="flex-grow truncate font-medium select-none">{item.name}</span>
+                                        
+                                        {/* Name with inline editing for manual entries */}
+                                        <div className="flex-grow flex items-center gap-1.5 min-w-0">
+                                            {editingItemId === item.id ? (
+                                                <div 
+                                                    className="flex items-center gap-1 flex-grow min-w-0" 
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    onPointerDown={(e) => e.stopPropagation()}
+                                                >
+                                                    <Input
+                                                        autoFocus
+                                                        size={1}
+                                                        className="h-6 text-xs px-1.5 py-0 bg-background"
+                                                        value={editingItemName}
+                                                        onChange={(e) => setEditingItemName(e.target.value)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') {
+                                                                renameItem(item.id, editingItemName)
+                                                                setEditingItemId(null)
+                                                            } else if (e.key === 'Escape') {
+                                                                setEditingItemId(null)
+                                                            }
+                                                        }}
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            renameItem(item.id, editingItemName)
+                                                            setEditingItemId(null)
+                                                        }}
+                                                        className="p-1 text-emerald-500 hover:text-emerald-400 rounded shrink-0"
+                                                        title="Save Name"
+                                                    >
+                                                        <Check className="h-3 w-3" />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setEditingItemId(null)}
+                                                        className="p-1 text-muted-foreground hover:text-foreground rounded shrink-0"
+                                                        title="Cancel"
+                                                    >
+                                                        <X className="h-3 w-3" />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-1.5 flex-grow min-w-0">
+                                                    <span 
+                                                        className={cn(
+                                                            "truncate font-medium select-none text-xs sm:text-sm",
+                                                            item.id.startsWith('custom-') && "cursor-pointer hover:text-primary transition-colors"
+                                                        )}
+                                                        onClick={(e) => {
+                                                            if (item.id.startsWith('custom-')) {
+                                                                e.stopPropagation()
+                                                                setEditingItemId(item.id)
+                                                                setEditingItemName(item.name)
+                                                            }
+                                                        }}
+                                                        title={item.id.startsWith('custom-') ? 'Click to rename entry' : item.name}
+                                                    >
+                                                        {item.name}
+                                                    </span>
+
+                                                    {item.id.startsWith('custom-') && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                setEditingItemId(item.id)
+                                                                setEditingItemName(item.name)
+                                                            }}
+                                                            className="opacity-0 group-hover:opacity-100 p-0.5 text-muted-foreground/60 hover:text-primary rounded transition-all shrink-0"
+                                                            title="Rename entry"
+                                                        >
+                                                            <Pencil className="h-2.5 w-2.5" />
+                                                        </button>
+                                                    )}
+
+                                                    {/* Perception Score Badge if available in DB */}
+                                                    {perceptions && perceptions[item.id] && (
+                                                        <TooltipProvider>
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <span 
+                                                                        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 shrink-0 cursor-help"
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                    >
+                                                                        <Eye className="h-2.5 w-2.5" />
+                                                                        <span>
+                                                                            {perceptions[item.id].bonus >= 0 ? `+${perceptions[item.id].bonus}` : perceptions[item.id].bonus}
+                                                                        </span>
+                                                                        {perceptions[item.id].proficiency && (
+                                                                            <span className="text-[8px] opacity-75">
+                                                                                ({perceptions[item.id].proficiency})
+                                                                            </span>
+                                                                        )}
+                                                                    </span>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent side="top" className="text-xs">
+                                                                    <p className="font-semibold">Perception Modifier: {perceptions[item.id].bonus >= 0 ? `+${perceptions[item.id].bonus}` : perceptions[item.id].bonus}</p>
+                                                                    {perceptions[item.id].proficiency && (
+                                                                        <p className="text-[10px] text-muted-foreground">Proficiency: {perceptions[item.id].proficiency}</p>
+                                                                    )}
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        </TooltipProvider>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                         
                                         <InitiativeCounterCell 
                                             item={item} 
@@ -853,6 +984,113 @@ export default function ToolSidebar({ sessionId, worldId, worldName, characters,
                                 <Button variant="ghost" className="h-9 px-3 border border-dashed border-border/50 hover:border-destructive hover:bg-destructive/5 hover:text-destructive text-muted-foreground text-xs" onClick={handleReset}>
                                     Reset
                                 </Button>
+                            </div>
+                        )}
+
+                        {/* Void Objective Contribution Tracker */}
+                        {currentObjective && (
+                            <div className="mt-2 p-3 bg-purple-950/20 border border-purple-500/30 rounded-lg space-y-2.5">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-1.5 text-xs font-bold text-purple-300">
+                                        <Target className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+                                        <span>Objective Tracker</span>
+                                    </div>
+                                    <span className="text-[10px] font-mono text-purple-300/80 bg-purple-950/40 px-1.5 py-0.5 rounded border border-purple-500/20">
+                                        {currentObjective.currentProgress} / {currentObjective.tier3Goal} {currentObjective.unit || 'pts'}
+                                    </span>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <p className="text-[11px] font-semibold text-foreground truncate" title={currentObjective.title}>
+                                        {currentObjective.title}
+                                    </p>
+                                    <p className="text-[10px] text-muted-foreground line-clamp-2">
+                                        {currentObjective.description}
+                                    </p>
+                                </div>
+
+                                <div className="space-y-1.5 pt-1 border-t border-purple-500/20">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <label className="text-[11px] text-muted-foreground">Session Contribution:</label>
+                                        <div className="flex items-center gap-1">
+                                            <Input
+                                                type="number"
+                                                min={0}
+                                                className="w-16 h-7 text-xs text-right font-mono font-bold bg-background/80"
+                                                value={objectiveContributionInput !== null ? objectiveContributionInput : (session?.pendingVoidContribution ?? session?.voidContribution ?? 0)}
+                                                onChange={(e) => {
+                                                    const val = parseInt(e.target.value, 10)
+                                                    setObjectiveContributionInput(isNaN(val) ? 0 : Math.max(0, val))
+                                                }}
+                                                disabled={session?.locked}
+                                            />
+                                            <span className="text-[10px] text-muted-foreground font-mono">
+                                                {currentObjective.unit || 'pts'}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-1.5">
+                                        <Button
+                                            size="sm"
+                                            variant="secondary"
+                                            className="h-6 text-[10px] font-semibold flex-grow bg-purple-600/20 hover:bg-purple-600/30 text-purple-200 border border-purple-500/30"
+                                            disabled={isSavingContribution || session?.locked}
+                                            onClick={async () => {
+                                                const targetVal = objectiveContributionInput !== null 
+                                                    ? objectiveContributionInput 
+                                                    : (session?.pendingVoidContribution ?? session?.voidContribution ?? 0)
+                                                setIsSavingContribution(true)
+                                                try {
+                                                    await setPendingContribution({
+                                                        sessionId,
+                                                        amount: targetVal,
+                                                    })
+                                                    toast.success(`Pending contribution set to ${targetVal} ${currentObjective.unit || 'pts'}`)
+                                                } catch (err: any) {
+                                                    toast.error(err.message || 'Failed to update pending contribution')
+                                                } finally {
+                                                    setIsSavingContribution(false)
+                                                }
+                                            }}
+                                        >
+                                            {isSavingContribution ? 'Saving...' : 'Set Pending'}
+                                        </Button>
+                                        {(session?.pendingVoidContribution ?? session?.voidContribution ?? 0) > 0 && !session?.locked && (
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-6 px-2 text-[10px] text-muted-foreground hover:text-destructive"
+                                                disabled={isSavingContribution}
+                                                onClick={async () => {
+                                                    setIsSavingContribution(true)
+                                                    try {
+                                                        await setPendingContribution({
+                                                            sessionId,
+                                                            amount: 0,
+                                                        })
+                                                        setObjectiveContributionInput(0)
+                                                        toast.info("Contribution cleared")
+                                                    } catch (err: any) {
+                                                        toast.error(err.message || 'Failed to clear')
+                                                    } finally {
+                                                        setIsSavingContribution(false)
+                                                    }
+                                                }}
+                                            >
+                                                Clear
+                                            </Button>
+                                        )}
+                                    </div>
+
+                                    <p className="text-[9px] text-muted-foreground italic leading-tight pt-0.5">
+                                        {session?.locked ? (
+                                            "Session is closed. Contribution is finalized."
+                                        ) : (
+                                            "Pending amount will only be submitted to the Void Objective when this session is closed/locked."
+                                        )}
+                                    </p>
+                                </div>
                             </div>
                         )}
                     </motion.div>

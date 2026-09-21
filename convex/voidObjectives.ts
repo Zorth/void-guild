@@ -240,6 +240,89 @@ export const upsertObjective = mutation({
 })
 
 /**
+ * Core helper to apply contribution to a session and its characters.
+ */
+export async function applyContributionHelper(
+  ctx: any,
+  session: Doc<'sessions'>,
+  amount: number
+) {
+  const previousContribution = session.voidContribution ?? 0
+  const newAmount = Math.max(0, amount)
+  const diff = newAmount - previousContribution
+
+  const { monthKey, deadline } = getMonthInfo(0)
+
+  if (diff === 0 && session.voidContribution === newAmount) {
+    const objective = await ctx.db
+      .query('voidObjectives')
+      .withIndex('by_monthKey', (q: any) => q.eq('monthKey', monthKey))
+      .unique()
+    return { success: true, updatedProgress: objective?.currentProgress ?? 0 }
+  }
+
+  let objective = await ctx.db
+    .query('voidObjectives')
+    .withIndex('by_monthKey', (q: any) => q.eq('monthKey', monthKey))
+    .unique()
+
+  if (!objective) {
+    const defaultId = await ctx.db.insert('voidObjectives', {
+      monthKey,
+      title: 'Void Anomaly Cleansing',
+      description: 'Banish the encroaching void creatures and cleanse the anomalies.',
+      unit: 'progress',
+      tier1Goal: 10,
+      tier2Goal: 25,
+      tier3Goal: 50,
+      currentProgress: 0,
+      deadline,
+    })
+    objective = await ctx.db.get(defaultId)
+  }
+
+  if (!objective) throw new Error('Could not find or create objective')
+
+  const newProgress = Math.max(0, objective.currentProgress + diff)
+  if (newProgress !== objective.currentProgress) {
+    await ctx.db.patch(objective._id, { currentProgress: newProgress })
+  }
+  if (session.voidContribution !== newAmount) {
+    await ctx.db.patch(session._id, { voidContribution: newAmount })
+  }
+
+  const gmCharId = session.gmCharacter
+  const playerCharacterIds = session.characters.filter((id) => id !== gmCharId)
+
+  for (const charId of playerCharacterIds) {
+    const existing = await ctx.db
+      .query('voidObjectiveContributions')
+      .withIndex('by_monthKey_character', (q: any) => q.eq('monthKey', monthKey).eq('characterId', charId))
+      .unique()
+
+    if (existing) {
+      const updatedCharAmount = Math.max(0, existing.amount + diff)
+      if (existing.amount !== updatedCharAmount || existing.lastSessionId !== session._id) {
+        await ctx.db.patch(existing._id, {
+          amount: updatedCharAmount,
+          lastSessionId: session._id,
+        })
+      }
+    } else if (newAmount > 0) {
+      await ctx.db.insert('voidObjectiveContributions', {
+        monthKey,
+        characterId: charId,
+        amount: newAmount,
+        rewardClaimed: false,
+        lastSessionId: session._id,
+      })
+    }
+  }
+
+  return { success: true, updatedProgress: newProgress }
+}
+
+/**
  * Record contribution to the Void Objective when a session ends/locks.
  * Adds all participating non-GM characters to the contributors list.
  */
@@ -260,79 +343,50 @@ export const contributeToObjective = mutation({
       throw new Error('Only the session owner or an admin can record contributions')
     }
 
-    const previousContribution = session.voidContribution ?? 0
+    return await applyContributionHelper(ctx, session, args.amount)
+  },
+})
+
+/**
+ * Set the pending objective contribution for a session before it is closed/locked.
+ * Does NOT immediately apply progress to the voidObjective until the session is locked.
+ */
+export const setPendingObjectiveContribution = mutation({
+  args: {
+    sessionId: v.id('sessions'),
+    amount: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    const session = await ctx.db.get(args.sessionId)
+    if (!session) throw new Error('Session not found')
+
+    const isAdminUser = await isAdmin(ctx)
+    if (session.owner !== user.subject && !isAdminUser) {
+      throw new Error('Only the session owner or an admin can set contribution')
+    }
+
     const newAmount = Math.max(0, args.amount)
-    const diff = newAmount - previousContribution
 
-    if (diff === 0 && session.voidContribution === newAmount) {
-      const { monthKey } = getMonthInfo(0)
-      const objective = await ctx.db
-        .query('voidObjectives')
-        .withIndex('by_monthKey', (q) => q.eq('monthKey', monthKey))
-        .unique()
-      return { success: true, updatedProgress: objective?.currentProgress ?? 0 }
-    }
-
-    const { monthKey, deadline } = getMonthInfo(0)
-    let objective = await ctx.db
-      .query('voidObjectives')
-      .withIndex('by_monthKey', (q) => q.eq('monthKey', monthKey))
-      .unique()
-
-    if (!objective) {
-      const defaultId = await ctx.db.insert('voidObjectives', {
-        monthKey,
-        title: 'Void Anomaly Cleansing',
-        description: 'Banish the encroaching void creatures and cleanse the anomalies.',
-        unit: 'progress',
-        tier1Goal: 10,
-        tier2Goal: 25,
-        tier3Goal: 50,
-        currentProgress: 0,
-        deadline,
-      })
-      objective = await ctx.db.get(defaultId)
-    }
-
-    if (!objective) throw new Error('Could not find or create objective')
-
-    const newProgress = Math.max(0, objective.currentProgress + diff)
-    if (newProgress !== objective.currentProgress) {
-      await ctx.db.patch(objective._id, { currentProgress: newProgress })
-    }
-    if (session.voidContribution !== newAmount) {
-      await ctx.db.patch(session._id, { voidContribution: newAmount })
-    }
-
-    const gmCharId = session.gmCharacter
-    const playerCharacterIds = session.characters.filter((id) => id !== gmCharId)
-
-    for (const charId of playerCharacterIds) {
-      const existing = await ctx.db
-        .query('voidObjectiveContributions')
-        .withIndex('by_monthKey_character', (q) => q.eq('monthKey', monthKey).eq('characterId', charId))
-        .unique()
-
-      if (existing) {
-        const updatedCharAmount = Math.max(0, existing.amount + diff)
-        if (existing.amount !== updatedCharAmount || existing.lastSessionId !== session._id) {
-          await ctx.db.patch(existing._id, {
-            amount: updatedCharAmount,
-            lastSessionId: session._id,
-          })
-        }
-      } else if (newAmount > 0) {
-        await ctx.db.insert('voidObjectiveContributions', {
-          monthKey,
-          characterId: charId,
-          amount: newAmount,
-          rewardClaimed: false,
-          lastSessionId: session._id,
-        })
+    // If session is already locked, directly apply it via helper
+    if (session.locked) {
+      await applyContributionHelper(ctx, session, newAmount)
+      if (session.pendingVoidContribution !== newAmount) {
+        await ctx.db.patch(session._id, { pendingVoidContribution: newAmount })
       }
+      return { success: true, pendingAmount: newAmount, locked: true }
     }
 
-    return { success: true, updatedProgress: newProgress }
+    // Unlocked session: store as pending without mutating voidObjectives or character contributions yet
+    if (session.pendingVoidContribution !== newAmount) {
+      await ctx.db.patch(session._id, {
+        pendingVoidContribution: newAmount,
+      })
+    }
+
+    return { success: true, pendingAmount: newAmount, locked: false }
   },
 })
 

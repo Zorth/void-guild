@@ -108,6 +108,31 @@ export const getCharactersByIds = query({
   },
 })
 
+export const getCharacterPerceptions = query({
+  args: { characterIds: v.array(v.id('characters')) },
+  handler: async (ctx, args) => {
+    const result: Record<string, { bonus: number; proficiency?: string }> = {}
+
+    await Promise.all(
+      args.characterIds.map(async (charId) => {
+        const details = await ctx.db
+          .query('characterDetails')
+          .withIndex('by_characterId', (q) => q.eq('characterId', charId))
+          .first()
+
+        if (details?.saves?.perception) {
+          result[charId] = {
+            bonus: details.saves.perception.bonus,
+            proficiency: details.saves.perception.proficiency,
+          }
+        }
+      })
+    )
+
+    return result
+  },
+})
+
 export const createCharacter = mutation({
   args: {
     name: v.string(),
@@ -266,3 +291,212 @@ export const deleteCharacter = mutation({
     await ctx.db.delete(args.characterId)
   },
 })
+
+export const getCharacterProfile = query({
+  args: { characterId: v.id('characters') },
+  handler: async (ctx, args) => {
+    const character = await ctx.db.get(args.characterId)
+    if (!character) return null
+
+    const identity = await ctx.auth.getUserIdentity()
+    const isAdminUser = await isAdmin(ctx)
+    const isOwner = identity ? identity.subject === character.userId : false
+
+    // Fetch character's owner info for avatar
+    const owner = await ctx.db
+      .query('users')
+      .withIndex('by_userId', (q) => q.eq('userId', character.userId))
+      .first()
+
+    // Fetch all commendations received by this character
+    const commendations = await ctx.db
+      .query('commendations')
+      .withIndex('by_toCharacter', (q) => q.eq('toCharacterId', args.characterId))
+      .collect()
+
+    const commendationSummary = {
+      total: commendations.length,
+      roleplay: 0,
+      tactics: 0,
+      clutch: 0,
+      heroic: 0,
+      gm: 0,
+    }
+
+    for (const c of commendations) {
+      if (c.category in commendationSummary) {
+        commendationSummary[c.category as keyof typeof commendationSummary] += 1
+      }
+    }
+
+    // Fetch all quotes by this character
+    const quotes = await ctx.db
+      .query('quotes')
+      .withIndex('by_character', (q) => q.eq('characterId', args.characterId))
+      .collect()
+
+    const quotesBySession = new Map<string, string[]>()
+    for (const q of quotes) {
+      const list = quotesBySession.get(q.sessionId) || []
+      list.push(q.quote)
+      quotesBySession.set(q.sessionId, list)
+    }
+
+    // Fetch sessions
+    // Locked sessions
+    const lockedSessions = await ctx.db
+      .query('sessions')
+      .withIndex('by_locked', (q) => q.eq('locked', true))
+      .collect()
+    // Unlocked sessions
+    const unlockedSessions = await ctx.db
+      .query('sessions')
+      .withIndex('by_locked', (q) => q.eq('locked', false))
+      .collect()
+
+    const allSessions = [...lockedSessions, ...unlockedSessions]
+
+    // Sort chronologically ascending
+    allSessions.sort((a, b) => {
+      const dateA = a.date || a._creationTime
+      const dateB = b.date || b._creationTime
+      return dateA - dateB
+    })
+
+    const isAttending = (s: typeof allSessions[0]) => {
+      return (
+        (Array.isArray(s.characters) && s.characters.includes(args.characterId)) ||
+        s.gmCharacter === args.characterId
+      )
+    }
+
+    const attendingSessions = allSessions.filter(isAttending)
+
+    // Calculate streaks:
+    // 1. Current world streak (for the most recent session played)
+    // 2. Max world streak across history
+    // 3. Consecutive session attendance streak (among all locked sessions)
+    let maxWorldStreak = 0
+    let currentWorldStreak = 0
+    let currentWorldName: string | undefined = undefined
+
+    // Calculate world streaks over attended locked sessions
+    const lockedAttendedSessions = attendingSessions.filter((s) => Boolean(s.locked))
+    let trackedWorldId: string | null = null
+    let tempWorldStreak = 0
+
+    for (const s of lockedAttendedSessions) {
+      const wId = s.world ? s.world.toString() : null
+      if (wId && wId === trackedWorldId) {
+        tempWorldStreak += 1
+      } else {
+        trackedWorldId = wId
+        tempWorldStreak = wId ? 1 : 0
+      }
+      if (tempWorldStreak > maxWorldStreak) {
+        maxWorldStreak = tempWorldStreak
+      }
+    }
+
+    // Current world streak from the latest session backwards
+    if (lockedAttendedSessions.length > 0) {
+      const latest = lockedAttendedSessions[lockedAttendedSessions.length - 1]
+      if (latest.world) {
+        for (let i = lockedAttendedSessions.length - 1; i >= 0; i--) {
+          if (lockedAttendedSessions[i].world === latest.world) {
+            currentWorldStreak += 1
+          } else {
+            break
+          }
+        }
+      }
+    }
+
+    // Attendance streak: consecutive locked sessions in the guild that this character attended
+    // from the latest locked session backwards
+    const sortedLocked = allSessions.filter((s) => Boolean(s.locked))
+    let attendanceStreak = 0
+    for (let i = sortedLocked.length - 1; i >= 0; i--) {
+      if (isAttending(sortedLocked[i])) {
+        attendanceStreak += 1
+      } else {
+        break
+      }
+    }
+
+    // Map worlds
+    const worldIds = Array.from(
+      new Set(attendingSessions.map((s) => s.world).filter(Boolean))
+    )
+    const worldDocs = await Promise.all(worldIds.map((wId) => ctx.db.get(wId)))
+    const worldMap = new Map<string, string>()
+    worldDocs.forEach((w) => {
+      if (w) worldMap.set(w._id, w.name)
+    })
+
+    if (lockedAttendedSessions.length > 0) {
+      const latest = lockedAttendedSessions[lockedAttendedSessions.length - 1]
+      if (latest.world) {
+        currentWorldName = worldMap.get(latest.world)
+      }
+    }
+
+    // Prepare session history list (sorted descending by date)
+    // Filter out private sessions if caller is not authorized
+    const visibleSessions = attendingSessions.filter((s) => {
+      if (!s.isPrivate) return true
+      if (identity && identity.subject === s.owner) return true
+      if (isAdminUser) return true
+      if (isOwner) return true
+      return false
+    })
+
+    const sessionsWithContext = visibleSessions.map((s) => {
+      const sessionComms = commendations.filter((c) => c.sessionId === s._id)
+      const commsBreakdown = {
+        total: sessionComms.length,
+        roleplay: sessionComms.filter((c) => c.category === 'roleplay').length,
+        tactics: sessionComms.filter((c) => c.category === 'tactics').length,
+        clutch: sessionComms.filter((c) => c.category === 'clutch').length,
+        heroic: sessionComms.filter((c) => c.category === 'heroic').length,
+        gm: sessionComms.filter((c) => c.category === 'gm').length,
+      }
+      const sessionQuotes = quotesBySession.get(s._id) || []
+
+      return {
+        _id: s._id,
+        date: s.date,
+        inGameDate: s.inGameDate,
+        worldName: s.world ? worldMap.get(s.world) || 'Unknown World' : 'The Void',
+        system: s.system,
+        level: s.level,
+        locked: s.locked,
+        isGm: s.gmCharacter === args.characterId,
+        commendations: commsBreakdown,
+        quotes: sessionQuotes,
+      }
+    })
+
+    sessionsWithContext.sort((a, b) => (b.date || 0) - (a.date || 0))
+
+    return {
+      character,
+      owner: {
+        userId: character.userId,
+        imageUrl: owner?.imageUrl,
+        name: owner?.name || owner?.username || 'Unknown Adventurer',
+      },
+      isOwner,
+      isAdmin: isAdminUser,
+      commendations: commendationSummary,
+      streaks: {
+        currentWorldStreak,
+        maxWorldStreak,
+        currentWorldName,
+        attendanceStreak,
+      },
+      sessions: sessionsWithContext,
+    }
+  },
+})
+

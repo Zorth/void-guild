@@ -75,6 +75,7 @@ export default defineSchema({
             claimed: v.optional(v.boolean()),
         })),
         voidContribution: v.optional(v.number()),
+        pendingVoidContribution: v.optional(v.number()),
   }).index('by_locked', ['locked'])
     .index('by_owner', ['owner'])
     .index('by_world', ['world'])

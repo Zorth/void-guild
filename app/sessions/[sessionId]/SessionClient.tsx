@@ -1125,7 +1125,7 @@ export default function SessionClient() {
         isOpen={isObjectiveContributeOpen}
         onClose={() => setIsObjectiveContributeOpen(false)}
         sessionId={session._id}
-        initialAmount={session.voidContribution}
+        initialAmount={session.pendingVoidContribution ?? session.voidContribution}
       />
     </div>
   )
