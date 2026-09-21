@@ -8,7 +8,7 @@ import { useAuth } from '@clerk/nextjs'
 import Link from 'next/link'
 import { 
   ZoomIn, ZoomOut, Maximize2, Layers, MapPin, Eye, Edit3, Plus, 
-  Trash2, Settings, ChevronLeft, Map, FileText, Check, X, Grid, Lock, Unlock, Move, HelpCircle, Copy
+  Trash2, Settings, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Map, FileText, Check, X, Grid, Lock, Unlock, Move, HelpCircle, Copy
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -58,7 +58,16 @@ export default function MapViewerClient() {
   // View state
   const isOwner = world ? userId === world.owner : false
   const [isEditMode, setIsEditMode] = useState(false)
-  const [activeTool, setActiveTool] = useState<'view' | 'add_pin' | 'add_area' | 'reveal_hex' | 'hide_hex' | 'grid_note'>('view')
+  const [activeTool, setActiveTool] = useState<'view' | 'add_pin' | 'add_area' | 'reveal_hex' | 'hide_hex' | 'grid_note' | 'align_grid'>('view')
+
+  // Live grid calibration / offset state
+  const [liveGridOffset, setLiveGridOffset] = useState<{ x: number; y: number } | null>(null)
+  const [liveGridSize, setLiveGridSize] = useState<number | null>(null)
+  const dragGridStartRef = useRef({ x: 0, y: 0, ox: 0, oy: 0 })
+
+  const currentOffsetX = liveGridOffset !== null ? liveGridOffset.x : (currentMap?.gridOffsetX ?? 0)
+  const currentOffsetY = liveGridOffset !== null ? liveGridOffset.y : (currentMap?.gridOffsetY ?? 0)
+  const currentGridSize = liveGridSize !== null ? liveGridSize : (currentMap?.gridSize ?? 100)
 
   // Pan & Zoom viewport state
   const viewportRef = useRef<HTMLDivElement>(null)
@@ -67,6 +76,8 @@ export default function MapViewerClient() {
   const [position, setPosition] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
   const dragStartRef = useRef({ x: 0, y: 0 })
+  const dragOriginRef = useRef({ x: 0, y: 0 })
+  const hasDraggedRef = useRef(false)
   const [naturalDimensions, setNaturalDimensions] = useState<{ width: number; height: number } | null>(null)
   const hasAutoFittedRef = useRef(false)
 
@@ -139,7 +150,7 @@ export default function MapViewerClient() {
     imageUrl: '',
     width: 2000,
     height: 2000,
-    gridType: 'none' as 'none' | 'hex' | 'square',
+    gridType: 'none' as 'none' | 'hex' | 'hex_flat' | 'square',
     gridSize: 100,
     gridOffsetX: 0,
     gridOffsetY: 0,
@@ -192,23 +203,70 @@ export default function MapViewerClient() {
     }
   }, [currentMap])
 
-  // Wheel zoom handler
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault()
-    const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85
-    setScale((prevScale) => Math.min(Math.max(prevScale * zoomFactor, 0.05), 8))
-  }
+  // Lock body scroll and set up non-passive wheel listener so scrolling strictly zooms the map without scrolling the webpage
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    const viewport = viewportRef.current
+    if (!viewport) {
+      return () => {
+        document.body.style.overflow = originalOverflow
+      }
+    }
+
+    const handleWheelNative = (e: WheelEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85
+      setScale((prevScale) => Math.min(Math.max(prevScale * zoomFactor, 0.05), 8))
+    }
+
+    viewport.addEventListener('wheel', handleWheelNative, { passive: false })
+    return () => {
+      document.body.style.overflow = originalOverflow
+      viewport.removeEventListener('wheel', handleWheelNative)
+    }
+  }, [])
 
   // Mouse pan handlers
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return // Left click only
     if (activeTool === 'add_area' && areaDraft.points.length > 0) return // Polygon drawing
+
     setIsDragging(true)
+    hasDraggedRef.current = false
+    dragOriginRef.current = { x: e.clientX, y: e.clientY }
+
+    if (activeTool === 'align_grid') {
+      dragGridStartRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+        ox: currentOffsetX,
+        oy: currentOffsetY,
+      }
+      return
+    }
+
     dragStartRef.current = { x: e.clientX - position.x, y: e.clientY - position.y }
   }
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging) return
+    if (Math.hypot(e.clientX - dragOriginRef.current.x, e.clientY - dragOriginRef.current.y) > 5) {
+      hasDraggedRef.current = true
+    }
+
+    if (activeTool === 'align_grid') {
+      const dx = (e.clientX - dragGridStartRef.current.x) / scale
+      const dy = (e.clientY - dragGridStartRef.current.y) / scale
+      setLiveGridOffset({
+        x: Math.round(dragGridStartRef.current.ox + dx),
+        y: Math.round(dragGridStartRef.current.oy + dy),
+      })
+      return
+    }
+
     setPosition({
       x: e.clientX - dragStartRef.current.x,
       y: e.clientY - dragStartRef.current.y,
@@ -229,6 +287,19 @@ export default function MapViewerClient() {
       touchDistanceRef.current = dist
     } else if (e.touches.length === 1) {
       setIsDragging(true)
+      hasDraggedRef.current = false
+      dragOriginRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+
+      if (activeTool === 'align_grid') {
+        dragGridStartRef.current = {
+          x: e.touches[0].clientX,
+          y: e.touches[0].clientY,
+          ox: currentOffsetX,
+          oy: currentOffsetY,
+        }
+        return
+      }
+
       dragStartRef.current = {
         x: e.touches[0].clientX - position.x,
         y: e.touches[0].clientY - position.y,
@@ -246,6 +317,20 @@ export default function MapViewerClient() {
       setScale((prevScale) => Math.min(Math.max(prevScale * delta, 0.05), 8))
       touchDistanceRef.current = dist
     } else if (e.touches.length === 1 && isDragging) {
+      if (Math.hypot(e.touches[0].clientX - dragOriginRef.current.x, e.touches[0].clientY - dragOriginRef.current.y) > 5) {
+        hasDraggedRef.current = true
+      }
+
+      if (activeTool === 'align_grid') {
+        const dx = (e.touches[0].clientX - dragGridStartRef.current.x) / scale
+        const dy = (e.touches[0].clientY - dragGridStartRef.current.y) / scale
+        setLiveGridOffset({
+          x: Math.round(dragGridStartRef.current.ox + dx),
+          y: Math.round(dragGridStartRef.current.oy + dy),
+        })
+        return
+      }
+
       setPosition({
         x: e.touches[0].clientX - dragStartRef.current.x,
         y: e.touches[0].clientY - dragStartRef.current.y,
@@ -278,7 +363,7 @@ export default function MapViewerClient() {
 
   // Canvas Click Handler based on Active Tool
   const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (isDragging) return
+    if (isDragging || hasDraggedRef.current) return
     const coords = getCanvasCoordinates(e)
 
     if (activeTool === 'add_pin') {
@@ -354,9 +439,6 @@ export default function MapViewerClient() {
   const gridType = currentMap?.gridType || 'none'
   const isExplorationMap = currentMap?.isExplorationMap || false
 
-  const cols = Math.ceil(mapWidth / gridSize)
-  const rows = Math.ceil(mapHeight / gridSize)
-
   const revealedSet = useMemo(() => {
     return new Set(currentMap?.revealedCells || [])
   }, [currentMap?.revealedCells])
@@ -369,15 +451,160 @@ export default function MapViewerClient() {
     return map
   }, [fullData?.notes])
 
+  // Exact gapless interlocking honeycomb and square grid calculation with border over-tiling
+  const gridCells = useMemo(() => {
+    if (gridType === 'none') return []
+    const effectiveGridSize = Math.max(25, currentGridSize)
+    const ox = currentOffsetX
+    const oy = currentOffsetY
+
+    // Pad by 3 cells beyond all 4 edges so hexagons and grid lines tile continuously over and past the image borders
+    const pad = 3
+
+    if (gridType === 'hex') {
+      // Pointy-topped hexagon (Standard D&D / RPG)
+      // Width W = effectiveGridSize
+      // Circumradius R = W / sqrt(3)
+      // Height H = 2 * R = (2 / sqrt(3)) * W
+      // Vertical row step deltaY = 1.5 * R = (sqrt(3) / 2) * W
+      const W = effectiveGridSize
+      const R = W / Math.sqrt(3)
+      const deltaY = 1.5 * R
+
+      const minC = Math.floor(-ox / W) - pad
+      const maxC = Math.ceil((mapWidth - ox) / W) + pad
+      const minR = Math.floor(-oy / deltaY) - pad
+      const maxR = Math.ceil((mapHeight - oy) / deltaY) + pad
+
+      const colCount = Math.min(maxC - minC + 1, 180)
+      const rowCount = Math.min(maxR - minR + 1, 180)
+
+      const cells = []
+      for (let rIdx = 0; rIdx < rowCount; rIdx++) {
+        const r = minR + rIdx
+        const isOdd = Math.abs(r) % 2 === 1
+        const cy = oy + R + r * deltaY
+
+        for (let cIdx = 0; cIdx < colCount; cIdx++) {
+          const c = minC + cIdx
+          const cx = ox + (c + (isOdd ? 0.5 : 0)) * W + W / 2
+          const points = [
+            `${cx.toFixed(2)},${(cy - R).toFixed(2)}`,
+            `${(cx + W / 2).toFixed(2)},${(cy - R / 2).toFixed(2)}`,
+            `${(cx + W / 2).toFixed(2)},${(cy + R / 2).toFixed(2)}`,
+            `${cx.toFixed(2)},${(cy + R).toFixed(2)}`,
+            `${(cx - W / 2).toFixed(2)},${(cy + R / 2).toFixed(2)}`,
+            `${(cx - W / 2).toFixed(2)},${(cy - R / 2).toFixed(2)}`,
+          ].join(' ')
+
+          cells.push({
+            key: `${c},${r}`,
+            c,
+            r,
+            cx,
+            cy,
+            points,
+          })
+        }
+      }
+      return cells
+    } else if (gridType === 'hex_flat') {
+      // Flat-topped hexagon
+      const H = effectiveGridSize
+      const R = H / Math.sqrt(3)
+      const deltaX = 1.5 * R
+
+      const minC = Math.floor(-ox / deltaX) - pad
+      const maxC = Math.ceil((mapWidth - ox) / deltaX) + pad
+      const minR = Math.floor(-oy / H) - pad
+      const maxR = Math.ceil((mapHeight - oy) / H) + pad
+
+      const colCount = Math.min(maxC - minC + 1, 180)
+      const rowCount = Math.min(maxR - minR + 1, 180)
+
+      const cells = []
+      for (let cIdx = 0; cIdx < colCount; cIdx++) {
+        const c = minC + cIdx
+        const isOdd = Math.abs(c) % 2 === 1
+        const cx = ox + R + c * deltaX
+
+        for (let rIdx = 0; rIdx < rowCount; rIdx++) {
+          const r = minR + rIdx
+          const cy = oy + (r + (isOdd ? 0.5 : 0)) * H + H / 2
+          const points = [
+            `${(cx - R).toFixed(2)},${cy.toFixed(2)}`,
+            `${(cx - R / 2).toFixed(2)},${(cy - H / 2).toFixed(2)}`,
+            `${(cx + R / 2).toFixed(2)},${(cy - H / 2).toFixed(2)}`,
+            `${(cx + R).toFixed(2)},${cy.toFixed(2)}`,
+            `${(cx + R / 2).toFixed(2)},${(cy + H / 2).toFixed(2)}`,
+            `${(cx - R / 2).toFixed(2)},${(cy + H / 2).toFixed(2)}`,
+          ].join(' ')
+
+          cells.push({
+            key: `${c},${r}`,
+            c,
+            r,
+            cx,
+            cy,
+            points,
+          })
+        }
+      }
+      return cells
+    } else if (gridType === 'square') {
+      const size = effectiveGridSize
+      const minC = Math.floor(-ox / size) - pad
+      const maxC = Math.ceil((mapWidth - ox) / size) + pad
+      const minR = Math.floor(-oy / size) - pad
+      const maxR = Math.ceil((mapHeight - oy) / size) + pad
+
+      const colCount = Math.min(maxC - minC + 1, 180)
+      const rowCount = Math.min(maxR - minR + 1, 180)
+
+      const cells = []
+      for (let rIdx = 0; rIdx < rowCount; rIdx++) {
+        const r = minR + rIdx
+        const y = oy + r * size
+
+        for (let cIdx = 0; cIdx < colCount; cIdx++) {
+          const c = minC + cIdx
+          const x = ox + c * size
+          const points = [
+            `${x},${y}`,
+            `${x + size},${y}`,
+            `${x + size},${y + size}`,
+            `${x},${y + size}`,
+          ].join(' ')
+
+          cells.push({
+            key: `${c},${r}`,
+            c,
+            r,
+            cx: x + size / 2,
+            cy: y + size / 2,
+            points,
+          })
+        }
+      }
+      return cells
+    }
+    return []
+  }, [gridType, currentGridSize, currentOffsetX, currentOffsetY, mapWidth, mapHeight])
+
   // Cell click handler (Exploration reveal or Player Note)
   const handleCellClick = (cellKey: string, e: React.MouseEvent) => {
     e.stopPropagation()
+    if (hasDraggedRef.current || activeTool === 'align_grid') return
     if (!currentMap) return
 
     if (isEditMode && activeTool === 'reveal_hex') {
-      toggleCellRevealMutation({ mapId: currentMap._id, cellKey })
+      if (!revealedSet.has(cellKey)) {
+        bulkRevealCellsMutation({ mapId: currentMap._id, cellKeys: [cellKey], reveal: true })
+      }
     } else if (isEditMode && activeTool === 'hide_hex') {
-      toggleCellRevealMutation({ mapId: currentMap._id, cellKey })
+      if (revealedSet.has(cellKey)) {
+        bulkRevealCellsMutation({ mapId: currentMap._id, cellKeys: [cellKey], reveal: false })
+      }
     } else if (activeTool === 'grid_note' || !isEditMode) {
       // Open note dialog for cell
       setSelectedCellKey(cellKey)
@@ -498,6 +725,8 @@ export default function MapViewerClient() {
         gridOffsetY: settingsDraft.gridOffsetY,
         isExplorationMap: settingsDraft.isExplorationMap,
       })
+      setLiveGridOffset(null)
+      setLiveGridSize(null)
       toast.success('Map settings updated!')
       setIsSettingsDialogOpen(false)
       if (settingsDraft.slug !== currentMap.slug) {
@@ -506,6 +735,46 @@ export default function MapViewerClient() {
     } catch (err: any) {
       toast.error(err.message || 'Failed to update settings')
     }
+  }
+
+  // Grid Calibration Handlers
+  const handleSaveGridCalibration = async () => {
+    if (!currentMap) return
+    try {
+      await updateMapSettingsMutation({
+        mapId: currentMap._id,
+        gridOffsetX: currentOffsetX,
+        gridOffsetY: currentOffsetY,
+        gridSize: currentGridSize,
+      })
+      toast.success(`Grid calibrated! Offset: (${currentOffsetX}px, ${currentOffsetY}px), Size: ${currentGridSize}px`)
+      setLiveGridOffset(null)
+      setLiveGridSize(null)
+      setActiveTool('view')
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save grid calibration')
+    }
+  }
+
+  const handleResetGridCalibration = () => {
+    setLiveGridOffset(null)
+    setLiveGridSize(null)
+    toast.info('Reset grid calibration')
+  }
+
+  const handleNudgeOffset = (dx: number, dy: number) => {
+    setLiveGridOffset({
+      x: currentOffsetX + dx,
+      y: currentOffsetY + dy,
+    })
+  }
+
+  const handleSetOffset = (x: number, y: number) => {
+    setLiveGridOffset({ x, y })
+  }
+
+  const handleSetGridSize = (size: number) => {
+    setLiveGridSize(Math.max(25, size))
   }
 
   // Add Layer Handler
@@ -628,7 +897,7 @@ export default function MapViewerClient() {
   }
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-slate-950 text-foreground select-none touch-none">
+    <div className="fixed inset-0 z-0 h-screen w-screen overflow-hidden bg-slate-950 text-foreground select-none touch-none">
       {/* TOP NAVIGATION BAR */}
       <div className="absolute top-4 left-4 right-4 z-30 flex items-center justify-between pointer-events-none">
         <div className="flex items-center gap-2 pointer-events-auto bg-background/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-border/50 shadow-lg">
@@ -761,6 +1030,17 @@ export default function MapViewerClient() {
           >
             <Plus className="h-4 w-4" />
           </Button>
+          {gridType !== 'none' && (
+            <Button
+              variant={activeTool === 'align_grid' ? 'secondary' : 'ghost'}
+              size="icon"
+              className="h-9 w-9 text-amber-400"
+              onClick={() => setActiveTool(activeTool === 'align_grid' ? 'view' : 'align_grid')}
+              title="Align / Offset Grid (Drag or Nudge)"
+            >
+              <Grid className="h-4 w-4" />
+            </Button>
+          )}
           {isExplorationMap && (
             <>
               <Button
@@ -787,12 +1067,7 @@ export default function MapViewerClient() {
                 className="h-9 w-9 text-emerald-400"
                 onClick={() => {
                   if (!currentMap) return
-                  const allKeys: string[] = []
-                  for (let r = 0; r < rows; r++) {
-                    for (let c = 0; c < cols; c++) {
-                      allKeys.push(`${c},${r}`)
-                    }
-                  }
+                  const allKeys = gridCells.map((cell) => cell.key)
                   bulkRevealCellsMutation({ mapId: currentMap._id, cellKeys: allKeys, reveal: true })
                   toast.success('Revealed all cells!')
                 }}
@@ -825,6 +1100,106 @@ export default function MapViewerClient() {
               Done ({areaDraft.points.length} pts)
             </Button>
           )}
+        </div>
+      )}
+
+      {/* FLOATING GRID CALIBRATION HUD */}
+      {isOwner && isEditMode && activeTool === 'align_grid' && gridType !== 'none' && (
+        <div className="absolute top-20 left-16 z-30 bg-background/95 backdrop-blur-md p-3.5 rounded-xl border border-amber-500/40 shadow-2xl flex flex-col gap-3 min-w-[270px]">
+          <div className="flex items-center justify-between border-b border-border/40 pb-2">
+            <span className="font-bold text-xs flex items-center gap-1.5 text-amber-400">
+              <Grid className="h-4 w-4" /> Grid Calibration
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-muted-foreground hover:text-foreground"
+              onClick={() => setActiveTool('view')}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+
+          <p className="text-[11px] text-muted-foreground leading-snug">
+            Drag the map with your cursor to shift the grid, or use the nudge buttons below.
+          </p>
+
+          <div className="space-y-2.5 text-xs">
+            {/* OFFSET X */}
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-muted-foreground font-semibold w-16">Offset X:</span>
+              <div className="flex items-center gap-1">
+                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleNudgeOffset(-5, 0)} title="Nudge Left 5px">
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </Button>
+                <Input
+                  type="number"
+                  className="h-7 w-16 text-center text-xs p-1 font-mono"
+                  value={currentOffsetX}
+                  onChange={(e) => handleSetOffset(Number(e.target.value), currentOffsetY)}
+                />
+                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleNudgeOffset(5, 0)} title="Nudge Right 5px">
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+
+            {/* OFFSET Y */}
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-muted-foreground font-semibold w-16">Offset Y:</span>
+              <div className="flex items-center gap-1">
+                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleNudgeOffset(0, -5)} title="Nudge Up 5px">
+                  <ChevronUp className="h-3.5 w-3.5" />
+                </Button>
+                <Input
+                  type="number"
+                  className="h-7 w-16 text-center text-xs p-1 font-mono"
+                  value={currentOffsetY}
+                  onChange={(e) => handleSetOffset(currentOffsetX, Number(e.target.value))}
+                />
+                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleNudgeOffset(0, 5)} title="Nudge Down 5px">
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+
+            {/* GRID SIZE */}
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/40">
+              <span className="text-muted-foreground font-semibold w-16">Cell Size:</span>
+              <div className="flex items-center gap-1">
+                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleSetGridSize(currentGridSize - 5)} title="Decrease Size 5px">
+                  -
+                </Button>
+                <Input
+                  type="number"
+                  className="h-7 w-16 text-center text-xs p-1 font-mono"
+                  value={currentGridSize}
+                  onChange={(e) => handleSetGridSize(Number(e.target.value))}
+                />
+                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleSetGridSize(currentGridSize + 5)} title="Increase Size 5px">
+                  +
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 pt-2 border-t border-border/40">
+            <Button
+              size="sm"
+              className="flex-1 text-xs h-8 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold shadow-md"
+              onClick={handleSaveGridCalibration}
+            >
+              Save Grid
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-xs h-8 px-2.5"
+              onClick={handleResetGridCalibration}
+            >
+              Reset
+            </Button>
+          </div>
         </div>
       )}
 
@@ -902,8 +1277,7 @@ export default function MapViewerClient() {
       {/* CANVAS CONTAINER */}
       <div
         ref={viewportRef}
-        className="w-full h-full cursor-grab active:cursor-grabbing flex items-center justify-center overflow-hidden"
-        onWheel={handleWheel}
+        className={`w-full h-full ${activeTool === 'align_grid' ? 'cursor-move' : 'cursor-grab active:cursor-grabbing'} flex items-center justify-center overflow-hidden`}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -991,54 +1365,6 @@ export default function MapViewerClient() {
             )}
           </svg>
 
-          {/* GRID OVERLAY (HEX OR SQUARE) */}
-          {gridType !== 'none' && (
-            <div
-              className="absolute inset-0 pointer-events-auto overflow-hidden"
-              style={{
-                transform: `translate(${currentMap?.gridOffsetX || 0}px, ${currentMap?.gridOffsetY || 0}px)`,
-              }}
-            >
-              {Array.from({ length: rows }).map((_, r) => (
-                <div
-                  key={`grid-row-${r}`}
-                  className="flex"
-                  style={{
-                    marginLeft: gridType === 'hex' && r % 2 === 1 ? `${gridSize * 0.5}px` : '0px',
-                    marginTop: gridType === 'hex' && r > 0 ? `-${gridSize * 0.25}px` : '0px',
-                  }}
-                >
-                  {Array.from({ length: cols }).map((_, c) => {
-                    const cellKey = `${c},${r}`
-                    const isRevealed = revealedSet.has(cellKey)
-                    const hasNote = !!notesMap[cellKey]
-
-                    return (
-                      <div
-                        key={cellKey}
-                        style={{
-                          width: `${gridSize}px`,
-                          height: `${gridSize}px`,
-                          clipPath: gridType === 'hex' ? 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' : undefined,
-                        }}
-                        className={`relative shrink-0 border border-white/10 transition-colors ${
-                          isExplorationMap && !isRevealed
-                            ? 'bg-slate-950/95 backdrop-blur-md'
-                            : 'hover:bg-white/5'
-                        }`}
-                        onClick={(e) => handleCellClick(cellKey, e)}
-                      >
-                        {hasNote && (
-                          <div className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-amber-400 shadow-glow" title="Has Note" />
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              ))}
-            </div>
-          )}
-
           {/* PINS */}
           {fullData?.pins.map((pin) => {
             if (pin.layerId && !enabledLayers[pin.layerId]) return null
@@ -1048,7 +1374,11 @@ export default function MapViewerClient() {
               <div
                 key={pin._id}
                 className="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-auto cursor-pointer group"
-                style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
+                style={{
+                  left: `${pin.x}%`,
+                  top: `${pin.y}%`,
+                  zIndex: isOwner && isEditMode ? 25 : 5,
+                }}
                 onClick={(e) => {
                   e.stopPropagation()
                   if (pin.targetMapId) {
@@ -1081,6 +1411,84 @@ export default function MapViewerClient() {
               </div>
             )
           })}
+
+          {/* GRID OVERLAY (HEX OR SQUARE) - Rendered at z-10 so opaque fog-of-war fully conceals map and unrevealed pins */}
+          {gridType !== 'none' && (
+            <svg
+              className="absolute inset-0 pointer-events-none overflow-visible select-none"
+              style={{ width: `${mapWidth}px`, height: `${mapHeight}px`, zIndex: 10 }}
+            >
+              {gridCells.map((cell) => {
+                const isRevealed = revealedSet.has(cell.key)
+                const isHidden = isExplorationMap && !isRevealed
+                const hasNote = !!notesMap[cell.key]
+                const canShowNote = hasNote && (!isHidden || isOwner)
+
+                // 100% solid fully opaque dark slate for hidden cells - zero transparency, map cannot be seen through it
+                const fillColor = isHidden ? '#020617' : 'transparent'
+
+                // Hover styling: Hidden cells NEVER reveal or become semi-transparent on hover
+                let hoverClass = ''
+                if (isHidden) {
+                  if (isEditMode && activeTool === 'reveal_hex') {
+                    // GM targeting outline only - fill remains 100% opaque #020617
+                    hoverClass = 'cursor-pointer hover:stroke-emerald-400 hover:stroke-2'
+                  } else if (isEditMode && activeTool === 'grid_note') {
+                    hoverClass = 'cursor-pointer hover:stroke-amber-400 hover:stroke-2'
+                  } else {
+                    // Players or view mode: strictly no hover effect
+                    hoverClass = 'cursor-default'
+                  }
+                } else {
+                  // Revealed cell
+                  if (isEditMode) {
+                    if (activeTool === 'hide_hex') {
+                      hoverClass = 'cursor-pointer hover:fill-red-500/25 hover:stroke-red-400 hover:stroke-2'
+                    } else if (activeTool === 'grid_note') {
+                      hoverClass = 'cursor-pointer hover:fill-amber-500/20 hover:stroke-amber-400'
+                    } else {
+                      hoverClass = 'cursor-pointer hover:fill-white/5'
+                    }
+                  } else {
+                    hoverClass = canShowNote ? 'cursor-pointer hover:fill-amber-500/10' : ''
+                  }
+                }
+
+                // Clicks pass through revealed cells to pins and areas underneath when not in editing mode
+                const shouldCaptureClicks = isHidden || (isEditMode && (activeTool === 'hide_hex' || activeTool === 'grid_note'))
+
+                return (
+                  <g key={cell.key}>
+                    <polygon
+                      points={cell.points}
+                      fill={fillColor}
+                      stroke="rgba(255, 255, 255, 0.18)"
+                      strokeWidth="1"
+                      vectorEffect="non-scaling-stroke"
+                      className={`transition-colors duration-150 ${hoverClass}`}
+                      style={{ pointerEvents: shouldCaptureClicks ? 'auto' : 'none' }}
+                      onClick={(e) => handleCellClick(cell.key, e)}
+                    >
+                      {canShowNote && <title>{notesMap[cell.key]}</title>}
+                    </polygon>
+                    {canShowNote && (
+                      <circle
+                        cx={cell.cx}
+                        cy={cell.cy}
+                        r={Math.min(6, Math.max(3, gridSize * 0.08))}
+                        fill="#f59e0b"
+                        stroke="#0f172a"
+                        strokeWidth="1.5"
+                        className="cursor-pointer drop-shadow-[0_0_6px_rgba(245,158,11,0.8)]"
+                        style={{ pointerEvents: 'auto' }}
+                        onClick={(e) => handleCellClick(cell.key, e)}
+                      />
+                    )}
+                  </g>
+                )
+              })}
+            </svg>
+          )}
         </div>
       </div>
 
@@ -1266,7 +1674,7 @@ export default function MapViewerClient() {
 
       {/* DIALOG: MAP SETTINGS */}
       <Dialog open={isSettingsDialogOpen} onOpenChange={setIsSettingsDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
               <span>Map Settings</span>
@@ -1348,56 +1756,175 @@ export default function MapViewerClient() {
                 </Button>
               </div>
             )}
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="font-bold text-muted-foreground">Grid Type</label>
-                <Select
-                  value={settingsDraft.gridType}
-                  onValueChange={(val: any) => setSettingsDraft({ ...settingsDraft, gridType: val })}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    <SelectItem value="hex">Hex Grid</SelectItem>
-                    <SelectItem value="square">Square Grid</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="font-bold text-muted-foreground">Grid Size (px)</label>
-                <Input
-                  type="number"
-                  value={settingsDraft.gridSize}
-                  onChange={(e) => setSettingsDraft({ ...settingsDraft, gridSize: Number(e.target.value) })}
-                />
-              </div>
-              <div className="flex flex-col justify-end">
-                <div className="flex items-center justify-between border p-2 rounded-md">
-                  <span className="font-bold text-[10px]">Exploration</span>
-                  <Switch
-                    checked={settingsDraft.isExplorationMap}
-                    onCheckedChange={(val) => setSettingsDraft({ ...settingsDraft, isExplorationMap: val })}
-                  />
+            
+            {/* Grid & Exploration Settings */}
+            <div className="border border-border/50 rounded-lg p-3.5 bg-muted/20 space-y-3.5">
+              <div className="grid grid-cols-2 gap-3 items-end">
+                <div className="min-w-0">
+                  <label className="font-bold text-muted-foreground block mb-1">Grid Type</label>
+                  <Select
+                    value={settingsDraft.gridType}
+                    onValueChange={(val: any) => setSettingsDraft({ ...settingsDraft, gridType: val })}
+                    className="w-full min-w-0 h-9 bg-background/50 border-border/70"
+                  >
+                    <SelectTrigger className="w-full truncate"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="hex">Pointy Hex (Standard)</SelectItem>
+                      <SelectItem value="hex_flat">Flat-top Hex</SelectItem>
+                      <SelectItem value="square">Square Grid</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="min-w-0">
+                  <label className="font-bold text-muted-foreground block mb-1">Fog of War</label>
+                  <div className="flex items-center justify-between border border-border/70 bg-background/50 px-3 h-9 rounded-md">
+                    <span className="font-medium text-xs">Exploration Mode</span>
+                    <Switch
+                      checked={settingsDraft.isExplorationMap}
+                      onCheckedChange={(val) => setSettingsDraft({ ...settingsDraft, isExplorationMap: val })}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="font-bold text-muted-foreground">Grid Offset X (px)</label>
-                <Input
-                  type="number"
-                  value={settingsDraft.gridOffsetX}
-                  onChange={(e) => setSettingsDraft({ ...settingsDraft, gridOffsetX: Number(e.target.value) })}
-                />
-              </div>
-              <div>
-                <label className="font-bold text-muted-foreground">Grid Offset Y (px)</label>
-                <Input
-                  type="number"
-                  value={settingsDraft.gridOffsetY}
-                  onChange={(e) => setSettingsDraft({ ...settingsDraft, gridOffsetY: Number(e.target.value) })}
-                />
-              </div>
+
+              {settingsDraft.gridType !== 'none' && (
+                <div className="space-y-3 pt-2 border-t border-border/40">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="font-bold text-muted-foreground">Grid Size (px)</label>
+                      <span className="text-[11px] font-mono text-muted-foreground">{settingsDraft.gridSize || 100}px</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9 shrink-0"
+                        onClick={() => {
+                          const val = Math.max(25, (settingsDraft.gridSize || 100) - 5)
+                          setSettingsDraft({ ...settingsDraft, gridSize: val })
+                          setLiveGridSize(val)
+                        }}
+                      >
+                        -
+                      </Button>
+                      <Input
+                        type="number"
+                        className="font-mono text-center h-9"
+                        value={settingsDraft.gridSize}
+                        onChange={(e) => {
+                          const val = Number(e.target.value)
+                          setSettingsDraft({ ...settingsDraft, gridSize: val })
+                          setLiveGridSize(val)
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9 shrink-0"
+                        onClick={() => {
+                          const val = (settingsDraft.gridSize || 100) + 5
+                          setSettingsDraft({ ...settingsDraft, gridSize: val })
+                          setLiveGridSize(val)
+                        }}
+                      >
+                        +
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="min-w-0">
+                      <label className="font-bold text-muted-foreground block mb-1">Grid Offset X (px)</label>
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-9 w-9 shrink-0"
+                          onClick={() => {
+                            const val = (settingsDraft.gridOffsetX || 0) - 5
+                            setSettingsDraft({ ...settingsDraft, gridOffsetX: val })
+                            setLiveGridOffset({ x: val, y: settingsDraft.gridOffsetY || 0 })
+                          }}
+                          title="Nudge Left 5px"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <Input
+                          type="number"
+                          className="font-mono text-center h-9"
+                          value={settingsDraft.gridOffsetX}
+                          onChange={(e) => {
+                            const val = Number(e.target.value)
+                            setSettingsDraft({ ...settingsDraft, gridOffsetX: val })
+                            setLiveGridOffset({ x: val, y: settingsDraft.gridOffsetY || 0 })
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-9 w-9 shrink-0"
+                          onClick={() => {
+                            const val = (settingsDraft.gridOffsetX || 0) + 5
+                            setSettingsDraft({ ...settingsDraft, gridOffsetX: val })
+                            setLiveGridOffset({ x: val, y: settingsDraft.gridOffsetY || 0 })
+                          }}
+                          title="Nudge Right 5px"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="min-w-0">
+                      <label className="font-bold text-muted-foreground block mb-1">Grid Offset Y (px)</label>
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-9 w-9 shrink-0"
+                          onClick={() => {
+                            const val = (settingsDraft.gridOffsetY || 0) - 5
+                            setSettingsDraft({ ...settingsDraft, gridOffsetY: val })
+                            setLiveGridOffset({ x: settingsDraft.gridOffsetX || 0, y: val })
+                          }}
+                          title="Nudge Up 5px"
+                        >
+                          <ChevronUp className="h-4 w-4" />
+                        </Button>
+                        <Input
+                          type="number"
+                          className="font-mono text-center h-9"
+                          value={settingsDraft.gridOffsetY}
+                          onChange={(e) => {
+                            const val = Number(e.target.value)
+                            setSettingsDraft({ ...settingsDraft, gridOffsetY: val })
+                            setLiveGridOffset({ x: settingsDraft.gridOffsetX || 0, y: val })
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-9 w-9 shrink-0"
+                          onClick={() => {
+                            const val = (settingsDraft.gridOffsetY || 0) + 5
+                            setSettingsDraft({ ...settingsDraft, gridOffsetY: val })
+                            setLiveGridOffset({ x: settingsDraft.gridOffsetX || 0, y: val })
+                          }}
+                          title="Nudge Down 5px"
+                        >
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>

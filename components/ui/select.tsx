@@ -37,5 +37,5 @@ export function SelectContent({ children }: { children?: React.ReactNode }) {
 }
 
 export function SelectItem({ value, children }: { value: string; children: React.ReactNode }) {
-  return <option value={value}>{children}</option>
+  return <option value={value} className="bg-slate-900 text-slate-100">{children}</option>
 }

@@ -463,7 +463,7 @@ export default defineSchema({
         width: v.optional(v.number()), // Base width in px (default 2000)
         height: v.optional(v.number()), // Base height in px (default 2000)
         // Hex / Square Grid settings
-        gridType: v.optional(v.union(v.literal('none'), v.literal('hex'), v.literal('square'))),
+        gridType: v.optional(v.union(v.literal('none'), v.literal('hex'), v.literal('hex_flat'), v.literal('square'))),
         gridSize: v.optional(v.number()), // Grid cell size in px
         gridOffsetX: v.optional(v.number()),
         gridOffsetY: v.optional(v.number()),
