@@ -16,10 +16,10 @@ import { cn } from '@/lib/utils'
 import Image from 'next/image'
 import logo from './Void_Logo_WhiteTransparent.png'
 import { motion, useMotionValue, useAnimationFrame } from 'framer-motion'
+import { useSystemFilters } from '@/lib/useSystemFilters'
 
 export function HomeClient({ skeleton }: { skeleton: React.ReactNode }) {
-  const [pfFilter, setPfFilter] = useState(true)
-  const [dndFilter, setDndFilter] = useState(true)
+  const { pfFilter, dndFilter, setPfFilter, setDndFilter } = useSystemFilters()
   const rotation = useMotionValue(0)
   const velocityRef = useRef(0)
   const [hasReachedRainbow, setHasReachedRainbow] = useState(false)

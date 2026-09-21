@@ -64,6 +64,12 @@ export default function CookiesPage() {
                   <td className="p-3">Functional (localStorage)</td>
                 </tr>
                 <tr>
+                  <td className="p-3 font-mono text-xs text-primary">void_filter_pf, void_filter_dnd</td>
+                  <td className="p-3">Guild of The Void</td>
+                  <td className="p-3">Remembers your preferred system filters (Pathfinder & D&D) across page refreshes.</td>
+                  <td className="p-3">Functional (localStorage)</td>
+                </tr>
+                <tr>
                   <td className="p-3 font-mono text-xs text-primary">Vercel Web Analytics</td>
                   <td className="p-3">Vercel</td>
                   <td className="p-3">Collects privacy-preserving, cookieless telemetry to assess platform uptime and speed.</td>

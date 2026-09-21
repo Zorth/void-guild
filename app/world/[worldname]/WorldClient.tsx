@@ -27,6 +27,7 @@ import '@/components/sessions/sessions.css'
 import QuestList from '@/components/quests/QuestList'
 import ReputationSystem from '@/components/world/ReputationSystem'
 import WorldCalendar from '@/components/world/WorldCalendar'
+import { useSystemFilters } from '@/lib/useSystemFilters'
 
 function WorldDescription({ 
   worldId, 
@@ -219,8 +220,7 @@ export default function WorldClient() {
   }, [userId, recordWorldVisit, syncAndGetAchievements])
   
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming')
-  const [pfFilter, setPfFilter] = useState(true)
-  const [dndFilter, setDndFilter] = useState(true)
+  const { pfFilter, dndFilter, setPfFilter, setDndFilter } = useSystemFilters()
   const [sessionsLimit, setSessionsLimit] = useState(5)
   const [isEditingName, setIsEditingName] = useState(false)
   const [isEditingMap, setIsEditingMap] = useState(false)
