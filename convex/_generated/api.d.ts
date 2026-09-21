@@ -20,6 +20,7 @@ import type * as discordHelpers from "../discordHelpers.js";
 import type * as discordInteractions from "../discordInteractions.js";
 import type * as external_api from "../external_api.js";
 import type * as http from "../http.js";
+import type * as maps from "../maps.js";
 import type * as migrations from "../migrations.js";
 import type * as planning from "../planning.js";
 import type * as quests from "../quests.js";
@@ -49,6 +50,7 @@ declare const fullApi: ApiFromModules<{
   discordInteractions: typeof discordInteractions;
   external_api: typeof external_api;
   http: typeof http;
+  maps: typeof maps;
   migrations: typeof migrations;
   planning: typeof planning;
   quests: typeof quests;

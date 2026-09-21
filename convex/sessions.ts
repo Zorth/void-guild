@@ -89,25 +89,10 @@ export const listSessions = query({
       return []
     }
 
-    const now = Date.now()
-    // A session is past if it is explicitly locked OR if its date is in the past (over 4 hours ago) and not in planning
-    const isPastSession = (s: { locked?: boolean; date?: number; planning?: boolean }) => {
-      if (s.locked) return true
-      if (s.date && !s.planning && s.date < (now - 4 * 60 * 60 * 1000)) return true
-      return false
-    }
-
-    const lockedSessions = await ctx.db
+    const allSessions = await ctx.db
       .query('sessions')
-      .withIndex('by_locked', (q) => q.eq('locked', true))
+      .withIndex('by_locked', (q) => q.eq('locked', args.past))
       .collect()
-
-    const unlockedSessions = await ctx.db
-      .query('sessions')
-      .withIndex('by_locked', (q) => q.eq('locked', false))
-      .collect()
-
-    const allSessions = [...lockedSessions, ...unlockedSessions]
 
     // Fetch caller's characters and admin status to evaluate private session visibility
     const userCharacters = await ctx.db
@@ -119,15 +104,13 @@ export const listSessions = query({
 
     // Private sessions are unlisted and hidden from general session lists unless the user
     // is the session owner, has a character in the session, or is an admin.
-    const visibleSessions = allSessions.filter((s) => {
+    const sessions = allSessions.filter((s) => {
       if (!s.isPrivate) return true
       if (user.subject === s.owner) return true
       if (isAdminUser) return true
       if (s.characters && s.characters.some((id) => userCharIds.has(id))) return true
       return false
     })
-
-    const sessions = visibleSessions.filter(s => args.past ? isPastSession(s) : !isPastSession(s))
 
     const sessionsWithDetails = await Promise.all(
       sessions.map(async (session) => {
@@ -172,27 +155,13 @@ export const listSessions = query({
 export const publicListSessions = query({
   args: { past: v.boolean() },
   handler: async (ctx, args) => {
-    const now = Date.now()
-    const isPastSession = (s: { locked?: boolean; date?: number; planning?: boolean }) => {
-      if (s.locked) return true
-      if (s.date && !s.planning && s.date < (now - 4 * 60 * 60 * 1000)) return true
-      return false
-    }
-
-    const lockedSessions = await ctx.db
+    const allSessions = await ctx.db
       .query('sessions')
-      .withIndex('by_locked', (q) => q.eq('locked', true))
-      .collect()
-
-    const unlockedSessions = await ctx.db
-      .query('sessions')
-      .withIndex('by_locked', (q) => q.eq('locked', false))
+      .withIndex('by_locked', (q) => q.eq('locked', args.past))
       .collect()
 
     // Public list strictly excludes private sessions
-    const allSessions = [...lockedSessions, ...unlockedSessions]
-    const publicSessions = allSessions.filter(s => !s.isPrivate)
-    const sessions = publicSessions.filter(s => args.past ? isPastSession(s) : !isPastSession(s))
+    const sessions = allSessions.filter(s => !s.isPrivate)
 
     const sessionsWithDetails = await Promise.all(
       sessions.map(async (session) => {
@@ -481,6 +450,15 @@ export const getSession = query({
         }
     }
 
+    let hasMap = false
+    if (session.world) {
+      const firstMap = await ctx.db
+        .query('worldMaps')
+        .withIndex('by_worldId', (q) => q.eq('worldId', session.world))
+        .first()
+      hasMap = !!firstMap
+    }
+
     return {
       ...session,
       level: computeEffectiveLevel(session, quest),
@@ -494,6 +472,7 @@ export const getSession = query({
       canManage,
       interestedPlayers: session.interestedPlayers || [], // Include interested players
       quest: quest,
+      hasMap,
     }
   },
 })

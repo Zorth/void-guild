@@ -27,9 +27,9 @@
 * **Event-Driven Achievements & Cosmetics:** Achievements auto-unlock upon completion of real-world actions without background polling, awarding customizable card borders, font colors, and backgrounds.
 * **7-Day Overview:** A calendar-like view of upcoming sessions for the next seven days, with visual cues for owned and joined sessions.
 * **Character Website Links:** Characters can have an associated website link, editable by the owner and visible to all in session details.
-* **Session Locking:** Game Masters can lock sessions to finalize attendance and XP awards.
-
-## Technologies Used
+* **Interactive World Map & Editor:** Full-screen responsive map canvas supporting multi-map hierarchies with unique URLs (`/world/[worldname]/map/[mapSlug]`), smooth touch pinch/wheel zoom, interactive icon/text pins that can link to other maps, transparent overlay layers with player visibility toggling, polygon area drawing with customizable opacity, hexagonal or square exploration grids with fog of war reveal tools, and player/GM grid cell notes.
+* **Self-Hosted Map Image & Tile Serving:** High-resolution map images and DeepZoom WebP tile sets are served with CORS enabled from a self-hosted Docker + Nginx processor at `https://maps.tarragon.be` to completely bypass database size limits.
+* **Technologies Used**
 
 * **Next.js:** React framework for building server-rendered and static web applications.
 * **React:** Frontend library for building user interfaces.

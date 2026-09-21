@@ -61,10 +61,12 @@ function WorldDescription({
             variant="ghost" 
             size="sm" 
             className="gap-2 transition-opacity h-7 px-2 text-muted-foreground hover:text-primary"
-            onClick={() => toast.info("Interactive map system coming soon!")}
+            asChild
           >
-            <Map className="h-3.5 w-3.5" />
-            Open map
+            <Link href={`/world/${encodeURIComponent(worldName)}/map`}>
+              <Map className="h-3.5 w-3.5" />
+              Open map
+            </Link>
           </Button>
           {isOwner && (
             <Button 
@@ -214,12 +216,7 @@ export default function WorldClient() {
 
   const allFilteredSessions = useMemo(() => {
     if (!sessions) return []
-    const now = Date.now()
-    const isPastSession = (s: { locked?: boolean; date?: number; planning?: boolean }) => {
-        if (s.locked) return true
-        if (s.date && !s.planning && s.date < (now - 4 * 60 * 60 * 1000)) return true
-        return false
-    }
+    const isPastSession = (s: { locked?: boolean }) => Boolean(s.locked)
     const filtered = sessions.filter(s => {
         const matchesTab = activeTab === 'past' ? isPastSession(s) : !isPastSession(s);
         if (!matchesTab) return false;
@@ -229,9 +226,14 @@ export default function WorldClient() {
     })
     return filtered.sort((a, b) => {
         if (activeTab === 'past') return (b.date || 0) - (a.date || 0)
+
+        // Planning sessions first
+        const aIsPlanning = a.planning || !a.date;
+        const bIsPlanning = b.planning || !b.date;
+        if (aIsPlanning && !bIsPlanning) return -1;
+        if (!aIsPlanning && bIsPlanning) return 1;
+
         if (a.date && b.date) return a.date - b.date
-        if (a.date) return -1
-        if (b.date) return 1
         return 0
     })
   }, [sessions, activeTab, pfFilter, dndFilter])

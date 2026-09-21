@@ -123,7 +123,7 @@ export default defineSchema({
         message: v.string(),
         userId: v.optional(v.string()), // The user who triggered the activity
         metadata: v.any(),
-    }),
+    }).index('by_type', ['type']),
     quests: defineTable({
         name: v.string(),
         level: v.optional(v.number()), // 1-20 or 0 for unknown (DEPRECATED: Use levelPF)
@@ -454,6 +454,63 @@ export default defineSchema({
         claimedMoneyAmount: v.number(), // Amount of GP claimed for money cut at the time of claim
         claimedAt: v.number(),
     }).index('by_session_character', ['sessionId', 'characterId']),
+    worldMaps: defineTable({
+        worldId: v.id('worlds'),
+        name: v.string(),
+        slug: v.string(), // Unique identifier for URL parameter e.g. "overworld", "capital-city"
+        isHomeMap: v.optional(v.boolean()),
+        imageUrl: v.optional(v.string()), // Background map image URL
+        width: v.optional(v.number()), // Base width in px (default 2000)
+        height: v.optional(v.number()), // Base height in px (default 2000)
+        // Hex / Square Grid settings
+        gridType: v.optional(v.union(v.literal('none'), v.literal('hex'), v.literal('square'))),
+        gridSize: v.optional(v.number()), // Grid cell size in px
+        gridOffsetX: v.optional(v.number()),
+        gridOffsetY: v.optional(v.number()),
+        isExplorationMap: v.optional(v.boolean()),
+        revealedCells: v.optional(v.array(v.string())), // Array of "col,row" strings for revealed cells
+    }).index('by_worldId', ['worldId'])
+      .index('by_worldId_slug', ['worldId', 'slug']),
+    mapLayers: defineTable({
+        mapId: v.id('worldMaps'),
+        name: v.string(),
+        imageUrl: v.optional(v.string()),
+        order: v.number(),
+        defaultEnabled: v.boolean(),
+        allowUserToggle: v.boolean(),
+    }).index('by_mapId', ['mapId']),
+    mapPins: defineTable({
+        mapId: v.id('worldMaps'),
+        layerId: v.optional(v.id('mapLayers')),
+        x: v.number(), // Normalized 0-100% or px coordinate
+        y: v.number(),
+        title: v.string(),
+        description: v.optional(v.string()),
+        style: v.union(v.literal('icon'), v.literal('text_only')),
+        icon: v.optional(v.string()), // Lucide icon name e.g. "MapPin", "Castle", "Skull"
+        color: v.optional(v.string()),
+        targetMapId: v.optional(v.id('worldMaps')), // Link to another map when clicked
+        minZoom: v.optional(v.number()), // Optional zoom threshold for text popup
+    }).index('by_mapId', ['mapId']),
+    mapAreas: defineTable({
+        mapId: v.id('worldMaps'),
+        layerId: v.optional(v.id('mapLayers')),
+        name: v.string(),
+        description: v.optional(v.string()),
+        points: v.array(v.object({ x: v.number(), y: v.number() })), // Polygon points
+        color: v.optional(v.string()),
+        fillOpacity: v.optional(v.number()), // 0 for invisible, 0.1-0.9 for transparent
+        targetMapId: v.optional(v.id('worldMaps')), // Link to another map
+    }).index('by_mapId', ['mapId']),
+    mapGridNotes: defineTable({
+        mapId: v.id('worldMaps'),
+        cellKey: v.string(), // "col,row"
+        userId: v.string(), // Clerk subject of the note creator
+        authorName: v.optional(v.string()),
+        note: v.string(),
+        updatedAt: v.number(),
+    }).index('by_mapId_cellKey', ['mapId', 'cellKey'])
+      .index('by_mapId', ['mapId']),
 })
 
 

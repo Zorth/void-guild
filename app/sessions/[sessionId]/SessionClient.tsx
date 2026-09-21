@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { useState, useEffect, useMemo } from 'react'
 import { Id, Doc } from '@/convex/_generated/dataModel'
 import Link from 'next/link'
-import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, Unlock, Globe, Scroll, Trophy, Menu, User, Target, UserPlus, Coins } from 'lucide-react'
+import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, Unlock, Globe, Scroll, Trophy, Menu, User, Target, UserPlus, Coins, Map } from 'lucide-react'
 import { useAuth, SignInButton } from '@clerk/nextjs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatDate, formatTime as formatTimeUtil, getLevelBadgeStyle, getDualLevelBadgeStyle, CharacterRankIcon } from '@/lib/utils'
@@ -60,6 +60,7 @@ interface SessionWithGM extends Doc<'sessions'> {
     worldName: string;
     interestedPlayers?: { userId: string; username: string }[];
     quest?: Doc<'quests'> | null;
+    hasMap?: boolean;
 }
 
 export default function SessionClient() {
@@ -69,6 +70,8 @@ export default function SessionClient() {
   const { userId } = useAuth()
   const session = useQuery(api.sessions.getSession, { sessionId }) as SessionWithGM | undefined | null
   const world = useQuery(api.worlds.getWorldByName, session?.worldName ? { name: session.worldName } : "skip")
+  const hasMapDirect = useQuery(api.maps.hasWorldMap, session?.world ? { worldId: session.world } : "skip")
+  const hasMap = session?.hasMap ?? hasMapDirect ?? false
   const xpGainsPreview = useQuery(api.sessions.previewXPGains, session?._id ? { sessionId: session._id } : "skip")
   const userCharacters = useQuery(api.characters.listCharacters)
   const joinSession = useMutation(api.sessions.joinSession)
@@ -115,7 +118,6 @@ export default function SessionClient() {
   const [optimisticInterestedPlayers, setOptimisticInterestedPlayers] = useState<{ userId: string; username: string }[] | null>(null)
   const [isJoinSuccessDialogOpen, setIsJoinSuccessDialogOpen] = useState(false)
   const [isObjectiveContributeOpen, setIsObjectiveContributeOpen] = useState(false)
-  const [sidebarTab, setSidebarTab] = useState<'quests' | 'loot'>('quests')
 
   const userIds = useMemo(() => {
     if (!session) return [];
@@ -550,37 +552,7 @@ export default function SessionClient() {
           />
       )}
 
-      {!session.locked && (
-        <div className="flex justify-center -mb-2">
-          <div className="bg-muted p-1 rounded-full border border-border/50 flex gap-1 shadow-sm w-full max-w-[280px]">
-            <Button 
-              variant={sidebarTab === 'quests' ? "secondary" : "ghost"} 
-              size="sm" 
-              className="rounded-full h-8 px-3 text-xs font-bold gap-1.5 flex-1"
-              onClick={() => setSidebarTab('quests')}
-            >
-              <Scroll className="h-3.5 w-3.5 text-primary" />
-              Quests
-            </Button>
-            <Button 
-              variant={sidebarTab === 'loot' ? "secondary" : "ghost"} 
-              size="sm" 
-              className="rounded-full h-8 px-3 text-xs font-bold gap-1.5 flex-1"
-              onClick={() => setSidebarTab('loot')}
-            >
-              <Coins className="h-3.5 w-3.5 text-primary" />
-              Loot
-              {session.loot && session.loot.length > 0 && (
-                <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.2 rounded-full font-bold">
-                  {session.loot.length}
-                </span>
-              )}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {session.locked || sidebarTab === 'loot' ? (
+      {session.isOwner || session.locked ? (
         <LootList 
           session={session as any} 
           userCharacterIds={userCharacterIds} 
@@ -759,6 +731,15 @@ export default function SessionClient() {
                                 >
                                     <Globe size={20} />
                                 </Link>
+                                {hasMap && (
+                                    <Link 
+                                        href={`/world/${encodeURIComponent(session.worldName)}/map`}
+                                        className="text-muted-foreground hover:text-purple-500 transition-colors"
+                                        title="View World Map"
+                                    >
+                                        <Map size={20} />
+                                    </Link>
+                                )}
                             </div>
                         </CardTitle>
                         <div className="text-base sm:text-lg text-muted-foreground mt-1">
