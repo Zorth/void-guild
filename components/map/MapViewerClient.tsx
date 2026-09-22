@@ -219,7 +219,7 @@ export default function MapViewerClient() {
       e.preventDefault()
       e.stopPropagation()
       const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85
-      setScale((prevScale) => Math.min(Math.max(prevScale * zoomFactor, 0.05), 8))
+      setScale((prevScale) => Math.min(Math.max(prevScale * zoomFactor, 0.01), 8))
     }
 
     viewport.addEventListener('wheel', handleWheelNative, { passive: false })
@@ -314,7 +314,7 @@ export default function MapViewerClient() {
         e.touches[0].clientY - e.touches[1].clientY
       )
       const delta = dist / touchDistanceRef.current
-      setScale((prevScale) => Math.min(Math.max(prevScale * delta, 0.05), 8))
+      setScale((prevScale) => Math.min(Math.max(prevScale * delta, 0.01), 8))
       touchDistanceRef.current = dist
     } else if (e.touches.length === 1 && isDragging) {
       if (Math.hypot(e.touches[0].clientX - dragOriginRef.current.x, e.touches[0].clientY - dragOriginRef.current.y) > 5) {
@@ -345,7 +345,7 @@ export default function MapViewerClient() {
 
   // Zoom controls
   const handleZoomIn = () => setScale((s) => Math.min(s * 1.25, 8))
-  const handleZoomOut = () => setScale((s) => Math.max(s * 0.8, 0.05))
+  const handleZoomOut = () => setScale((s) => Math.max(s * 0.8, 0.01))
   const handleResetZoom = () => {
     fitMapToViewport()
   }
@@ -398,10 +398,11 @@ export default function MapViewerClient() {
     if (!viewportRef.current || !w || !h) return
     const vw = viewportRef.current.clientWidth || window.innerWidth
     const vh = viewportRef.current.clientHeight || (window.innerHeight - 60)
-    const scaleX = (vw - 48) / w
-    const scaleY = (vh - 48) / h
+    const padding = vw < 640 ? 16 : 48
+    const scaleX = (vw - padding) / w
+    const scaleY = (vh - padding) / h
     const fitScale = Math.min(scaleX, scaleY, 1)
-    const safeScale = Math.max(fitScale, 0.05)
+    const safeScale = Math.max(fitScale, 0.01)
     setScale(Number(safeScale.toFixed(4)))
     setPosition({ x: 0, y: 0 })
   }
@@ -412,10 +413,9 @@ export default function MapViewerClient() {
     const nh = img.naturalHeight
     if (nw && nh && (nw !== naturalDimensions?.width || nh !== naturalDimensions?.height)) {
       setNaturalDimensions({ width: nw, height: nh })
-      if (!hasAutoFittedRef.current) {
-        hasAutoFittedRef.current = true
-        fitMapToViewport(nw, nh)
-      }
+      fitMapToViewport(nw, nh)
+      hasAutoFittedRef.current = true
+
       // If the map is still stored with default 2000x2000 square dimensions, persist real dimensions
       if (currentMap && isOwner && (currentMap.width === 2000 && currentMap.height === 2000)) {
         updateMapSettingsMutation({
@@ -458,8 +458,8 @@ export default function MapViewerClient() {
     const ox = currentOffsetX
     const oy = currentOffsetY
 
-    // Pad by 3 cells beyond all 4 edges so hexagons and grid lines tile continuously over and past the image borders
-    const pad = 3
+    // Pad by 1 cell beyond borders so hexagons and grid lines cleanly tile across and cover image edges
+    const pad = 1
 
     if (gridType === 'hex') {
       // Pointy-topped hexagon (Standard D&D / RPG)
@@ -897,7 +897,7 @@ export default function MapViewerClient() {
   }
 
   return (
-    <div className="fixed inset-0 z-0 h-screen w-screen overflow-hidden bg-slate-950 text-foreground select-none touch-none">
+    <div className="fixed inset-0 z-0 h-dvh w-screen overflow-hidden bg-slate-950 text-foreground select-none touch-none">
       {/* TOP NAVIGATION BAR */}
       <div className="absolute top-4 left-4 right-4 z-30 flex items-center justify-between pointer-events-none">
         <div className="flex items-center gap-2 pointer-events-auto bg-background/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-border/50 shadow-lg">
@@ -1287,11 +1287,14 @@ export default function MapViewerClient() {
       >
         <div
           ref={containerRef}
-          className="relative transition-transform duration-75 ease-out origin-center shadow-2xl"
+          className="relative shrink-0 transition-transform duration-75 ease-out origin-center shadow-2xl"
           style={{
             transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
             width: `${mapWidth}px`,
             height: `${mapHeight}px`,
+            minWidth: `${mapWidth}px`,
+            minHeight: `${mapHeight}px`,
+            flexShrink: 0,
           }}
           onClick={handleCanvasClick}
         >
@@ -1300,7 +1303,7 @@ export default function MapViewerClient() {
             <img
               src={currentMap.imageUrl}
               alt={currentMap.name}
-              className="absolute inset-0 w-full h-full object-contain select-none pointer-events-none"
+              className="absolute inset-0 w-full h-full max-w-none object-fill select-none pointer-events-none"
               draggable={false}
               onLoad={handleImageLoad}
             />
@@ -1319,7 +1322,7 @@ export default function MapViewerClient() {
                 key={layer._id}
                 src={layer.imageUrl}
                 alt={layer.name}
-                className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                className="absolute inset-0 w-full h-full max-w-none object-fill pointer-events-none"
                 draggable={false}
               />
             )
@@ -1415,7 +1418,7 @@ export default function MapViewerClient() {
           {/* GRID OVERLAY (HEX OR SQUARE) - Rendered at z-10 so opaque fog-of-war fully conceals map and unrevealed pins */}
           {gridType !== 'none' && (
             <svg
-              className="absolute inset-0 pointer-events-none overflow-visible select-none"
+              className="absolute inset-0 pointer-events-none overflow-hidden select-none"
               style={{ width: `${mapWidth}px`, height: `${mapHeight}px`, zIndex: 10 }}
             >
               {gridCells.map((cell) => {
