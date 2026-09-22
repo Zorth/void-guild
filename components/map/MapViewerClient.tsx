@@ -208,24 +208,37 @@ export default function MapViewerClient() {
     const originalOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
 
-    const viewport = viewportRef.current
-    if (!viewport) {
-      return () => {
-        document.body.style.overflow = originalOverflow
+    const handleWheelNative = (e: WheelEvent) => {
+      const viewport = viewportRef.current
+      if (!viewport) return
+
+      // Do not intercept if scrolling inside dialogs, modals, popovers, or scrollable dropdown menus
+      const target = e.target as HTMLElement | null
+      if (
+        target &&
+        target.closest(
+          '[role="dialog"], [role="menu"], [data-radix-popper-content-wrapper], .overflow-y-auto, .overflow-y-scroll, .overflow-auto'
+        )
+      ) {
+        return
+      }
+
+      if (e.target === viewport || viewport.contains(e.target as Node)) {
+        e.preventDefault()
+        e.stopPropagation()
+        const zoomFactor = e.ctrlKey
+          ? Math.exp(-e.deltaY * 0.01)
+          : e.deltaY < 0
+          ? 1.15
+          : 0.85
+        setScale((prevScale) => Math.min(Math.max(prevScale * zoomFactor, 0.01), 8))
       }
     }
 
-    const handleWheelNative = (e: WheelEvent) => {
-      e.preventDefault()
-      e.stopPropagation()
-      const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85
-      setScale((prevScale) => Math.min(Math.max(prevScale * zoomFactor, 0.01), 8))
-    }
-
-    viewport.addEventListener('wheel', handleWheelNative, { passive: false })
+    window.addEventListener('wheel', handleWheelNative, { passive: false })
     return () => {
       document.body.style.overflow = originalOverflow
-      viewport.removeEventListener('wheel', handleWheelNative)
+      window.removeEventListener('wheel', handleWheelNative)
     }
   }, [])
 

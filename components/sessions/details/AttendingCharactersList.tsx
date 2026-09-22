@@ -199,11 +199,192 @@ export default function AttendingCharactersList({
         const hasGivenGmComm = !!myGmComm
         const cosmeticsStyles = resolveCosmeticsStyles(char.cosmetics)
         
+        const actionButtons = (
+          <>
+            {sessionId && (
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full border border-border/40 bg-muted/30 text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-all shrink-0 focus:outline-none"
+                onClick={() => handleOpenQuoteDialog(char)}
+                title={`Log a quote by ${char.name}`}
+              >
+                <Quote className="h-3 w-3 text-muted-foreground" />
+                <span>Quote</span>
+                {(sessionQuotes?.filter((q) => q.characterId === char._id).length ?? 0) > 0 && (
+                  <span className="ml-0.5 px-1.5 py-0.2 bg-primary/20 text-primary rounded-full text-[8px]">
+                    {sessionQuotes?.filter((q) => q.characterId === char._id).length}
+                  </span>
+                )}
+              </button>
+            )}
+            {canCommend && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      "inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full border transition-all shrink-0 focus:outline-none",
+                      isAnyCommendedByMe
+                        ? "bg-purple-500/20 text-purple-600 dark:text-purple-300 border-purple-500/40 hover:bg-purple-500/30 shadow-sm"
+                        : "bg-muted/30 text-muted-foreground border-border/40 hover:bg-muted/60"
+                    )}
+                    title="Commend this character"
+                  >
+                    <Medal className={cn("h-3 w-3", isAnyCommendedByMe ? "text-purple-500 fill-purple-500" : "")} />
+                    {isAnyCommendedByMe ? (
+                      <span className="flex items-center gap-1">
+                        {isGmCommendedByMe && '👑 GM'}
+                        {isGmCommendedByMe && isPlayerCommendedByMe && ' & '}
+                        {isPlayerCommendedByMe && (
+                          <>
+                            {myPlayerComm?.category === 'roleplay' && '🎭 Roleplay'}
+                            {myPlayerComm?.category === 'tactics' && '⚔️ Tactics'}
+                            {myPlayerComm?.category === 'clutch' && '🛡️ Clutch'}
+                            {myPlayerComm?.category === 'heroic' && '🌟 Heroic'}
+                          </>
+                        )}
+                      </span>
+                    ) : (
+                      <span>Commend</span>
+                    )}
+                    {(sessionCommendations?.countsByCharacter[char._id]?.total ?? 0) > 0 && (
+                      <span className="ml-0.5 px-1.5 py-0.2 bg-purple-500/20 text-purple-600 dark:text-purple-300 rounded-full text-[8px]">
+                        {sessionCommendations?.countsByCharacter[char._id]?.total}
+                      </span>
+                    )}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-72 p-3 text-xs space-y-3">
+                  <div className="font-bold text-sm flex items-center gap-1.5 border-b pb-2">
+                    <Medal className="h-4 w-4 text-purple-500" />
+                    <span>Commend {char.name}</span>
+                  </div>
+
+                  {canCommendAsPlayer && (
+                    <div className="space-y-2">
+                      {canCommendAsGm && (
+                        <div className="font-semibold text-[10px] text-muted-foreground uppercase tracking-wider">
+                          Player Commendation
+                        </div>
+                      )}
+                      <p className="text-[11px] text-muted-foreground">
+                        Award 1 commendation to a fellow party member:
+                      </p>
+
+                      {hasGivenPlayerComm && !isPlayerCommendedByMe ? (
+                        <div className="text-[11px] text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 p-2 rounded-md italic">
+                          You have already given your player commendation this session. Unselect it first to commend {char.name}.
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 gap-1.5">
+                          {(!hasGivenPlayerComm || (isPlayerCommendedByMe && myPlayerComm?.category === 'roleplay')) && (
+                            <Button
+                              size="sm"
+                              variant={isPlayerCommendedByMe && myPlayerComm?.category === 'roleplay' ? 'default' : 'outline'}
+                              className="justify-start text-xs h-9 gap-2 font-normal"
+                              onClick={() => handleCommend(char._id, 'roleplay', char.name)}
+                            >
+                              <span className="text-base">🎭</span>
+                              <div className="flex flex-col items-start text-left">
+                                <span className="font-semibold text-[11px]">Roleplay MVP</span>
+                                <span className="text-[9px] opacity-70">Great story & in-character play</span>
+                              </div>
+                            </Button>
+                          )}
+
+                          {(!hasGivenPlayerComm || (isPlayerCommendedByMe && myPlayerComm?.category === 'tactics')) && (
+                            <Button
+                              size="sm"
+                              variant={isPlayerCommendedByMe && myPlayerComm?.category === 'tactics' ? 'default' : 'outline'}
+                              className="justify-start text-xs h-9 gap-2 font-normal"
+                              onClick={() => handleCommend(char._id, 'tactics', char.name)}
+                            >
+                              <span className="text-base">⚔️</span>
+                              <div className="flex flex-col items-start text-left">
+                                <span className="font-semibold text-[11px]">Tactical Genius</span>
+                                <span className="text-[9px] opacity-70">Smart combat & party strategies</span>
+                              </div>
+                            </Button>
+                          )}
+
+                          {(!hasGivenPlayerComm || (isPlayerCommendedByMe && myPlayerComm?.category === 'clutch')) && (
+                            <Button
+                              size="sm"
+                              variant={isPlayerCommendedByMe && myPlayerComm?.category === 'clutch' ? 'default' : 'outline'}
+                              className="justify-start text-xs h-9 gap-2 font-normal"
+                              onClick={() => handleCommend(char._id, 'clutch', char.name)}
+                            >
+                              <span className="text-base">🛡️</span>
+                              <div className="flex flex-col items-start text-left">
+                                <span className="font-semibold text-[11px]">Clutch Savior</span>
+                                <span className="text-[9px] opacity-70">Saved the team in a tight spot</span>
+                              </div>
+                            </Button>
+                          )}
+
+                          {(!hasGivenPlayerComm || (isPlayerCommendedByMe && myPlayerComm?.category === 'heroic')) && (
+                            <Button
+                              size="sm"
+                              variant={isPlayerCommendedByMe && myPlayerComm?.category === 'heroic' ? 'default' : 'outline'}
+                              className="justify-start text-xs h-9 gap-2 font-normal"
+                              onClick={() => handleCommend(char._id, 'heroic', char.name)}
+                            >
+                              <span className="text-base">🌟</span>
+                              <div className="flex flex-col items-start text-left">
+                                <span className="font-semibold text-[11px]">Heroic MVP</span>
+                                <span className="text-[9px] opacity-70">Overall outstanding performance</span>
+                              </div>
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {canCommendAsGm && (
+                    <div className="space-y-2">
+                      {canCommendAsPlayer && <div className="border-t pt-2" />}
+                      <div className="font-semibold text-[10px] text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1">
+                        <Crown className="h-3.5 w-3.5" /> GM Commendation
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Award 1 player with your Gamemaster commendation:
+                      </p>
+
+                      {hasGivenGmComm && !isGmCommendedByMe ? (
+                        <div className="text-[11px] text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 p-2 rounded-md italic">
+                          You have already given your GM commendation this session. Unselect it first to award it to {char.name}.
+                        </div>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant={isGmCommendedByMe ? 'default' : 'outline'}
+                          className={cn(
+                            "w-full justify-start text-xs h-9 gap-2 font-normal",
+                            isGmCommendedByMe ? "bg-amber-600 hover:bg-amber-700 text-white" : "border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+                          )}
+                          onClick={() => handleCommend(char._id, 'gm', char.name)}
+                        >
+                          <Crown className="h-4 w-4 shrink-0 text-amber-500" />
+                          <div className="flex flex-col items-start text-left">
+                            <span className="font-semibold text-[11px]">GM Commendation</span>
+                            <span className="text-[9px] opacity-80">Gamemaster's award for excellence</span>
+                          </div>
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </PopoverContent>
+              </Popover>
+            )}
+          </>
+        )
+
         return (
             <li 
                 key={char._id} 
                 className={cn(
-                    "flex items-center justify-between p-4 rounded-lg border transition-colors gap-3 relative overflow-visible",
+                    "flex flex-col sm:flex-row sm:items-center justify-between p-3.5 sm:p-4 rounded-lg border transition-colors gap-2.5 sm:gap-3 relative overflow-visible",
                     cosmeticsStyles.cardClassName || "bg-muted/20"
                 )}
                 style={cosmeticsStyles.cardStyle}
@@ -221,24 +402,25 @@ export default function AttendingCharactersList({
               {(cosmeticsStyles.cardClassName.includes('crimson-particle') || char.cosmetics?.bgColor === 'crimson_particles' || char.cosmetics?.bgColor === 'crimson-particle-bg') && (
                 <TintParticlesEffect variant="crimson" />
               )}
-              <div className="flex items-center gap-3 min-w-0 relative z-10">
-                <button
-                  type="button"
-                  onClick={() => setCharacterDetailsId(char._id)}
-                  className="shrink-0 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 rounded-full"
-                  title={`View ${char.name}'s Profile`}
-                >
-                  <ProfileAvatarWithBadge
-                    imageUrl={metadata?.imageUrl}
-                    name={char.name}
-                    cosmetics={char.cosmetics}
-                    profileRingClassName={cosmeticsStyles.profileRingClassName}
-                    rankNumber={characterRanks?.[char._id]}
-                    streak={rel?.streak}
-                    size="lg"
-                  />
-                </button>
-                <div className="min-w-0">
+              <div className="flex items-start sm:items-center justify-between gap-3 min-w-0 relative z-10 w-full sm:w-auto">
+                <div className="flex items-center gap-3 min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => setCharacterDetailsId(char._id)}
+                    className="shrink-0 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 rounded-full"
+                    title={`View ${char.name}'s Profile`}
+                  >
+                    <ProfileAvatarWithBadge
+                      imageUrl={metadata?.imageUrl}
+                      name={char.name}
+                      cosmetics={char.cosmetics}
+                      profileRingClassName={cosmeticsStyles.profileRingClassName}
+                      rankNumber={characterRanks?.[char._id]}
+                      streak={rel?.streak}
+                      size="lg"
+                    />
+                  </button>
+                  <div className="min-w-0">
                     <div className="font-bold flex items-center flex-wrap gap-2">
                         <button
                           type="button"
@@ -481,225 +663,93 @@ export default function AttendingCharactersList({
                             href={char.websiteLink} 
                             target="_blank" 
                             rel="noopener noreferrer" 
-                            className="text-[10px] text-blue-500 hover:underline"
+                            className="text-[10px] text-blue-500 hover:underline break-all block mt-0.5"
                         >
                             {char.websiteLink}
                         </a>
                     )}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {sessionId && (
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full border border-border/40 bg-muted/30 text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-all shrink-0 focus:outline-none"
-                    onClick={() => handleOpenQuoteDialog(char)}
-                    title={`Log a quote by ${char.name}`}
-                  >
-                    <Quote className="h-3 w-3 text-muted-foreground" />
-                    <span className="hidden sm:inline">Quote</span>
-                    {(sessionQuotes?.filter((q) => q.characterId === char._id).length ?? 0) > 0 && (
-                      <span className="ml-0.5 px-1.5 py-0.2 bg-primary/20 text-primary rounded-full text-[8px]">
-                        {sessionQuotes?.filter((q) => q.characterId === char._id).length}
-                      </span>
-                    )}
-                  </button>
+
+              {/* Mobile top-right: Rank, System, Level and Delete */}
+              <div className="flex sm:hidden items-center gap-1.5 shrink-0 self-start pt-0.5">
+                <CharacterRankIcon rank={char.rank} />
+                {char.system && (
+                  <img 
+                    src={char.system === 'PF' ? '/PFVoid.svg' : '/DnDVoid.svg'} 
+                    alt={char.system} 
+                    className="h-4 w-4 mx-0.5"
+                  />
                 )}
-                {canCommend && (
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <button
-                        type="button"
-                        className={cn(
-                          "inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full border transition-all shrink-0 focus:outline-none",
-                          isAnyCommendedByMe
-                            ? "bg-purple-500/20 text-purple-600 dark:text-purple-300 border-purple-500/40 hover:bg-purple-500/30 shadow-sm"
-                            : "bg-muted/30 text-muted-foreground border-border/40 hover:bg-muted/60"
-                        )}
-                        title="Commend this character"
-                      >
-                        <Medal className={cn("h-3 w-3", isAnyCommendedByMe ? "text-purple-500 fill-purple-500" : "")} />
-                        {isAnyCommendedByMe ? (
-                          <span className="flex items-center gap-1">
-                            {isGmCommendedByMe && '👑 GM'}
-                            {isGmCommendedByMe && isPlayerCommendedByMe && ' & '}
-                            {isPlayerCommendedByMe && (
-                              <>
-                                {myPlayerComm?.category === 'roleplay' && '🎭 Roleplay'}
-                                {myPlayerComm?.category === 'tactics' && '⚔️ Tactics'}
-                                {myPlayerComm?.category === 'clutch' && '🛡️ Clutch'}
-                                {myPlayerComm?.category === 'heroic' && '🌟 Heroic'}
-                              </>
-                            )}
-                          </span>
-                        ) : (
-                          <span>Commend</span>
-                        )}
-                        {(sessionCommendations?.countsByCharacter[char._id]?.total ?? 0) > 0 && (
-                          <span className="ml-0.5 px-1.5 py-0.2 bg-purple-500/20 text-purple-600 dark:text-purple-300 rounded-full text-[8px]">
-                            {sessionCommendations?.countsByCharacter[char._id]?.total}
-                          </span>
-                        )}
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-72 p-3 text-xs space-y-3">
-                      <div className="font-bold text-sm flex items-center gap-1.5 border-b pb-2">
-                        <Medal className="h-4 w-4 text-purple-500" />
-                        <span>Commend {char.name}</span>
-                      </div>
-
-                      {canCommendAsPlayer && (
-                        <div className="space-y-2">
-                          {canCommendAsGm && (
-                            <div className="font-semibold text-[10px] text-muted-foreground uppercase tracking-wider">
-                              Player Commendation
-                            </div>
-                          )}
-                          <p className="text-[11px] text-muted-foreground">
-                            Award 1 commendation to a fellow party member:
-                          </p>
-
-                          {hasGivenPlayerComm && !isPlayerCommendedByMe ? (
-                            <div className="text-[11px] text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 p-2 rounded-md italic">
-                              You have already given your player commendation this session. Unselect it first to commend {char.name}.
-                            </div>
-                          ) : (
-                            <div className="grid grid-cols-1 gap-1.5">
-                              {(!hasGivenPlayerComm || (isPlayerCommendedByMe && myPlayerComm?.category === 'roleplay')) && (
-                                <Button
-                                  size="sm"
-                                  variant={isPlayerCommendedByMe && myPlayerComm?.category === 'roleplay' ? 'default' : 'outline'}
-                                  className="justify-start text-xs h-9 gap-2 font-normal"
-                                  onClick={() => handleCommend(char._id, 'roleplay', char.name)}
-                                >
-                                  <span className="text-base">🎭</span>
-                                  <div className="flex flex-col items-start text-left">
-                                    <span className="font-semibold text-[11px]">Roleplay MVP</span>
-                                    <span className="text-[9px] opacity-70">Great story & in-character play</span>
-                                  </div>
-                                </Button>
-                              )}
-
-                              {(!hasGivenPlayerComm || (isPlayerCommendedByMe && myPlayerComm?.category === 'tactics')) && (
-                                <Button
-                                  size="sm"
-                                  variant={isPlayerCommendedByMe && myPlayerComm?.category === 'tactics' ? 'default' : 'outline'}
-                                  className="justify-start text-xs h-9 gap-2 font-normal"
-                                  onClick={() => handleCommend(char._id, 'tactics', char.name)}
-                                >
-                                  <span className="text-base">⚔️</span>
-                                  <div className="flex flex-col items-start text-left">
-                                    <span className="font-semibold text-[11px]">Tactical Genius</span>
-                                    <span className="text-[9px] opacity-70">Smart combat & party strategies</span>
-                                  </div>
-                                </Button>
-                              )}
-
-                              {(!hasGivenPlayerComm || (isPlayerCommendedByMe && myPlayerComm?.category === 'clutch')) && (
-                                <Button
-                                  size="sm"
-                                  variant={isPlayerCommendedByMe && myPlayerComm?.category === 'clutch' ? 'default' : 'outline'}
-                                  className="justify-start text-xs h-9 gap-2 font-normal"
-                                  onClick={() => handleCommend(char._id, 'clutch', char.name)}
-                                >
-                                  <span className="text-base">🛡️</span>
-                                  <div className="flex flex-col items-start text-left">
-                                    <span className="font-semibold text-[11px]">Clutch Savior</span>
-                                    <span className="text-[9px] opacity-70">Saved the team in a tight spot</span>
-                                  </div>
-                                </Button>
-                              )}
-
-                              {(!hasGivenPlayerComm || (isPlayerCommendedByMe && myPlayerComm?.category === 'heroic')) && (
-                                <Button
-                                  size="sm"
-                                  variant={isPlayerCommendedByMe && myPlayerComm?.category === 'heroic' ? 'default' : 'outline'}
-                                  className="justify-start text-xs h-9 gap-2 font-normal"
-                                  onClick={() => handleCommend(char._id, 'heroic', char.name)}
-                                >
-                                  <span className="text-base">🌟</span>
-                                  <div className="flex flex-col items-start text-left">
-                                    <span className="font-semibold text-[11px]">Heroic MVP</span>
-                                    <span className="text-[9px] opacity-70">Overall outstanding performance</span>
-                                  </div>
-                                </Button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {canCommendAsGm && (
-                        <div className="space-y-2">
-                          {canCommendAsPlayer && <div className="border-t pt-2" />}
-                          <div className="font-semibold text-[10px] text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1">
-                            <Crown className="h-3.5 w-3.5" /> GM Commendation
-                          </div>
-                          <p className="text-[11px] text-muted-foreground">
-                            Award 1 player with your Gamemaster commendation:
-                          </p>
-
-                          {hasGivenGmComm && !isGmCommendedByMe ? (
-                            <div className="text-[11px] text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 p-2 rounded-md italic">
-                              You have already given your GM commendation this session. Unselect it first to award it to {char.name}.
-                            </div>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant={isGmCommendedByMe ? 'default' : 'outline'}
-                              className={cn(
-                                "w-full justify-start text-xs h-9 gap-2 font-normal",
-                                isGmCommendedByMe ? "bg-amber-600 hover:bg-amber-700 text-white" : "border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
-                              )}
-                              onClick={() => handleCommend(char._id, 'gm', char.name)}
-                            >
-                              <Crown className="h-4 w-4 shrink-0 text-amber-500" />
-                              <div className="flex flex-col items-start text-left">
-                                <span className="font-semibold text-[11px]">GM Commendation</span>
-                                <span className="text-[9px] opacity-80">Gamemaster's award for excellence</span>
-                              </div>
-                            </Button>
-                          )}
-                        </div>
-                      )}
-                    </PopoverContent>
-                  </Popover>
-                )}
-                <div className="flex flex-col items-end">
-                    <div className="flex items-center gap-1">
-                        <CharacterRankIcon rank={char.rank} />
-                        {char.system && (
-                            <img 
-                                src={char.system === 'PF' ? '/PFVoid.svg' : '/DnDVoid.svg'} 
-                                alt={char.system} 
-                                className="h-4 w-4 mx-0.5"
-                            />
-                        )}
-                        <span 
-                            className="inline-flex align-middle justify-center w-14 rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap"
-                            style={getLevelBadgeStyle(char.lvl)}
-                        >
-                            Lvl {char.lvl}
-                        </span>
-                    </div>
-                </div>
+                <span 
+                  className="inline-flex align-middle justify-center w-14 rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap"
+                  style={getLevelBadgeStyle(char.lvl)}
+                >
+                  Lvl {char.lvl}
+                </span>
                 {canRemove && (
-                    <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8"
-                        onClick={() => onLeave(char._id)}
-                        disabled={leavingCharacterId === char._id}
-                    >
-                        {leavingCharacterId === char._id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                            <Trash2 className="h-4 w-4" />
-                        )}
-                    </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10 h-7 w-7 ml-0.5"
+                    onClick={() => onLeave(char._id)}
+                    disabled={leavingCharacterId === char._id}
+                  >
+                    {leavingCharacterId === char._id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
                 )}
               </div>
-            </li>
+            </div>
+
+            {/* Mobile second row: Action buttons (Quote & Commend) */}
+            {(sessionId || canCommend) && (
+              <div className="flex sm:hidden items-center gap-2 pt-2 border-t border-border/20 w-full relative z-10">
+                {actionButtons}
+              </div>
+            )}
+
+            {/* Desktop right group */}
+            <div className="hidden sm:flex items-center gap-2 shrink-0 relative z-10">
+              {actionButtons}
+              <div className="flex flex-col items-end">
+                <div className="flex items-center gap-1">
+                  <CharacterRankIcon rank={char.rank} />
+                  {char.system && (
+                    <img 
+                      src={char.system === 'PF' ? '/PFVoid.svg' : '/DnDVoid.svg'} 
+                      alt={char.system} 
+                      className="h-4 w-4 mx-0.5"
+                    />
+                  )}
+                  <span 
+                    className="inline-flex align-middle justify-center w-14 rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap"
+                    style={getLevelBadgeStyle(char.lvl)}
+                  >
+                    Lvl {char.lvl}
+                  </span>
+                </div>
+              </div>
+              {canRemove && (
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8"
+                  onClick={() => onLeave(char._id)}
+                  disabled={leavingCharacterId === char._id}
+                >
+                  {leavingCharacterId === char._id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
+            </div>
+          </li>
         )
       })}
       </ul>
