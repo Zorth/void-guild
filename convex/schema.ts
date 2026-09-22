@@ -467,6 +467,8 @@ export default defineSchema({
         gridSize: v.optional(v.number()), // Grid cell size in px
         gridOffsetX: v.optional(v.number()),
         gridOffsetY: v.optional(v.number()),
+        gridScale: v.optional(v.number()), // Real-world distance per cell (e.g. 6 miles)
+        gridScaleUnit: v.optional(v.string()), // Unit (e.g. "miles", "km", "ft")
         isExplorationMap: v.optional(v.boolean()),
         revealedCells: v.optional(v.array(v.string())), // Array of "col,row" strings for revealed cells
     }).index('by_worldId', ['worldId'])
@@ -491,6 +493,7 @@ export default defineSchema({
         color: v.optional(v.string()),
         targetMapId: v.optional(v.id('worldMaps')), // Link to another map when clicked
         minZoom: v.optional(v.number()), // Optional zoom threshold for text popup
+        gmOnly: v.optional(v.boolean()), // Secret pin visible only to world owner / GM
     }).index('by_mapId', ['mapId']),
     mapAreas: defineTable({
         mapId: v.id('worldMaps'),
@@ -501,6 +504,7 @@ export default defineSchema({
         color: v.optional(v.string()),
         fillOpacity: v.optional(v.number()), // 0 for invisible, 0.1-0.9 for transparent
         targetMapId: v.optional(v.id('worldMaps')), // Link to another map
+        gmOnly: v.optional(v.boolean()), // Secret area visible only to world owner / GM
     }).index('by_mapId', ['mapId']),
     mapGridNotes: defineTable({
         mapId: v.id('worldMaps'),

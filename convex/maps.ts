@@ -66,17 +66,22 @@ export const getMapFullData = query({
     const map = await ctx.db.get(args.mapId)
     if (!map) return null
 
+    const user = await ctx.auth.getUserIdentity()
+    const world = await ctx.db.get(map.worldId)
+    const isAdminUser = user ? await isAdmin(ctx) : false
+    const isOwnerOrAdmin = !!(user && world && (world.owner === user.subject || isAdminUser))
+
     const layers = await ctx.db
       .query('mapLayers')
       .withIndex('by_mapId', (q) => q.eq('mapId', args.mapId))
       .collect()
 
-    const pins = await ctx.db
+    const rawPins = await ctx.db
       .query('mapPins')
       .withIndex('by_mapId', (q) => q.eq('mapId', args.mapId))
       .collect()
 
-    const areas = await ctx.db
+    const rawAreas = await ctx.db
       .query('mapAreas')
       .withIndex('by_mapId', (q) => q.eq('mapId', args.mapId))
       .collect()
@@ -85,6 +90,9 @@ export const getMapFullData = query({
       .query('mapGridNotes')
       .withIndex('by_mapId', (q) => q.eq('mapId', args.mapId))
       .collect()
+
+    const pins = isOwnerOrAdmin ? rawPins : rawPins.filter((p) => !p.gmOnly)
+    const areas = isOwnerOrAdmin ? rawAreas : rawAreas.filter((a) => !a.gmOnly)
 
     return {
       map,
@@ -111,6 +119,8 @@ export const createMap = mutation({
     gridSize: v.optional(v.number()),
     gridOffsetX: v.optional(v.number()),
     gridOffsetY: v.optional(v.number()),
+    gridScale: v.optional(v.number()),
+    gridScaleUnit: v.optional(v.string()),
     isExplorationMap: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
@@ -151,6 +161,8 @@ export const createMap = mutation({
       gridSize: args.gridSize ?? 100,
       gridOffsetX: args.gridOffsetX ?? 0,
       gridOffsetY: args.gridOffsetY ?? 0,
+      gridScale: args.gridScale,
+      gridScaleUnit: args.gridScaleUnit,
       isExplorationMap: args.isExplorationMap ?? false,
       revealedCells: [],
     })
@@ -172,6 +184,8 @@ export const updateMapSettings = mutation({
     gridSize: v.optional(v.number()),
     gridOffsetX: v.optional(v.number()),
     gridOffsetY: v.optional(v.number()),
+    gridScale: v.optional(v.number()),
+    gridScaleUnit: v.optional(v.string()),
     isExplorationMap: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
@@ -202,6 +216,8 @@ export const updateMapSettings = mutation({
     if (args.gridSize !== undefined) patches.gridSize = args.gridSize
     if (args.gridOffsetX !== undefined) patches.gridOffsetX = args.gridOffsetX
     if (args.gridOffsetY !== undefined) patches.gridOffsetY = args.gridOffsetY
+    if (args.gridScale !== undefined) patches.gridScale = args.gridScale
+    if (args.gridScaleUnit !== undefined) patches.gridScaleUnit = args.gridScaleUnit
     if (args.isExplorationMap !== undefined) patches.isExplorationMap = args.isExplorationMap
 
     await ctx.db.patch(args.mapId, patches)
@@ -341,6 +357,7 @@ export const savePin = mutation({
     color: v.optional(v.string()),
     targetMapId: v.optional(v.id('worldMaps')),
     minZoom: v.optional(v.number()),
+    gmOnly: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const map = await ctx.db.get(args.mapId)
@@ -359,6 +376,7 @@ export const savePin = mutation({
         color: args.color,
         targetMapId: args.targetMapId,
         minZoom: args.minZoom,
+        gmOnly: args.gmOnly,
       })
       return args.pinId
     } else {
@@ -374,8 +392,29 @@ export const savePin = mutation({
         color: args.color,
         targetMapId: args.targetMapId,
         minZoom: args.minZoom,
+        gmOnly: args.gmOnly,
       })
     }
+  },
+})
+
+export const updatePinPosition = mutation({
+  args: {
+    pinId: v.id('mapPins'),
+    x: v.number(),
+    y: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const pin = await ctx.db.get(args.pinId)
+    if (!pin) throw new Error('Pin not found')
+    const map = await ctx.db.get(pin.mapId)
+    if (!map) throw new Error('Map not found')
+    await verifyWorldOwner(ctx, map.worldId)
+
+    await ctx.db.patch(args.pinId, {
+      x: args.x,
+      y: args.y,
+    })
   },
 })
 
@@ -403,6 +442,7 @@ export const saveArea = mutation({
     color: v.optional(v.string()),
     fillOpacity: v.optional(v.number()),
     targetMapId: v.optional(v.id('worldMaps')),
+    gmOnly: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const map = await ctx.db.get(args.mapId)
@@ -418,6 +458,7 @@ export const saveArea = mutation({
         color: args.color,
         fillOpacity: args.fillOpacity,
         targetMapId: args.targetMapId,
+        gmOnly: args.gmOnly,
       })
       return args.areaId
     } else {
@@ -430,6 +471,7 @@ export const saveArea = mutation({
         color: args.color,
         fillOpacity: args.fillOpacity,
         targetMapId: args.targetMapId,
+        gmOnly: args.gmOnly,
       })
     }
   },

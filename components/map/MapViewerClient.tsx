@@ -8,7 +8,8 @@ import { useAuth } from '@clerk/nextjs'
 import Link from 'next/link'
 import { 
   ZoomIn, ZoomOut, Maximize2, Layers, MapPin, Eye, Edit3, Plus, 
-  Trash2, Settings, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Map, FileText, Check, X, Grid, Lock, Unlock, Move, HelpCircle, Copy
+  Trash2, Settings, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Map, FileText, Check, X, Grid, Lock, Unlock, Move, HelpCircle, Copy,
+  Castle, Crown, Skull, Swords, Shield, Mountain, Tent, Beer, Anchor, Flame, TreePine, Sparkles, BookOpen, Coins, Compass, Gem, Crosshair, Flag, Ghost, EyeOff, Ruler, Search
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,6 +21,36 @@ import { Switch } from '@/components/ui/switch'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 import { Id } from '@/convex/_generated/dataModel'
+
+export const PIN_ICONS = [
+  { name: 'MapPin', label: 'Default Pin', icon: MapPin },
+  { name: 'Castle', label: 'Castle / Keep', icon: Castle },
+  { name: 'Crown', label: 'Capital / City', icon: Crown },
+  { name: 'Skull', label: 'Dungeon / Danger', icon: Skull },
+  { name: 'Swords', label: 'Battle / Conflict', icon: Swords },
+  { name: 'Shield', label: 'Guard / Outpost', icon: Shield },
+  { name: 'Mountain', label: 'Mountain / Peaks', icon: Mountain },
+  { name: 'Tent', label: 'Camp / Caravan', icon: Tent },
+  { name: 'Beer', label: 'Tavern / Inn', icon: Beer },
+  { name: 'Anchor', label: 'Port / Harbor', icon: Anchor },
+  { name: 'Flame', label: 'Forge / Fire', icon: Flame },
+  { name: 'TreePine', label: 'Forest / Woods', icon: TreePine },
+  { name: 'Sparkles', label: 'Magic / Arcane', icon: Sparkles },
+  { name: 'BookOpen', label: 'Library / Lore', icon: BookOpen },
+  { name: 'Coins', label: 'Market / Vault', icon: Coins },
+  { name: 'Compass', label: 'Waypoint', icon: Compass },
+  { name: 'Gem', label: 'Mine / Quarry', icon: Gem },
+  { name: 'Crosshair', label: 'Target / Bounty', icon: Crosshair },
+  { name: 'Flag', label: 'Settlement / Clan', icon: Flag },
+  { name: 'Ghost', label: 'Crypt / Tomb', icon: Ghost },
+  { name: 'Eye', label: 'Watchtower / Lookout', icon: Eye },
+] as const
+
+export function renderPinIcon(iconName?: string, className = "h-4 w-4 text-white") {
+  const found = PIN_ICONS.find((item) => item.name === iconName)
+  const IconComp = found ? found.icon : MapPin
+  return <IconComp className={className} />
+}
 
 export default function MapViewerClient() {
   const params = useParams()
@@ -46,6 +77,7 @@ export default function MapViewerClient() {
   const updateMapSettingsMutation = useMutation(api.maps.updateMapSettings)
   const deleteMapMutation = useMutation(api.maps.deleteMap)
   const savePinMutation = useMutation(api.maps.savePin)
+  const updatePinPositionMutation = useMutation(api.maps.updatePinPosition)
   const deletePinMutation = useMutation(api.maps.deletePin)
   const saveAreaMutation = useMutation(api.maps.saveArea)
   const deleteAreaMutation = useMutation(api.maps.deleteArea)
@@ -58,7 +90,7 @@ export default function MapViewerClient() {
   // View state
   const isOwner = world ? userId === world.owner : false
   const [isEditMode, setIsEditMode] = useState(false)
-  const [activeTool, setActiveTool] = useState<'view' | 'add_pin' | 'add_area' | 'reveal_hex' | 'hide_hex' | 'grid_note' | 'align_grid'>('view')
+  const [activeTool, setActiveTool] = useState<'view' | 'add_pin' | 'add_area' | 'reveal_hex' | 'hide_hex' | 'grid_note' | 'align_grid' | 'ruler'>('view')
 
   // Live grid calibration / offset state
   const [liveGridOffset, setLiveGridOffset] = useState<{ x: number; y: number } | null>(null)
@@ -74,12 +106,31 @@ export default function MapViewerClient() {
   const containerRef = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(1)
   const [position, setPosition] = useState({ x: 0, y: 0 })
+  const scaleRef = useRef(scale)
+  scaleRef.current = scale
+  const positionRef = useRef(position)
+  positionRef.current = position
+
   const [isDragging, setIsDragging] = useState(false)
   const dragStartRef = useRef({ x: 0, y: 0 })
   const dragOriginRef = useRef({ x: 0, y: 0 })
   const hasDraggedRef = useRef(false)
   const [naturalDimensions, setNaturalDimensions] = useState<{ width: number; height: number } | null>(null)
   const hasAutoFittedRef = useRef(false)
+
+  // Distance Measurement Ruler state
+  const [rulerPoints, setRulerPoints] = useState<{ start: { x: number; y: number }; current: { x: number; y: number } } | null>(null)
+  const [isMeasuring, setIsMeasuring] = useState(false)
+
+  // Draggable Pin Repositioning state
+  const [draggingPinId, setDraggingPinId] = useState<Id<'mapPins'> | null>(null)
+  const [draggedPinOffset, setDraggedPinOffset] = useState<{ x: number; y: number } | null>(null)
+  const pinDragStartRef = useRef<{ clientX: number; clientY: number; origX: number; origY: number; moved: boolean } | null>(null)
+
+  // Locations Directory state
+  const [isLocationsMenuOpen, setIsLocationsMenuOpen] = useState(false)
+  const [locationSearch, setLocationSearch] = useState('')
+  const [locationFilterLayer, setLocationFilterLayer] = useState<string>('all')
 
   // Touch pinch zoom state
   const touchDistanceRef = useRef<number | null>(null)
@@ -114,6 +165,7 @@ export default function MapViewerClient() {
     color: string
     targetMapId?: Id<'worldMaps'>
     layerId?: Id<'mapLayers'>
+    gmOnly?: boolean
   }>({
     x: 50,
     y: 50,
@@ -122,6 +174,7 @@ export default function MapViewerClient() {
     style: 'icon',
     icon: 'MapPin',
     color: '#a855f7',
+    gmOnly: false,
   })
 
   // Area Form Draft
@@ -134,12 +187,14 @@ export default function MapViewerClient() {
     targetMapId?: Id<'worldMaps'>
     layerId?: Id<'mapLayers'>
     points: { x: number; y: number }[]
+    gmOnly?: boolean
   }>({
     name: '',
     description: '',
     color: '#a855f7',
     fillOpacity: 0.3,
     points: [],
+    gmOnly: false,
   })
 
   // Map Settings Draft
@@ -154,6 +209,8 @@ export default function MapViewerClient() {
     gridSize: 100,
     gridOffsetX: 0,
     gridOffsetY: 0,
+    gridScale: 0,
+    gridScaleUnit: 'miles',
     isExplorationMap: false,
   })
 
@@ -198,12 +255,14 @@ export default function MapViewerClient() {
         gridSize: currentMap.gridSize || 100,
         gridOffsetX: currentMap.gridOffsetX || 0,
         gridOffsetY: currentMap.gridOffsetY || 0,
+        gridScale: currentMap.gridScale || 0,
+        gridScaleUnit: currentMap.gridScaleUnit || 'miles',
         isExplorationMap: currentMap.isExplorationMap || false,
       })
     }
   }, [currentMap])
 
-  // Lock body scroll and set up non-passive wheel listener so scrolling strictly zooms the map without scrolling the webpage
+  // Lock body scroll and set up non-passive wheel listener with focal zoom (zooming towards mouse cursor)
   useEffect(() => {
     const originalOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -226,12 +285,33 @@ export default function MapViewerClient() {
       if (e.target === viewport || viewport.contains(e.target as Node)) {
         e.preventDefault()
         e.stopPropagation()
+
         const zoomFactor = e.ctrlKey
           ? Math.exp(-e.deltaY * 0.01)
           : e.deltaY < 0
           ? 1.15
           : 0.85
-        setScale((prevScale) => Math.min(Math.max(prevScale * zoomFactor, 0.01), 8))
+
+        const currentScale = scaleRef.current
+        const currentPos = positionRef.current
+
+        const newScale = Math.min(Math.max(currentScale * zoomFactor, 0.01), 8)
+        const k = newScale / currentScale
+
+        const rect = viewport.getBoundingClientRect()
+        const cx = rect.width / 2
+        const cy = rect.height / 2
+        const mouseX = e.clientX - rect.left - cx
+        const mouseY = e.clientY - rect.top - cy
+
+        const newX = mouseX + (currentPos.x - mouseX) * k
+        const newY = mouseY + (currentPos.y - mouseY) * k
+
+        scaleRef.current = newScale
+        positionRef.current = { x: newX, y: newY }
+
+        setScale(newScale)
+        setPosition({ x: newX, y: newY })
       }
     }
 
@@ -242,10 +322,37 @@ export default function MapViewerClient() {
     }
   }, [])
 
-  // Mouse pan handlers
+  // Keyboard shortcuts (Esc to cancel tools/drafts/menus)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setRulerPoints(null)
+        setIsMeasuring(false)
+        if (activeTool === 'ruler') setActiveTool('view')
+        if (activeTool === 'add_area' && areaDraft.points.length > 0) {
+          setAreaDraft({ name: '', description: '', color: '#a855f7', fillOpacity: 0.3, points: [], gmOnly: false })
+          setActiveTool('view')
+          toast.info('Area drawing cancelled')
+        }
+        setIsLocationsMenuOpen(false)
+        setIsLayersMenuOpen(false)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [activeTool, areaDraft.points.length])
+
+  // Mouse pan & interaction handlers
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return // Left click only
     if (activeTool === 'add_area' && areaDraft.points.length > 0) return // Polygon drawing
+
+    if (activeTool === 'ruler') {
+      const p = getCanvasPixelCoordinates(e as unknown as React.MouseEvent<HTMLDivElement>)
+      setIsMeasuring(true)
+      setRulerPoints({ start: p, current: p })
+      return
+    }
 
     setIsDragging(true)
     hasDraggedRef.current = false
@@ -265,6 +372,26 @@ export default function MapViewerClient() {
   }
 
   const handleMouseMove = (e: React.MouseEvent) => {
+    if (isMeasuring && activeTool === 'ruler') {
+      const p = getCanvasPixelCoordinates(e as unknown as React.MouseEvent<HTMLDivElement>)
+      setRulerPoints((prev) => prev ? { start: prev.start, current: p } : null)
+      return
+    }
+
+    if (draggingPinId && pinDragStartRef.current) {
+      const dx = (e.clientX - pinDragStartRef.current.clientX) / scale
+      const dy = (e.clientY - pinDragStartRef.current.clientY) / scale
+      if (Math.hypot(dx, dy) > 4) {
+        pinDragStartRef.current.moved = true
+        const dxPercent = (dx / mapWidth) * 100
+        const dyPercent = (dy / mapHeight) * 100
+        const newX = Math.min(100, Math.max(0, pinDragStartRef.current.origX + dxPercent))
+        const newY = Math.min(100, Math.max(0, pinDragStartRef.current.origY + dyPercent))
+        setDraggedPinOffset({ x: newX, y: newY })
+      }
+      return
+    }
+
     if (!isDragging) return
     if (Math.hypot(e.clientX - dragOriginRef.current.x, e.clientY - dragOriginRef.current.y) > 5) {
       hasDraggedRef.current = true
@@ -280,18 +407,61 @@ export default function MapViewerClient() {
       return
     }
 
-    setPosition({
-      x: e.clientX - dragStartRef.current.x,
-      y: e.clientY - dragStartRef.current.y,
-    })
+    const newX = e.clientX - dragStartRef.current.x
+    const newY = e.clientY - dragStartRef.current.y
+    positionRef.current = { x: newX, y: newY }
+    setPosition({ x: newX, y: newY })
   }
 
   const handleMouseUp = () => {
+    if (isMeasuring) {
+      setIsMeasuring(false)
+      return
+    }
+
+    if (draggingPinId && pinDragStartRef.current) {
+      if (pinDragStartRef.current.moved && draggedPinOffset) {
+        const pinToUpdate = draggingPinId
+        const newX = Number(draggedPinOffset.x.toFixed(2))
+        const newY = Number(draggedPinOffset.y.toFixed(2))
+        updatePinPositionMutation({
+          pinId: pinToUpdate,
+          x: newX,
+          y: newY,
+        })
+          .then(() => toast.success('Pin repositioned'))
+          .catch(() => toast.error('Failed to move pin'))
+      } else if (!pinDragStartRef.current.moved) {
+        const clickedPin = fullData?.pins.find((p) => p._id === draggingPinId)
+        if (clickedPin) setSelectedPin(clickedPin)
+      }
+      setDraggingPinId(null)
+      setDraggedPinOffset(null)
+      pinDragStartRef.current = null
+      return
+    }
+
     setIsDragging(false)
   }
 
   // Touch Pinch Zoom & Pan Handlers
   const handleTouchStart = (e: React.TouchEvent) => {
+    if (activeTool === 'ruler' && e.touches.length === 1) {
+      const touch = e.touches[0]
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect()
+        const clickX = (touch.clientX - rect.left) / scale
+        const clickY = (touch.clientY - rect.top) / scale
+        const p = {
+          x: Math.min(Math.max(clickX, 0), mapWidth),
+          y: Math.min(Math.max(clickY, 0), mapHeight),
+        }
+        setIsMeasuring(true)
+        setRulerPoints({ start: p, current: p })
+      }
+      return
+    }
+
     if (e.touches.length === 2) {
       const dist = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
@@ -321,13 +491,30 @@ export default function MapViewerClient() {
   }
 
   const handleTouchMove = (e: React.TouchEvent) => {
+    if (isMeasuring && activeTool === 'ruler' && e.touches.length === 1) {
+      const touch = e.touches[0]
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect()
+        const clickX = (touch.clientX - rect.left) / scale
+        const clickY = (touch.clientY - rect.top) / scale
+        const p = {
+          x: Math.min(Math.max(clickX, 0), mapWidth),
+          y: Math.min(Math.max(clickY, 0), mapHeight),
+        }
+        setRulerPoints((prev) => prev ? { start: prev.start, current: p } : null)
+      }
+      return
+    }
+
     if (e.touches.length === 2 && touchDistanceRef.current !== null) {
       const dist = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
         e.touches[0].clientY - e.touches[1].clientY
       )
       const delta = dist / touchDistanceRef.current
-      setScale((prevScale) => Math.min(Math.max(prevScale * delta, 0.01), 8))
+      const newScale = Math.min(Math.max(scaleRef.current * delta, 0.01), 8)
+      scaleRef.current = newScale
+      setScale(newScale)
       touchDistanceRef.current = dist
     } else if (e.touches.length === 1 && isDragging) {
       if (Math.hypot(e.touches[0].clientX - dragOriginRef.current.x, e.touches[0].clientY - dragOriginRef.current.y) > 5) {
@@ -344,21 +531,33 @@ export default function MapViewerClient() {
         return
       }
 
-      setPosition({
-        x: e.touches[0].clientX - dragStartRef.current.x,
-        y: e.touches[0].clientY - dragStartRef.current.y,
-      })
+      const newX = e.touches[0].clientX - dragStartRef.current.x
+      const newY = e.touches[0].clientY - dragStartRef.current.y
+      positionRef.current = { x: newX, y: newY }
+      setPosition({ x: newX, y: newY })
     }
   }
 
   const handleTouchEnd = () => {
+    if (isMeasuring) {
+      setIsMeasuring(false)
+      return
+    }
     setIsDragging(false)
     touchDistanceRef.current = null
   }
 
   // Zoom controls
-  const handleZoomIn = () => setScale((s) => Math.min(s * 1.25, 8))
-  const handleZoomOut = () => setScale((s) => Math.max(s * 0.8, 0.01))
+  const handleZoomIn = () => {
+    const newScale = Math.min(scaleRef.current * 1.25, 8)
+    scaleRef.current = newScale
+    setScale(newScale)
+  }
+  const handleZoomOut = () => {
+    const newScale = Math.max(scaleRef.current * 0.8, 0.01)
+    scaleRef.current = newScale
+    setScale(newScale)
+  }
   const handleResetZoom = () => {
     fitMapToViewport()
   }
@@ -374,9 +573,21 @@ export default function MapViewerClient() {
     return { x: Number(xPct.toFixed(2)), y: Number(yPct.toFixed(2)) }
   }
 
+  // Pixel coordinates within unscaled map dimensions [0..mapWidth, 0..mapHeight]
+  const getCanvasPixelCoordinates = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!containerRef.current) return { x: 0, y: 0 }
+    const rect = containerRef.current.getBoundingClientRect()
+    const clickX = (e.clientX - rect.left) / scale
+    const clickY = (e.clientY - rect.top) / scale
+    return {
+      x: Math.min(Math.max(clickX, 0), mapWidth),
+      y: Math.min(Math.max(clickY, 0), mapHeight),
+    }
+  }
+
   // Canvas Click Handler based on Active Tool
   const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (isDragging || hasDraggedRef.current) return
+    if (isDragging || hasDraggedRef.current || activeTool === 'ruler') return
     const coords = getCanvasCoordinates(e)
 
     if (activeTool === 'add_pin') {
@@ -388,6 +599,7 @@ export default function MapViewerClient() {
         style: 'icon',
         icon: 'MapPin',
         color: '#a855f7',
+        gmOnly: false,
       })
       setIsPinDialogOpen(true)
     } else if (activeTool === 'add_area') {
@@ -463,6 +675,53 @@ export default function MapViewerClient() {
     })
     return map
   }, [fullData?.notes])
+
+  // Search & Filtered Pins for Locations Directory
+  const filteredPins = useMemo(() => {
+    if (!fullData?.pins) return []
+    return fullData.pins.filter((pin) => {
+      if (locationFilterLayer !== 'all' && pin.layerId !== locationFilterLayer) {
+        return false
+      }
+      if (locationSearch.trim()) {
+        const q = locationSearch.toLowerCase()
+        const titleMatch = pin.title.toLowerCase().includes(q)
+        const descMatch = pin.description ? pin.description.toLowerCase().includes(q) : false
+        return titleMatch || descMatch
+      }
+      return true
+    })
+  }, [fullData?.pins, locationFilterLayer, locationSearch])
+
+  // Distance Measurement Calculation
+  const getRulerDistance = () => {
+    if (!rulerPoints) return null
+    const dx = rulerPoints.current.x - rulerPoints.start.x
+    const dy = rulerPoints.current.y - rulerPoints.start.y
+    const pixelDist = Math.hypot(dx, dy)
+
+    const cellPx = Math.max(25, currentGridSize)
+    const cellCount = pixelDist / cellPx
+    const cellLabel = gridType === 'hex' || gridType === 'hex_flat' ? 'hexes' : gridType === 'square' ? 'squares' : 'cells'
+
+    const scaleValue = currentMap?.gridScale
+    const scaleUnit = currentMap?.gridScaleUnit || 'miles'
+
+    if (scaleValue && scaleValue > 0) {
+      const realDist = cellCount * scaleValue
+      return {
+        primary: `${realDist.toFixed(1)} ${scaleUnit}`,
+        secondary: `${cellCount.toFixed(1)} ${cellLabel} (${Math.round(pixelDist)}px)`,
+        pixelDist,
+      }
+    }
+
+    return {
+      primary: `${cellCount.toFixed(1)} ${cellLabel}`,
+      secondary: `${Math.round(pixelDist)}px`,
+      pixelDist,
+    }
+  }
 
   // Exact gapless interlocking honeycomb and square grid calculation with border over-tiling
   const gridCells = useMemo(() => {
@@ -645,6 +904,7 @@ export default function MapViewerClient() {
         icon: pinDraft.icon,
         color: pinDraft.color,
         targetMapId: pinDraft.targetMapId,
+        gmOnly: pinDraft.gmOnly,
       })
       toast.success('Pin saved!')
       setIsPinDialogOpen(false)
@@ -671,10 +931,11 @@ export default function MapViewerClient() {
         color: areaDraft.color,
         fillOpacity: areaDraft.fillOpacity,
         targetMapId: areaDraft.targetMapId,
+        gmOnly: areaDraft.gmOnly,
       })
       toast.success('Area saved!')
       setIsAreaDialogOpen(false)
-      setAreaDraft({ name: '', description: '', color: '#a855f7', fillOpacity: 0.3, points: [] })
+      setAreaDraft({ name: '', description: '', color: '#a855f7', fillOpacity: 0.3, points: [], gmOnly: false })
       setActiveTool('view')
     } catch (err) {
       toast.error('Failed to save area')
@@ -736,6 +997,8 @@ export default function MapViewerClient() {
         gridSize: settingsDraft.gridSize,
         gridOffsetX: settingsDraft.gridOffsetX,
         gridOffsetY: settingsDraft.gridOffsetY,
+        gridScale: settingsDraft.gridScale,
+        gridScaleUnit: settingsDraft.gridScaleUnit,
         isExplorationMap: settingsDraft.isExplorationMap,
       })
       setLiveGridOffset(null)
@@ -958,13 +1221,58 @@ export default function MapViewerClient() {
         </div>
 
         {/* TOP RIGHT CONTROLS (MODE SWITCH & LAYERS & SETTINGS) */}
+        {/* TOP RIGHT CONTROLS (LOCATIONS, RULER, LAYERS & SETTINGS) */}
         <div className="flex items-center gap-2 pointer-events-auto">
+          {/* LOCATIONS DIRECTORY BUTTON */}
+          <Button
+            variant={isLocationsMenuOpen ? 'secondary' : 'outline'}
+            size="sm"
+            className="h-9 gap-1.5 bg-background/80 backdrop-blur-md border-border/50 shadow-lg"
+            onClick={() => {
+              setIsLocationsMenuOpen(!isLocationsMenuOpen)
+              if (isLayersMenuOpen) setIsLayersMenuOpen(false)
+            }}
+            title="Browse Map Locations"
+          >
+            <Compass className="h-4 w-4 text-cyan-400" />
+            <span className="hidden sm:inline">Locations</span>
+            {fullData?.pins && fullData.pins.length > 0 && (
+              <span className="ml-0.5 px-1.5 py-0.2 bg-muted/80 rounded-full text-[10px] font-mono">
+                {fullData.pins.length}
+              </span>
+            )}
+          </Button>
+
+          {/* RULER MEASURE BUTTON */}
+          <Button
+            variant={activeTool === 'ruler' ? 'secondary' : 'outline'}
+            size="sm"
+            className={`h-9 gap-1.5 bg-background/80 backdrop-blur-md border-border/50 shadow-lg ${
+              activeTool === 'ruler' ? 'text-cyan-400 border-cyan-500/50 bg-cyan-950/40' : ''
+            }`}
+            onClick={() => {
+              if (activeTool === 'ruler') {
+                setActiveTool('view')
+                setRulerPoints(null)
+              } else {
+                setActiveTool('ruler')
+              }
+            }}
+            title="Measure Distance (Ruler)"
+          >
+            <Ruler className="h-4 w-4 text-cyan-400" />
+            <span className="hidden sm:inline">Ruler</span>
+          </Button>
+
           {/* LAYERS TOGGLE */}
           <Button
             variant={isLayersMenuOpen ? 'secondary' : 'outline'}
             size="sm"
             className="h-9 gap-2 bg-background/80 backdrop-blur-md border-border/50 shadow-lg"
-            onClick={() => setIsLayersMenuOpen(!isLayersMenuOpen)}
+            onClick={() => {
+              setIsLayersMenuOpen(!isLayersMenuOpen)
+              if (isLocationsMenuOpen) setIsLocationsMenuOpen(false)
+            }}
           >
             <Layers className="h-4 w-4 text-purple-400" />
             <span className="hidden sm:inline">Layers</span>
@@ -980,6 +1288,7 @@ export default function MapViewerClient() {
                 onClick={() => {
                   setIsEditMode(false)
                   setActiveTool('view')
+                  setRulerPoints(null)
                 }}
               >
                 <Eye className="h-3.5 w-3.5" /> View
@@ -1017,7 +1326,10 @@ export default function MapViewerClient() {
             variant={activeTool === 'view' ? 'secondary' : 'ghost'}
             size="icon"
             className="h-9 w-9"
-            onClick={() => setActiveTool('view')}
+            onClick={() => {
+              setActiveTool('view')
+              setRulerPoints(null)
+            }}
             title="Pan / Select"
           >
             <Move className="h-4 w-4" />
@@ -1037,11 +1349,27 @@ export default function MapViewerClient() {
             className="h-9 w-9 text-emerald-400"
             onClick={() => {
               setActiveTool('add_area')
-              setAreaDraft({ name: '', description: '', color: '#a855f7', fillOpacity: 0.3, points: [] })
+              setAreaDraft({ name: '', description: '', color: '#a855f7', fillOpacity: 0.3, points: [], gmOnly: false })
             }}
             title="Draw Polygon Area"
           >
             <Plus className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={activeTool === 'ruler' ? 'secondary' : 'ghost'}
+            size="icon"
+            className={`h-9 w-9 ${activeTool === 'ruler' ? 'text-cyan-400 bg-cyan-950/40 ring-1 ring-cyan-500/50' : 'text-cyan-400'}`}
+            onClick={() => {
+              if (activeTool === 'ruler') {
+                setActiveTool('view')
+                setRulerPoints(null)
+              } else {
+                setActiveTool('ruler')
+              }
+            }}
+            title="Measure Distance (Ruler)"
+          >
+            <Ruler className="h-4 w-4" />
           </Button>
           {gridType !== 'none' && (
             <Button
@@ -1274,6 +1602,131 @@ export default function MapViewerClient() {
         </Card>
       )}
 
+      {/* LOCATIONS DIRECTORY SIDEBAR PANEL */}
+      {isLocationsMenuOpen && (
+        <Card className="absolute top-16 right-4 z-40 w-80 bg-card/95 backdrop-blur-md border-border/50 shadow-2xl flex flex-col max-h-[75vh]">
+          <CardHeader className="py-3 px-4 flex flex-row items-center justify-between border-b border-border/50 shrink-0">
+            <CardTitle className="text-sm font-bold flex items-center gap-2">
+              <Compass className="h-4 w-4 text-cyan-400" /> Locations ({filteredPins.length})
+            </CardTitle>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsLocationsMenuOpen(false)}>
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </CardHeader>
+          <div className="p-3 border-b border-border/40 space-y-2 shrink-0">
+            <div className="relative">
+              <Search className="h-3.5 w-3.5 absolute left-2.5 top-2.5 text-muted-foreground" />
+              <Input
+                placeholder="Search locations..."
+                className="h-8 pl-8 text-xs bg-background/60"
+                value={locationSearch}
+                onChange={(e) => setLocationSearch(e.target.value)}
+              />
+            </div>
+            {fullData?.layers && fullData.layers.length > 0 && (
+              <Select value={locationFilterLayer} onValueChange={setLocationFilterLayer}>
+                <SelectTrigger className="h-7 text-xs bg-background/60"><SelectValue placeholder="All Layers" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Layers</SelectItem>
+                  {fullData.layers.map((l) => (
+                    <SelectItem key={l._id} value={l._id}>{l.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+          <CardContent className="p-2 space-y-1.5 overflow-y-auto flex-1">
+            {filteredPins.length === 0 ? (
+              <p className="text-xs text-muted-foreground italic text-center py-6">No locations found.</p>
+            ) : (
+              filteredPins.map((pin) => {
+                const pinLayer = fullData?.layers.find((l) => l._id === pin.layerId)
+                return (
+                  <div
+                    key={pin._id}
+                    className="p-2 rounded-lg hover:bg-muted/50 border border-transparent hover:border-border/40 transition-colors cursor-pointer group flex items-start justify-between gap-2"
+                    onClick={() => {
+                      // Center viewport on pin
+                      const targetPxX = (pin.x / 100) * mapWidth - mapWidth / 2
+                      const targetPxY = (pin.y / 100) * mapHeight - mapHeight / 2
+                      const newScale = Math.max(scaleRef.current, 1.2)
+                      scaleRef.current = newScale
+                      setScale(newScale)
+                      positionRef.current = { x: -targetPxX * newScale, y: -targetPxY * newScale }
+                      setPosition({ x: -targetPxX * newScale, y: -targetPxY * newScale })
+                      setSelectedPin(pin)
+                    }}
+                  >
+                    <div className="flex items-start gap-2.5 min-w-0">
+                      <div
+                        className="p-1.5 rounded-full shadow-sm shrink-0 mt-0.5"
+                        style={{ backgroundColor: pin.color || '#a855f7' }}
+                      >
+                        {renderPinIcon(pin.icon, "h-3.5 w-3.5 text-white")}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-semibold text-xs truncate group-hover:text-primary transition-colors">
+                            {pin.title}
+                          </span>
+                          {pin.gmOnly && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center gap-0.5">
+                              <EyeOff className="h-2.5 w-2.5" /> Secret
+                            </span>
+                          )}
+                        </div>
+                        {pin.description && (
+                          <p className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5">
+                            {pin.description}
+                          </p>
+                        )}
+                        {pinLayer && (
+                          <span className="text-[10px] text-purple-400/80 mt-0.5 block">
+                            {pinLayer.name}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground/50 group-hover:text-foreground shrink-0 mt-1" />
+                  </div>
+                )
+              })
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* RULER ACTIVE BOTTOM HUD */}
+      {activeTool === 'ruler' && (
+        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-30 flex items-center gap-3 bg-background/90 backdrop-blur-md px-4 py-2 rounded-full border border-cyan-500/40 shadow-2xl">
+          <div className="flex items-center gap-2 text-xs font-medium text-foreground">
+            <Ruler className="h-4 w-4 text-cyan-400" />
+            <span>Click &amp; drag across the map to measure distance</span>
+          </div>
+          {rulerPoints && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs px-2 text-muted-foreground hover:text-destructive"
+              onClick={() => setRulerPoints(null)}
+            >
+              Clear
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs px-2.5"
+            onClick={() => {
+              setRulerPoints(null)
+              setActiveTool('view')
+            }}
+          >
+            Done
+          </Button>
+        </div>
+      )}
+
       {/* ZOOM & VIEWPORT CONTROLS */}
       <div className="absolute bottom-6 right-6 z-30 flex flex-col gap-2 bg-background/80 backdrop-blur-md p-1.5 rounded-full border border-border/50 shadow-xl">
         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={handleZoomIn}>
@@ -1290,7 +1743,7 @@ export default function MapViewerClient() {
       {/* CANVAS CONTAINER */}
       <div
         ref={viewportRef}
-        className={`w-full h-full ${activeTool === 'align_grid' ? 'cursor-move' : 'cursor-grab active:cursor-grabbing'} flex items-center justify-center overflow-hidden`}
+        className={`w-full h-full ${activeTool === 'align_grid' ? 'cursor-move' : activeTool === 'ruler' ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing'} flex items-center justify-center overflow-hidden`}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -1341,7 +1794,7 @@ export default function MapViewerClient() {
             )
           })}
 
-          {/* POLYGON AREAS */}
+          {/* POLYGON AREAS & RULER SVG */}
           <svg className="absolute inset-0 w-full h-full pointer-events-none">
             {fullData?.areas.map((area) => {
               if (area.layerId && !enabledLayers[area.layerId]) return null
@@ -1354,6 +1807,7 @@ export default function MapViewerClient() {
                   fillOpacity={area.fillOpacity ?? 0.3}
                   stroke={area.color || '#a855f7'}
                   strokeWidth="2"
+                  strokeDasharray={area.gmOnly ? '6,4' : undefined}
                   className="pointer-events-auto cursor-pointer hover:opacity-80 transition-opacity"
                   onClick={(e) => {
                     e.stopPropagation()
@@ -1379,24 +1833,111 @@ export default function MapViewerClient() {
                 strokeDasharray="5,5"
               />
             )}
+
+            {/* RULER MEASUREMENT LINE */}
+            {rulerPoints && (
+              <g className="pointer-events-none">
+                <line
+                  x1={rulerPoints.start.x}
+                  y1={rulerPoints.start.y}
+                  x2={rulerPoints.current.x}
+                  y2={rulerPoints.current.y}
+                  stroke="#0f172a"
+                  strokeWidth="6"
+                  strokeLinecap="round"
+                />
+                <line
+                  x1={rulerPoints.start.x}
+                  y1={rulerPoints.start.y}
+                  x2={rulerPoints.current.x}
+                  y2={rulerPoints.current.y}
+                  stroke="#06b6d4"
+                  strokeWidth="3"
+                  strokeDasharray="8,6"
+                  strokeLinecap="round"
+                />
+                <circle
+                  cx={rulerPoints.start.x}
+                  cy={rulerPoints.start.y}
+                  r="7"
+                  fill="#06b6d4"
+                  stroke="#0f172a"
+                  strokeWidth="2"
+                />
+                <circle
+                  cx={rulerPoints.current.x}
+                  cy={rulerPoints.current.y}
+                  r="7"
+                  fill="#22d3ee"
+                  stroke="#0f172a"
+                  strokeWidth="2"
+                />
+              </g>
+            )}
           </svg>
+
+          {/* RULER FLOATING DISTANCE BADGE */}
+          {rulerPoints && (
+            <div
+              className="absolute pointer-events-none transform -translate-x-1/2 -translate-y-1/2 z-30"
+              style={{
+                left: `${(rulerPoints.start.x + rulerPoints.current.x) / 2}px`,
+                top: `${(rulerPoints.start.y + rulerPoints.current.y) / 2}px`,
+              }}
+            >
+              {(() => {
+                const dist = getRulerDistance()
+                if (!dist) return null
+                return (
+                  <div className="bg-slate-950/95 border border-cyan-500/60 shadow-[0_0_16px_rgba(6,182,212,0.4)] backdrop-blur-md px-3 py-1.5 rounded-full flex flex-col items-center whitespace-nowrap text-center">
+                    <span className="text-xs font-bold text-cyan-300 font-mono flex items-center gap-1.5">
+                      <Ruler className="h-3.5 w-3.5 text-cyan-400" />
+                      {dist.primary}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground font-mono">
+                      {dist.secondary}
+                    </span>
+                  </div>
+                )
+              })()}
+            </div>
+          )}
 
           {/* PINS */}
           {fullData?.pins.map((pin) => {
             if (pin.layerId && !enabledLayers[pin.layerId]) return null
             const showTextOnly = pin.style === 'text_only'
+            const isDraggingThisPin = draggingPinId === pin._id
+            const currentPinX = isDraggingThisPin && draggedPinOffset ? draggedPinOffset.x : pin.x
+            const currentPinY = isDraggingThisPin && draggedPinOffset ? draggedPinOffset.y : pin.y
 
             return (
               <div
                 key={pin._id}
-                className="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-auto cursor-pointer group"
+                className={`absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-auto group ${
+                  isOwner && isEditMode && activeTool === 'view' ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
+                }`}
                 style={{
-                  left: `${pin.x}%`,
-                  top: `${pin.y}%`,
-                  zIndex: isOwner && isEditMode ? 25 : 5,
+                  left: `${currentPinX}%`,
+                  top: `${currentPinY}%`,
+                  zIndex: isDraggingThisPin ? 40 : (isOwner && isEditMode ? 25 : 5),
+                }}
+                onMouseDown={(e) => {
+                  if (isOwner && isEditMode && activeTool === 'view') {
+                    e.stopPropagation()
+                    pinDragStartRef.current = {
+                      clientX: e.clientX,
+                      clientY: e.clientY,
+                      origX: pin.x,
+                      origY: pin.y,
+                      moved: false,
+                    }
+                    setDraggingPinId(pin._id)
+                  }
                 }}
                 onClick={(e) => {
                   e.stopPropagation()
+                  if (pinDragStartRef.current?.moved) return
                   if (pin.targetMapId) {
                     const target = worldMaps?.find((m) => m._id === pin.targetMapId)
                     if (target) router.push(`/world/${encodeURIComponent(world.name)}/map/${target.slug}`)
@@ -1406,17 +1947,32 @@ export default function MapViewerClient() {
                 }}
               >
                 {showTextOnly ? (
-                  <span className="bg-background/90 backdrop-blur-md px-2 py-0.5 rounded-md border border-border/50 text-xs font-bold shadow-lg text-primary whitespace-nowrap">
+                  <span className="bg-background/90 backdrop-blur-md px-2 py-0.5 rounded-md border border-border/50 text-xs font-bold shadow-lg text-primary whitespace-nowrap flex items-center gap-1.5">
                     {pin.title}
+                    {pin.gmOnly && (
+                      <span title="Secret (GM Only)">
+                        <EyeOff className="h-3 w-3 text-amber-400 shrink-0" />
+                      </span>
+                    )}
                   </span>
                 ) : (
-                  <div className="flex flex-col items-center">
+                  <div className="flex flex-col items-center relative">
                     <div
-                      className="p-2 rounded-full shadow-lg border border-white/20 transition-transform group-hover:scale-110"
+                      className={`p-2 rounded-full shadow-lg border border-white/20 transition-transform ${
+                        isDraggingThisPin ? 'scale-125 ring-2 ring-amber-400' : 'group-hover:scale-110'
+                      }`}
                       style={{ backgroundColor: pin.color || '#a855f7' }}
                     >
-                      <MapPin className="h-5 w-5 text-white" />
+                      {renderPinIcon(pin.icon, "h-5 w-5 text-white")}
                     </div>
+                    {pin.gmOnly && (
+                      <div
+                        className="absolute -top-1 -right-1 bg-amber-500 rounded-full p-0.5 shadow-md border border-slate-900"
+                        title="Secret Pin (Hidden from players)"
+                      >
+                        <EyeOff className="h-2.5 w-2.5 text-slate-950" />
+                      </div>
+                    )}
                     {(scale > 0.8 || (pin.minZoom && scale >= pin.minZoom)) && (
                       <span className="mt-1 bg-background/90 backdrop-blur-md px-2 py-0.5 rounded-md text-[10px] font-bold text-white whitespace-nowrap shadow-md">
                         {pin.title}
@@ -1513,31 +2069,86 @@ export default function MapViewerClient() {
         <Dialog open={!!selectedPin} onOpenChange={() => setSelectedPin(null)}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle className="flex items-center justify-between text-lg font-bold">
-                <span className="flex items-center gap-2">
-                  <MapPin className="h-5 w-5 text-purple-400" />
-                  {selectedPin.title}
-                </span>
-                {isOwner && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-destructive"
-                    onClick={() => {
-                      deletePinMutation({ pinId: selectedPin._id })
-                      setSelectedPin(null)
-                    }}
+              <div className="flex items-start justify-between gap-3">
+                <DialogTitle className="flex items-center gap-2.5 text-lg font-bold">
+                  <div
+                    className="p-2 rounded-lg flex items-center justify-center shrink-0 shadow-md"
+                    style={{ backgroundColor: selectedPin.color || '#a855f7' }}
                   >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                    {renderPinIcon(selectedPin.icon, "h-5 w-5 text-white")}
+                  </div>
+                  <div className="min-w-0">
+                    <span className="break-words leading-tight block">{selectedPin.title}</span>
+                    {selectedPin.gmOnly && (
+                      <span className="inline-flex items-center gap-1 mt-1 text-[11px] font-mono text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                        <EyeOff className="h-3 w-3" /> Secret (GM Only)
+                      </span>
+                    )}
+                  </div>
+                </DialogTitle>
+                {isOwner && (
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1 text-xs"
+                      onClick={() => {
+                        setPinDraft({
+                          id: selectedPin._id,
+                          x: selectedPin.x,
+                          y: selectedPin.y,
+                          title: selectedPin.title,
+                          description: selectedPin.description || '',
+                          style: selectedPin.style || 'icon',
+                          icon: selectedPin.icon || 'MapPin',
+                          color: selectedPin.color || '#a855f7',
+                          targetMapId: selectedPin.targetMapId,
+                          layerId: selectedPin.layerId,
+                          gmOnly: selectedPin.gmOnly || false,
+                        })
+                        setSelectedPin(null)
+                        setIsPinDialogOpen(true)
+                      }}
+                    >
+                      <Edit3 className="h-3.5 w-3.5" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                      onClick={() => {
+                        deletePinMutation({ pinId: selectedPin._id })
+                        setSelectedPin(null)
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 )}
-              </DialogTitle>
+              </div>
             </DialogHeader>
-            <div className="space-y-4 text-sm leading-relaxed">
+            <div className="space-y-4 text-sm leading-relaxed pt-2">
               {selectedPin.description ? (
-                <p className="text-muted-foreground">{selectedPin.description}</p>
+                <p className="text-muted-foreground whitespace-pre-wrap">{selectedPin.description}</p>
               ) : (
                 <p className="text-xs italic text-muted-foreground">No description provided.</p>
+              )}
+              {selectedPin.targetMapId && (
+                <div className="pt-2 border-t border-border/40">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="w-full gap-2 text-xs"
+                    onClick={() => {
+                      const target = worldMaps?.find((m) => m._id === selectedPin.targetMapId)
+                      if (target) router.push(`/world/${encodeURIComponent(world.name)}/map/${target.slug}`)
+                    }}
+                  >
+                    <Map className="h-3.5 w-3.5" />
+                    Open Linked Map
+                  </Button>
+                </div>
               )}
             </div>
           </DialogContent>
@@ -1545,12 +2156,29 @@ export default function MapViewerClient() {
       )}
 
       {/* DIALOG: CREATE / EDIT PIN FORM */}
-      <Dialog open={isPinDialogOpen} onOpenChange={setIsPinDialogOpen}>
-        <DialogContent className="max-w-md">
+      <Dialog
+        open={isPinDialogOpen}
+        onOpenChange={(open) => {
+          setIsPinDialogOpen(open)
+          if (!open) {
+            setPinDraft({
+              x: 50,
+              y: 50,
+              title: '',
+              description: '',
+              style: 'icon',
+              icon: 'MapPin',
+              color: '#a855f7',
+              gmOnly: false,
+            })
+          }
+        }}
+      >
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Add Map Pin</DialogTitle>
+            <DialogTitle>{pinDraft.id ? 'Edit Map Pin' : 'Add Map Pin'}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3 text-xs">
+          <div className="space-y-3.5 text-xs">
             <div>
               <label className="font-bold text-muted-foreground">Title</label>
               <Input
@@ -1564,7 +2192,8 @@ export default function MapViewerClient() {
               <Textarea
                 value={pinDraft.description}
                 onChange={(e) => setPinDraft({ ...pinDraft, description: e.target.value })}
-                placeholder="Details or lore..."
+                placeholder="Details, secrets, lore..."
+                rows={3}
               />
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -1591,6 +2220,63 @@ export default function MapViewerClient() {
                 />
               </div>
             </div>
+
+            {/* Fantasy Icon Picker */}
+            {pinDraft.style === 'icon' && (
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="font-bold text-muted-foreground">Pin Icon</label>
+                  <span className="text-[11px] text-muted-foreground font-medium">
+                    {PIN_ICONS.find((i) => i.name === pinDraft.icon)?.label || pinDraft.icon}
+                  </span>
+                </div>
+                <div className="grid grid-cols-7 gap-1.5 p-2 bg-muted/20 border border-border/50 rounded-lg max-h-36 overflow-y-auto">
+                  {PIN_ICONS.map((item) => {
+                    const isSelected = pinDraft.icon === item.name
+                    const IconCmp = item.icon
+                    return (
+                      <button
+                        key={item.name}
+                        type="button"
+                        title={item.label}
+                        onClick={() => setPinDraft({ ...pinDraft, icon: item.name })}
+                        className={`h-9 w-9 rounded-md flex items-center justify-center transition-all ${
+                          isSelected
+                            ? 'bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2 ring-offset-background scale-105'
+                            : 'bg-background/80 hover:bg-accent text-muted-foreground hover:text-foreground border border-border/40'
+                        }`}
+                      >
+                        <IconCmp className="h-4 w-4" />
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Layer Selection (if layers present) */}
+            {fullData?.layers && fullData.layers.length > 0 && (
+              <div>
+                <label className="font-bold text-muted-foreground">Layer (Optional)</label>
+                <Select
+                  value={pinDraft.layerId || 'none'}
+                  onValueChange={(val) =>
+                    setPinDraft({ ...pinDraft, layerId: val === 'none' ? undefined : (val as Id<'mapLayers'>) })
+                  }
+                >
+                  <SelectTrigger><SelectValue placeholder="All Layers" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Default / All Layers</SelectItem>
+                    {fullData.layers.map((l) => (
+                      <SelectItem key={l._id} value={l._id}>
+                        {l.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div>
               <label className="font-bold text-muted-foreground">Link to Map (Optional)</label>
               <Select
@@ -1610,9 +2296,30 @@ export default function MapViewerClient() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* GM Secret Toggle */}
+            {isOwner && (
+              <div className="flex items-center justify-between border border-border/60 bg-muted/20 px-3 py-2.5 rounded-md">
+                <div className="space-y-0.5 pr-2">
+                  <span className="font-bold flex items-center gap-1.5 text-xs text-foreground">
+                    <EyeOff className="h-3.5 w-3.5 text-amber-400" />
+                    Secret Pin (GM Only)
+                  </span>
+                  <p className="text-[11px] text-muted-foreground">
+                    Only visible to GM. Completely hidden from players.
+                  </p>
+                </div>
+                <Switch
+                  checked={pinDraft.gmOnly || false}
+                  onCheckedChange={(val) => setPinDraft({ ...pinDraft, gmOnly: val })}
+                />
+              </div>
+            )}
           </div>
-          <DialogFooter>
-            <Button size="sm" onClick={handleSavePin}>Save Pin</Button>
+          <DialogFooter className="pt-2">
+            <Button size="sm" onClick={handleSavePin}>
+              {pinDraft.id ? 'Update Pin' : 'Save Pin'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1939,6 +2646,54 @@ export default function MapViewerClient() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Map Scale / Distance Calibration */}
+                  <div className="pt-2 border-t border-border/40 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="font-bold text-muted-foreground flex items-center gap-1.5">
+                        <Ruler className="h-3.5 w-3.5 text-cyan-400" />
+                        Map Distance Scale (Optional)
+                      </label>
+                      <span className="text-[10px] text-muted-foreground">Used by Ruler tool</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] text-muted-foreground block mb-1">
+                          Distance per {settingsDraft.gridType === 'square' ? 'Square' : 'Hex'}
+                        </label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="any"
+                          placeholder="e.g. 5, 24, 50"
+                          value={settingsDraft.gridScale || ''}
+                          onChange={(e) => setSettingsDraft({ ...settingsDraft, gridScale: Math.max(0, Number(e.target.value)) })}
+                          className="h-9 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-muted-foreground block mb-1">Scale Unit</label>
+                        <Select
+                          value={settingsDraft.gridScaleUnit || 'miles'}
+                          onValueChange={(val) => setSettingsDraft({ ...settingsDraft, gridScaleUnit: val })}
+                        >
+                          <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="miles">Miles (mi)</SelectItem>
+                            <SelectItem value="km">Kilometers (km)</SelectItem>
+                            <SelectItem value="feet">Feet (ft)</SelectItem>
+                            <SelectItem value="meters">Meters (m)</SelectItem>
+                            <SelectItem value="leagues">Leagues</SelectItem>
+                            <SelectItem value="days travel">Days Travel</SelectItem>
+                            <SelectItem value="hours travel">Hours Travel</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground/80">
+                      Example: 1 hex = {settingsDraft.gridScale || 1} {settingsDraft.gridScaleUnit || 'miles'}. When set, the Ruler measures real in-world travel distances.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
@@ -1954,31 +2709,82 @@ export default function MapViewerClient() {
         <Dialog open={!!selectedArea} onOpenChange={() => setSelectedArea(null)}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle className="flex items-center justify-between text-lg font-bold">
-                <span className="flex items-center gap-2">
-                  <div className="h-4 w-4 rounded-full" style={{ backgroundColor: selectedArea.color || '#a855f7' }} />
-                  {selectedArea.name}
-                </span>
+              <div className="flex items-start justify-between gap-3">
+                <DialogTitle className="flex items-center gap-2.5 text-lg font-bold">
+                  <div
+                    className="h-5 w-5 rounded-full shrink-0 shadow-sm border border-white/20"
+                    style={{ backgroundColor: selectedArea.color || '#a855f7' }}
+                  />
+                  <div className="min-w-0">
+                    <span className="break-words leading-tight block">{selectedArea.name}</span>
+                    {selectedArea.gmOnly && (
+                      <span className="inline-flex items-center gap-1 mt-1 text-[11px] font-mono text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                        <EyeOff className="h-3 w-3" /> Secret (GM Only)
+                      </span>
+                    )}
+                  </div>
+                </DialogTitle>
                 {isOwner && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-destructive"
-                    onClick={() => {
-                      deleteAreaMutation({ areaId: selectedArea._id })
-                      setSelectedArea(null)
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1 text-xs"
+                      onClick={() => {
+                        setAreaDraft({
+                          id: selectedArea._id,
+                          name: selectedArea.name,
+                          description: selectedArea.description || '',
+                          color: selectedArea.color || '#a855f7',
+                          fillOpacity: selectedArea.fillOpacity ?? 0.3,
+                          targetMapId: selectedArea.targetMapId,
+                          layerId: selectedArea.layerId,
+                          points: selectedArea.points || [],
+                          gmOnly: selectedArea.gmOnly || false,
+                        })
+                        setSelectedArea(null)
+                        setIsAreaDialogOpen(true)
+                      }}
+                    >
+                      <Edit3 className="h-3.5 w-3.5" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                      onClick={() => {
+                        deleteAreaMutation({ areaId: selectedArea._id })
+                        setSelectedArea(null)
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 )}
-              </DialogTitle>
+              </div>
             </DialogHeader>
-            <div className="space-y-4 text-sm leading-relaxed">
+            <div className="space-y-4 text-sm leading-relaxed pt-2">
               {selectedArea.description ? (
-                <p className="text-muted-foreground">{selectedArea.description}</p>
+                <p className="text-muted-foreground whitespace-pre-wrap">{selectedArea.description}</p>
               ) : (
                 <p className="text-xs italic text-muted-foreground">No description provided for this area.</p>
+              )}
+              {selectedArea.targetMapId && (
+                <div className="pt-2 border-t border-border/40">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="w-full gap-2 text-xs"
+                    onClick={() => {
+                      const target = worldMaps?.find((m) => m._id === selectedArea.targetMapId)
+                      if (target) router.push(`/world/${encodeURIComponent(world.name)}/map/${target.slug}`)
+                    }}
+                  >
+                    <Map className="h-3.5 w-3.5" />
+                    Open Linked Map
+                  </Button>
+                </div>
               )}
             </div>
           </DialogContent>
@@ -1986,12 +2792,29 @@ export default function MapViewerClient() {
       )}
 
       {/* DIALOG: SAVE AREA DRAFT */}
-      <Dialog open={isAreaDialogOpen} onOpenChange={setIsAreaDialogOpen}>
-        <DialogContent className="max-w-md">
+      <Dialog
+        open={isAreaDialogOpen}
+        onOpenChange={(open) => {
+          setIsAreaDialogOpen(open)
+          if (!open) {
+            setAreaDraft({
+              name: '',
+              description: '',
+              color: '#a855f7',
+              fillOpacity: 0.3,
+              points: [],
+              gmOnly: false,
+            })
+          }
+        }}
+      >
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Save Polygon Area ({areaDraft.points.length} points)</DialogTitle>
+            <DialogTitle>
+              {areaDraft.id ? 'Edit Area Details' : `Save Polygon Area (${areaDraft.points.length} points)`}
+            </DialogTitle>
           </DialogHeader>
-          <div className="space-y-3 text-xs">
+          <div className="space-y-3.5 text-xs">
             <div>
               <label className="font-bold text-muted-foreground">Area Name</label>
               <Input
@@ -2006,6 +2829,7 @@ export default function MapViewerClient() {
                 value={areaDraft.description}
                 onChange={(e) => setAreaDraft({ ...areaDraft, description: e.target.value })}
                 placeholder="Area lore, hazards, details..."
+                rows={3}
               />
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -2030,6 +2854,30 @@ export default function MapViewerClient() {
                 />
               </div>
             </div>
+
+            {/* Layer selection if layers exist */}
+            {fullData?.layers && fullData.layers.length > 0 && (
+              <div>
+                <label className="font-bold text-muted-foreground">Layer (Optional)</label>
+                <Select
+                  value={areaDraft.layerId || 'none'}
+                  onValueChange={(val) =>
+                    setAreaDraft({ ...areaDraft, layerId: val === 'none' ? undefined : (val as Id<'mapLayers'>) })
+                  }
+                >
+                  <SelectTrigger><SelectValue placeholder="All Layers" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Default / All Layers</SelectItem>
+                    {fullData.layers.map((l) => (
+                      <SelectItem key={l._id} value={l._id}>
+                        {l.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div>
               <label className="font-bold text-muted-foreground">Link to Map (Optional)</label>
               <Select
@@ -2049,9 +2897,30 @@ export default function MapViewerClient() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* GM Secret Toggle */}
+            {isOwner && (
+              <div className="flex items-center justify-between border border-border/60 bg-muted/20 px-3 py-2.5 rounded-md">
+                <div className="space-y-0.5 pr-2">
+                  <span className="font-bold flex items-center gap-1.5 text-xs text-foreground">
+                    <EyeOff className="h-3.5 w-3.5 text-amber-400" />
+                    Secret Area (GM Only)
+                  </span>
+                  <p className="text-[11px] text-muted-foreground">
+                    Dashed outline. Hidden from players, visible only to GM.
+                  </p>
+                </div>
+                <Switch
+                  checked={areaDraft.gmOnly || false}
+                  onCheckedChange={(val) => setAreaDraft({ ...areaDraft, gmOnly: val })}
+                />
+              </div>
+            )}
           </div>
-          <DialogFooter>
-            <Button size="sm" onClick={handleSaveArea}>Save Area</Button>
+          <DialogFooter className="pt-2">
+            <Button size="sm" onClick={handleSaveArea}>
+              {areaDraft.id ? 'Update Area' : 'Save Area'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
