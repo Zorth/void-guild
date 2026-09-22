@@ -9,7 +9,7 @@ import Link from 'next/link'
 import { 
   ZoomIn, ZoomOut, Maximize2, Layers, MapPin, Eye, Edit3, Plus, 
   Trash2, Settings, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Map, FileText, Check, X, Grid, Lock, Unlock, Move, HelpCircle, Copy,
-  Castle, Crown, Skull, Swords, Shield, Mountain, Tent, Beer, Anchor, Flame, TreePine, Sparkles, BookOpen, Coins, Compass, Gem, Crosshair, Flag, Ghost, EyeOff, Ruler, Search
+  Castle, Crown, Skull, Swords, Shield, Mountain, Tent, Beer, Anchor, Flame, TreePine, Sparkles, BookOpen, Coins, Compass, Gem, Crosshair, Flag, Ghost, EyeOff, Ruler, Search, RotateCcw
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -129,6 +129,7 @@ export default function MapViewerClient() {
 
   // Locations Directory state
   const [isLocationsMenuOpen, setIsLocationsMenuOpen] = useState(false)
+  const [locationDirectoryTab, setLocationDirectoryTab] = useState<'pins' | 'areas'>('pins')
   const [locationSearch, setLocationSearch] = useState('')
   const [locationFilterLayer, setLocationFilterLayer] = useState<string>('all')
 
@@ -152,6 +153,17 @@ export default function MapViewerClient() {
   const [selectedArea, setSelectedArea] = useState<any>(null)
   const [selectedCellKey, setSelectedCellKey] = useState<string | null>(null)
   const [draftNote, setDraftNote] = useState('')
+
+  // Reshaping polygon area state
+  const [reshapingArea, setReshapingArea] = useState<{
+    id: Id<'mapAreas'>
+    name: string
+    color: string
+    points: { x: number; y: number }[]
+    originalPoints: { x: number; y: number }[]
+  } | null>(null)
+  const [draggedVertexIndex, setDraggedVertexIndex] = useState<number | null>(null)
+  const [isReshapingAddPointMode, setIsReshapingAddPointMode] = useState(false)
 
   // Pin Form Draft
   const [pinDraft, setPinDraft] = useState<{
@@ -212,6 +224,7 @@ export default function MapViewerClient() {
     gridScale: 0,
     gridScaleUnit: 'miles',
     isExplorationMap: false,
+    hideFromMenu: false,
   })
 
   // New Map Draft
@@ -220,6 +233,7 @@ export default function MapViewerClient() {
     slug: '',
     isHomeMap: false,
     imageUrl: '',
+    hideFromMenu: false,
   })
 
   // New Layer Draft
@@ -258,6 +272,7 @@ export default function MapViewerClient() {
         gridScale: currentMap.gridScale || 0,
         gridScaleUnit: currentMap.gridScaleUnit || 'miles',
         isExplorationMap: currentMap.isExplorationMap || false,
+        hideFromMenu: currentMap.hideFromMenu || false,
       })
     }
   }, [currentMap])
@@ -269,7 +284,8 @@ export default function MapViewerClient() {
 
     const handleWheelNative = (e: WheelEvent) => {
       const viewport = viewportRef.current
-      if (!viewport) return
+      const container = containerRef.current
+      if (!viewport || !container) return
 
       // Do not intercept if scrolling inside dialogs, modals, popovers, or scrollable dropdown menus
       const target = e.target as HTMLElement | null
@@ -296,19 +312,27 @@ export default function MapViewerClient() {
         const currentPos = positionRef.current
 
         const newScale = Math.min(Math.max(currentScale * zoomFactor, 0.01), 8)
+        if (newScale === currentScale) return
         const k = newScale / currentScale
 
-        const rect = viewport.getBoundingClientRect()
-        const cx = rect.width / 2
-        const cy = rect.height / 2
-        const mouseX = e.clientX - rect.left - cx
-        const mouseY = e.clientY - rect.top - cy
+        // Use the container's live bounding rect to obtain its exact visual center on screen
+        const cRect = container.getBoundingClientRect()
+        const mapCenterX = cRect.left + cRect.width / 2
+        const mapCenterY = cRect.top + cRect.height / 2
 
-        const newX = mouseX + (currentPos.x - mouseX) * k
-        const newY = mouseY + (currentPos.y - mouseY) * k
+        // Vector from map visual center to mouse cursor
+        const mouseOffsetX = e.clientX - mapCenterX
+        const mouseOffsetY = e.clientY - mapCenterY
+
+        // Adjust position so the point under the mouse cursor remains invariant
+        const newX = currentPos.x + (1 - k) * mouseOffsetX
+        const newY = currentPos.y + (1 - k) * mouseOffsetY
 
         scaleRef.current = newScale
         positionRef.current = { x: newX, y: newY }
+
+        // Directly apply transform to container DOM element for instant 0ms latency response
+        container.style.transform = `translate(${newX}px, ${newY}px) scale(${newScale})`
 
         setScale(newScale)
         setPosition({ x: newX, y: newY })
@@ -334,13 +358,19 @@ export default function MapViewerClient() {
           setActiveTool('view')
           toast.info('Area drawing cancelled')
         }
+        if (reshapingArea) {
+          setReshapingArea(null)
+          setDraggedVertexIndex(null)
+          setIsReshapingAddPointMode(false)
+          toast.info('Area reshaping cancelled')
+        }
         setIsLocationsMenuOpen(false)
         setIsLayersMenuOpen(false)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [activeTool, areaDraft.points.length])
+  }, [activeTool, areaDraft.points.length, reshapingArea])
 
   // Mouse pan & interaction handlers
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -368,10 +398,21 @@ export default function MapViewerClient() {
       return
     }
 
-    dragStartRef.current = { x: e.clientX - position.x, y: e.clientY - position.y }
+    dragStartRef.current = { x: e.clientX - positionRef.current.x, y: e.clientY - positionRef.current.y }
   }
 
   const handleMouseMove = (e: React.MouseEvent) => {
+    if (draggedVertexIndex !== null && reshapingArea) {
+      const coords = getCanvasCoordinates(e as unknown as React.MouseEvent<HTMLDivElement>)
+      setReshapingArea((prev) => {
+        if (!prev) return null
+        const newPoints = [...prev.points]
+        newPoints[draggedVertexIndex] = coords
+        return { ...prev, points: newPoints }
+      })
+      return
+    }
+
     if (isMeasuring && activeTool === 'ruler') {
       const p = getCanvasPixelCoordinates(e as unknown as React.MouseEvent<HTMLDivElement>)
       setRulerPoints((prev) => prev ? { start: prev.start, current: p } : null)
@@ -410,10 +451,18 @@ export default function MapViewerClient() {
     const newX = e.clientX - dragStartRef.current.x
     const newY = e.clientY - dragStartRef.current.y
     positionRef.current = { x: newX, y: newY }
+    if (containerRef.current) {
+      containerRef.current.style.transform = `translate(${newX}px, ${newY}px) scale(${scaleRef.current})`
+    }
     setPosition({ x: newX, y: newY })
   }
 
   const handleMouseUp = () => {
+    if (draggedVertexIndex !== null) {
+      setDraggedVertexIndex(null)
+      return
+    }
+
     if (isMeasuring) {
       setIsMeasuring(false)
       return
@@ -484,13 +533,32 @@ export default function MapViewerClient() {
       }
 
       dragStartRef.current = {
-        x: e.touches[0].clientX - position.x,
-        y: e.touches[0].clientY - position.y,
+        x: e.touches[0].clientX - positionRef.current.x,
+        y: e.touches[0].clientY - positionRef.current.y,
       }
     }
   }
 
   const handleTouchMove = (e: React.TouchEvent) => {
+    if (draggedVertexIndex !== null && reshapingArea && e.touches.length === 1) {
+      const touch = e.touches[0]
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect()
+        const clickX = touch.clientX - rect.left
+        const clickY = touch.clientY - rect.top
+        const xPct = Math.min(Math.max((clickX / rect.width) * 100, 0), 100)
+        const yPct = Math.min(Math.max((clickY / rect.height) * 100, 0), 100)
+        const coords = { x: Number(xPct.toFixed(2)), y: Number(yPct.toFixed(2)) }
+        setReshapingArea((prev) => {
+          if (!prev) return null
+          const newPoints = [...prev.points]
+          newPoints[draggedVertexIndex] = coords
+          return { ...prev, points: newPoints }
+        })
+      }
+      return
+    }
+
     if (isMeasuring && activeTool === 'ruler' && e.touches.length === 1) {
       const touch = e.touches[0]
       if (containerRef.current) {
@@ -514,6 +582,9 @@ export default function MapViewerClient() {
       const delta = dist / touchDistanceRef.current
       const newScale = Math.min(Math.max(scaleRef.current * delta, 0.01), 8)
       scaleRef.current = newScale
+      if (containerRef.current) {
+        containerRef.current.style.transform = `translate(${positionRef.current.x}px, ${positionRef.current.y}px) scale(${newScale})`
+      }
       setScale(newScale)
       touchDistanceRef.current = dist
     } else if (e.touches.length === 1 && isDragging) {
@@ -534,11 +605,18 @@ export default function MapViewerClient() {
       const newX = e.touches[0].clientX - dragStartRef.current.x
       const newY = e.touches[0].clientY - dragStartRef.current.y
       positionRef.current = { x: newX, y: newY }
+      if (containerRef.current) {
+        containerRef.current.style.transform = `translate(${newX}px, ${newY}px) scale(${scaleRef.current})`
+      }
       setPosition({ x: newX, y: newY })
     }
   }
 
   const handleTouchEnd = () => {
+    if (draggedVertexIndex !== null) {
+      setDraggedVertexIndex(null)
+      return
+    }
     if (isMeasuring) {
       setIsMeasuring(false)
       return
@@ -551,11 +629,17 @@ export default function MapViewerClient() {
   const handleZoomIn = () => {
     const newScale = Math.min(scaleRef.current * 1.25, 8)
     scaleRef.current = newScale
+    if (containerRef.current) {
+      containerRef.current.style.transform = `translate(${positionRef.current.x}px, ${positionRef.current.y}px) scale(${newScale})`
+    }
     setScale(newScale)
   }
   const handleZoomOut = () => {
     const newScale = Math.max(scaleRef.current * 0.8, 0.01)
     scaleRef.current = newScale
+    if (containerRef.current) {
+      containerRef.current.style.transform = `translate(${positionRef.current.x}px, ${positionRef.current.y}px) scale(${newScale})`
+    }
     setScale(newScale)
   }
   const handleResetZoom = () => {
@@ -589,6 +673,13 @@ export default function MapViewerClient() {
   const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (isDragging || hasDraggedRef.current || activeTool === 'ruler') return
     const coords = getCanvasCoordinates(e)
+
+    if (reshapingArea) {
+      if (isReshapingAddPointMode) {
+        setReshapingArea((prev) => prev ? { ...prev, points: [...prev.points, coords] } : null)
+      }
+      return
+    }
 
     if (activeTool === 'add_pin') {
       setPinDraft({
@@ -628,7 +719,13 @@ export default function MapViewerClient() {
     const scaleY = (vh - padding) / h
     const fitScale = Math.min(scaleX, scaleY, 1)
     const safeScale = Math.max(fitScale, 0.01)
-    setScale(Number(safeScale.toFixed(4)))
+    const finalScale = Number(safeScale.toFixed(4))
+    scaleRef.current = finalScale
+    positionRef.current = { x: 0, y: 0 }
+    if (containerRef.current) {
+      containerRef.current.style.transform = `translate(0px, 0px) scale(${finalScale})`
+    }
+    setScale(finalScale)
     setPosition({ x: 0, y: 0 })
   }
 
@@ -692,6 +789,30 @@ export default function MapViewerClient() {
       return true
     })
   }, [fullData?.pins, locationFilterLayer, locationSearch])
+
+  // Search & Filtered Areas for Locations Directory
+  const filteredAreas = useMemo(() => {
+    if (!fullData?.areas) return []
+    return fullData.areas.filter((area) => {
+      if (locationFilterLayer !== 'all' && area.layerId !== locationFilterLayer) {
+        return false
+      }
+      if (locationSearch.trim()) {
+        const q = locationSearch.toLowerCase()
+        const nameMatch = area.name.toLowerCase().includes(q)
+        const descMatch = area.description ? area.description.toLowerCase().includes(q) : false
+        return nameMatch || descMatch
+      }
+      return true
+    })
+  }, [fullData?.areas, locationFilterLayer, locationSearch])
+
+  // Filtered Maps for Top-Left Switcher Dropdown (Hidden maps visible only to owner)
+  const dropdownMaps = useMemo(() => {
+    if (!worldMaps) return []
+    if (isOwner) return worldMaps
+    return worldMaps.filter((m) => !m.hideFromMenu)
+  }, [worldMaps, isOwner])
 
   // Distance Measurement Calculation
   const getRulerDistance = () => {
@@ -942,6 +1063,105 @@ export default function MapViewerClient() {
     }
   }
 
+  // Start reshaping an existing area
+  const handleStartReshaping = (area: any) => {
+    setSelectedArea(null)
+    setIsEditMode(true)
+    setActiveTool('view')
+    setReshapingArea({
+      id: area._id,
+      name: area.name,
+      color: area.color || '#a855f7',
+      points: [...area.points],
+      originalPoints: [...area.points],
+    })
+    setDraggedVertexIndex(null)
+    setIsReshapingAddPointMode(false)
+
+    // Center viewport on area centroid
+    if (area.points && area.points.length > 0) {
+      const avgX = area.points.reduce((acc: number, p: any) => acc + p.x, 0) / area.points.length
+      const avgY = area.points.reduce((acc: number, p: any) => acc + p.y, 0) / area.points.length
+      const targetPxX = (avgX / 100) * mapWidth - mapWidth / 2
+      const targetPxY = (avgY / 100) * mapHeight - mapHeight / 2
+      const newScale = Math.max(scaleRef.current, 1.0)
+      scaleRef.current = newScale
+      setScale(newScale)
+      positionRef.current = { x: -targetPxX * newScale, y: -targetPxY * newScale }
+      setPosition({ x: -targetPxX * newScale, y: -targetPxY * newScale })
+    }
+  }
+
+  const handleVertexMouseDown = (index: number, e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    setDraggedVertexIndex(index)
+  }
+
+  const handleVertexTouchStart = (index: number, e: React.TouchEvent) => {
+    e.stopPropagation()
+    setDraggedVertexIndex(index)
+  }
+
+  const handleInsertVertex = (insertIndex: number, x: number, y: number) => {
+    setReshapingArea((prev) => {
+      if (!prev) return null
+      const newPoints = [...prev.points]
+      newPoints.splice(insertIndex, 0, { x: Number(x.toFixed(2)), y: Number(y.toFixed(2)) })
+      return { ...prev, points: newPoints }
+    })
+    toast.info(`Inserted vertex at position ${insertIndex + 1}`)
+  }
+
+  const handleDeleteVertex = (vertexIndex: number) => {
+    setReshapingArea((prev) => {
+      if (!prev) return null
+      if (prev.points.length <= 3) {
+        toast.error('An area polygon must have at least 3 vertices')
+        return prev
+      }
+      const newPoints = prev.points.filter((_, idx) => idx !== vertexIndex)
+      toast.info(`Removed vertex ${vertexIndex + 1}`)
+      return { ...prev, points: newPoints }
+    })
+  }
+
+  const handleSaveReshapedArea = async () => {
+    if (!reshapingArea || !currentMap) return
+    if (reshapingArea.points.length < 3) {
+      toast.error('An area must have at least 3 points')
+      return
+    }
+    try {
+      const existingArea = fullData?.areas.find((a) => a._id === reshapingArea.id)
+      if (!existingArea) throw new Error('Area not found')
+      await saveAreaMutation({
+        mapId: currentMap._id,
+        areaId: reshapingArea.id,
+        layerId: existingArea.layerId,
+        name: existingArea.name,
+        description: existingArea.description,
+        points: reshapingArea.points,
+        color: existingArea.color,
+        fillOpacity: existingArea.fillOpacity,
+        targetMapId: existingArea.targetMapId,
+        gmOnly: existingArea.gmOnly,
+      })
+      toast.success(`Shape updated for "${reshapingArea.name}"!`)
+      setReshapingArea(null)
+      setDraggedVertexIndex(null)
+      setIsReshapingAddPointMode(false)
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update area shape')
+    }
+  }
+
+  const handleCancelReshape = () => {
+    setReshapingArea(null)
+    setDraggedVertexIndex(null)
+    setIsReshapingAddPointMode(false)
+  }
+
   // Save Grid Note Handler
   const handleSaveNote = async () => {
     if (!currentMap || !selectedCellKey) return
@@ -971,6 +1191,7 @@ export default function MapViewerClient() {
         slug: newMapDraft.slug,
         isHomeMap: newMapDraft.isHomeMap,
         imageUrl: newMapDraft.imageUrl,
+        hideFromMenu: newMapDraft.hideFromMenu,
       })
       toast.success('Map created!')
       setIsNewMapDialogOpen(false)
@@ -1000,6 +1221,7 @@ export default function MapViewerClient() {
         gridScale: settingsDraft.gridScale,
         gridScaleUnit: settingsDraft.gridScaleUnit,
         isExplorationMap: settingsDraft.isExplorationMap,
+        hideFromMenu: settingsDraft.hideFromMenu,
       })
       setLiveGridOffset(null)
       setLiveGridSize(null)
@@ -1162,6 +1384,21 @@ export default function MapViewerClient() {
                   onCheckedChange={(val) => setNewMapDraft({ ...newMapDraft, isHomeMap: val })}
                 />
               </div>
+              <div className="flex items-center justify-between pt-2 border-t border-border/40">
+                <div className="space-y-0.5 pr-2">
+                  <span className="font-bold flex items-center gap-1.5 text-xs text-foreground">
+                    <EyeOff className="h-3.5 w-3.5 text-amber-400" />
+                    Hide from Map Switcher
+                  </span>
+                  <p className="text-[11px] text-muted-foreground">
+                    Hidden from players in the dropdown. Navigable via linked markers.
+                  </p>
+                </div>
+                <Switch
+                  checked={newMapDraft.hideFromMenu || false}
+                  onCheckedChange={(val) => setNewMapDraft({ ...newMapDraft, hideFromMenu: val })}
+                />
+              </div>
             </div>
             <DialogFooter>
               <Button size="sm" onClick={handleCreateNewMap}>Create Map</Button>
@@ -1176,14 +1413,14 @@ export default function MapViewerClient() {
     <div className="fixed inset-0 z-0 h-dvh w-screen overflow-hidden bg-slate-950 text-foreground select-none touch-none">
       {/* TOP NAVIGATION BAR */}
       <div className="absolute top-4 left-4 right-4 z-30 flex items-center justify-between pointer-events-none">
-        <div className="flex items-center gap-2 pointer-events-auto bg-background/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-border/50 shadow-lg">
-          <Button variant="ghost" size="sm" className="h-8 px-2" asChild>
+        <div className="flex items-center gap-2 pointer-events-auto bg-slate-950 dark:bg-slate-950 backdrop-blur-md px-3 py-1.5 rounded-full border border-slate-700/80 shadow-xl text-slate-100">
+          <Button variant="ghost" size="sm" className="h-8 px-2 text-slate-200 hover:text-white hover:bg-slate-900" asChild>
             <Link href={`/world/${encodeURIComponent(world.name)}`}>
-              <ChevronLeft className="h-4 w-4 mr-1" />
+              <ChevronLeft className="h-4 w-4 mr-1 text-slate-400" />
               {world.name}
             </Link>
           </Button>
-          <span className="text-muted-foreground">/</span>
+          <span className="text-slate-500">/</span>
 
           {/* MAP SWITCHER DROPDOWN */}
           <Select
@@ -1194,14 +1431,23 @@ export default function MapViewerClient() {
                 router.push(`/world/${encodeURIComponent(world.name)}/map/${target.slug}`)
               }
             }}
+            className="h-8 border-none bg-transparent focus:ring-0 text-sm font-bold text-purple-400 gap-2 px-2 hover:text-purple-300 cursor-pointer"
           >
-            <SelectTrigger className="h-8 border-none bg-transparent focus:ring-0 text-sm font-bold text-primary gap-2 px-2">
-              <SelectValue placeholder="Select Map" />
+            <SelectTrigger className="h-8 border-none bg-transparent focus:ring-0 text-sm font-bold text-purple-400 gap-2 px-2 hover:text-purple-300">
+              <SelectValue placeholder={currentMap?.name || "Select Map"} />
             </SelectTrigger>
             <SelectContent>
-              {worldMaps?.map((m) => (
+              {dropdownMaps.map((m) => (
                 <SelectItem key={m._id} value={m._id}>
-                  {m.name} {m.isHomeMap && '🏠'}
+                  <span className="flex items-center gap-1.5">
+                    <span>{m.name}</span>
+                    {m.isHomeMap && <span>🏠</span>}
+                    {m.hideFromMenu && isOwner && (
+                      <span className="text-[10px] text-amber-400 font-medium px-1.5 py-0.5 bg-amber-500/20 border border-amber-500/30 rounded inline-flex items-center gap-0.5">
+                        <EyeOff className="h-2.5 w-2.5" /> Hidden
+                      </span>
+                    )}
+                  </span>
                 </SelectItem>
               ))}
             </SelectContent>
@@ -1211,7 +1457,7 @@ export default function MapViewerClient() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-primary"
+              className="h-8 w-8 text-slate-300 hover:text-white hover:bg-slate-900"
               onClick={() => setIsNewMapDialogOpen(true)}
               title="Add New Map"
             >
@@ -1220,14 +1466,15 @@ export default function MapViewerClient() {
           )}
         </div>
 
-        {/* TOP RIGHT CONTROLS (MODE SWITCH & LAYERS & SETTINGS) */}
         {/* TOP RIGHT CONTROLS (LOCATIONS, RULER, LAYERS & SETTINGS) */}
         <div className="flex items-center gap-2 pointer-events-auto">
           {/* LOCATIONS DIRECTORY BUTTON */}
           <Button
-            variant={isLocationsMenuOpen ? 'secondary' : 'outline'}
+            variant="ghost"
             size="sm"
-            className="h-9 gap-1.5 bg-background/80 backdrop-blur-md border-border/50 shadow-lg"
+            className={`h-9 gap-1.5 bg-slate-950 dark:bg-slate-950 text-slate-100 hover:text-white hover:bg-slate-900 dark:hover:bg-slate-900 border border-slate-700/80 shadow-xl backdrop-blur-md ${
+              isLocationsMenuOpen ? 'ring-2 ring-cyan-500/60 bg-slate-900 dark:bg-slate-900 text-cyan-300' : ''
+            }`}
             onClick={() => {
               setIsLocationsMenuOpen(!isLocationsMenuOpen)
               if (isLayersMenuOpen) setIsLayersMenuOpen(false)
@@ -1235,9 +1482,9 @@ export default function MapViewerClient() {
             title="Browse Map Locations"
           >
             <Compass className="h-4 w-4 text-cyan-400" />
-            <span className="hidden sm:inline">Locations</span>
+            <span className="hidden sm:inline font-medium">Locations</span>
             {fullData?.pins && fullData.pins.length > 0 && (
-              <span className="ml-0.5 px-1.5 py-0.2 bg-muted/80 rounded-full text-[10px] font-mono">
+              <span className="ml-0.5 px-1.5 py-0.2 bg-slate-800 border border-slate-700 rounded-full text-[10px] font-mono text-slate-300">
                 {fullData.pins.length}
               </span>
             )}
@@ -1245,10 +1492,10 @@ export default function MapViewerClient() {
 
           {/* RULER MEASURE BUTTON */}
           <Button
-            variant={activeTool === 'ruler' ? 'secondary' : 'outline'}
+            variant="ghost"
             size="sm"
-            className={`h-9 gap-1.5 bg-background/80 backdrop-blur-md border-border/50 shadow-lg ${
-              activeTool === 'ruler' ? 'text-cyan-400 border-cyan-500/50 bg-cyan-950/40' : ''
+            className={`h-9 gap-1.5 bg-slate-950 dark:bg-slate-950 text-slate-100 hover:text-white hover:bg-slate-900 dark:hover:bg-slate-900 border border-slate-700/80 shadow-xl backdrop-blur-md ${
+              activeTool === 'ruler' ? 'text-cyan-400 border-cyan-500/80 bg-slate-900 dark:bg-slate-900 ring-2 ring-cyan-500/60' : ''
             }`}
             onClick={() => {
               if (activeTool === 'ruler') {
@@ -1261,30 +1508,35 @@ export default function MapViewerClient() {
             title="Measure Distance (Ruler)"
           >
             <Ruler className="h-4 w-4 text-cyan-400" />
-            <span className="hidden sm:inline">Ruler</span>
+            <span className="hidden sm:inline font-medium">Ruler</span>
           </Button>
 
           {/* LAYERS TOGGLE */}
           <Button
-            variant={isLayersMenuOpen ? 'secondary' : 'outline'}
+            variant="ghost"
             size="sm"
-            className="h-9 gap-2 bg-background/80 backdrop-blur-md border-border/50 shadow-lg"
+            className={`h-9 gap-2 bg-slate-950 dark:bg-slate-950 text-slate-100 hover:text-white hover:bg-slate-900 dark:hover:bg-slate-900 border border-slate-700/80 shadow-xl backdrop-blur-md ${
+              isLayersMenuOpen ? 'ring-2 ring-purple-500/60 bg-slate-900 dark:bg-slate-900 text-purple-300' : ''
+            }`}
             onClick={() => {
               setIsLayersMenuOpen(!isLayersMenuOpen)
               if (isLocationsMenuOpen) setIsLocationsMenuOpen(false)
             }}
+            title="Toggle Map Layers"
           >
             <Layers className="h-4 w-4 text-purple-400" />
-            <span className="hidden sm:inline">Layers</span>
+            <span className="hidden sm:inline font-medium">Layers</span>
           </Button>
 
           {/* EDIT / VIEW MODE TOGGLE FOR OWNER */}
           {isOwner && (
-            <div className="flex items-center bg-background/80 backdrop-blur-md p-1 rounded-full border border-border/50 shadow-lg">
+            <div className="flex items-center bg-slate-950 dark:bg-slate-950 backdrop-blur-md p-1 rounded-full border border-slate-700/80 shadow-xl">
               <Button
                 variant={!isEditMode ? 'secondary' : 'ghost'}
                 size="sm"
-                className="h-7 rounded-full text-xs font-bold gap-1 px-3"
+                className={`h-7 rounded-full text-xs font-bold gap-1 px-3 ${
+                  !isEditMode ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
                 onClick={() => {
                   setIsEditMode(false)
                   setActiveTool('view')
@@ -1296,7 +1548,9 @@ export default function MapViewerClient() {
               <Button
                 variant={isEditMode ? 'secondary' : 'ghost'}
                 size="sm"
-                className="h-7 rounded-full text-xs font-bold gap-1 px-3 text-purple-400"
+                className={`h-7 rounded-full text-xs font-bold gap-1 px-3 text-purple-400 ${
+                  isEditMode ? 'bg-slate-800 text-purple-300' : 'text-purple-400 hover:text-purple-300 hover:bg-slate-900'
+                }`}
                 onClick={() => setIsEditMode(true)}
               >
                 <Edit3 className="h-3.5 w-3.5" /> Edit
@@ -1307,13 +1561,13 @@ export default function MapViewerClient() {
           {/* MAP SETTINGS BUTTON FOR OWNER */}
           {isOwner && (
             <Button
-              variant="outline"
+              variant="ghost"
               size="icon"
-              className="h-9 w-9 bg-background/80 backdrop-blur-md border-border/50 shadow-lg"
+              className="h-9 w-9 bg-slate-950 dark:bg-slate-950 text-slate-100 hover:text-white hover:bg-slate-900 dark:hover:bg-slate-900 border border-slate-700/80 shadow-xl backdrop-blur-md"
               onClick={() => setIsSettingsDialogOpen(true)}
               title="Map Settings"
             >
-              <Settings className="h-4 w-4" />
+              <Settings className="h-4 w-4 text-slate-200" />
             </Button>
           )}
         </div>
@@ -1321,11 +1575,11 @@ export default function MapViewerClient() {
 
       {/* TOOLBAR WHEN IN EDIT MODE */}
       {isOwner && isEditMode && (
-        <div className="absolute top-20 left-4 z-30 flex flex-col gap-2 bg-background/90 backdrop-blur-md p-2 rounded-xl border border-border/50 shadow-2xl">
+        <div className="absolute top-20 left-4 z-30 flex flex-col gap-2 bg-slate-950 dark:bg-slate-950 backdrop-blur-md p-2 rounded-xl border border-slate-700/80 shadow-2xl text-slate-200">
           <Button
             variant={activeTool === 'view' ? 'secondary' : 'ghost'}
             size="icon"
-            className="h-9 w-9"
+            className={`h-9 w-9 ${activeTool === 'view' ? 'bg-slate-800 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-900'}`}
             onClick={() => {
               setActiveTool('view')
               setRulerPoints(null)
@@ -1337,7 +1591,7 @@ export default function MapViewerClient() {
           <Button
             variant={activeTool === 'add_pin' ? 'secondary' : 'ghost'}
             size="icon"
-            className="h-9 w-9 text-purple-400"
+            className={`h-9 w-9 ${activeTool === 'add_pin' ? 'bg-slate-800 text-purple-300' : 'text-purple-400 hover:text-purple-300 hover:bg-slate-900'}`}
             onClick={() => setActiveTool('add_pin')}
             title="Add Pin (Click on Map)"
           >
@@ -1346,7 +1600,7 @@ export default function MapViewerClient() {
           <Button
             variant={activeTool === 'add_area' ? 'secondary' : 'ghost'}
             size="icon"
-            className="h-9 w-9 text-emerald-400"
+            className={`h-9 w-9 ${activeTool === 'add_area' ? 'bg-slate-800 text-emerald-300' : 'text-emerald-400 hover:text-emerald-300 hover:bg-slate-900'}`}
             onClick={() => {
               setActiveTool('add_area')
               setAreaDraft({ name: '', description: '', color: '#a855f7', fillOpacity: 0.3, points: [], gmOnly: false })
@@ -1358,7 +1612,7 @@ export default function MapViewerClient() {
           <Button
             variant={activeTool === 'ruler' ? 'secondary' : 'ghost'}
             size="icon"
-            className={`h-9 w-9 ${activeTool === 'ruler' ? 'text-cyan-400 bg-cyan-950/40 ring-1 ring-cyan-500/50' : 'text-cyan-400'}`}
+            className={`h-9 w-9 ${activeTool === 'ruler' ? 'bg-slate-800 text-cyan-300 ring-1 ring-cyan-500/50' : 'text-cyan-400 hover:text-cyan-300 hover:bg-slate-900'}`}
             onClick={() => {
               if (activeTool === 'ruler') {
                 setActiveTool('view')
@@ -1375,7 +1629,7 @@ export default function MapViewerClient() {
             <Button
               variant={activeTool === 'align_grid' ? 'secondary' : 'ghost'}
               size="icon"
-              className="h-9 w-9 text-amber-400"
+              className={`h-9 w-9 ${activeTool === 'align_grid' ? 'bg-slate-800 text-amber-300' : 'text-amber-400 hover:text-amber-300 hover:bg-slate-900'}`}
               onClick={() => setActiveTool(activeTool === 'align_grid' ? 'view' : 'align_grid')}
               title="Align / Offset Grid (Drag or Nudge)"
             >
@@ -1387,7 +1641,7 @@ export default function MapViewerClient() {
               <Button
                 variant={activeTool === 'reveal_hex' ? 'secondary' : 'ghost'}
                 size="icon"
-                className="h-9 w-9 text-blue-400"
+                className={`h-9 w-9 ${activeTool === 'reveal_hex' ? 'bg-slate-800 text-blue-300' : 'text-blue-400 hover:text-blue-300 hover:bg-slate-900'}`}
                 onClick={() => setActiveTool('reveal_hex')}
                 title="Reveal Grid Hex/Square"
               >
@@ -1396,7 +1650,7 @@ export default function MapViewerClient() {
               <Button
                 variant={activeTool === 'hide_hex' ? 'secondary' : 'ghost'}
                 size="icon"
-                className="h-9 w-9 text-red-400"
+                className={`h-9 w-9 ${activeTool === 'hide_hex' ? 'bg-slate-800 text-red-300' : 'text-red-400 hover:text-red-300 hover:bg-slate-900'}`}
                 onClick={() => setActiveTool('hide_hex')}
                 title="Hide Grid Hex/Square"
               >
@@ -1405,7 +1659,7 @@ export default function MapViewerClient() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 text-emerald-400"
+                className="h-9 w-9 text-emerald-400 hover:text-emerald-300 hover:bg-slate-900"
                 onClick={() => {
                   if (!currentMap) return
                   const allKeys = gridCells.map((cell) => cell.key)
@@ -1419,7 +1673,7 @@ export default function MapViewerClient() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 text-muted-foreground hover:text-red-400"
+                className="h-9 w-9 text-slate-400 hover:text-red-400 hover:bg-slate-900"
                 onClick={() => {
                   if (!currentMap) return
                   bulkRevealCellsMutation({ mapId: currentMap._id, cellKeys: currentMap.revealedCells || [], reveal: false })
@@ -1446,40 +1700,40 @@ export default function MapViewerClient() {
 
       {/* FLOATING GRID CALIBRATION HUD */}
       {isOwner && isEditMode && activeTool === 'align_grid' && gridType !== 'none' && (
-        <div className="absolute top-20 left-16 z-30 bg-background/95 backdrop-blur-md p-3.5 rounded-xl border border-amber-500/40 shadow-2xl flex flex-col gap-3 min-w-[270px]">
-          <div className="flex items-center justify-between border-b border-border/40 pb-2">
+        <div className="absolute top-20 left-16 z-30 bg-slate-950 dark:bg-slate-950 backdrop-blur-md p-3.5 rounded-xl border border-amber-500/60 shadow-2xl flex flex-col gap-3 min-w-[270px] text-slate-100">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
             <span className="font-bold text-xs flex items-center gap-1.5 text-amber-400">
               <Grid className="h-4 w-4" /> Grid Calibration
             </span>
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 text-muted-foreground hover:text-foreground"
+              className="h-6 w-6 text-slate-400 hover:text-white"
               onClick={() => setActiveTool('view')}
             >
               <X className="h-3.5 w-3.5" />
             </Button>
           </div>
 
-          <p className="text-[11px] text-muted-foreground leading-snug">
+          <p className="text-[11px] text-slate-400 leading-snug">
             Drag the map with your cursor to shift the grid, or use the nudge buttons below.
           </p>
 
           <div className="space-y-2.5 text-xs">
             {/* OFFSET X */}
             <div className="flex items-center justify-between gap-2">
-              <span className="text-muted-foreground font-semibold w-16">Offset X:</span>
+              <span className="text-slate-400 font-semibold w-16">Offset X:</span>
               <div className="flex items-center gap-1">
-                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleNudgeOffset(-5, 0)} title="Nudge Left 5px">
+                <Button variant="ghost" size="icon" className="h-7 w-7 bg-slate-900 border border-slate-700 text-slate-200 hover:text-white hover:bg-slate-800" onClick={() => handleNudgeOffset(-5, 0)} title="Nudge Left 5px">
                   <ChevronLeft className="h-3.5 w-3.5" />
                 </Button>
                 <Input
                   type="number"
-                  className="h-7 w-16 text-center text-xs p-1 font-mono"
+                  className="h-7 w-16 text-center text-xs p-1 font-mono bg-slate-900 border-slate-700 text-slate-100"
                   value={currentOffsetX}
                   onChange={(e) => handleSetOffset(Number(e.target.value), currentOffsetY)}
                 />
-                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleNudgeOffset(5, 0)} title="Nudge Right 5px">
+                <Button variant="ghost" size="icon" className="h-7 w-7 bg-slate-900 border border-slate-700 text-slate-200 hover:text-white hover:bg-slate-800" onClick={() => handleNudgeOffset(5, 0)} title="Nudge Right 5px">
                   <ChevronRight className="h-3.5 w-3.5" />
                 </Button>
               </div>
@@ -1487,44 +1741,44 @@ export default function MapViewerClient() {
 
             {/* OFFSET Y */}
             <div className="flex items-center justify-between gap-2">
-              <span className="text-muted-foreground font-semibold w-16">Offset Y:</span>
+              <span className="text-slate-400 font-semibold w-16">Offset Y:</span>
               <div className="flex items-center gap-1">
-                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleNudgeOffset(0, -5)} title="Nudge Up 5px">
+                <Button variant="ghost" size="icon" className="h-7 w-7 bg-slate-900 border border-slate-700 text-slate-200 hover:text-white hover:bg-slate-800" onClick={() => handleNudgeOffset(0, -5)} title="Nudge Up 5px">
                   <ChevronUp className="h-3.5 w-3.5" />
                 </Button>
                 <Input
                   type="number"
-                  className="h-7 w-16 text-center text-xs p-1 font-mono"
+                  className="h-7 w-16 text-center text-xs p-1 font-mono bg-slate-900 border-slate-700 text-slate-100"
                   value={currentOffsetY}
                   onChange={(e) => handleSetOffset(currentOffsetX, Number(e.target.value))}
                 />
-                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleNudgeOffset(0, 5)} title="Nudge Down 5px">
+                <Button variant="ghost" size="icon" className="h-7 w-7 bg-slate-900 border border-slate-700 text-slate-200 hover:text-white hover:bg-slate-800" onClick={() => handleNudgeOffset(0, 5)} title="Nudge Down 5px">
                   <ChevronDown className="h-3.5 w-3.5" />
                 </Button>
               </div>
             </div>
 
             {/* GRID SIZE */}
-            <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/40">
-              <span className="text-muted-foreground font-semibold w-16">Cell Size:</span>
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-800">
+              <span className="text-slate-400 font-semibold w-16">Cell Size:</span>
               <div className="flex items-center gap-1">
-                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleSetGridSize(currentGridSize - 5)} title="Decrease Size 5px">
+                <Button variant="ghost" size="icon" className="h-7 w-7 bg-slate-900 border border-slate-700 text-slate-200 hover:text-white hover:bg-slate-800" onClick={() => handleSetGridSize(currentGridSize - 5)} title="Decrease Size 5px">
                   -
                 </Button>
                 <Input
                   type="number"
-                  className="h-7 w-16 text-center text-xs p-1 font-mono"
+                  className="h-7 w-16 text-center text-xs p-1 font-mono bg-slate-900 border-slate-700 text-slate-100"
                   value={currentGridSize}
                   onChange={(e) => handleSetGridSize(Number(e.target.value))}
                 />
-                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleSetGridSize(currentGridSize + 5)} title="Increase Size 5px">
+                <Button variant="ghost" size="icon" className="h-7 w-7 bg-slate-900 border border-slate-700 text-slate-200 hover:text-white hover:bg-slate-800" onClick={() => handleSetGridSize(currentGridSize + 5)} title="Increase Size 5px">
                   +
                 </Button>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 pt-2 border-t border-border/40">
+          <div className="flex items-center gap-2 pt-2 border-t border-slate-800">
             <Button
               size="sm"
               className="flex-1 text-xs h-8 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold shadow-md"
@@ -1534,8 +1788,8 @@ export default function MapViewerClient() {
             </Button>
             <Button
               size="sm"
-              variant="outline"
-              className="text-xs h-8 px-2.5"
+              variant="ghost"
+              className="text-xs h-8 px-2.5 bg-slate-900 border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800"
               onClick={handleResetGridCalibration}
             >
               Reset
@@ -1544,26 +1798,113 @@ export default function MapViewerClient() {
         </div>
       )}
 
+      {/* FLOATING RESHAPING HUD */}
+      {reshapingArea && (
+        <div className="absolute top-20 left-16 z-30 bg-slate-950 dark:bg-slate-950 backdrop-blur-md p-3.5 rounded-xl border border-purple-500/60 shadow-2xl flex flex-col gap-2.5 min-w-[280px] max-w-sm text-slate-100">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Maximize2 className="h-4 w-4 text-purple-400 shrink-0" />
+              <span className="font-bold text-xs text-purple-300 truncate">
+                Reshaping: {reshapingArea.name}
+              </span>
+            </div>
+            <span className="text-[10px] text-purple-300 font-mono px-2 py-0.5 rounded-full bg-purple-950/60 border border-purple-500/40 shrink-0">
+              {reshapingArea.points.length} pts
+            </span>
+          </div>
+
+          <p className="text-[11px] text-slate-400 leading-snug">
+            Drag any vertex to reposition it. Click <span className="text-cyan-400 font-bold">+</span> between points to add vertices. Right-click a vertex to delete it.
+          </p>
+
+          <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+            <Button
+              variant={isReshapingAddPointMode ? 'secondary' : 'outline'}
+              size="sm"
+              className={`h-7 text-xs gap-1 ${
+                isReshapingAddPointMode
+                  ? 'bg-purple-600 text-white hover:bg-purple-500'
+                  : 'bg-slate-900 border-slate-700 text-slate-200 hover:text-white hover:bg-slate-800'
+              }`}
+              onClick={() => setIsReshapingAddPointMode(!isReshapingAddPointMode)}
+              title="Click on the map to append new points"
+            >
+              <Plus className="h-3 w-3" />
+              {isReshapingAddPointMode ? 'Click Map to Add' : 'Add Points'}
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs gap-1 bg-slate-900 border-slate-700 text-slate-200 hover:text-white hover:bg-slate-800"
+              onClick={() => {
+                setReshapingArea((prev) => (prev ? { ...prev, points: [] } : null))
+                setIsReshapingAddPointMode(true)
+                toast.info('Click on map to draw the new shape')
+              }}
+              title="Clear all points and redraw from scratch"
+            >
+              <RotateCcw className="h-3 w-3" />
+              Redraw
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs bg-slate-900 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800"
+              onClick={() => {
+                if (reshapingArea) {
+                  setReshapingArea((prev) => (prev ? { ...prev, points: [...prev.originalPoints] } : null))
+                  setIsReshapingAddPointMode(false)
+                  toast.info('Reset points to original shape')
+                }
+              }}
+              title="Reset to original shape"
+            >
+              Reset
+            </Button>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs text-slate-400 hover:text-white"
+              onClick={handleCancelReshape}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className="h-7 text-xs bg-purple-600 hover:bg-purple-500 text-white font-bold"
+              onClick={handleSaveReshapedArea}
+            >
+              Save Shape
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* LAYERS MENU PANEL */}
       {isLayersMenuOpen && (
-        <Card className="absolute top-16 right-4 z-40 w-72 bg-card/95 backdrop-blur-md border-border/50 shadow-2xl">
-          <CardHeader className="py-3 px-4 flex flex-row items-center justify-between border-b border-border/50">
-            <CardTitle className="text-sm font-bold flex items-center gap-2">
+        <Card className="absolute top-16 right-4 z-40 w-72 bg-slate-950 dark:bg-slate-950 backdrop-blur-md border-slate-700/80 shadow-2xl text-slate-100">
+          <CardHeader className="py-3 px-4 flex flex-row items-center justify-between border-b border-slate-800">
+            <CardTitle className="text-sm font-bold flex items-center gap-2 text-slate-100">
               <Layers className="h-4 w-4 text-purple-400" /> Map Layers
             </CardTitle>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsLayersMenuOpen(false)}>
+            <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-white" onClick={() => setIsLayersMenuOpen(false)}>
               <X className="h-3.5 w-3.5" />
             </Button>
           </CardHeader>
           <CardContent className="p-4 space-y-3 max-h-[60vh] overflow-y-auto">
             {fullData?.layers.length === 0 ? (
-              <p className="text-xs text-muted-foreground italic">No extra layers created.</p>
+              <p className="text-xs text-slate-400 italic">No extra layers created.</p>
             ) : (
               fullData?.layers.map((layer) => {
                 const canToggle = isOwner || layer.allowUserToggle
                 return (
                   <div key={layer._id} className="flex items-center justify-between text-xs">
-                    <span className="font-medium">{layer.name}</span>
+                    <span className="font-medium text-slate-200">{layer.name}</span>
                     <div className="flex items-center gap-2">
                       <Switch
                         disabled={!canToggle}
@@ -1576,7 +1917,7 @@ export default function MapViewerClient() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6 text-destructive"
+                          className="h-6 w-6 text-destructive hover:bg-destructive/10"
                           onClick={() => deleteLayerMutation({ layerId: layer._id })}
                         >
                           <Trash2 className="h-3 w-3" />
@@ -1590,9 +1931,9 @@ export default function MapViewerClient() {
 
             {isOwner && (
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                className="w-full mt-2 text-xs border-dashed"
+                className="w-full mt-2 text-xs border border-dashed border-slate-700 text-slate-300 hover:text-white hover:bg-slate-900"
                 onClick={() => setIsLayerDialogOpen(true)}
               >
                 <Plus className="h-3.5 w-3.5 mr-1" /> Add Layer
@@ -1604,28 +1945,52 @@ export default function MapViewerClient() {
 
       {/* LOCATIONS DIRECTORY SIDEBAR PANEL */}
       {isLocationsMenuOpen && (
-        <Card className="absolute top-16 right-4 z-40 w-80 bg-card/95 backdrop-blur-md border-border/50 shadow-2xl flex flex-col max-h-[75vh]">
-          <CardHeader className="py-3 px-4 flex flex-row items-center justify-between border-b border-border/50 shrink-0">
-            <CardTitle className="text-sm font-bold flex items-center gap-2">
-              <Compass className="h-4 w-4 text-cyan-400" /> Locations ({filteredPins.length})
+        <Card className="absolute top-16 right-4 z-40 w-80 bg-slate-950 dark:bg-slate-950 backdrop-blur-md border-slate-700/80 shadow-2xl flex flex-col max-h-[75vh] text-slate-100">
+          <CardHeader className="py-3 px-4 flex flex-row items-center justify-between border-b border-slate-800 shrink-0">
+            <CardTitle className="text-sm font-bold flex items-center gap-2 text-slate-100">
+              <Compass className="h-4 w-4 text-cyan-400" /> Locations ({filteredPins.length + filteredAreas.length})
             </CardTitle>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsLocationsMenuOpen(false)}>
+            <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-white" onClick={() => setIsLocationsMenuOpen(false)}>
               <X className="h-3.5 w-3.5" />
             </Button>
           </CardHeader>
-          <div className="p-3 border-b border-border/40 space-y-2 shrink-0">
+          <div className="flex border-b border-slate-800 shrink-0 bg-slate-900/50">
+            <button
+              type="button"
+              onClick={() => setLocationDirectoryTab('pins')}
+              className={`flex-1 py-2 text-xs font-bold text-center border-b-2 transition-colors ${
+                locationDirectoryTab === 'pins'
+                  ? 'border-cyan-400 text-cyan-300 bg-cyan-950/30'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Pins ({filteredPins.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setLocationDirectoryTab('areas')}
+              className={`flex-1 py-2 text-xs font-bold text-center border-b-2 transition-colors ${
+                locationDirectoryTab === 'areas'
+                  ? 'border-purple-400 text-purple-300 bg-purple-950/30'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Areas ({filteredAreas.length})
+            </button>
+          </div>
+          <div className="p-3 border-b border-slate-800 space-y-2 shrink-0">
             <div className="relative">
-              <Search className="h-3.5 w-3.5 absolute left-2.5 top-2.5 text-muted-foreground" />
+              <Search className="h-3.5 w-3.5 absolute left-2.5 top-2.5 text-slate-500" />
               <Input
-                placeholder="Search locations..."
-                className="h-8 pl-8 text-xs bg-background/60"
+                placeholder={locationDirectoryTab === 'pins' ? "Search pin locations..." : "Search areas..."}
+                className="h-8 pl-8 text-xs bg-slate-900 border-slate-700 text-slate-100 placeholder:text-slate-500"
                 value={locationSearch}
                 onChange={(e) => setLocationSearch(e.target.value)}
               />
             </div>
             {fullData?.layers && fullData.layers.length > 0 && (
-              <Select value={locationFilterLayer} onValueChange={setLocationFilterLayer}>
-                <SelectTrigger className="h-7 text-xs bg-background/60"><SelectValue placeholder="All Layers" /></SelectTrigger>
+              <Select value={locationFilterLayer} onValueChange={setLocationFilterLayer} className="h-7 text-xs bg-slate-900 border-slate-700 text-slate-200">
+                <SelectTrigger className="h-7 text-xs bg-slate-900 border-slate-700 text-slate-200"><SelectValue placeholder="All Layers" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Layers</SelectItem>
                   {fullData.layers.map((l) => (
@@ -1636,15 +2001,82 @@ export default function MapViewerClient() {
             )}
           </div>
           <CardContent className="p-2 space-y-1.5 overflow-y-auto flex-1">
-            {filteredPins.length === 0 ? (
-              <p className="text-xs text-muted-foreground italic text-center py-6">No locations found.</p>
+            {locationDirectoryTab === 'areas' ? (
+              filteredAreas.length === 0 ? (
+                <p className="text-xs text-slate-400 italic text-center py-6">No areas found.</p>
+              ) : (
+                filteredAreas.map((area) => {
+                  const areaLayer = fullData?.layers.find((l) => l._id === area.layerId)
+                  return (
+                    <div
+                      key={area._id}
+                      className="p-2 rounded-lg hover:bg-slate-900 border border-transparent hover:border-slate-800 transition-colors cursor-pointer group flex items-start justify-between gap-2"
+                      onClick={() => {
+                        // Center viewport on area centroid
+                        const avgX = area.points.reduce((acc, p) => acc + p.x, 0) / (area.points.length || 1)
+                        const avgY = area.points.reduce((acc, p) => acc + p.y, 0) / (area.points.length || 1)
+                        const targetPxX = (avgX / 100) * mapWidth - mapWidth / 2
+                        const targetPxY = (avgY / 100) * mapHeight - mapHeight / 2
+                        const newScale = Math.max(scaleRef.current, 1.2)
+                        scaleRef.current = newScale
+                        setScale(newScale)
+                        positionRef.current = { x: -targetPxX * newScale, y: -targetPxY * newScale }
+                        setPosition({ x: -targetPxX * newScale, y: -targetPxY * newScale })
+                        setSelectedArea(area)
+                      }}
+                    >
+                      <div className="flex items-start gap-2.5 min-w-0">
+                        <div
+                          className="h-6 w-6 rounded-md shadow-sm shrink-0 mt-0.5 border border-white/20 flex items-center justify-center"
+                          style={{ backgroundColor: area.color || '#a855f7' }}
+                        >
+                          <Maximize2 className="h-3 w-3 text-white" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-semibold text-xs truncate group-hover:text-purple-300 transition-colors text-slate-200">
+                              {area.name}
+                            </span>
+                            {area.gmOnly && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center gap-0.5">
+                                <EyeOff className="h-2.5 w-2.5" /> Secret
+                              </span>
+                            )}
+                            {area.targetMapId && (
+                              <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center gap-0.5">
+                                <Map className="h-2.5 w-2.5" /> Linked
+                              </span>
+                            )}
+                          </div>
+                          {area.description && (
+                            <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">
+                              {area.description}
+                            </p>
+                          )}
+                          {areaLayer && (
+                            <span className="text-[10px] text-purple-400/80 mt-0.5 block">
+                              {areaLayer.name}
+                            </span>
+                          )}
+                          <span className="text-[10px] text-slate-500 mt-0.5 block">
+                            {area.points.length} vertices
+                          </span>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-slate-500 group-hover:text-slate-200 shrink-0 mt-1" />
+                    </div>
+                  )
+                })
+              )
+            ) : filteredPins.length === 0 ? (
+              <p className="text-xs text-slate-400 italic text-center py-6">No locations found.</p>
             ) : (
               filteredPins.map((pin) => {
                 const pinLayer = fullData?.layers.find((l) => l._id === pin.layerId)
                 return (
                   <div
                     key={pin._id}
-                    className="p-2 rounded-lg hover:bg-muted/50 border border-transparent hover:border-border/40 transition-colors cursor-pointer group flex items-start justify-between gap-2"
+                    className="p-2 rounded-lg hover:bg-slate-900 border border-transparent hover:border-slate-800 transition-colors cursor-pointer group flex items-start justify-between gap-2"
                     onClick={() => {
                       // Center viewport on pin
                       const targetPxX = (pin.x / 100) * mapWidth - mapWidth / 2
@@ -1666,7 +2098,7 @@ export default function MapViewerClient() {
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-semibold text-xs truncate group-hover:text-primary transition-colors">
+                          <span className="font-semibold text-xs truncate group-hover:text-purple-300 transition-colors text-slate-200">
                             {pin.title}
                           </span>
                           {pin.gmOnly && (
@@ -1676,7 +2108,7 @@ export default function MapViewerClient() {
                           )}
                         </div>
                         {pin.description && (
-                          <p className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5">
+                          <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">
                             {pin.description}
                           </p>
                         )}
@@ -1687,7 +2119,7 @@ export default function MapViewerClient() {
                         )}
                       </div>
                     </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground/50 group-hover:text-foreground shrink-0 mt-1" />
+                    <ChevronRight className="h-4 w-4 text-slate-500 group-hover:text-slate-200 shrink-0 mt-1" />
                   </div>
                 )
               })
@@ -1698,8 +2130,8 @@ export default function MapViewerClient() {
 
       {/* RULER ACTIVE BOTTOM HUD */}
       {activeTool === 'ruler' && (
-        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-30 flex items-center gap-3 bg-background/90 backdrop-blur-md px-4 py-2 rounded-full border border-cyan-500/40 shadow-2xl">
-          <div className="flex items-center gap-2 text-xs font-medium text-foreground">
+        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-30 flex items-center gap-3 bg-slate-950/95 dark:bg-slate-950/95 backdrop-blur-md px-4 py-2 rounded-full border border-cyan-500/60 shadow-2xl text-slate-100">
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-100">
             <Ruler className="h-4 w-4 text-cyan-400" />
             <span>Click &amp; drag across the map to measure distance</span>
           </div>
@@ -1707,16 +2139,16 @@ export default function MapViewerClient() {
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 text-xs px-2 text-muted-foreground hover:text-destructive"
+              className="h-7 text-xs px-2 text-slate-400 hover:text-red-400"
               onClick={() => setRulerPoints(null)}
             >
               Clear
             </Button>
           )}
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
-            className="h-7 text-xs px-2.5"
+            className="h-7 text-xs px-2.5 bg-slate-900 border border-slate-700 text-slate-200 hover:text-white hover:bg-slate-800"
             onClick={() => {
               setRulerPoints(null)
               setActiveTool('view')
@@ -1728,14 +2160,14 @@ export default function MapViewerClient() {
       )}
 
       {/* ZOOM & VIEWPORT CONTROLS */}
-      <div className="absolute bottom-6 right-6 z-30 flex flex-col gap-2 bg-background/80 backdrop-blur-md p-1.5 rounded-full border border-border/50 shadow-xl">
-        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={handleZoomIn}>
+      <div className="absolute bottom-6 right-6 z-30 flex flex-col gap-2 bg-slate-950 dark:bg-slate-950 backdrop-blur-md p-1.5 rounded-full border border-slate-700/80 shadow-xl text-slate-200">
+        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-slate-200 hover:text-white hover:bg-slate-900" onClick={handleZoomIn} title="Zoom In">
           <ZoomIn className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={handleResetZoom}>
+        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-slate-200 hover:text-white hover:bg-slate-900" onClick={handleResetZoom} title="Reset View">
           <Maximize2 className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={handleZoomOut}>
+        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-slate-200 hover:text-white hover:bg-slate-900" onClick={handleZoomOut} title="Zoom Out">
           <ZoomOut className="h-4 w-4" />
         </Button>
       </div>
@@ -1753,7 +2185,7 @@ export default function MapViewerClient() {
       >
         <div
           ref={containerRef}
-          className="relative shrink-0 transition-transform duration-75 ease-out origin-center shadow-2xl"
+          className="relative shrink-0 origin-center shadow-2xl"
           style={{
             transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
             width: `${mapWidth}px`,
@@ -1798,6 +2230,7 @@ export default function MapViewerClient() {
           <svg className="absolute inset-0 w-full h-full pointer-events-none">
             {fullData?.areas.map((area) => {
               if (area.layerId && !enabledLayers[area.layerId]) return null
+              if (reshapingArea && reshapingArea.id === area._id) return null
               const pointsStr = area.points.map((p) => `${(p.x * mapWidth) / 100},${(p.y * mapHeight) / 100}`).join(' ')
               return (
                 <polygon
@@ -1811,10 +2244,22 @@ export default function MapViewerClient() {
                   className="pointer-events-auto cursor-pointer hover:opacity-80 transition-opacity"
                   onClick={(e) => {
                     e.stopPropagation()
+                    if (reshapingArea) return
+                    if (isOwner && isEditMode) {
+                      setSelectedArea(area)
+                      return
+                    }
                     if (area.targetMapId) {
                       const target = worldMaps?.find((m) => m._id === area.targetMapId)
                       if (target) router.push(`/world/${encodeURIComponent(world.name)}/map/${target.slug}`)
                     } else {
+                      setSelectedArea(area)
+                    }
+                  }}
+                  onContextMenu={(e) => {
+                    if (isOwner) {
+                      e.preventDefault()
+                      e.stopPropagation()
                       setSelectedArea(area)
                     }
                   }}
@@ -1832,6 +2277,109 @@ export default function MapViewerClient() {
                 strokeWidth="3"
                 strokeDasharray="5,5"
               />
+            )}
+
+            {/* RESHAPING AREA POLYGON & INTERACTIVE VERTEX HANDLES */}
+            {reshapingArea && (
+              <g className="pointer-events-auto">
+                {reshapingArea.points.length > 0 && (
+                  <polygon
+                    points={reshapingArea.points.map((p) => `${(p.x * mapWidth) / 100},${(p.y * mapHeight) / 100}`).join(' ')}
+                    fill={reshapingArea.color}
+                    fillOpacity={0.4}
+                    stroke="#38bdf8"
+                    strokeWidth={Math.min(Math.max(3 / scale, 2), 6)}
+                    strokeDasharray="6,4"
+                  />
+                )}
+                {/* Vertex handles and midpoint add buttons */}
+                {reshapingArea.points.map((p, idx) => {
+                  const cx = (p.x * mapWidth) / 100
+                  const cy = (p.y * mapHeight) / 100
+                  const isDragged = draggedVertexIndex === idx
+                  const hitRadius = Math.min(Math.max(18 / scale, 14), 28)
+                  const visualRadius = Math.min(Math.max(8 / scale, 6), 14)
+                  const strokeW = Math.min(Math.max(2.5 / scale, 2), 4)
+
+                  // Next point for midpoint '+' button
+                  const nextP = reshapingArea.points[(idx + 1) % reshapingArea.points.length]
+                  const midX = (((p.x + nextP.x) / 2) * mapWidth) / 100
+                  const midY = (((p.y + nextP.y) / 2) * mapHeight) / 100
+
+                  return (
+                    <g key={`vertex-${idx}`}>
+                      {/* Midpoint '+' handle between this vertex and next */}
+                      {reshapingArea.points.length >= 3 && !isReshapingAddPointMode && (
+                        <g
+                          className="cursor-pointer transition-opacity opacity-75 hover:opacity-100"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleInsertVertex(idx + 1, (p.x + nextP.x) / 2, (p.y + nextP.y) / 2)
+                          }}
+                        >
+                          <circle
+                            cx={midX}
+                            cy={midY}
+                            r={Math.min(Math.max(7 / scale, 5), 11)}
+                            fill="#020617"
+                            stroke="#38bdf8"
+                            strokeWidth={Math.min(Math.max(1.5 / scale, 1.2), 3)}
+                          />
+                          <text
+                            x={midX}
+                            y={midY + 3.5 / scale}
+                            fill="#38bdf8"
+                            fontSize={Math.min(Math.max(11 / scale, 8), 15)}
+                            fontWeight="bold"
+                            textAnchor="middle"
+                            className="select-none pointer-events-none"
+                          >
+                            +
+                          </text>
+                        </g>
+                      )}
+
+                      {/* Vertex Drag Handle (transparent larger hit zone) */}
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={hitRadius}
+                        fill="transparent"
+                        className="cursor-move"
+                        onMouseDown={(e) => handleVertexMouseDown(idx, e)}
+                        onTouchStart={(e) => handleVertexTouchStart(idx, e)}
+                        onContextMenu={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          handleDeleteVertex(idx)
+                        }}
+                      />
+                      {/* Visible circle */}
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={visualRadius}
+                        fill={isDragged ? '#38bdf8' : '#ffffff'}
+                        stroke={reshapingArea.color}
+                        strokeWidth={strokeW}
+                        className="pointer-events-none drop-shadow-md"
+                      />
+                      {/* Vertex Number */}
+                      <text
+                        x={cx}
+                        y={cy - 10 / scale}
+                        fill="#ffffff"
+                        fontSize={Math.min(Math.max(11 / scale, 9), 16)}
+                        fontWeight="bold"
+                        textAnchor="middle"
+                        className="select-none pointer-events-none drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
+                      >
+                        {idx + 1}
+                      </text>
+                    </g>
+                  )
+                })}
+              </g>
             )}
 
             {/* RULER MEASUREMENT LINE */}
@@ -1938,6 +2486,10 @@ export default function MapViewerClient() {
                 onClick={(e) => {
                   e.stopPropagation()
                   if (pinDragStartRef.current?.moved) return
+                  if (isOwner && isEditMode) {
+                    setSelectedPin(pin)
+                    return
+                  }
                   if (pin.targetMapId) {
                     const target = worldMaps?.find((m) => m._id === pin.targetMapId)
                     if (target) router.push(`/world/${encodeURIComponent(world.name)}/map/${target.slug}`)
@@ -1945,9 +2497,16 @@ export default function MapViewerClient() {
                     setSelectedPin(pin)
                   }
                 }}
+                onContextMenu={(e) => {
+                  if (isOwner) {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setSelectedPin(pin)
+                  }
+                }}
               >
                 {showTextOnly ? (
-                  <span className="bg-background/90 backdrop-blur-md px-2 py-0.5 rounded-md border border-border/50 text-xs font-bold shadow-lg text-primary whitespace-nowrap flex items-center gap-1.5">
+                  <span className="bg-slate-950/95 backdrop-blur-md px-2 py-0.5 rounded-md border border-slate-700/80 text-xs font-bold shadow-lg text-purple-300 whitespace-nowrap flex items-center gap-1.5">
                     {pin.title}
                     {pin.gmOnly && (
                       <span title="Secret (GM Only)">
@@ -1974,7 +2533,7 @@ export default function MapViewerClient() {
                       </div>
                     )}
                     {(scale > 0.8 || (pin.minZoom && scale >= pin.minZoom)) && (
-                      <span className="mt-1 bg-background/90 backdrop-blur-md px-2 py-0.5 rounded-md text-[10px] font-bold text-white whitespace-nowrap shadow-md">
+                      <span className="mt-1 bg-slate-950/95 backdrop-blur-md px-2 py-0.5 rounded-md text-[10px] font-bold text-slate-100 whitespace-nowrap shadow-md border border-slate-800">
                         {pin.title}
                       </span>
                     )}
@@ -2290,7 +2849,7 @@ export default function MapViewerClient() {
                   <SelectItem value="none">None</SelectItem>
                   {worldMaps?.map((m) => (
                     <SelectItem key={m._id} value={m._id}>
-                      {m.name}
+                      {m.name} {m.isHomeMap ? '🏠 ' : ''}{m.hideFromMenu ? '(Hidden)' : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -2388,6 +2947,21 @@ export default function MapViewerClient() {
                 onCheckedChange={(val) => setNewMapDraft({ ...newMapDraft, isHomeMap: val })}
               />
             </div>
+            <div className="flex items-center justify-between pt-2 border-t border-border/40">
+              <div className="space-y-0.5 pr-2">
+                <span className="font-bold flex items-center gap-1.5 text-xs text-foreground">
+                  <EyeOff className="h-3.5 w-3.5 text-amber-400" />
+                  Hide from Map Switcher
+                </span>
+                <p className="text-[11px] text-muted-foreground">
+                  Hidden from players in the dropdown. Navigable via linked markers.
+                </p>
+              </div>
+              <Switch
+                checked={newMapDraft.hideFromMenu || false}
+                onCheckedChange={(val) => setNewMapDraft({ ...newMapDraft, hideFromMenu: val })}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button size="sm" onClick={handleCreateNewMap}>Create Map</Button>
@@ -2479,6 +3053,32 @@ export default function MapViewerClient() {
                 </Button>
               </div>
             )}
+
+            {/* World Home Map & Map Visibility */}
+            <div className="space-y-2 pt-1 border-t border-border/40">
+              <div className="flex items-center justify-between">
+                <span className="font-bold">Set as World Home Map</span>
+                <Switch
+                  checked={settingsDraft.isHomeMap}
+                  onCheckedChange={(val) => setSettingsDraft({ ...settingsDraft, isHomeMap: val })}
+                />
+              </div>
+              <div className="flex items-center justify-between pt-2 border-t border-border/40">
+                <div className="space-y-0.5 pr-2">
+                  <span className="font-bold flex items-center gap-1.5 text-xs text-foreground">
+                    <EyeOff className="h-3.5 w-3.5 text-amber-400" />
+                    Hide from Map Switcher
+                  </span>
+                  <p className="text-[11px] text-muted-foreground">
+                    Hidden from players in the top-left dropdown. Navigable via linked markers.
+                  </p>
+                </div>
+                <Switch
+                  checked={settingsDraft.hideFromMenu || false}
+                  onCheckedChange={(val) => setSettingsDraft({ ...settingsDraft, hideFromMenu: val })}
+                />
+              </div>
+            </div>
             
             {/* Grid & Exploration Settings */}
             <div className="border border-border/50 rounded-lg p-3.5 bg-muted/20 space-y-3.5">
@@ -2745,9 +3345,22 @@ export default function MapViewerClient() {
                         setSelectedArea(null)
                         setIsAreaDialogOpen(true)
                       }}
+                      title="Edit Area Name, Lore & Link"
                     >
                       <Edit3 className="h-3.5 w-3.5" />
-                      Edit
+                      Edit Details
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1 text-xs border-purple-500/40 text-purple-300 hover:text-white hover:bg-purple-950/50"
+                      onClick={() => {
+                        handleStartReshaping(selectedArea)
+                      }}
+                      title="Edit Polygon Shape & Vertices on Map"
+                    >
+                      <Maximize2 className="h-3.5 w-3.5" />
+                      Edit Shape
                     </Button>
                     <Button
                       variant="ghost"
@@ -2757,6 +3370,7 @@ export default function MapViewerClient() {
                         deleteAreaMutation({ areaId: selectedArea._id })
                         setSelectedArea(null)
                       }}
+                      title="Delete Area"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -2891,12 +3505,42 @@ export default function MapViewerClient() {
                   <SelectItem value="none">None</SelectItem>
                   {worldMaps?.map((m) => (
                     <SelectItem key={m._id} value={m._id}>
-                      {m.name}
+                      {m.name} {m.isHomeMap ? '🏠 ' : ''}{m.hideFromMenu ? '(Hidden)' : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Polygon Shape & Reshape on Map */}
+            {areaDraft.id && (
+              <div className="flex items-center justify-between border border-border/60 bg-muted/20 px-3 py-2 rounded-md">
+                <div className="space-y-0.5 pr-2">
+                  <span className="font-bold flex items-center gap-1.5 text-xs text-foreground">
+                    <Maximize2 className="h-3.5 w-3.5 text-purple-400" />
+                    Polygon Shape ({areaDraft.points.length} points)
+                  </span>
+                  <p className="text-[11px] text-muted-foreground">
+                    Move vertices, insert points, or redraw directly on the map.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs gap-1 border-purple-500/40 text-purple-300 hover:text-white hover:bg-purple-950/50 shrink-0"
+                  onClick={() => {
+                    const currentArea = fullData?.areas.find((a) => a._id === areaDraft.id)
+                    if (currentArea) {
+                      setIsAreaDialogOpen(false)
+                      handleStartReshaping(currentArea)
+                    }
+                  }}
+                >
+                  <Edit3 className="h-3 w-3" /> Reshape
+                </Button>
+              </div>
+            )}
 
             {/* GM Secret Toggle */}
             {isOwner && (

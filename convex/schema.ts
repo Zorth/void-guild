@@ -471,6 +471,7 @@ export default defineSchema({
         gridScaleUnit: v.optional(v.string()), // Unit (e.g. "miles", "km", "ft")
         isExplorationMap: v.optional(v.boolean()),
         revealedCells: v.optional(v.array(v.string())), // Array of "col,row" strings for revealed cells
+        hideFromMenu: v.optional(v.boolean()), // Hide from top-left map dropdown for players
     }).index('by_worldId', ['worldId'])
       .index('by_worldId_slug', ['worldId', 'slug']),
     mapLayers: defineTable({

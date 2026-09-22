@@ -122,6 +122,7 @@ export const createMap = mutation({
     gridScale: v.optional(v.number()),
     gridScaleUnit: v.optional(v.string()),
     isExplorationMap: v.optional(v.boolean()),
+    hideFromMenu: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     await verifyWorldOwner(ctx, args.worldId)
@@ -164,6 +165,7 @@ export const createMap = mutation({
       gridScale: args.gridScale,
       gridScaleUnit: args.gridScaleUnit,
       isExplorationMap: args.isExplorationMap ?? false,
+      hideFromMenu: args.hideFromMenu ?? false,
       revealedCells: [],
     })
 
@@ -187,6 +189,7 @@ export const updateMapSettings = mutation({
     gridScale: v.optional(v.number()),
     gridScaleUnit: v.optional(v.string()),
     isExplorationMap: v.optional(v.boolean()),
+    hideFromMenu: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const map = await ctx.db.get(args.mapId)
@@ -219,6 +222,7 @@ export const updateMapSettings = mutation({
     if (args.gridScale !== undefined) patches.gridScale = args.gridScale
     if (args.gridScaleUnit !== undefined) patches.gridScaleUnit = args.gridScaleUnit
     if (args.isExplorationMap !== undefined) patches.isExplorationMap = args.isExplorationMap
+    if (args.hideFromMenu !== undefined) patches.hideFromMenu = args.hideFromMenu
 
     await ctx.db.patch(args.mapId, patches)
   },
