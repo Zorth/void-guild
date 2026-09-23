@@ -9,7 +9,7 @@ import Link from 'next/link'
 import { 
   ZoomIn, ZoomOut, Maximize2, Layers, MapPin, Eye, Edit3, Plus, 
   Trash2, Settings, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Map, FileText, Check, X, Grid, Lock, Unlock, Move, HelpCircle, Copy,
-  Castle, Crown, Skull, Swords, Shield, Mountain, Tent, Beer, Anchor, Flame, TreePine, Sparkles, BookOpen, Coins, Compass, Gem, Crosshair, Flag, Ghost, EyeOff, Ruler, Search, RotateCcw
+  Castle, Crown, Skull, Swords, Shield, Mountain, Tent, Beer, Anchor, Flame, TreePine, Sparkles, BookOpen, Coins, Compass, Gem, Crosshair, Flag, Ghost, EyeOff, Ruler, Search, RotateCcw, RefreshCw
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -86,10 +86,12 @@ export default function MapViewerClient() {
   const toggleCellRevealMutation = useMutation(api.maps.toggleCellReveal)
   const bulkRevealCellsMutation = useMutation(api.maps.bulkRevealCells)
   const saveGridNoteMutation = useMutation(api.maps.saveGridNote)
+  const refreshMapImageMutation = useMutation(api.maps.refreshMapImage)
 
   // View state
   const isOwner = world ? userId === world.owner : false
   const [isEditMode, setIsEditMode] = useState(false)
+  const [isRefreshingImage, setIsRefreshingImage] = useState(false)
   const [activeTool, setActiveTool] = useState<'view' | 'add_pin' | 'add_area' | 'reveal_hex' | 'hide_hex' | 'grid_note' | 'align_grid' | 'ruler'>('view')
 
   // Live grid calibration / offset state
@@ -1235,6 +1237,26 @@ export default function MapViewerClient() {
     }
   }
 
+  // Force Reload Image from Host (Cache-Busting)
+  const getCacheBustedUrl = (url?: string, timestamp?: number) => {
+    if (!url) return ''
+    if (!timestamp) return url
+    return `${url}${url.includes('?') ? '&' : '?'}t=${timestamp}`
+  }
+
+  const handleForceRefreshImage = async () => {
+    if (!currentMap) return
+    setIsRefreshingImage(true)
+    try {
+      await refreshMapImageMutation({ mapId: currentMap._id })
+      toast.success('Map image reloaded from source!')
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to reload map image')
+    } finally {
+      setTimeout(() => setIsRefreshingImage(false), 800)
+    }
+  }
+
   // Grid Calibration Handlers
   const handleSaveGridCalibration = async () => {
     if (!currentMap) return
@@ -1695,6 +1717,18 @@ export default function MapViewerClient() {
               Done ({areaDraft.points.length} pts)
             </Button>
           )}
+
+          <div className="h-px bg-slate-800 my-1" />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 text-slate-300 hover:text-purple-300 hover:bg-slate-900"
+            onClick={handleForceRefreshImage}
+            disabled={isRefreshingImage || !currentMap?.imageUrl}
+            title="Reload Map Image (Clear Cache)"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshingImage ? 'animate-spin text-purple-400' : ''}`} />
+          </Button>
         </div>
       )}
 
@@ -2199,7 +2233,7 @@ export default function MapViewerClient() {
           {/* BASE MAP BACKGROUND IMAGE */}
           {currentMap?.imageUrl ? (
             <img
-              src={currentMap.imageUrl}
+              src={getCacheBustedUrl(currentMap.imageUrl, currentMap.imageUpdatedAt)}
               alt={currentMap.name}
               className="absolute inset-0 w-full h-full max-w-none object-fill select-none pointer-events-none"
               draggable={false}
@@ -2218,7 +2252,7 @@ export default function MapViewerClient() {
             return (
               <img
                 key={layer._id}
-                src={layer.imageUrl}
+                src={getCacheBustedUrl(layer.imageUrl, layer.imageUpdatedAt)}
                 alt={layer.name}
                 className="absolute inset-0 w-full h-full max-w-none object-fill pointer-events-none"
                 draggable={false}
@@ -3009,11 +3043,31 @@ export default function MapViewerClient() {
               </div>
             </div>
             <div>
-              <label className="font-bold text-muted-foreground">Background Image URL</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="font-bold text-muted-foreground">Background Image URL</label>
+                {currentMap?.imageUrl && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-[11px] gap-1.5 text-purple-400 hover:text-purple-300 hover:bg-purple-950/40"
+                    onClick={handleForceRefreshImage}
+                    disabled={isRefreshingImage}
+                    title="Force reload latest image from host (bypasses browser HTTP cache)"
+                  >
+                    <RefreshCw className={`h-3 w-3 ${isRefreshingImage ? 'animate-spin' : ''}`} />
+                    Reload Image (Clear Cache)
+                  </Button>
+                )}
+              </div>
               <Input
                 value={settingsDraft.imageUrl}
                 onChange={(e) => setSettingsDraft({ ...settingsDraft, imageUrl: e.target.value })}
+                placeholder="https://maps.tarragon.be/kalogeron.webp"
               />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                If the file was modified on your server at the same URL, click <strong>Reload Image</strong> to force all players and browsers to fetch the updated image.
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>

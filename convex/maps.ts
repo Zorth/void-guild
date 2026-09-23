@@ -190,6 +190,7 @@ export const updateMapSettings = mutation({
     gridScaleUnit: v.optional(v.string()),
     isExplorationMap: v.optional(v.boolean()),
     hideFromMenu: v.optional(v.boolean()),
+    imageUpdatedAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const map = await ctx.db.get(args.mapId)
@@ -223,8 +224,22 @@ export const updateMapSettings = mutation({
     if (args.gridScaleUnit !== undefined) patches.gridScaleUnit = args.gridScaleUnit
     if (args.isExplorationMap !== undefined) patches.isExplorationMap = args.isExplorationMap
     if (args.hideFromMenu !== undefined) patches.hideFromMenu = args.hideFromMenu
+    if (args.imageUpdatedAt !== undefined) patches.imageUpdatedAt = args.imageUpdatedAt
 
     await ctx.db.patch(args.mapId, patches)
+  },
+})
+
+export const refreshMapImage = mutation({
+  args: { mapId: v.id('worldMaps') },
+  handler: async (ctx, args) => {
+    const map = await ctx.db.get(args.mapId)
+    if (!map) throw new Error('Map not found')
+    await verifyWorldOwner(ctx, map.worldId)
+
+    const now = Date.now()
+    await ctx.db.patch(args.mapId, { imageUpdatedAt: now })
+    return now
   },
 })
 

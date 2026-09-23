@@ -472,6 +472,7 @@ export default defineSchema({
         isExplorationMap: v.optional(v.boolean()),
         revealedCells: v.optional(v.array(v.string())), // Array of "col,row" strings for revealed cells
         hideFromMenu: v.optional(v.boolean()), // Hide from top-left map dropdown for players
+        imageUpdatedAt: v.optional(v.number()), // Timestamp to bust browser HTTP cache when image is updated at same URL
     }).index('by_worldId', ['worldId'])
       .index('by_worldId_slug', ['worldId', 'slug']),
     mapLayers: defineTable({
@@ -481,6 +482,7 @@ export default defineSchema({
         order: v.number(),
         defaultEnabled: v.boolean(),
         allowUserToggle: v.boolean(),
+        imageUpdatedAt: v.optional(v.number()),
     }).index('by_mapId', ['mapId']),
     mapPins: defineTable({
         mapId: v.id('worldMaps'),
