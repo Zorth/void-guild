@@ -148,6 +148,33 @@ export const getSessionCommendations = query({
       gm: number
     }> = {}
 
+    // Collect distinct fromUserIds to resolve quoter / commender names
+    const distinctUserIds = Array.from(new Set(allInSession.map((c) => c.fromUserId)))
+    const userDocs = await Promise.all(
+      distinctUserIds.map((uid) =>
+        ctx.db
+          .query('users')
+          .withIndex('by_userId', (q) => q.eq('userId', uid))
+          .first()
+      )
+    )
+    const userMap = new Map<string, string>()
+    distinctUserIds.forEach((uid, idx) => {
+      const u = userDocs[idx]
+      const name = u?.name || u?.username || 'Adventurer'
+      userMap.set(uid, name)
+    })
+
+    const receivedByCharacter: Record<
+      string,
+      Array<{
+        _id: Id<'commendations'>
+        fromUserId: string
+        fromUserName: string
+        category: 'roleplay' | 'tactics' | 'clutch' | 'heroic' | 'gm'
+      }>
+    > = {}
+
     for (const comm of allInSession) {
       if (user && comm.fromUserId === user.subject) {
         if (comm.category === 'gm') {
@@ -178,12 +205,23 @@ export const getSessionCommendations = query({
 
       countsByCharacter[comm.toCharacterId].total += 1
       countsByCharacter[comm.toCharacterId][comm.category] += 1
+
+      if (!receivedByCharacter[comm.toCharacterId]) {
+        receivedByCharacter[comm.toCharacterId] = []
+      }
+      receivedByCharacter[comm.toCharacterId].push({
+        _id: comm._id,
+        fromUserId: comm.fromUserId,
+        fromUserName: userMap.get(comm.fromUserId) || 'Adventurer',
+        category: comm.category,
+      })
     }
 
     return {
       myCommendation,
       myGmCommendation,
       countsByCharacter,
+      receivedByCharacter,
     }
   },
 })

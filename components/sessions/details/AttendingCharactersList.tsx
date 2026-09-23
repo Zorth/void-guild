@@ -217,6 +217,67 @@ export default function AttendingCharactersList({
                 )}
               </button>
             )}
+            {/* If user's own character, show Commendations received badge/popover */}
+            {sessionId && isUserCharacter && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      "inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full border transition-all shrink-0 focus:outline-none",
+                      (sessionCommendations?.countsByCharacter[char._id]?.total ?? 0) > 0
+                        ? "bg-purple-500/20 text-purple-600 dark:text-purple-300 border-purple-500/40 hover:bg-purple-500/30 shadow-sm"
+                        : "bg-muted/30 text-muted-foreground border-border/40 hover:bg-muted/60"
+                    )}
+                    title="View commendations received this session"
+                  >
+                    <Medal className={cn("h-3 w-3", (sessionCommendations?.countsByCharacter[char._id]?.total ?? 0) > 0 ? "text-purple-500 fill-purple-500" : "")} />
+                    <span>Commendations</span>
+                    <span className="ml-0.5 px-1.5 py-0.2 bg-purple-500/20 text-purple-600 dark:text-purple-300 rounded-full text-[8px]">
+                      {sessionCommendations?.countsByCharacter[char._id]?.total ?? 0}
+                    </span>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-72 p-3 text-xs space-y-2.5">
+                  <div className="font-bold text-sm flex items-center justify-between border-b pb-2">
+                    <div className="flex items-center gap-1.5">
+                      <Medal className="h-4 w-4 text-purple-500" />
+                      <span>Commendations</span>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground font-normal">
+                      {sessionCommendations?.countsByCharacter[char._id]?.total ?? 0} total
+                    </span>
+                  </div>
+
+                  {(sessionCommendations?.receivedByCharacter?.[char._id]?.length ?? 0) === 0 ? (
+                    <p className="text-muted-foreground italic text-[11px] py-1">
+                      No commendations received yet this session.
+                    </p>
+                  ) : (
+                    <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                      {sessionCommendations?.receivedByCharacter?.[char._id]?.map((comm) => (
+                        <div
+                          key={comm._id}
+                          className="flex items-center justify-between p-1.5 rounded-md bg-muted/40 border border-border/30 text-[11px]"
+                        >
+                          <span className="font-medium text-foreground truncate max-w-[120px]">
+                            {comm.fromUserName}
+                          </span>
+                          <span className="inline-flex items-center gap-1 font-semibold text-[10px] shrink-0">
+                            {comm.category === 'roleplay' && <span className="text-purple-600 dark:text-purple-400">🎭 Roleplay MVP</span>}
+                            {comm.category === 'tactics' && <span className="text-blue-600 dark:text-blue-400">⚔️ Tactical Genius</span>}
+                            {comm.category === 'clutch' && <span className="text-emerald-600 dark:text-emerald-400">🛡️ Clutch Savior</span>}
+                            {comm.category === 'heroic' && <span className="text-amber-600 dark:text-amber-400">🌟 Heroic MVP</span>}
+                            {comm.category === 'gm' && <span className="text-amber-500 dark:text-amber-400 font-bold">👑 GM Award</span>}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </PopoverContent>
+              </Popover>
+            )}
+
             {canCommend && (
               <Popover>
                 <PopoverTrigger asChild>
@@ -255,9 +316,16 @@ export default function AttendingCharactersList({
                   </button>
                 </PopoverTrigger>
                 <PopoverContent className="w-72 p-3 text-xs space-y-3">
-                  <div className="font-bold text-sm flex items-center gap-1.5 border-b pb-2">
-                    <Medal className="h-4 w-4 text-purple-500" />
-                    <span>Commend {char.name}</span>
+                  <div className="font-bold text-sm flex items-center justify-between border-b pb-2">
+                    <div className="flex items-center gap-1.5">
+                      <Medal className="h-4 w-4 text-purple-500" />
+                      <span>Commend {char.name}</span>
+                    </div>
+                    {(sessionCommendations?.countsByCharacter[char._id]?.total ?? 0) > 0 && (
+                      <span className="text-[10px] text-muted-foreground font-normal">
+                        {sessionCommendations?.countsByCharacter[char._id]?.total} received
+                      </span>
+                    )}
                   </div>
 
                   {canCommendAsPlayer && (
@@ -372,6 +440,34 @@ export default function AttendingCharactersList({
                           </div>
                         </Button>
                       )}
+                    </div>
+                  )}
+
+                  {/* Commendations received this session breakdown */}
+                  {(sessionCommendations?.receivedByCharacter?.[char._id]?.length ?? 0) > 0 && (
+                    <div className="border-t pt-2 space-y-1.5">
+                      <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                        Received this session
+                      </div>
+                      <div className="space-y-1 max-h-36 overflow-y-auto pr-1">
+                        {sessionCommendations?.receivedByCharacter?.[char._id]?.map((comm) => (
+                          <div
+                            key={comm._id}
+                            className="flex items-center justify-between p-1 rounded bg-muted/40 text-[10px]"
+                          >
+                            <span className="font-medium text-foreground truncate max-w-[120px]">
+                              {comm.fromUserName}
+                            </span>
+                            <span className="font-semibold shrink-0">
+                              {comm.category === 'roleplay' && <span className="text-purple-600 dark:text-purple-400">🎭 Roleplay</span>}
+                              {comm.category === 'tactics' && <span className="text-blue-600 dark:text-blue-400">⚔️ Tactics</span>}
+                              {comm.category === 'clutch' && <span className="text-emerald-600 dark:text-emerald-400">🛡️ Clutch</span>}
+                              {comm.category === 'heroic' && <span className="text-amber-600 dark:text-amber-400">🌟 Heroic</span>}
+                              {comm.category === 'gm' && <span className="text-amber-500 dark:text-amber-400 font-bold">👑 GM</span>}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </PopoverContent>

@@ -465,18 +465,26 @@ export default function CharacterDetailsDialog({
 
                         {/* Quotes in this session */}
                         {sess.quotes.length > 0 && (
-                          <div className="space-y-1 pt-1 border-t border-border/30">
+                          <div className="space-y-1.5 pt-1 border-t border-border/30">
                             <div className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1">
                               <Quote className="h-3 w-3 text-purple-400" /> Quotes:
                             </div>
-                            {sess.quotes.map((qText, idx) => (
-                              <blockquote
-                                key={idx}
-                                className="pl-2 border-l-2 border-purple-500/50 text-[11px] italic text-muted-foreground"
-                              >
-                                &ldquo;{qText}&rdquo;
-                              </blockquote>
-                            ))}
+                            {sess.quotes.map((qItem, idx) => {
+                              const qText = typeof qItem === 'string' ? qItem : qItem.quote
+                              const quoter = typeof qItem === 'object' ? qItem.quoterName : undefined
+                              return (
+                                <div key={idx} className="space-y-0.5">
+                                  <blockquote className="pl-2 border-l-2 border-purple-500/50 text-[11px] italic text-muted-foreground">
+                                    &ldquo;{qText}&rdquo;
+                                  </blockquote>
+                                  {quoter && (
+                                    <div className="pl-2 text-[9px] text-muted-foreground/80 font-medium">
+                                      — quoted by <span className="text-foreground/90 font-semibold">{quoter}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })}
                           </div>
                         )}
                       </div>

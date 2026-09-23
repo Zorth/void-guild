@@ -1,6 +1,7 @@
 import { query, mutation, QueryCtx } from './_generated/server'
 import { v } from 'convex/values'
 import { internal } from './_generated/api'
+import { Id } from './_generated/dataModel'
 import { isAdmin } from './roles'
 
 export const listCharacters = query({
@@ -335,10 +336,39 @@ export const getCharacterProfile = query({
       .withIndex('by_character', (q) => q.eq('characterId', args.characterId))
       .collect()
 
-    const quotesBySession = new Map<string, string[]>()
+    // Resolve quoter user names
+    const quoterUserIds = Array.from(new Set(quotes.map((q) => q.userId).filter(Boolean))) as string[]
+    const quoterUserDocs = await Promise.all(
+      quoterUserIds.map((uid) =>
+        ctx.db
+          .query('users')
+          .withIndex('by_userId', (q) => q.eq('userId', uid))
+          .first()
+      )
+    )
+    const quoterMap = new Map<string, string>()
+    quoterUserIds.forEach((uid, idx) => {
+      const u = quoterUserDocs[idx]
+      const name = u?.name || u?.username || 'Adventurer'
+      quoterMap.set(uid, name)
+    })
+
+    interface QuoteProfileItem {
+      _id: Id<'quotes'>
+      quote: string
+      quoterName?: string
+      userId?: string
+    }
+
+    const quotesBySession = new Map<string, QuoteProfileItem[]>()
     for (const q of quotes) {
       const list = quotesBySession.get(q.sessionId) || []
-      list.push(q.quote)
+      list.push({
+        _id: q._id,
+        quote: q.quote,
+        userId: q.userId,
+        quoterName: q.userId ? quoterMap.get(q.userId) || 'Adventurer' : undefined,
+      })
       quotesBySession.set(q.sessionId, list)
     }
 
