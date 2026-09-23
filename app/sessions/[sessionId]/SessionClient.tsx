@@ -696,7 +696,7 @@ export default function SessionClient() {
 
         {/* Central pillar area */}
         <main className="w-full max-w-2xl mx-auto lg:mx-0 lg:col-start-1 2xl:col-start-2 space-y-8 pb-12">
-              <Card className={session.locked ? "border-amber-200 bg-amber-50/10" : session.isPrivate ? "border-amber-500/30 bg-amber-500/5" : session.planning ? "border-purple-200 bg-purple-50/10" : ""}>
+              <Card className={session.locked ? "border-amber-200 bg-amber-50/10" : session.isPrivate ? "border-amber-500/30 bg-amber-500/5" : session.isIntro ? "border-emerald-500/30 bg-emerald-500/5" : session.planning ? "border-purple-200 bg-purple-50/10" : ""}>
                 <CardHeader>
                   <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                     <div className="space-y-4 flex-grow w-full">
@@ -837,11 +837,11 @@ export default function SessionClient() {
                         <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg overflow-hidden">
                             <div className="bg-emerald-500/10 px-4 py-2 border-b border-emerald-500/20 flex items-center justify-between">
                                 <div className="flex items-center gap-2 font-bold text-sm text-emerald-400">
-                                    <Sprout className="h-4 w-4" />
+                                    <Sprout className="h-4 w-4 shrink-0" />
                                     <span>Intro Session for New Players</span>
                                 </div>
                                 <div 
-                                    className="flex items-center justify-center rounded-full font-bold h-6 w-6 text-[10px]"
+                                    className="flex items-center justify-center rounded-full font-bold h-6 w-6 text-[10px] shrink-0"
                                     style={getLevelBadgeStyle(session.system === 'PF' ? 1 : 3)}
                                 >
                                     {session.system === 'PF' ? 1 : 3}

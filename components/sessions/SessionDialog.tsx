@@ -253,7 +253,7 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
             <input 
               type="checkbox" 
               id="intro-toggle" 
-              className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+              className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer shrink-0"
               checked={isIntro}
               onChange={(e) => {
                 const checked = e.target.checked
@@ -269,10 +269,10 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
                     htmlFor="intro-toggle"
                     className="text-sm font-bold leading-none cursor-pointer flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400"
                 >
-                    <Sprout className="h-4 w-4" />
+                    <Sprout className="h-4 w-4 shrink-0" />
                     <span>Intro Session (New Players)</span>
                 </label>
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-[10px] text-muted-foreground leading-normal">
                     For new players and beginners. No quest is required, and level is fixed to Level 1 (Pathfinder) or Level 3 (D&D).
                 </p>
             </div>

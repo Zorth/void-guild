@@ -117,8 +117,8 @@ export default function SessionManagement({
             <div className="flex items-center justify-between p-2 bg-muted/30 rounded-md border border-border/40">
                 <div className="text-sm truncate mr-2">
                     {session.isIntro ? (
-                        <span className="font-medium text-emerald-400 flex items-center gap-1.5">
-                            <Sprout className="h-4 w-4" />
+                        <span className="font-medium text-emerald-400 flex items-center gap-1.5 truncate">
+                            <Sprout className="h-4 w-4 shrink-0" />
                             Intro Session for Beginners
                         </span>
                     ) : session.quest ? (

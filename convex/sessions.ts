@@ -121,7 +121,7 @@ export const listSessions = query({
           (session.characters || []).map((id) => ctx.db.get(id))
         )
         const worldDoc = session.world ? await ctx.db.get(session.world as Id<'worlds'>) : null
-        let questDoc = session.questId ? await ctx.db.get(session.questId) : null
+        let questDoc = session.questId && !session.isIntro ? await ctx.db.get(session.questId) : null
         const isWorldOwner = worldDoc && user.subject === worldDoc.owner
         if (questDoc?.isHidden && !isWorldOwner && !isAdminUser) {
           questDoc = null
@@ -172,7 +172,7 @@ export const publicListSessions = query({
           (session.characters || []).map((id) => ctx.db.get(id))
         )
         const worldDoc = session.world ? await ctx.db.get(session.world as Id<'worlds'>) : null
-        let questDoc = session.questId ? await ctx.db.get(session.questId) : null
+        let questDoc = session.questId && !session.isIntro ? await ctx.db.get(session.questId) : null
         if (questDoc?.isHidden) {
           questDoc = null
         }
@@ -461,7 +461,7 @@ export const getSession = query({
     const isWorldOwner = worldDoc && user?.subject === worldDoc.owner
     
     let quest = null
-    if (session.questId) {
+    if (session.questId && !session.isIntro) {
         quest = await ctx.db.get(session.questId)
         if (quest?.isHidden && !isWorldOwner && !isAdminUser) {
           quest = null
@@ -511,6 +511,10 @@ export const selectQuest = mutation({
     const isAdminUser = await isAdmin(ctx)
     if (session.owner !== user.subject && !isAdminUser) {
       throw new Error('Only the session owner or an admin can select a quest.')
+    }
+
+    if (session.isIntro) {
+      throw new Error('Intro sessions do not use quests.')
     }
 
     await ctx.db.patch(args.sessionId, { questId: args.questId })
@@ -615,7 +619,7 @@ export const createSession = mutation({
       planning: args.planning,
       isPrivate: args.isPrivate ?? false,
       isIntro: args.isIntro ?? false,
-      questId: args.questId,
+      questId: args.isIntro ? undefined : args.questId,
     })
 
     await ctx.scheduler.runAfter(0, internal.discord.syncSessionToDiscord, {
@@ -670,7 +674,7 @@ export const updateSession = mutation({
       planning: args.planning,
       isPrivate: args.isPrivate ?? false,
       isIntro: args.isIntro ?? false,
-      questId: args.questId,
+      questId: args.isIntro ? undefined : args.questId,
     })
 
     await ctx.scheduler.runAfter(0, internal.discord.syncSessionToDiscord, {

@@ -530,7 +530,11 @@ function FiveDayOverview({ sessions, userCharacterIds }: { sessions: SessionWith
                                         let displayLevel: number | 'V' | 'TBD' | undefined = undefined;
                                         let badgeStyle: React.CSSProperties = {};
 
-                                        if (session.system === 'PF') {
+                                        if (session.isIntro) {
+                                            const l = session.system === 'PF' ? 1 : 3;
+                                            displayLevel = l;
+                                            badgeStyle = getLevelBadgeStyle(l);
+                                        } else if (session.system === 'PF') {
                                             const l = levelPF ?? numLevel;
                                             if (l !== undefined) {
                                                 displayLevel = l;
@@ -567,7 +571,7 @@ function FiveDayOverview({ sessions, userCharacterIds }: { sessions: SessionWith
                                                     session.isOwner && "border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20",
                                                     isJoined && "border-purple-500/40 bg-purple-500/10 hover:bg-purple-500/20"
                                                 )}
-                                                title={`${session.worldName}${displayLevel !== undefined ? ` (Lvl ${displayLevel})` : ''}`}
+                                                title={`${session.worldName}${session.isIntro ? ' [Intro]' : ''}${displayLevel !== undefined ? ` (Lvl ${displayLevel})` : ''}`}
                                             >
                                                 <div className="flex items-center gap-1 flex-wrap">
                                                     {session.system && (
@@ -956,7 +960,11 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
                                            let displayLevel: number | 'V' | 'TBD' = 'TBD';
                                            let badgeStyle: React.CSSProperties = {};
 
-                                           if (session.system === 'PF') {
+                                           if (session.isIntro) {
+                                               const l = session.system === 'PF' ? 1 : 3;
+                                               displayLevel = l;
+                                               badgeStyle = getLevelBadgeStyle(l);
+                                           } else if (session.system === 'PF') {
                                                const l = levelPF ?? numLevel;
                                                displayLevel = l ?? 'TBD';
                                                if (typeof displayLevel === 'number') badgeStyle = getLevelBadgeStyle(displayLevel);
@@ -1039,6 +1047,7 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
                               }
                             </div>
                             {(() => {
+                                if (session.isIntro) return null;
                                 const q = session.quest;
                                 const levelPF = q?.levelPF ?? (q?.levelDnD === undefined ? q?.level : undefined);
                                 const levelDnD = q?.levelDnD;

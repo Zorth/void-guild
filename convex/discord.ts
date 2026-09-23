@@ -614,7 +614,7 @@ export const getInternalSessionDetails = internalQuery({
       .collect();
 
     let selectedQuest = null;
-    if (session.questId) {
+    if (session.questId && !session.isIntro) {
         selectedQuest = await ctx.db.get(session.questId);
         // If the selected quest was marked hidden, do not reveal it on Discord
         if (selectedQuest?.isHidden) {
