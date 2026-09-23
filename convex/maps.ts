@@ -211,7 +211,17 @@ export const updateMapSettings = mutation({
 
     const patches: any = {}
     if (args.name !== undefined) patches.name = args.name.trim()
-    if (args.slug !== undefined) patches.slug = args.slug.trim().toLowerCase().replace(/\s+/g, '-')
+    if (args.slug !== undefined) {
+      const cleanSlug = args.slug.trim().toLowerCase().replace(/\s+/g, '-')
+      const existing = await ctx.db
+        .query('worldMaps')
+        .withIndex('by_worldId_slug', (q) => q.eq('worldId', map.worldId).eq('slug', cleanSlug))
+        .first()
+      if (existing && existing._id !== map._id) {
+        throw new Error('A map with this URL slug already exists in this world.')
+      }
+      patches.slug = cleanSlug
+    }
     if (args.isHomeMap !== undefined) patches.isHomeMap = args.isHomeMap
     if (args.imageUrl !== undefined) patches.imageUrl = args.imageUrl
     if (args.width !== undefined) patches.width = args.width

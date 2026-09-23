@@ -741,12 +741,14 @@ export default function MapViewerClient() {
       hasAutoFittedRef.current = true
 
       // If the map is still stored with default 2000x2000 square dimensions, persist real dimensions
-      if (currentMap && isOwner && (currentMap.width === 2000 && currentMap.height === 2000)) {
+      if (currentMap && isOwner && (currentMap.width === 2000 && currentMap.height === 2000) && nw > 0 && nh > 0) {
         updateMapSettingsMutation({
           mapId: currentMap._id,
           width: nw,
           height: nh,
-        }).catch(console.error)
+        }).catch((err) => {
+          console.warn('Could not auto-persist detected map dimensions:', err)
+        })
       }
     }
   }
@@ -1208,19 +1210,26 @@ export default function MapViewerClient() {
   const handleUpdateSettings = async () => {
     if (!currentMap || !world) return
     try {
+      const widthVal = Number(settingsDraft.width)
+      const heightVal = Number(settingsDraft.height)
+      const gridSizeVal = Number(settingsDraft.gridSize)
+      const gridOffsetValX = Number(settingsDraft.gridOffsetX)
+      const gridOffsetValY = Number(settingsDraft.gridOffsetY)
+      const gridScaleVal = Number(settingsDraft.gridScale)
+
       await updateMapSettingsMutation({
         mapId: currentMap._id,
         name: settingsDraft.name,
         slug: settingsDraft.slug,
         isHomeMap: settingsDraft.isHomeMap,
         imageUrl: settingsDraft.imageUrl,
-        width: settingsDraft.width,
-        height: settingsDraft.height,
+        width: !isNaN(widthVal) && widthVal > 0 ? widthVal : (currentMap.width || 2000),
+        height: !isNaN(heightVal) && heightVal > 0 ? heightVal : (currentMap.height || 2000),
         gridType: settingsDraft.gridType,
-        gridSize: settingsDraft.gridSize,
-        gridOffsetX: settingsDraft.gridOffsetX,
-        gridOffsetY: settingsDraft.gridOffsetY,
-        gridScale: settingsDraft.gridScale,
+        gridSize: !isNaN(gridSizeVal) && gridSizeVal > 0 ? gridSizeVal : 100,
+        gridOffsetX: !isNaN(gridOffsetValX) ? gridOffsetValX : 0,
+        gridOffsetY: !isNaN(gridOffsetValY) ? gridOffsetValY : 0,
+        gridScale: !isNaN(gridScaleVal) ? gridScaleVal : 0,
         gridScaleUnit: settingsDraft.gridScaleUnit,
         isExplorationMap: settingsDraft.isExplorationMap,
         hideFromMenu: settingsDraft.hideFromMenu,
