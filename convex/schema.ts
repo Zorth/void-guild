@@ -35,6 +35,7 @@ export default defineSchema({
         locked: v.boolean(),
         planning: v.optional(v.boolean()),
         isPrivate: v.optional(v.boolean()),
+        isIntro: v.optional(v.boolean()),
         characters: v.array(v.id("characters")),
         gmCharacter: v.optional(v.id("characters")),
         location: v.optional(v.string()), // Google Maps link

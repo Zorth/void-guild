@@ -16,6 +16,7 @@ import { FormEvent, useState } from 'react'
 import { Id, Doc } from '@/convex/_generated/dataModel'
 import { fireVoidParticles } from '@/lib/particles'
 import { track } from '@vercel/analytics'
+import { Sprout } from 'lucide-react'
 
 interface SessionDialogProps {
   session?: Doc<'sessions'>
@@ -40,6 +41,7 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
   const [system, setSystem] = useState<'PF' | 'DnD'>(session?.system || 'PF')
   const [planning, setPlanning] = useState(session?.planning || false)
   const [isPrivate, setIsPrivate] = useState(session?.isPrivate || false)
+  const [isIntro, setIsIntro] = useState(session?.isIntro || false)
   const [isOpen, setIsOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -70,7 +72,9 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
         }
         
         // setWorld(session.world) // Removed: world is now derived
-        setLevel(session.level?.toString() || '')
+        const sessIntro = session.isIntro || false
+        setIsIntro(sessIntro)
+        setLevel(sessIntro ? (session.system === 'PF' ? '1' : '3') : (session.level?.toString() || ''))
         setMaxPlayers(session.maxPlayers.toString())
         setGmCharacter(session.gmCharacter || '')
         setLocation(session.location || '')
@@ -81,6 +85,7 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
         setDate('')
         setTime('')
         // setWorld('') // Removed: world is now derived
+        setIsIntro(false)
         setLevel('1')
         setMaxPlayers('4')
         setGmCharacter('')
@@ -109,8 +114,8 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
       newErrors.maxPlayers = "Max 20 players"
     }
 
-    const levelNum = parseInt(level)
-    if (level && levelNum !== 0 && (isNaN(levelNum) || levelNum < 1 || levelNum > 20)) {
+    const levelNum = isIntro ? (system === 'PF' ? 1 : 3) : parseInt(level)
+    if (!isIntro && level && levelNum !== 0 && (isNaN(levelNum) || levelNum < 1 || levelNum > 20)) {
       newErrors.level = "Level must be 1-20"
     }
 
@@ -126,8 +131,8 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
         if (isNaN(sessionDateTime)) sessionDateTime = undefined
     }
 
-    let levelValue: number | undefined = parseInt(level)
-    if (isNaN(levelValue) || levelValue === 0) {
+    let levelValue: number | undefined = isIntro ? (system === 'PF' ? 1 : 3) : parseInt(level)
+    if (!isIntro && (isNaN(levelValue) || levelValue === 0)) {
       levelValue = undefined
     }
 
@@ -149,8 +154,9 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
           system: system,
           planning: planning,
           isPrivate: isPrivate,
+          isIntro: isIntro,
         })
-        track('session_updated', { worldName: worldName?.name, system, planning, isPrivate });
+        track('session_updated', { worldName: worldName?.name, system, planning, isPrivate, isIntro });
       } else {
         // Trigger particle effect at the mouse position for new sessions
         if ('clientX' in event.nativeEvent) {
@@ -169,8 +175,9 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
           system: system,
           planning: planning,
           isPrivate: isPrivate,
+          isIntro: isIntro,
         })
-        track('session_created', { worldName: worldName?.name, system, planning, isPrivate });
+        track('session_created', { worldName: worldName?.name, system, planning, isPrivate, isIntro });
       }
       setIsOpen(false)
     } finally {
@@ -242,12 +249,47 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
             </div>
           </div>
 
+          <div className="flex items-center space-x-2 bg-muted/30 p-3 rounded-lg border border-emerald-500/20">
+            <input 
+              type="checkbox" 
+              id="intro-toggle" 
+              className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+              checked={isIntro}
+              onChange={(e) => {
+                const checked = e.target.checked
+                setIsIntro(checked)
+                if (checked) {
+                  setLevel(system === 'PF' ? '1' : '3')
+                  if (errors.level) setErrors({ ...errors, level: '' })
+                }
+              }}
+            />
+            <div className="grid gap-1.5 leading-none">
+                <label
+                    htmlFor="intro-toggle"
+                    className="text-sm font-bold leading-none cursor-pointer flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400"
+                >
+                    <Sprout className="h-4 w-4" />
+                    <span>Intro Session (New Players)</span>
+                </label>
+                <p className="text-[10px] text-muted-foreground">
+                    For new players and beginners. No quest is required, and level is fixed to Level 1 (Pathfinder) or Level 3 (D&D).
+                </p>
+            </div>
+          </div>
+
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium">System</label>
             <select
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               value={system}
-              onChange={(e) => setSystem(e.target.value as 'PF' | 'DnD')}
+              onChange={(e) => {
+                const newSystem = e.target.value as 'PF' | 'DnD'
+                setSystem(newSystem)
+                if (isIntro) {
+                  setLevel(newSystem === 'PF' ? '1' : '3')
+                }
+              }}
             >
               <option value="PF">Pathfinder</option>
               <option value="DnD">Dungeons & Dragons</option>
@@ -262,16 +304,17 @@ export default function SessionDialog({ session, trigger, hasWorld }: SessionDia
           </div>
           <div className="flex gap-4">
             <div className="flex-1 flex flex-col gap-2">
-                <label className="text-sm font-medium">Level</label>
+                <label className="text-sm font-medium">Level {isIntro && "(Fixed for Intro)"}</label>
                 <p className="text-[10px] text-muted-foreground -mt-1 italic">
-                  Level can be 0 or empty to set TBD
+                  {isIntro ? `Fixed at Level ${system === 'PF' ? '1' : '3'} for ${system === 'PF' ? 'Pathfinder' : 'D&D'}` : 'Level can be 0 or empty to set TBD'}
                 </p>
                 <Input
                 type="number"
                 min="0"
                 max="20"
-                placeholder="TBD"
-                value={level}
+                placeholder={isIntro ? (system === 'PF' ? '1' : '3') : "TBD"}
+                value={isIntro ? (system === 'PF' ? '1' : '3') : level}
+                disabled={isIntro}
                 onChange={(e) => {
                   setLevel(e.target.value)
                   if (errors.level) setErrors({ ...errors, level: '' })

@@ -167,6 +167,8 @@ export const createSession = mutation({
         system: v.union(v.literal('PF'), v.literal('DnD')),
         location: v.optional(v.string()),
         planning: v.optional(v.boolean()),
+        isPrivate: v.optional(v.boolean()),
+        isIntro: v.optional(v.boolean()),
         worldId: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
@@ -189,8 +191,10 @@ export const createSession = mutation({
         }
 
         const { apiKey, worldId, ...sessionData } = args
+        const level = args.isIntro ? (args.system === 'PF' ? 1 : 3) : args.level
         return await ctx.db.insert('sessions', {
             ...sessionData,
+            level,
             world: targetWorldId,
             owner: user.userId,
             characters: [],
@@ -251,6 +255,8 @@ export const updateSession = mutation({
         location: v.optional(v.string()),
         locked: v.optional(v.boolean()),
         planning: v.optional(v.boolean()),
+        isPrivate: v.optional(v.boolean()),
+        isIntro: v.optional(v.boolean()),
     },
     handler: async (ctx, args) => {
         const user = await requireUser(ctx, args.apiKey)
@@ -264,6 +270,12 @@ export const updateSession = mutation({
         }
 
         const { apiKey, sessionId, ...patch } = args
+        if (patch.isIntro !== undefined) {
+            const system = (patch as any).system ?? session.system
+            if (patch.isIntro) {
+                patch.level = system === 'PF' ? 1 : 3
+            }
+        }
         await ctx.db.patch(sId, patch)
         return { success: true }
     },

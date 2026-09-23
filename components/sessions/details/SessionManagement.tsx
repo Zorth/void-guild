@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { Pencil, CheckCircle2, Shield, Send, Bell, XCircle, Scroll, Calendar, CalendarRange, Clock, Unlock, User, Globe, Target } from 'lucide-react'
+import { Pencil, CheckCircle2, Shield, Send, Bell, XCircle, Scroll, Calendar, CalendarRange, Clock, Unlock, User, Globe, Target, Sprout } from 'lucide-react'
 import SessionDialog from '@/components/sessions/SessionDialog'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -111,30 +111,36 @@ export default function SessionManagement({
       <CardContent className="space-y-6">
         <div className="space-y-2">
             <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                <Scroll className="h-3 w-3" />
-                Active Quest
+                {session.isIntro ? <Sprout className="h-3.5 w-3.5 text-emerald-400" /> : <Scroll className="h-3 w-3" />}
+                {session.isIntro ? "Intro Session (No Quest Needed)" : "Active Quest"}
             </h4>
             <div className="flex items-center justify-between p-2 bg-muted/30 rounded-md border border-border/40">
                 <div className="text-sm truncate mr-2">
-                    {session.quest ? (
+                    {session.isIntro ? (
+                        <span className="font-medium text-emerald-400 flex items-center gap-1.5">
+                            <Sprout className="h-4 w-4" />
+                            Intro Session for Beginners
+                        </span>
+                    ) : session.quest ? (
                         <span className="font-medium text-primary">{session.quest.name}</span>
                     ) : (
                         <span className="italic text-muted-foreground">No quest selected</span>
                     )}
                 </div>
-                <Dialog open={isQuestDialogOpen} onOpenChange={setIsQuestDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button variant="outline" size="sm" className="h-7 text-[10px] uppercase font-bold tracking-tight" disabled={session.locked}>
-                            {session.quest ? "Change" : "Select"}
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
-                        <DialogHeader>
-                            <DialogTitle>Select Quest</DialogTitle>
-                            <DialogDescription>
-                                Choose a specific quest for this session to display it on Discord and the session page.
-                            </DialogDescription>
-                        </DialogHeader>
+                {!session.isIntro && (
+                    <Dialog open={isQuestDialogOpen} onOpenChange={setIsQuestDialogOpen}>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-7 text-[10px] uppercase font-bold tracking-tight" disabled={session.locked}>
+                                {session.quest ? "Change" : "Select"}
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[425px]">
+                            <DialogHeader>
+                                <DialogTitle>Select Quest</DialogTitle>
+                                <DialogDescription>
+                                    Choose a specific quest for this session to display it on Discord and the session page.
+                                </DialogDescription>
+                            </DialogHeader>
                         <div className="grid gap-2 py-4 max-h-[300px] overflow-y-auto pr-2">
                             <Button 
                                 variant={!session.questId ? "secondary" : "ghost"}
@@ -227,6 +233,7 @@ export default function SessionManagement({
                         </div>
                     </DialogContent>
                 </Dialog>
+                )}
             </div>
         </div>
 

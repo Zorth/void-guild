@@ -64,6 +64,9 @@ export const isAdminQuery = query({
 })
 
 export function computeEffectiveLevel(session: Doc<'sessions'>, quest: Doc<'quests'> | null): number | undefined {
+  if (session.isIntro) {
+    return session.system === 'PF' ? 1 : 3
+  }
   const numericSessionLevel = typeof session.level === 'number' ? session.level : undefined
   if (!quest) return numericSessionLevel
   const levelPF = quest.levelPF ?? quest.level
@@ -264,6 +267,7 @@ export const getPublicSession = query({
       interestedCount: (session.interestedPlayers || []).length,
       planning: session.planning,
       isPrivate: session.isPrivate,
+      isIntro: session.isIntro,
       location: session.location,
     };
   },
@@ -572,6 +576,7 @@ export const createSession = mutation({
     system: v.union(v.literal('PF'), v.literal('DnD')),
     planning: v.optional(v.boolean()),
     isPrivate: v.optional(v.boolean()),
+    isIntro: v.optional(v.boolean()),
     questId: v.optional(v.id('quests')),
   },
   handler: async (ctx, args) => {
@@ -594,10 +599,12 @@ export const createSession = mutation({
         throw new Error('Game Master must have a world to create a session.')
     }
 
+    const level = args.isIntro ? (args.system === 'PF' ? 1 : 3) : args.level
+
     const sessionId = await ctx.db.insert('sessions', {
       date: args.date,
       world: gmWorld._id,
-      level: args.level,
+      level: level,
       maxPlayers: args.maxPlayers,
       locked: false,
       characters: args.characters,
@@ -607,6 +614,7 @@ export const createSession = mutation({
       system: args.system,
       planning: args.planning,
       isPrivate: args.isPrivate ?? false,
+      isIntro: args.isIntro ?? false,
       questId: args.questId,
     })
 
@@ -631,6 +639,7 @@ export const updateSession = mutation({
     system: v.union(v.literal('PF'), v.literal('DnD')),
     planning: v.optional(v.boolean()),
     isPrivate: v.optional(v.boolean()),
+    isIntro: v.optional(v.boolean()),
     questId: v.optional(v.id('quests')),
   },
   handler: async (ctx, args) => {
@@ -647,10 +656,12 @@ export const updateSession = mutation({
         throw new Error('This session is locked and cannot be edited.')
     }
 
+    const level = args.isIntro ? (args.system === 'PF' ? 1 : 3) : args.level
+
     await ctx.db.patch(args.sessionId, {
       date: args.date,
       world: args.world,
-      level: args.level,
+      level: level,
       maxPlayers: args.maxPlayers,
       characters: args.characters,
       gmCharacter: args.gmCharacter,
@@ -658,6 +669,7 @@ export const updateSession = mutation({
       system: args.system,
       planning: args.planning,
       isPrivate: args.isPrivate ?? false,
+      isIntro: args.isIntro ?? false,
       questId: args.questId,
     })
 

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { useState, useEffect, useMemo } from 'react'
 import { Id, Doc } from '@/convex/_generated/dataModel'
 import Link from 'next/link'
-import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, Unlock, Globe, Scroll, Trophy, Menu, User, Target, UserPlus, Coins, Map } from 'lucide-react'
+import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, Unlock, Globe, Scroll, Trophy, Menu, User, Target, UserPlus, Coins, Map, Sprout } from 'lucide-react'
 import { useAuth, SignInButton } from '@clerk/nextjs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatDate, formatTime as formatTimeUtil, getLevelBadgeStyle, getDualLevelBadgeStyle, CharacterRankIcon } from '@/lib/utils'
@@ -711,6 +711,12 @@ export default function SessionClient() {
                                         Private
                                     </span>
                                 )}
+                                {session.isIntro && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-bold text-emerald-400 border border-emerald-500/30 shadow-xs uppercase tracking-wider">
+                                        <Sprout className="h-3.5 w-3.5" />
+                                        Intro
+                                    </span>
+                                )}
                                 {session.planning && <div className="text-[10px] bg-purple-600 text-white px-2 py-0.5 rounded-full uppercase tracking-widest font-black shadow-sm">Planning</div>}
                                 <a 
                                     href={`https://void.tarragon.be/Session-Reports/${session.date ? new Date(session.date).toISOString().slice(0, 10) : 'TBD'}-${session.worldName.replace(/\s+/g, '-')}`} 
@@ -826,7 +832,35 @@ export default function SessionClient() {
                   )}
                 </CardHeader>
 
-                {session.quest && (() => {
+                {session.isIntro ? (
+                    <div className="px-6 pb-6">
+                        <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg overflow-hidden">
+                            <div className="bg-emerald-500/10 px-4 py-2 border-b border-emerald-500/20 flex items-center justify-between">
+                                <div className="flex items-center gap-2 font-bold text-sm text-emerald-400">
+                                    <Sprout className="h-4 w-4" />
+                                    <span>Intro Session for New Players</span>
+                                </div>
+                                <div 
+                                    className="flex items-center justify-center rounded-full font-bold h-6 w-6 text-[10px]"
+                                    style={getLevelBadgeStyle(session.system === 'PF' ? 1 : 3)}
+                                >
+                                    {session.system === 'PF' ? 1 : 3}
+                                </div>
+                            </div>
+                            <div className="p-4 space-y-2">
+                                <h4 className="font-bold text-lg text-foreground">Welcome to the Void!</h4>
+                                <p className="text-sm text-muted-foreground leading-relaxed">
+                                    This is a dedicated <strong>Intro Session</strong> designed specifically for new players. You do not need to choose or prepare a quest beforehand—the Game Master will guide you through your first adventure!
+                                </p>
+                                <div className="flex items-center gap-2 pt-1 text-xs text-emerald-400/90 font-medium">
+                                    <span className="inline-flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-md">
+                                        🌱 Fixed Level: <strong>{session.system === 'PF' ? 'Level 1 (Pathfinder)' : 'Level 3 (D&D 5e)'}</strong>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ) : session.quest && (() => {
                     const q = session.quest;
                     const levelPF = q.levelPF ?? q.level;
                     const levelDnD = q.levelDnD ?? q.level;

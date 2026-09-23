@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useState, useEffect, useMemo } from 'react'
 import SessionDialog from './SessionDialog'
 import Link from 'next/link'
-import { Book, Lock, ChevronLeft, ChevronRight, User, Shield, Filter } from 'lucide-react'
+import { Book, Lock, ChevronLeft, ChevronRight, User, Shield, Filter, Sprout } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn, getLevelBadgeStyle, getDualLevelBadgeStyle, formatDate, formatTime, CharacterRankIcon } from '@/lib/utils'
 import './sessions.css'
@@ -585,6 +585,11 @@ function FiveDayOverview({ sessions, userCharacterIds }: { sessions: SessionWith
                                                             {typeof displayLevel === 'number' ? `Lvl ${displayLevel}` : displayLevel}
                                                         </span>
                                                     )}
+                                                    {session.isIntro && (
+                                                        <span title="Intro Session">
+                                                            <Sprout className="h-3 w-3 text-emerald-400 shrink-0" />
+                                                        </span>
+                                                    )}
                                                     {session.isPrivate && (
                                                         <Lock className="h-3 w-3 text-amber-500 shrink-0 ml-auto" />
                                                     )}
@@ -1004,6 +1009,12 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
                                 <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-500 border border-amber-500/30 uppercase tracking-wider">
                                   <Lock className="h-2.5 w-2.5" />
                                   Private
+                                </span>
+                              )}
+                              {session.isIntro && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/30 uppercase tracking-wider">
+                                  <Sprout className="h-2.5 w-2.5" />
+                                  Intro
                                 </span>
                               )}
                               {isPlanning && <div className="text-[10px] bg-purple-600 text-white px-2 py-0.5 rounded-full uppercase tracking-widest font-black shadow-sm">Planning</div>}

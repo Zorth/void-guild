@@ -44,22 +44,25 @@ export const syncSessionToDiscord = internalAction({
     }
     
     // Format: (DD/MM) The Void: <WorldName> [Lvl X] [<signupCharacters>/<MaxCharacters>]
-    // OR: (PLANNING) The Void: <WorldName> [Lvl X] [<interestCount> Interested]
     const isPlanning = session.planning || !session.date;
     const isPrivate = Boolean(session.isPrivate);
+    const isIntro = Boolean(session.isIntro);
     
     let levelStr = (session.level && session.level > 0) ? `[Lvl ${session.level}]` : "[Lvl ?]";
-    if (session.selectedQuest) {
+    if (isIntro) {
+        levelStr = `[Lvl ${session.system === 'PF' ? 1 : 3}]`;
+    } else if (session.selectedQuest) {
         levelStr = `[${getQuestLevelStr(session.selectedQuest)}]`;
     }
     
     const interestCount = (session.interestedPlayers || []).length;
     const interestStr = interestCount > 0 ? ` (+${interestCount})` : "";
     const privateTag = isPrivate ? " [PRIVATE]" : "";
+    const introTag = isIntro ? " 🌱 [INTRO]" : "";
 
     let threadName = isPlanning 
-      ? `(PLANNING) The Void: ${session.worldName}${privateTag} ${levelStr} [${interestCount} Interested]`
-      : `(${dateStr}) The Void: ${session.worldName}${privateTag} ${levelStr} [${session.attendingCharacters.length}/${session.maxPlayers}${interestStr}]`;
+      ? `(PLANNING) The Void: ${session.worldName}${privateTag}${introTag} ${levelStr} [${interestCount} Interested]`
+      : `(${dateStr}) The Void: ${session.worldName}${privateTag}${introTag} ${levelStr} [${session.attendingCharacters.length}/${session.maxPlayers}${interestStr}]`;
 
     if (threadName.length > 100) {
       threadName = threadName.substring(0, 97) + "...";
@@ -78,15 +81,19 @@ export const syncSessionToDiscord = internalAction({
       ? `Level ${session.level}` 
       : "Discuss what you're going to do to decide the mission's level";
     
-    if (session.selectedQuest) {
-        levelInfo = getQuestLevelStr(session.selectedQuest);
+    if (isIntro) {
+      levelInfo = `Level ${session.system === 'PF' ? 1 : 3} (Intro Session)`;
+    } else if (session.selectedQuest) {
+      levelInfo = getQuestLevelStr(session.selectedQuest);
     }
 
     const worldLink = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'}/world/${encodeURIComponent(session.worldName)}`;
     const sessionLink = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'}/sessions/${session._id}`;
     
     let questContent = "";
-    if (session.selectedQuest) {
+    if (isIntro) {
+      questContent = `\n## 🌱 Intro Session\n> This session is designed for new players and beginners. No quest selection is required, and character level is set to Level ${session.system === 'PF' ? 1 : 3}.\n`;
+    } else if (session.selectedQuest) {
         const qLevel = getQuestLevelStr(session.selectedQuest);
         questContent = `\n## Quest\n**${session.selectedQuest.name}** (${qLevel})`;
         if (session.selectedQuest.description) {
@@ -382,8 +389,11 @@ export const sendSessionNotification = action({
       ? `Level ${session.level}` 
       : "Discuss what you're going to do to decide the mission's level";
     
-    if (session.selectedQuest) {
-        levelInfo = `Level ${getQuestLevelStr(session.selectedQuest)}`;
+    const isIntro = Boolean(session.isIntro);
+    if (isIntro) {
+      levelInfo = `Level ${session.system === 'PF' ? 1 : 3} (Intro Session)`;
+    } else if (session.selectedQuest) {
+      levelInfo = `Level ${getQuestLevelStr(session.selectedQuest)}`;
     }
 
     const content = (roleId && args.type !== 'cancel') ? `<@&${roleId}>` : undefined;
@@ -394,16 +404,17 @@ export const sendSessionNotification = action({
     const isPrivate = Boolean(session.isPrivate);
 
     if (args.type === 'new') {
+      const typeLabel = isIntro ? "🌱 Intro Session" : "Session";
       embedTitle = isPrivate
-        ? `🔒 Private Session Alert: ${session.worldName}`
-        : `New Session Alert: ${session.worldName}`;
+        ? `🔒 Private ${typeLabel} Alert: ${session.worldName}`
+        : `New ${typeLabel} Alert: ${session.worldName}`;
       embedDescription = session.date 
         ? (isPrivate 
-            ? `A new private (unlisted) session for "${session.worldName}" has been scheduled for ${dateInfo}!`
-            : `A new session for "${session.worldName}" has been announced for ${dateInfo}!`)
+            ? `A new private (unlisted) ${isIntro ? 'intro ' : ''}session for "${session.worldName}" has been scheduled for ${dateInfo}!`
+            : `A new ${isIntro ? 'intro ' : ''}session for "${session.worldName}" has been announced for ${dateInfo}!`)
         : (isPrivate
-            ? `A new private (unlisted) session for "${session.worldName}" is now in planning!`
-            : `A new session for "${session.worldName}" is now in the planning phase! Express interest on the website to help pick a date.`);
+            ? `A new private (unlisted) ${isIntro ? 'intro ' : ''}session for "${session.worldName}" is now in planning!`
+            : `A new ${isIntro ? 'intro ' : ''}session for "${session.worldName}" is now in the planning phase! Express interest on the website to help pick a date.`);
     } else if (args.type === 'remind' && session.date) {
       const spotsLeft = session.maxPlayers - session.attendingCharacters.length;
       embedTitle = isPrivate 
