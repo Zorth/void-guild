@@ -30,15 +30,15 @@ https://guild.tarragon.be/api/external/v1
 ## Endpoints
 
 ### Sessions
-*   **GET** `/sessions?past=true|false&worldId=...&system=PF|DnD` - List all sessions with filters.
+*   **GET** `/sessions?past=true|false&isIntro=true|false&worldId=...&system=PF|DnD` - List all sessions with filters (private sessions are filtered out unless requester owns them or is an Admin).
 *   **GET** `/session/:sessionId` - Get detailed session info including attending characters, GM character, and quest.
 *   **GET** `/session/:sessionId/characters` - List attending characters in a session.
 *   **GET** `/session/:sessionId/quotes` - List character quotes logged in a session.
 *   **GET** `/session/:sessionId/state` - Get live initiative and clock state.
-*   **POST** `/session` - Create a new session (GM/Admin). Body: `{ date?, level?, maxPlayers, system, location?, planning?, worldId? }`.
+*   **POST** `/session` - Create a new session (GM/Admin). Body: `{ date?, level?, maxPlayers, system, location?, planning?, isPrivate?, isIntro?, worldId? }`. *(Note: If `isIntro` is true, level defaults automatically to 1 for Pathfinder or 3 for DnD).*
 *   **POST** `/session/:sessionId/loot` - Add loot item to a session (Owner/Admin). Body: `{ name, valueGP, isGood, isPerCharacter?, link?, quantity? }`.
 *   **POST** `/session/:sessionId/commendation` - Submit a character commendation. Body: `{ toCharacterId, category }`.
-*   **PATCH** `/session/:sessionId` - Update session parameters (Owner/Admin). Body: `{ date?, level?, maxPlayers?, location?, locked?, planning? }`.
+*   **PATCH** `/session/:sessionId` - Update session parameters (Owner/Admin). Body: `{ date?, level?, maxPlayers?, location?, locked?, planning?, isPrivate?, isIntro? }`.
 *   **PATCH** `/session/:sessionId/state` - Update initiative/clock (Owner/Admin). Body: `{ initiative?, currentIndex?, round?, timeSeconds?, isClockRunning?, multiplier? }`.
 
 ### Characters
@@ -95,6 +95,25 @@ https://guild.tarragon.be/api/external/v1
 ---
 
 ## Data Models
+
+### Session
+```json
+{
+  "_id": "s7...",
+  "date": 1757721600000,
+  "level": 1,
+  "maxPlayers": 5,
+  "system": "PF",
+  "world": "wd7...",
+  "owner": "user_...",
+  "location": "Ouroubouros Inn",
+  "planning": false,
+  "isPrivate": false,
+  "isIntro": true,
+  "characters": ["jh7..."],
+  "locked": false
+}
+```
 
 ### Character
 ```json

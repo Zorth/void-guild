@@ -100,6 +100,7 @@ export const listSessions = query({
     args: {
         apiKey: v.optional(v.string()),
         past: v.optional(v.boolean()),
+        isIntro: v.optional(v.boolean()),
         worldId: v.optional(v.string()),
         system: v.optional(v.union(v.literal('PF'), v.literal('DnD'))),
     },
@@ -117,6 +118,9 @@ export const listSessions = query({
 
         if (args.past !== undefined) {
             sessions = sessions.filter((s) => s.locked === args.past)
+        }
+        if (args.isIntro !== undefined) {
+            sessions = sessions.filter((s) => !!s.isIntro === args.isIntro)
         }
         if (args.worldId) {
             const wId = ctx.db.normalizeId('worlds', args.worldId)

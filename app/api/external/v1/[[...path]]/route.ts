@@ -40,7 +40,7 @@ function getApiDocsResponse() {
             ]
         },
         endpoints: [
-            { method: "GET", path: "/sessions", description: "List sessions with filters", queryParams: ["past=true|false", "worldId=string", "system=PF|DnD"] },
+            { method: "GET", path: "/sessions", description: "List sessions with filters", queryParams: ["past=true|false", "isIntro=true|false", "worldId=string", "system=PF|DnD"] },
             { method: "GET", path: "/session/:id", description: "Get detailed session info" },
             { method: "GET", path: "/session/:id/characters", description: "List attending characters in a session" },
             { method: "GET", path: "/session/:id/quotes", description: "List character quotes logged in a session" },
@@ -71,9 +71,11 @@ function getApiDocsResponse() {
 
             { method: "GET", path: "/black-void/listings", description: "List items & services on The Black Void market", queryParams: ["type=item|service", "status=active|completed"] },
             { method: "GET", path: "/black-void/character/:id/transactions", description: "Get sold items and won auctions for a character" },
+            { method: "GET", path: "/black-void/character/:id/log", description: "Get full character sheet transaction log & unclaimed counts" },
             { method: "POST", path: "/black-void/item", description: "Post an item listing" },
             { method: "POST", path: "/black-void/service", description: "Post a crafting/service listing" },
             { method: "POST", path: "/black-void/bid", description: "Place bid, 2-sig-fig auto-bid cap, or buyout on item" },
+            { method: "PATCH", path: "/black-void/claim/:type", description: "Toggle claim state or claim all log entries (seller, buyer, quest, guildmaster, bet/winner, bet/loser, all)" },
 
             { method: "GET", path: "/world/:id/reputation", description: "Get character faction reputation scores" },
             { method: "PATCH", path: "/reputation", description: "Update character faction reputation" },
@@ -107,9 +109,12 @@ export async function GET(
             const past = req.nextUrl.searchParams.has('past')
                 ? req.nextUrl.searchParams.get('past') === 'true'
                 : undefined;
+            const isIntro = req.nextUrl.searchParams.has('isIntro')
+                ? req.nextUrl.searchParams.get('isIntro') === 'true'
+                : undefined;
             const worldIdFilter = req.nextUrl.searchParams.get('worldId') || undefined;
             const systemFilter = (req.nextUrl.searchParams.get('system') as any) || undefined;
-            return handleResponse(convex.query(api.external_api.listSessions, { apiKey, past, worldId: worldIdFilter, system: systemFilter }));
+            return handleResponse(convex.query(api.external_api.listSessions, { apiKey, past, isIntro, worldId: worldIdFilter, system: systemFilter }));
         case 'session':
             if (subresource === 'characters') {
                 return handleResponse(convex.query(api.external_api.getSessionCharacters, { apiKey, sessionId: id }));
@@ -160,6 +165,9 @@ export async function GET(
                 return handleResponse(convex.query(api.external_api.getBlackVoidListings, { apiKey, type: type || undefined, status: status || undefined }));
             }
             if (id === 'character' && subresource) {
+                if (path[3] === 'log') {
+                    return handleResponse(convex.query(api.external_api.getBlackVoidCharacterLog, { apiKey, characterId: subresource }));
+                }
                 return handleResponse(convex.query(api.external_api.getBlackVoidTransactions, { apiKey, characterId: subresource }));
             }
             break;
@@ -267,6 +275,33 @@ export async function PATCH(
             return handleResponse(convex.mutation(api.external_api.updateQuest, { apiKey, questId: id, ...body }));
         case 'reputation':
             return handleResponse(convex.mutation(api.external_api.updateReputation, { apiKey, ...body }));
+        case 'black-void':
+            if (id === 'claim') {
+                if (subresource === 'seller') {
+                    return handleResponse(convex.mutation(api.external_api.toggleBlackVoidSellerClaimed, { apiKey, listingId: body.listingId }));
+                }
+                if (subresource === 'buyer') {
+                    return handleResponse(convex.mutation(api.external_api.toggleBlackVoidBuyerClaimed, { apiKey, listingId: body.listingId }));
+                }
+                if (subresource === 'quest') {
+                    return handleResponse(convex.mutation(api.external_api.toggleBlackVoidQuestClaimed, { apiKey, questId: body.questId, type: body.type }));
+                }
+                if (subresource === 'guildmaster') {
+                    return handleResponse(convex.mutation(api.external_api.toggleBlackVoidGuildmasterClaimed, { apiKey, sessionId: body.sessionId }));
+                }
+                if (subresource === 'bet') {
+                    if (path[3] === 'winner') {
+                        return handleResponse(convex.mutation(api.external_api.toggleBlackVoidBetWinnerClaimed, { apiKey, betId: body.betId }));
+                    }
+                    if (path[3] === 'loser') {
+                        return handleResponse(convex.mutation(api.external_api.toggleBlackVoidBetLoserClaimed, { apiKey, betId: body.betId }));
+                    }
+                }
+                if (subresource === 'all') {
+                    return handleResponse(convex.mutation(api.external_api.markAllBlackVoidLogClaimed, { apiKey, characterId: body.characterId }));
+                }
+            }
+            break;
     }
 
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
