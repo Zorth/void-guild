@@ -1,5 +1,6 @@
 import { query, mutation, QueryCtx } from './_generated/server'
 import { v } from 'convex/values'
+import { internal } from './_generated/api'
 import { Doc, Id } from './_generated/dataModel'
 import { isAdmin } from './roles'
 
@@ -246,6 +247,10 @@ export const sendBetInvitation = mutation({
       status: 'pending',
       createdAt: Date.now(),
     })
+
+    if (!args.targetCharacterId) {
+      await ctx.scheduler.runAfter(0, internal.blackVoidDiscord.notifyPublicBetInvite, { betId })
+    }
 
     return { success: true, betId }
   },

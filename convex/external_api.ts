@@ -1,5 +1,6 @@
 import { v } from 'convex/values'
 import { query, mutation } from './_generated/server'
+import { internal } from './_generated/api'
 import { Id } from './_generated/dataModel'
 import { roundToTwoSigFigs, getNextValidBid } from './blackVoid'
 
@@ -1137,7 +1138,7 @@ export const createBlackVoidItemListing = mutation({
         const now = Date.now()
         const expiresAt = now + durationDays * 86400000
 
-        return await ctx.db.insert('blackVoidListings', {
+        const listingId = await ctx.db.insert('blackVoidListings', {
             characterId: cId,
             type: 'item',
             name: args.name.trim(),
@@ -1151,6 +1152,10 @@ export const createBlackVoidItemListing = mutation({
             sellerClaimed: false,
             buyerClaimed: false,
         })
+
+        await ctx.scheduler.runAfter(0, internal.blackVoidDiscord.notifyNewListing, { listingId })
+
+        return listingId
     },
 })
 
@@ -1194,7 +1199,7 @@ export const createBlackVoidServiceListing = mutation({
             throw new Error('Minimum level cannot exceed maximum level.')
         }
 
-        return await ctx.db.insert('blackVoidListings', {
+        const listingId = await ctx.db.insert('blackVoidListings', {
             characterId: cId,
             type: 'service',
             name: args.name.trim(),
@@ -1210,6 +1215,10 @@ export const createBlackVoidServiceListing = mutation({
             sellerClaimed: false,
             buyerClaimed: false,
         })
+
+        await ctx.scheduler.runAfter(0, internal.blackVoidDiscord.notifyNewListing, { listingId })
+
+        return listingId
     },
 })
 

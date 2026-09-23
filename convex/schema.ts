@@ -237,9 +237,11 @@ export default defineSchema({
         maxAutoBid: v.optional(v.number()),
         sellerClaimed: v.optional(v.boolean()), // Checkmark for seller adding earnings to character sheet
         buyerClaimed: v.optional(v.boolean()), // Checkmark for buyer adding item/expense to character sheet
+        closingNotificationSent: v.optional(v.boolean()), // True if 1-hour warning sent to Discord
     }).index('by_characterId', ['characterId'])
       .index('by_status', ['status'])
       .index('by_type_status', ['type', 'status'])
+      .index('by_status_expiresAt', ['status', 'expiresAt'])
       .index('by_winningBidderCharacterId', ['winningBidderCharacterId']),
     blackVoidBids: defineTable({
         listingId: v.id('blackVoidListings'),

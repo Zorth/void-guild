@@ -1,5 +1,6 @@
 import { query, mutation, action, QueryCtx } from './_generated/server'
 import { v } from 'convex/values'
+import { internal } from './_generated/api'
 import { Doc, Id } from './_generated/dataModel'
 import { isAdmin } from './roles'
 
@@ -147,6 +148,8 @@ export const createItemListing = mutation({
             buyerClaimed: false,
         })
 
+        await ctx.scheduler.runAfter(0, internal.blackVoidDiscord.notifyNewListing, { listingId })
+
         return listingId
     },
 })
@@ -211,6 +214,8 @@ export const createServiceListing = mutation({
             sellerClaimed: false,
             buyerClaimed: false,
         })
+
+        await ctx.scheduler.runAfter(0, internal.blackVoidDiscord.notifyNewListing, { listingId })
 
         return listingId
     },

@@ -9,7 +9,8 @@ import Link from 'next/link'
 import { 
   ZoomIn, ZoomOut, Maximize2, Layers, MapPin, Eye, Edit3, Plus, 
   Trash2, Settings, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Map, FileText, Check, X, Grid, Lock, Unlock, Move, HelpCircle, Copy,
-  Castle, Crown, Skull, Swords, Shield, Mountain, Tent, Beer, Anchor, Flame, TreePine, Sparkles, BookOpen, Coins, Compass, Gem, Crosshair, Flag, Ghost, EyeOff, Ruler, Search, RotateCcw, RefreshCw
+  Castle, Crown, Skull, Swords, Shield, Mountain, Tent, Beer, Anchor, Flame, TreePine, Sparkles, BookOpen, Coins, Compass, Gem, Crosshair, Flag, Ghost, EyeOff, Ruler, Search, RotateCcw, RefreshCw,
+  Upload, ExternalLink
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -1401,7 +1402,22 @@ export default function MapViewerClient() {
                 />
               </div>
               <div>
-                <label className="font-bold text-muted-foreground">Background Image URL</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-bold text-muted-foreground">Background Image URL</label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-[11px] gap-1 text-purple-400 hover:text-purple-300 hover:bg-purple-950/40"
+                    asChild
+                  >
+                    <a href="https://maps.tarragon.be" target="_blank" rel="noopener noreferrer" title="Upload new map image on maps.tarragon.be">
+                      <Upload className="h-3 w-3" />
+                      Upload new image
+                      <ExternalLink className="h-2.5 w-2.5 opacity-60" />
+                    </a>
+                  </Button>
+                </div>
                 <Input
                   value={newMapDraft.imageUrl}
                   onChange={(e) => setNewMapDraft({ ...newMapDraft, imageUrl: e.target.value })}
@@ -1973,14 +1989,29 @@ export default function MapViewerClient() {
             )}
 
             {isOwner && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full mt-2 text-xs border border-dashed border-slate-700 text-slate-300 hover:text-white hover:bg-slate-900"
-                onClick={() => setIsLayerDialogOpen(true)}
-              >
-                <Plus className="h-3.5 w-3.5 mr-1" /> Add Layer
-              </Button>
+              <div className="space-y-1.5 mt-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-xs border border-dashed border-slate-700 text-slate-300 hover:text-white hover:bg-slate-900"
+                  onClick={() => setIsLayerDialogOpen(true)}
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Add Layer
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="w-full h-7 text-[11px] gap-1 text-purple-400 hover:text-purple-300 hover:bg-purple-950/40"
+                  asChild
+                >
+                  <a href="https://maps.tarragon.be" target="_blank" rel="noopener noreferrer" title="Upload new layer image on maps.tarragon.be">
+                    <Upload className="h-3 w-3" />
+                    Upload new image
+                    <ExternalLink className="h-2.5 w-2.5 opacity-60" />
+                  </a>
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -3054,20 +3085,35 @@ export default function MapViewerClient() {
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="font-bold text-muted-foreground">Background Image URL</label>
-                {currentMap?.imageUrl && (
+                <div className="flex items-center gap-1.5">
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-6 px-2 text-[11px] gap-1.5 text-purple-400 hover:text-purple-300 hover:bg-purple-950/40"
-                    onClick={handleForceRefreshImage}
-                    disabled={isRefreshingImage}
-                    title="Force reload latest image from host (bypasses browser HTTP cache)"
+                    className="h-6 px-2 text-[11px] gap-1 text-purple-400 hover:text-purple-300 hover:bg-purple-950/40"
+                    asChild
                   >
-                    <RefreshCw className={`h-3 w-3 ${isRefreshingImage ? 'animate-spin' : ''}`} />
-                    Reload Image (Clear Cache)
+                    <a href="https://maps.tarragon.be" target="_blank" rel="noopener noreferrer" title="Upload new map image on maps.tarragon.be">
+                      <Upload className="h-3 w-3" />
+                      Upload new image
+                      <ExternalLink className="h-2.5 w-2.5 opacity-60" />
+                    </a>
                   </Button>
-                )}
+                  {currentMap?.imageUrl && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-[11px] gap-1.5 text-purple-400 hover:text-purple-300 hover:bg-purple-950/40"
+                      onClick={handleForceRefreshImage}
+                      disabled={isRefreshingImage}
+                      title="Force reload latest image from host (bypasses browser HTTP cache)"
+                    >
+                      <RefreshCw className={`h-3 w-3 ${isRefreshingImage ? 'animate-spin' : ''}`} />
+                      Reload Image (Clear Cache)
+                    </Button>
+                  )}
+                </div>
               </div>
               <Input
                 value={settingsDraft.imageUrl}
@@ -3648,7 +3694,22 @@ export default function MapViewerClient() {
               />
             </div>
             <div>
-              <label className="font-bold text-muted-foreground">Overlay Image URL (Transparent PNG/WebP)</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="font-bold text-muted-foreground">Overlay Image URL (Transparent PNG/WebP)</label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-[11px] gap-1 text-purple-400 hover:text-purple-300 hover:bg-purple-950/40"
+                  asChild
+                >
+                  <a href="https://maps.tarragon.be" target="_blank" rel="noopener noreferrer" title="Upload new layer image on maps.tarragon.be">
+                    <Upload className="h-3 w-3" />
+                    Upload new image
+                    <ExternalLink className="h-2.5 w-2.5 opacity-60" />
+                  </a>
+                </Button>
+              </div>
               <Input
                 value={newLayerDraft.imageUrl}
                 onChange={(e) => setNewLayerDraft({ ...newLayerDraft, imageUrl: e.target.value })}

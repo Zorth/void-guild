@@ -1,5 +1,5 @@
 import { cronJobs } from "convex/server";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 
 const crons = cronJobs();
 
@@ -11,6 +11,16 @@ crons.daily(
   "delete past availability",
   { hourUTC: 0, minuteUTC: 0 },
   api.planning.cleanupOldAvailability
+);
+
+/**
+ * Check for Black Void auction house items closing in under 1 hour
+ * and send a warning alert to #black-void.
+ */
+crons.interval(
+  "notify closing soon black void listings",
+  { minutes: 5 },
+  internal.blackVoidDiscord.checkClosingSoonListings
 );
 
 export default crons;
