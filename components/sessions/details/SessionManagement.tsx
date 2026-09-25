@@ -377,7 +377,7 @@ export default function SessionManagement({
                             <span className="font-bold">New Session Alert</span>
                         </Button>
                         <p className="text-[11px] text-muted-foreground px-1">
-                            Ping the system role in this session's Discord forum thread.
+                            Post an announcement in #ourobouros pinging the system role with a link to the forum thread.
                         </p>
                     </div>
 
@@ -392,7 +392,7 @@ export default function SessionManagement({
                             <span className="font-bold">Send Reminder</span>
                         </Button>
                         <p className="text-[11px] text-muted-foreground px-1">
-                            Remind players of available spots and time left before start. {!session.date && "(Requires a date)"}
+                            Post a reminder in #ourobouros pinging the system role with available spots, time left, and forum link. {!session.date && "(Requires a date)"}
                         </p>
                     </div>
 

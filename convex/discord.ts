@@ -160,8 +160,16 @@ export const syncSessionToDiscord = internalAction({
         ? `*This session is currently in the planning phase. Click the link above to **show your interest** and make it easier for everyone to pick a date by filling in the Planning tab!*`
         : `*Click the link above to **sign up with your character**! Voidmasters encourage you to use this thread to discuss your plans and prepare for this session!*`);
 
+    const gmPing = session.gmDiscordId 
+      ? `<@${session.gmDiscordId}>` 
+      : (session.gmName || session.gmCharacterName || "Unknown");
+    const gmDisplay = session.gmCharacterName && session.gmDiscordId
+      ? `${gmPing} (${session.gmCharacterName})`
+      : gmPing;
+
     const messageContent = `# ${systemEmoji} [${session.worldName}](${worldLink})\n` +
       privateBanner +
+      `**Voidmaster**: ${gmDisplay}\n` +
       `**System**: ${systemName}\n` +
       `**Level**: ${levelInfo}\n` +
       `**Location**: ${locationInfo}\n` +
@@ -195,6 +203,7 @@ export const syncSessionToDiscord = internalAction({
       : "_No interest expressed yet._";
 
     const embedFields = [
+      { name: "Voidmaster", value: gmDisplay, inline: true },
       { name: isPrivate ? "Invited Characters" : "Current Signups", value: signupList, inline: false },
     ];
     if (!isPrivate) {
@@ -274,7 +283,7 @@ export const syncSessionToDiscord = internalAction({
           name: threadName,
           auto_archive_duration: 1440, // 1 day
           message: {
-            content: messageContent,
+            content: finalMessageContent,
             embeds: [embed],
           },
         };
@@ -351,9 +360,9 @@ export const sendActivityToDiscord = internalAction({
 
 /**
  * Sends a session notification (New, Reminder, Cancellation).
- * - "new": Posts an announcement directly to the session's Discord forum thread, pinging @VoidPathfinder or @VoidDungeonsAndDragons.
- * - "remind": Posts a reminder with role ping to the activity feed channel (#ouroubouros-inn).
- * - "cancel": Posts cancellation to the activity feed channel, and also alerts inside the forum thread.
+ * - "new": Posts an announcement to the activity channel (#ourobouros), pinging @VoidPathfinder or @VoidDungeonsAndDragons with a link to the session's Discord forum post.
+ * - "remind": Posts a reminder with role ping to the activity channel (#ourobouros) with a link to the session's Discord forum post.
+ * - "cancel": Posts cancellation to the activity channel (#ourobouros), and also alerts inside the forum thread.
  */
 export const sendSessionNotification = action({
   args: {
@@ -366,14 +375,25 @@ export const sendSessionNotification = action({
     if (!botToken) {
       throw new Error("Discord bot token not configured.");
     }
-    if (args.type !== 'new' && !channelId) {
+    if (!channelId) {
       throw new Error("Discord activity channel ID not configured.");
     }
 
-    const session = await ctx.runQuery(internal.discord.getInternalSessionDetails, { 
+    let session = await ctx.runQuery(internal.discord.getInternalSessionDetails, { 
       sessionId: args.sessionId 
     });
     if (!session) throw new Error("Session not found");
+
+    // Ensure Discord forum thread exists so we have the forum link ready
+    if (!session.discordThreadId) {
+      await ctx.runAction(internal.discord.syncSessionToDiscord, { sessionId: args.sessionId });
+      const refreshedSession = await ctx.runQuery(internal.discord.getInternalSessionDetails, { 
+        sessionId: args.sessionId 
+      });
+      if (refreshedSession) {
+        session = refreshedSession;
+      }
+    }
 
     const unixTimestamp = session.date ? Math.floor(session.date / 1000) : null;
     let dateInfo = "TBD";
@@ -436,6 +456,13 @@ export const sendSessionNotification = action({
       ? `https://discord.com/channels/${guildId}/${session.discordThreadId}` 
       : null;
 
+    const gmPing = session.gmDiscordId 
+      ? `<@${session.gmDiscordId}>` 
+      : (session.gmName || session.gmCharacterName || "Unknown");
+    const gmDisplay = session.gmCharacterName && session.gmDiscordId
+      ? `${gmPing} (${session.gmCharacterName})`
+      : gmPing;
+
     const interestCount = (session.interestedPlayers || []).length;
     const playersValue = `${session.attendingCharacters.length}/${session.maxPlayers}` + (!isPrivate && interestCount > 0 ? ` (+${interestCount} interested)` : "");
 
@@ -459,6 +486,7 @@ export const sendSessionNotification = action({
       description: embedDescription,
       color: isPrivate ? 0xd97706 : embedColor,
       fields: [
+        { name: 'Voidmaster', value: gmDisplay, inline: true },
         { name: 'System', value: session.system === 'PF' ? '<:Pathfinder:1322734594864320522> Pathfinder 2e' : '<:DnD:1322734981524754473> D&D 5e', inline: true },
         { name: 'Level', value: levelInfo, inline: true },
         { name: 'Players', value: playersValue, inline: true },
@@ -477,41 +505,17 @@ export const sendSessionNotification = action({
       embed.fields.push({ name: 'Location', value: `[View on Google Maps](${session.location})`, inline: false });
     }
 
-    // 1. "new" notifications: ping the role in the session's forum thread directly
-    if (args.type === 'new') {
-      let targetThreadId = session.discordThreadId;
-
-      // If the forum thread does not exist yet, sync session to create it first
-      if (!targetThreadId) {
-        await ctx.runAction(internal.discord.syncSessionToDiscord, { sessionId: args.sessionId });
-        const refreshedSession = await ctx.runQuery(internal.discord.getInternalSessionDetails, { 
-          sessionId: args.sessionId 
-        });
-        targetThreadId = refreshedSession?.discordThreadId;
+    if (args.type !== 'cancel') {
+      if (session.discordThreadId) {
+        const threadValue = threadLink 
+          ? `<#${session.discordThreadId}> • [Open Forum Thread](${threadLink})`
+          : `<#${session.discordThreadId}>`;
+        embed.fields.push({ name: 'Discord Discussion', value: threadValue, inline: false });
       }
-
-      if (!targetThreadId) {
-        throw new Error("Could not find or create a Discord forum thread for this session.");
-      }
-
-      const response = await fetch(`${DISCORD_API_BASE}/channels/${targetThreadId}/messages`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bot ${botToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ content, embeds: [embed] }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`Discord API error in thread (${response.status}):`, errorText);
-        throw new Error(`Discord API error: ${errorText}`);
-      }
-      return;
+      embed.fields.push({ name: 'Void Guild', value: `[View Session on Website](${sessionLink})`, inline: false });
     }
 
-    // 2. Post cancellation message in the thread if it exists
+    // 1. Post cancellation message in the thread if it exists
     if (args.type === 'cancel' && session.discordThreadId) {
       try {
         await fetch(`${DISCORD_API_BASE}/channels/${session.discordThreadId}/messages`, {
@@ -529,7 +533,7 @@ export const sendSessionNotification = action({
       }
     }
 
-    // 3. For "remind" and "cancel", post to the activity channel (#ouroubouros-inn)
+    // 2. For "new", "remind", and "cancel", post to the activity channel (#ourobouros)
     const response = await fetch(`${DISCORD_API_BASE}/channels/${channelId}/messages`, {
       method: "POST",
       headers: {
@@ -601,6 +605,11 @@ export const getInternalSessionDetails = internalQuery({
         )
       : [];
 
+    const gmUser = await ctx.db
+      .query("users")
+      .withIndex("by_userId", (q) => q.eq("userId", session.owner))
+      .first();
+
     const gmCharacter = session.gmCharacter ? await ctx.db.get(session.gmCharacter) : null;
 
     const quests = await ctx.db
@@ -630,6 +639,8 @@ export const getInternalSessionDetails = internalQuery({
       worldCalendar: world?.calendar || null,
       attendingCharacters: attendingCharacters.filter((c): c is any => c !== null),
       interestedPlayers,
+      gmDiscordId: gmUser?.discordId || null,
+      gmName: gmUser?.name || gmUser?.username || null,
       gmCharacterName: gmCharacter?.name || null,
       quests: availableQuests,
       selectedQuest,
