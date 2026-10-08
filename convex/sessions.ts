@@ -1735,14 +1735,18 @@ export const addLoot = mutation({
     const quantity = args.quantity || 1
     const newItems = []
 
-    for (let i = 0; i < quantity; i++) {
+    const shouldExpandForEach = args.isPerCharacter ?? false
+    const attendingCount = Math.max((session.characters || []).length, 1)
+    const count = shouldExpandForEach ? quantity * attendingCount : quantity
+
+    for (let i = 0; i < count; i++) {
         newItems.push({
             id: crypto.randomUUID(),
             name: args.name,
             link: args.link,
             valueGP: args.valueGP,
             isGood: args.isGood,
-            isPerCharacter: args.isPerCharacter ?? false,
+            isPerCharacter: shouldExpandForEach ? false : (args.isPerCharacter ?? false),
         })
     }
 
@@ -1777,19 +1781,46 @@ export const editLoot = mutation({
       throw new Error('Only the session owner or an admin can edit loot.')
     }
 
-    const loot = (session.loot || []).map((item) => {
+    const shouldExpandForEach = args.isPerCharacter ?? false
+    const attendingCount = Math.max((session.characters || []).length, 1)
+
+    const loot: any[] = []
+    for (const item of (session.loot || [])) {
       if (item.id === args.lootId) {
-        return {
-          ...item,
-          name: args.name,
-          link: args.link,
-          valueGP: args.valueGP,
-          isGood: args.isGood,
-          isPerCharacter: args.isPerCharacter ?? false,
+        if (shouldExpandForEach) {
+          // If edited to be "for each", expand to attendingCount items
+          loot.push({
+            ...item,
+            name: args.name,
+            link: args.link,
+            valueGP: args.valueGP,
+            isGood: args.isGood,
+            isPerCharacter: false,
+          })
+          for (let i = 1; i < attendingCount; i++) {
+            loot.push({
+              id: crypto.randomUUID(),
+              name: args.name,
+              link: args.link,
+              valueGP: args.valueGP,
+              isGood: args.isGood,
+              isPerCharacter: false,
+            })
+          }
+        } else {
+          loot.push({
+            ...item,
+            name: args.name,
+            link: args.link,
+            valueGP: args.valueGP,
+            isGood: args.isGood,
+            isPerCharacter: args.isPerCharacter ?? false,
+          })
         }
+      } else {
+        loot.push(item)
       }
-      return item
-    })
+    }
 
     await ctx.db.patch(args.sessionId, { loot })
   },
@@ -1840,18 +1871,39 @@ export const claimLoot = mutation({
       throw new Error('Character is not part of this session')
     }
 
-    const loot = (session.loot || []).map((item) => {
+    const attendingCount = Math.max((session.characters || []).length, 1)
+    const loot: any[] = []
+
+    for (const item of (session.loot || [])) {
       if (item.id === args.lootId) {
-        if (item.isGood) {
-          throw new Error('"Goods" cannot be claimed')
-        }
         if (item.claimedBy) {
           throw new Error('Item already claimed')
         }
-        return { ...item, claimedBy: args.characterId }
+        if (item.isPerCharacter) {
+          // If claiming a legacy or unexpanded item with isPerCharacter,
+          // claim this copy and generate the remaining (attendingCount - 1) copies so others can claim them
+          loot.push({
+            ...item,
+            claimedBy: args.characterId,
+            isPerCharacter: false,
+          })
+          for (let i = 1; i < attendingCount; i++) {
+            loot.push({
+              id: crypto.randomUUID(),
+              name: item.name,
+              link: item.link,
+              valueGP: item.valueGP,
+              isGood: item.isGood,
+              isPerCharacter: false,
+            })
+          }
+        } else {
+          loot.push({ ...item, claimedBy: args.characterId })
+        }
+      } else {
+        loot.push(item)
       }
-      return item
-    })
+    }
 
     await ctx.db.patch(args.sessionId, { loot })
   },

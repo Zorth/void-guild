@@ -265,19 +265,23 @@ export const addSessionLoot = mutation({
         const quantity = args.quantity || 1
         const newItems = []
 
-        for (let i = 0; i < quantity; i++) {
+        const shouldExpandForEach = args.isPerCharacter ?? false
+        const attendingCount = Math.max((session.characters || []).length, 1)
+        const count = shouldExpandForEach ? quantity * attendingCount : quantity
+
+        for (let i = 0; i < count; i++) {
             newItems.push({
                 id: crypto.randomUUID(),
                 name: args.name,
                 link: args.link,
                 valueGP: args.valueGP,
                 isGood: args.isGood,
-                isPerCharacter: args.isPerCharacter ?? false,
+                isPerCharacter: shouldExpandForEach ? false : (args.isPerCharacter ?? false),
             })
         }
 
         await ctx.db.patch(sId, { loot: [...loot, ...newItems] })
-        return { success: true, count: quantity }
+        return { success: true, count }
     },
 })
 
