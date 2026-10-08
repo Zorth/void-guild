@@ -187,7 +187,7 @@ export default function SessionManagement({
                                                 const levelDnD = quest.levelDnD ?? quest.level;
                                                 const numLevel = typeof session.level === 'number' ? session.level : undefined;
                                                 
-                                                let displayLevel: number | 'V' | '?' = '?';
+                                                let displayLevel: number | '?' = '?';
                                                 let badgeStyle: React.CSSProperties = {};
 
                                                 if (session.system === 'PF') {
@@ -201,7 +201,8 @@ export default function SessionManagement({
                                                 } else {
                                                     const isDual = levelPF !== undefined && levelDnD !== undefined && levelPF !== levelDnD;
                                                     if (isDual) {
-                                                        displayLevel = 'V';
+                                                        const l = levelPF ?? numLevel;
+                                                        displayLevel = (l ?? 0) > 0 ? l! : '?';
                                                         badgeStyle = getDualLevelBadgeStyle(levelPF, levelDnD);
                                                     } else {
                                                         const l = levelPF ?? levelDnD ?? numLevel;

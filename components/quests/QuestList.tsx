@@ -426,7 +426,7 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
                         )}
                         style={getDualLevelBadgeStyle(levelPF, levelDnD)}
                     >
-                      {isDual ? 'V' : (levelPF ?? levelDnD ?? 0) > 0 ? (levelPF ?? levelDnD) : '?'}
+                      {(levelPF ?? levelDnD ?? 0) > 0 ? (levelPF ?? levelDnD) : '?'}
                     </div>
                     <div className="min-w-0 flex-1">
                         <h4 className={cn("font-bold flex items-center gap-1.5 flex-wrap", isSidebar ? "text-xs" : "text-sm", !isExpanded && "truncate")}>

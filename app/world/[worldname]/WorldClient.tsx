@@ -565,7 +565,7 @@ export default function WorldClient() {
                                       const levelDnD = q?.levelDnD ?? q?.level;
                                       const numLevel = typeof session.level === 'number' ? session.level : undefined;
                                       
-                                      let displayLevel: number | 'V' | 'TBD' = 'TBD';
+                                      let displayLevel: number | 'TBD' = 'TBD';
                                       let badgeStyle: React.CSSProperties = {};
 
                                       if (session.system === 'PF') {
@@ -579,7 +579,8 @@ export default function WorldClient() {
                                       } else {
                                           const isDual = levelPF !== undefined && levelDnD !== undefined && levelPF !== levelDnD;
                                           if (isDual) {
-                                              displayLevel = 'V';
+                                              const l = levelPF ?? numLevel;
+                                              displayLevel = l ?? 'TBD';
                                               badgeStyle = getDualLevelBadgeStyle(levelPF, levelDnD);
                                           } else {
                                               const l = levelPF ?? levelDnD ?? numLevel;

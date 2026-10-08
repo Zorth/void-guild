@@ -553,7 +553,7 @@ function FiveDayOverview({ sessions, userCharacterIds }: { sessions: SessionWith
                                         const levelDnD = q?.levelDnD ?? q?.level;
                                         const numLevel = typeof session.level === 'number' ? session.level : undefined;
                                         
-                                        let displayLevel: number | 'V' | 'TBD' | undefined = undefined;
+                                        let displayLevel: number | 'TBD' | undefined = undefined;
                                         let badgeStyle: React.CSSProperties = {};
 
                                         if (session.isIntro) {
@@ -575,7 +575,10 @@ function FiveDayOverview({ sessions, userCharacterIds }: { sessions: SessionWith
                                         } else {
                                             const isDual = levelPF !== undefined && levelDnD !== undefined && levelPF !== levelDnD;
                                             if (isDual) {
-                                                displayLevel = 'V';
+                                                const l = levelPF ?? numLevel;
+                                                if (l !== undefined) {
+                                                    displayLevel = l;
+                                                }
                                                 badgeStyle = getDualLevelBadgeStyle(levelPF, levelDnD);
                                             } else {
                                                 const l = levelPF ?? levelDnD ?? numLevel;
@@ -978,7 +981,7 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
                                            const levelDnD = q?.levelDnD ?? q?.level;
                                            const numLevel = typeof session.level === 'number' ? session.level : undefined;
                                            
-                                           let displayLevel: number | 'V' | 'TBD' = 'TBD';
+                                           let displayLevel: number | 'TBD' = 'TBD';
                                            let badgeStyle: React.CSSProperties = {};
 
                                            if (session.isIntro) {
@@ -996,7 +999,8 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
                                            } else {
                                                const isDual = levelPF !== undefined && levelDnD !== undefined && levelPF !== levelDnD;
                                                if (isDual) {
-                                                   displayLevel = 'V';
+                                                   const l = levelPF ?? numLevel;
+                                                   displayLevel = l ?? 'TBD';
                                                    badgeStyle = getDualLevelBadgeStyle(levelPF, levelDnD);
                                                } else {
                                                    const l = levelPF ?? levelDnD ?? numLevel;
