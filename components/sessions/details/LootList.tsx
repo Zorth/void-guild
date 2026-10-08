@@ -97,6 +97,10 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
 
     const handleAdd = async () => {
         try {
+            const parsedQty = parseInt(quantity) || 1
+            const attendingCount = session.attendingCharacters.length || 1
+            const count = isPerCharacter ? parsedQty * attendingCount : parsedQty
+
             await addLoot({
                 sessionId: session._id,
                 name,
@@ -104,11 +108,11 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                 valueGP: parseFloat(valueGP) || 0,
                 isGood,
                 isPerCharacter,
-                quantity: parseInt(quantity) || 1
+                quantity: parsedQty
             })
             setIsAddDialogOpen(false)
             resetForm()
-            toast.success('Loot added')
+            toast.success(count > 1 ? `Added ${count} loot items` : 'Loot added')
         } catch (e) {
             toast.error('Failed to add loot')
         }
@@ -319,14 +323,16 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                                     <div className="flex items-center gap-2">
                                         <Checkbox id="isGood" checked={isGood} onCheckedChange={(val) => setIsGood(!!val)} />
                                         <label htmlFor="isGood" className="text-sm font-medium cursor-pointer">
-                                            Is &quot;Good&quot; (Trade good - unclaimable, full resale value)
+                                            Is &quot;Good&quot; (Trade good - 100% full value, no 50% resale penalty)
                                         </label>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <Checkbox id="isPerCharacter" checked={isPerCharacter} onCheckedChange={(val) => setIsPerCharacter(!!val)} />
                                         <label htmlFor="isPerCharacter" className="text-sm font-medium cursor-pointer flex items-center gap-1.5">
                                             For <span className="font-bold underline text-primary">EACH</span> character
-                                            <span className="text-xs text-muted-foreground font-normal">(Added to every player&apos;s share)</span>
+                                            <span className="text-xs text-muted-foreground font-normal">
+                                                {`(Creates 1 item for each character${session.attendingCharacters.length > 0 ? ` - ${session.attendingCharacters.length} total` : ''})`}
+                                            </span>
                                         </label>
                                     </div>
                                 </div>
@@ -542,7 +548,7 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                                             )}
                                             {item.isGood ? (
                                                 <span className="text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded uppercase font-bold">
-                                                    Good (Unclaimable)
+                                                    Good (100% Value)
                                                 </span>
                                             ) : (
                                                 <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded uppercase font-bold text-muted-foreground">Used</span>
@@ -582,7 +588,7 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                                                     </button>
                                                 )}
                                             </div>
-                                        ) : !item.isGood && userCharacterInSession ? (
+                                        ) : userCharacterInSession ? (
                                             <Button 
                                                 size="sm" 
                                                 variant="outline" 
@@ -657,14 +663,16 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                                 <div className="flex items-center gap-2">
                                     <Checkbox id="isGoodEdit" checked={isGood} onCheckedChange={(val) => setIsGood(!!val)} />
                                     <label htmlFor="isGoodEdit" className="text-sm font-medium cursor-pointer">
-                                        Is &quot;Good&quot; (Trade good - unclaimable, full resale value)
+                                        Is &quot;Good&quot; (Trade good - 100% full value, no 50% resale penalty)
                                     </label>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Checkbox id="isPerCharacterEdit" checked={isPerCharacter} onCheckedChange={(val) => setIsPerCharacter(!!val)} />
                                     <label htmlFor="isPerCharacterEdit" className="text-sm font-medium cursor-pointer flex items-center gap-1.5">
                                         For <span className="font-bold underline text-primary">EACH</span> character
-                                        <span className="text-xs text-muted-foreground font-normal">(Added to every player&apos;s share)</span>
+                                        <span className="text-xs text-muted-foreground font-normal">
+                                            {`(Creates 1 item for each character${session.attendingCharacters.length > 0 ? ` - ${session.attendingCharacters.length} total` : ''})`}
+                                        </span>
                                     </label>
                                 </div>
                             </div>
