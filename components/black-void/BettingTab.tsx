@@ -166,7 +166,7 @@ export default function BettingTab({
     openChallenges = [],
     activeMatches = [],
     recentBets = [],
-    record = { wins: 0, losses: 0 },
+    record = { wins: 0, losses: 0, net: 0 },
   } = heldData ?? bettingData ?? {}
   const totalPlayed = record.wins + record.losses
 
@@ -629,6 +629,26 @@ export default function BettingTab({
               </span>
             )}
           </div>
+
+          {totalPlayed > 0 && (
+            <div className="p-3 rounded-lg bg-card/60 border border-border/40 space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground uppercase tracking-wider font-bold">Net profit</span>
+                <span
+                  className={cn(
+                    'font-mono font-bold text-base',
+                    record.net > 0 ? 'text-emerald-400' : record.net < 0 ? 'text-rose-400' : 'text-muted-foreground'
+                  )}
+                >
+                  {record.net > 0 ? '+' : ''}
+                  {record.net.toLocaleString()} GP
+                </span>
+              </div>
+              <div className="flex h-1.5 rounded-full overflow-hidden bg-rose-500/40">
+                <div className="bg-emerald-500" style={{ width: `${(record.wins / totalPlayed) * 100}%` }} />
+              </div>
+            </div>
+          )}
 
           <div className="space-y-2">
             {recentBets.map((bet) => {
