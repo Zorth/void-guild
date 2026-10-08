@@ -48,6 +48,7 @@ import SessionJoinForm from '@/components/sessions/details/SessionJoinForm'
 import QuestList from '@/components/quests/QuestList'
 import LootList from '@/components/sessions/details/LootList'
 import ToolSidebar from '@/components/sessions/ToolSidebar'
+import VoidmasterLeftSidebar from '@/components/sessions/VoidmasterLeftSidebar'
 import ReputationSystem from '@/components/world/ReputationSystem'
 import VoidObjectiveContributeModal from '@/components/sessions/details/VoidObjectiveContributeModal'
 
@@ -698,16 +699,15 @@ export default function SessionClient() {
                                             Voidmaster Tools
                                         </DialogTitle>
                                         <DialogDescription>
-                                            Manage your session, initiative, and world clock.
+                                            Manage your session, tactical view, and world calendar.
                                         </DialogDescription>
                                     </DialogHeader>
                                     <div className="p-4 flex-grow overflow-y-auto custom-scrollbar">
                                         <div className="max-w-md mx-auto h-full pb-20">
-                                            <ToolSidebar 
+                                            <VoidmasterLeftSidebar 
                                                 sessionId={session._id} 
                                                 worldId={session.world}
                                                 worldName={session.worldName}
-                                                characters={session.attendingCharacters.map(c => ({ id: c._id, name: c.name }))} 
                                                 isAdmin={!!isAdmin}
                                             />
                                         </div>
@@ -781,11 +781,10 @@ export default function SessionClient() {
         <aside className="hidden 2xl:flex justify-end lg:col-start-1">
             {isOwnerOrAdmin && (
                 <div className="w-80 sticky top-0 h-screen overflow-y-auto p-6 z-40 custom-scrollbar">
-                    <ToolSidebar 
+                    <VoidmasterLeftSidebar 
                         sessionId={session._id} 
                         worldId={session.world}
                         worldName={session.worldName}
-                        characters={session.attendingCharacters.map(c => ({ id: c._id, name: c.name }))} 
                         isAdmin={!!isAdmin}
                     />
                 </div>

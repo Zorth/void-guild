@@ -160,6 +160,288 @@ export const getCharacterPerceptions = query({
   },
 })
 
+export const getPartyCharacterDetails = query({
+  args: { characterIds: v.array(v.id('characters')) },
+  handler: async (ctx, args) => {
+    const result: Record<string, any> = {}
+
+    await Promise.all(
+      args.characterIds.map(async (charId) => {
+        const details = await ctx.db
+          .query('characterDetails')
+          .withIndex('by_characterId', (q) => q.eq('characterId', charId))
+          .first()
+
+        if (details) {
+          result[charId] = details
+        }
+      })
+    )
+
+    return result
+  },
+})
+
+export const updateCharacterPerception = mutation({
+  args: {
+    characterId: v.id('characters'),
+    bonus: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) {
+      throw new Error('Not authenticated')
+    }
+
+    const character = await ctx.db.get(args.characterId)
+    if (!character) {
+      throw new Error('Character not found')
+    }
+
+    const isAdminUser = await isAdmin(ctx)
+    const isCharOwner = character.userId === identity.subject
+
+    if (!isAdminUser && !isCharOwner) {
+      const activeSessions = await ctx.db
+        .query('sessions')
+        .withIndex('by_locked', (q) => q.eq('locked', false))
+        .collect()
+
+      const isGmOfAttendingSession = activeSessions.some(
+        (s) => s.owner === identity.subject && s.characters?.includes(args.characterId)
+      )
+
+      if (!isGmOfAttendingSession) {
+        throw new Error('Unauthorized to update character perception')
+      }
+    }
+
+    const existingDetails = await ctx.db
+      .query('characterDetails')
+      .withIndex('by_characterId', (q) => q.eq('characterId', args.characterId))
+      .first()
+
+    if (existingDetails) {
+      const currentSaves = existingDetails.saves || {}
+      const currentPerception = currentSaves.perception || { bonus: 0 }
+
+      if (currentPerception.bonus === args.bonus) {
+        return { success: true }
+      }
+
+      await ctx.db.patch(existingDetails._id, {
+        saves: {
+          ...currentSaves,
+          perception: {
+            ...currentPerception,
+            bonus: args.bonus,
+          },
+        },
+      })
+    } else {
+      await ctx.db.insert('characterDetails', {
+        characterId: args.characterId,
+        system: character.system === 'DnD' ? 'DnD' : 'PF2e',
+        name: character.name,
+        level: character.lvl,
+        saves: {
+          perception: {
+            bonus: args.bonus,
+          },
+        },
+        lastSyncedAt: Date.now(),
+      })
+    }
+
+    return { success: true }
+  },
+})
+
+export const updatePartyCharacterStats = mutation({
+  args: {
+    characterId: v.id('characters'),
+    hitPoints: v.optional(
+      v.object({
+        max: v.number(),
+        current: v.number(),
+        temporary: v.number(),
+        dieSize: v.optional(v.number()),
+        ancestryHP: v.optional(v.number()),
+        classHP: v.optional(v.number()),
+        bonusHP: v.optional(v.number()),
+      })
+    ),
+    armorClass: v.optional(
+      v.object({
+        total: v.number(),
+        shieldBonus: v.optional(v.number()),
+        unarmoredProf: v.optional(v.number()),
+        equippedArmorName: v.optional(v.string()),
+        shieldHardness: v.optional(v.number()),
+        shieldCurrentHP: v.optional(v.number()),
+        shieldMaxHP: v.optional(v.number()),
+      })
+    ),
+    abilities: v.optional(
+      v.object({
+        str: v.number(),
+        dex: v.number(),
+        con: v.number(),
+        int: v.number(),
+        wis: v.number(),
+        cha: v.number(),
+      })
+    ),
+    saves: v.optional(
+      v.object({
+        fortitude: v.optional(
+          v.object({
+            bonus: v.number(),
+            proficiency: v.optional(
+              v.union(
+                v.literal('U'),
+                v.literal('T'),
+                v.literal('E'),
+                v.literal('M'),
+                v.literal('L')
+              )
+            ),
+            profValue: v.optional(v.number()),
+            itemBonus: v.optional(v.number()),
+          })
+        ),
+        reflex: v.optional(
+          v.object({
+            bonus: v.number(),
+            proficiency: v.optional(
+              v.union(
+                v.literal('U'),
+                v.literal('T'),
+                v.literal('E'),
+                v.literal('M'),
+                v.literal('L')
+              )
+            ),
+            profValue: v.optional(v.number()),
+            itemBonus: v.optional(v.number()),
+          })
+        ),
+        will: v.optional(
+          v.object({
+            bonus: v.number(),
+            proficiency: v.optional(
+              v.union(
+                v.literal('U'),
+                v.literal('T'),
+                v.literal('E'),
+                v.literal('M'),
+                v.literal('L')
+              )
+            ),
+            profValue: v.optional(v.number()),
+            itemBonus: v.optional(v.number()),
+          })
+        ),
+        perception: v.optional(
+          v.object({
+            bonus: v.number(),
+            proficiency: v.optional(
+              v.union(
+                v.literal('U'),
+                v.literal('T'),
+                v.literal('E'),
+                v.literal('M'),
+                v.literal('L')
+              )
+            ),
+            profValue: v.optional(v.number()),
+            itemBonus: v.optional(v.number()),
+          })
+        ),
+      })
+    ),
+    skills: v.optional(
+      v.record(
+        v.string(),
+        v.object({
+          name: v.string(),
+          modifier: v.number(),
+          proficiency: v.optional(
+            v.union(
+              v.literal('U'),
+              v.literal('T'),
+              v.literal('E'),
+              v.literal('M'),
+              v.literal('L')
+            )
+          ),
+          ability: v.optional(v.string()),
+          isLore: v.optional(v.boolean()),
+        })
+      )
+    ),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) {
+      throw new Error('Not authenticated')
+    }
+
+    const character = await ctx.db.get(args.characterId)
+    if (!character) {
+      throw new Error('Character not found')
+    }
+
+    const isAdminUser = await isAdmin(ctx)
+    const isCharOwner = character.userId === identity.subject
+
+    if (!isAdminUser && !isCharOwner) {
+      const activeSessions = await ctx.db
+        .query('sessions')
+        .withIndex('by_locked', (q) => q.eq('locked', false))
+        .collect()
+
+      const isGmOfAttendingSession = activeSessions.some(
+        (s) => s.owner === identity.subject && s.characters?.includes(args.characterId)
+      )
+
+      if (!isGmOfAttendingSession) {
+        throw new Error('Unauthorized to update character stats')
+      }
+    }
+
+    const existingDetails = await ctx.db
+      .query('characterDetails')
+      .withIndex('by_characterId', (q) => q.eq('characterId', args.characterId))
+      .first()
+
+    const patchPayload: Record<string, any> = {
+      lastSyncedAt: Date.now(),
+    }
+    if (args.hitPoints !== undefined) patchPayload.hitPoints = args.hitPoints
+    if (args.armorClass !== undefined) patchPayload.armorClass = args.armorClass
+    if (args.abilities !== undefined) patchPayload.abilities = args.abilities
+    if (args.saves !== undefined) patchPayload.saves = args.saves
+    if (args.skills !== undefined) patchPayload.skills = args.skills
+
+    if (existingDetails) {
+      await ctx.db.patch(existingDetails._id, patchPayload)
+    } else {
+      await ctx.db.insert('characterDetails', {
+        characterId: args.characterId,
+        system: character.system === 'DnD' ? 'DnD' : 'PF2e',
+        name: character.name,
+        level: character.lvl,
+        lastSyncedAt: Date.now(),
+        ...patchPayload,
+      })
+    }
+
+    return { success: true }
+  },
+})
+
+
 async function assertUniqueCharacterName(
   ctx: MutationCtx,
   name: string,
