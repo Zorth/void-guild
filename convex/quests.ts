@@ -2,6 +2,7 @@ import { query, mutation, QueryCtx } from './_generated/server'
 import { v } from 'convex/values'
 import { isAdmin } from './roles'
 import { adjustCharacterMoney, parseGpAmount } from './moneyHelpers'
+import { syncActiveSessionsForQuestChange } from './questSyncHelpers'
 export const createQuest = mutation({
   args: {
     name: v.string(),
@@ -132,6 +133,10 @@ export const createQuest = mutation({
       paymentClaimed: false,
       isCompleted: false,
     })
+
+    if (!isSuggested && !args.isHidden) {
+      await syncActiveSessionsForQuestChange(ctx, args.worldId, { affectedQuestId: questId });
+    }
 
     return questId
   },
@@ -268,6 +273,17 @@ export const updateQuest = mutation({
         sponsoredAmount,
         netCost,
     })
+
+    await syncActiveSessionsForQuestChange(ctx, args.worldId, {
+      affectedQuestId: args.questId,
+      isRemovedOrCompleted: args.isHidden,
+    })
+    if (quest.worldId && quest.worldId !== args.worldId) {
+      await syncActiveSessionsForQuestChange(ctx, quest.worldId, {
+        affectedQuestId: args.questId,
+        isRemovedOrCompleted: true,
+      })
+    }
   },
 })
 
@@ -357,6 +373,8 @@ export const approveSuggestedQuest = mutation({
       sponsoredAmount: quest.reward ? `${quest.reward} (100% Paid in Full by The Void)` : 'Paid in Full by The Void',
       netCost: '0 GP (Free of charge)',
     })
+
+    await syncActiveSessionsForQuestChange(ctx, quest.worldId, { affectedQuestId: args.questId })
   },
 })
 
@@ -412,6 +430,11 @@ export const toggleQuestHidden = mutation({
     const nextHidden = !quest.isHidden
     await ctx.db.patch(args.questId, {
       isHidden: nextHidden,
+    })
+
+    await syncActiveSessionsForQuestChange(ctx, quest.worldId, {
+      affectedQuestId: args.questId,
+      isRemovedOrCompleted: nextHidden,
     })
 
     return nextHidden
@@ -488,6 +511,11 @@ export const deleteQuest = mutation({
       throw new Error('You do not have permission to delete this quest.')
     }
 
+    await syncActiveSessionsForQuestChange(ctx, quest.worldId, {
+      affectedQuestId: args.questId,
+      isRemovedOrCompleted: true,
+    })
+
     await ctx.db.delete(args.questId)
   },
 })
@@ -503,10 +531,12 @@ export const getQuestsByWorld = query({
       : []
     
     // Global quests are quests without an associated world (worldId: undefined)
-    const allQuests = await ctx.db.query('quests').collect()
-    const worldlessQuests = allQuests.filter((q) => !q.worldId)
+    const worldlessQuests = await ctx.db
+      .query('quests')
+      .withIndex('by_worldId', (q) => q.eq('worldId', undefined))
+      .collect()
 
-    const questMap = new Map<string, typeof allQuests[0]>()
+    const questMap = new Map<string, typeof worldlessQuests[0]>()
     for (const q of worldQuests) {
       questMap.set(q._id, q)
     }

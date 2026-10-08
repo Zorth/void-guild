@@ -3,7 +3,7 @@ import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 
-import { DISCORD_API_BASE, getQuestLevelStr, formatInGameDate } from "./discordHelpers";
+import { DISCORD_API_BASE, getQuestLevelStr, formatDiscordBlockquote, formatInGameDate } from "./discordHelpers";
 
 
 /**
@@ -102,11 +102,10 @@ export const syncSessionToDiscord = internalAction({
                 ? session.selectedQuest.description.substring(0, 497) + "..." 
                 : session.selectedQuest.description;
             
-            // Format each line with blockquote
-            const formattedDesc = desc.split("\n")
-              .map((line: string) => line.trim() ? `> ${line}` : ">")
-              .join("\n");
-            questContent += `\n${formattedDesc}`;
+            const formattedDesc = formatDiscordBlockquote(desc);
+            if (formattedDesc) {
+              questContent += `\n${formattedDesc}`;
+            }
         }
         questContent += "\n";
     } else if (session.quests && session.quests.length > 0) {
@@ -114,24 +113,23 @@ export const syncSessionToDiscord = internalAction({
         const displayedQuests = session.quests.slice(0, 5);
         questContent = "\n## Quests\n" + displayedQuests.map((q: any) => {
           const qLevel = getQuestLevelStr(q);
-          let str = `**${q.name}** (${qLevel})`;
+          let str = `• **${q.name}** (${qLevel})`;
           if (q.description) {
             // Truncate description for list view
             const desc = q.description.length > 200 
                 ? q.description.substring(0, 197) + "..." 
                 : q.description;
             
-            // Format each line with blockquote
-            const formattedDesc = desc.split("\n")
-              .map((line: string) => line.trim() ? `> ${line}` : ">")
-              .join("\n");
-            str += `\n${formattedDesc}`;
+            const formattedDesc = formatDiscordBlockquote(desc);
+            if (formattedDesc) {
+              str += `\n${formattedDesc}`;
+            }
           }
           return str;
-        }).join("\n") + "\n";
+        }).join("\n\n") + "\n";
         
         if (session.quests.length > 5) {
-            questContent += `*...and ${session.quests.length - 5} more on the website!*\n`;
+            questContent += `\n*...and ${session.quests.length - 5} more on the website!*\n`;
         }
     }
 
@@ -753,14 +751,18 @@ export const getInternalSessionDetails = internalQuery({
 
     const gmCharacter = session.gmCharacter ? await ctx.db.get(session.gmCharacter) : null;
 
-    const quests = await ctx.db
-      .query('quests')
-      .withIndex('by_worldId', (q) => q.eq('worldId', session.world))
-      .collect();
+    const quests = session.world
+      ? await ctx.db
+          .query('quests')
+          .withIndex('by_worldId', (q) => q.eq('worldId', session.world))
+          .collect()
+      : [];
     
     // Fetch worldless / global quests
-    const allQuests = await ctx.db.query('quests').collect();
-    const worldlessQuests = allQuests.filter((q) => !q.worldId);
+    const worldlessQuests = await ctx.db
+      .query('quests')
+      .withIndex('by_worldId', (q) => q.eq('worldId', undefined))
+      .collect();
 
     const questMap = new Map<string, typeof quests[0]>();
     for (const q of quests) questMap.set(q._id, q);
@@ -768,10 +770,12 @@ export const getInternalSessionDetails = internalQuery({
 
     let selectedQuest = null;
     if (session.questId && !session.isIntro) {
-        selectedQuest = await ctx.db.get(session.questId);
-        // If the selected quest was marked hidden, do not reveal it on Discord
-        if (selectedQuest?.isHidden) {
-          selectedQuest = null;
+        const qDoc = await ctx.db.get(session.questId);
+        // If the selected quest was hidden, or completed (unless this session is already locked and completed it), do not show it
+        if (qDoc && !qDoc.isHidden) {
+          if (session.locked || !qDoc.isCompleted) {
+            selectedQuest = qDoc;
+          }
         }
     }
 

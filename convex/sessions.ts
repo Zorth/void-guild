@@ -6,6 +6,7 @@ import { isAdmin, isGameMaster, isMember, extractClaim } from './roles'
 import { applyContributionHelper } from './voidObjectives'
 import { formatUserDisplayName } from './users'
 import { adjustCharacterMoney } from './moneyHelpers'
+import { syncActiveSessionsForQuestChange } from './questSyncHelpers'
 
 /**
  * XP gain based on session level and character level.
@@ -145,6 +146,9 @@ export const listSessions = query({
       let questDoc = session.questId && !session.isIntro ? questMap.get(session.questId) ?? null : null
       const isWorldOwner = worldDoc && user.subject === worldDoc.owner
       if (questDoc?.isHidden && !isWorldOwner && !isAdminUser) {
+        questDoc = null
+      }
+      if (!session.locked && questDoc?.isCompleted) {
         questDoc = null
       }
       return {
@@ -504,6 +508,9 @@ export const getSession = query({
         if (quest?.isHidden && !isWorldOwner && !isAdminUser) {
           quest = null
         }
+        if (!session.locked && quest?.isCompleted) {
+          quest = null
+        }
     }
 
     let hasMap = false
@@ -568,6 +575,13 @@ export const selectQuest = mutation({
 
     if (session.isIntro) {
       throw new Error('Intro sessions do not use quests.')
+    }
+
+    if (args.questId) {
+      const quest = await ctx.db.get(args.questId)
+      if (!quest) throw new Error('Quest not found')
+      if (quest.isCompleted) throw new Error('This quest has already been completed.')
+      if (quest.isHidden) throw new Error('This quest is hidden.')
     }
 
     await ctx.db.patch(args.sessionId, { questId: args.questId })
@@ -1572,6 +1586,10 @@ export const lockSession = mutation({
           completedSessionId: session._id,
           completedAt: Date.now(),
         })
+        await syncActiveSessionsForQuestChange(ctx, session.world as Id<'worlds'> | undefined, {
+          affectedQuestId: session.questId,
+          isRemovedOrCompleted: true,
+        })
       }
 
       await ctx.db.patch(args.sessionId, { locked: true, xpGains })
@@ -1614,6 +1632,9 @@ export const unlockSession = mutation({
           completedSessionId: undefined,
           completedAt: undefined,
         })
+        await syncActiveSessionsForQuestChange(ctx, session.world as Id<'worlds'> | undefined, {
+          affectedQuestId: session.questId,
+        })
       }
 
       await ctx.db.patch(args.sessionId, { locked: false, xpGains: [] })
@@ -1639,6 +1660,10 @@ export const forceLockSession = mutation({
           isCompleted: true,
           completedSessionId: session._id,
           completedAt: Date.now(),
+        })
+        await syncActiveSessionsForQuestChange(ctx, session.world as Id<'worlds'> | undefined, {
+          affectedQuestId: session.questId,
+          isRemovedOrCompleted: true,
         })
       }
 

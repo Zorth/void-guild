@@ -13,6 +13,51 @@ export const getQuestLevelStr = (q: any): string => {
 };
 
 /**
+ * Formats multi-line text into clean Discord blockquotes.
+ * 
+ * Discord Markdown requires "> " (greater-than + space) for each line of a quote.
+ * A bare ">" without a trailing space is rendered by Discord as a literal text character ">"!
+ * This helper strips accidental pre-existing quote markers, collapses excessive empty lines,
+ * and ensures every non-empty line begins with "> " and empty lines use "> " (with space)
+ * so Discord renders a seamless vertical embedded bar.
+ */
+export const formatDiscordBlockquote = (text: string): string => {
+  if (!text) return "";
+  const lines = text
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .trim()
+    .split("\n");
+
+  const formattedLines: string[] = [];
+  let prevWasEmpty = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.length === 0) {
+      if (!prevWasEmpty && formattedLines.length > 0) {
+        formattedLines.push("> ");
+        prevWasEmpty = true;
+      }
+    } else {
+      // Strip any accidental leading markdown quote marker if entered by user (e.g. "> " or ">")
+      const cleanLine = trimmed.replace(/^>\s*/, "");
+      if (cleanLine.length > 0) {
+        formattedLines.push(`> ${cleanLine}`);
+        prevWasEmpty = false;
+      }
+    }
+  }
+
+  // Remove trailing empty blockquote lines
+  while (formattedLines.length > 0 && formattedLines[formattedLines.length - 1] === "> ") {
+    formattedLines.pop();
+  }
+
+  return formattedLines.join("\n");
+};
+
+/**
  * Formats an in-game date object into calendar string representation.
  */
 export const formatInGameDate = (ig: any, eras: any[] = [], globalYearZero: boolean = false): string => {
