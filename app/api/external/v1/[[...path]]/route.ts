@@ -26,7 +26,7 @@ async function handleResponse(promise: Promise<any>) {
 function getApiDocsResponse() {
     return NextResponse.json({
         name: "Guild of The Void External API",
-        version: "v1.1",
+        version: "v1.2",
         documentationUrl: "https://github.com/Zorth/void-guild/blob/main/API.md",
         baseUrl: "https://guild.tarragon.be/api/external/v1",
         authentication: {
@@ -55,9 +55,9 @@ function getApiDocsResponse() {
             { method: "GET", path: "/character/:id", description: "Get full character details (including synced Pathbuilder sheet)" },
             { method: "GET", path: "/character/:id/sheet", description: "Get Pathbuilder character sheet data directly" },
             { method: "POST", path: "/character", description: "Create a new character (starts at Lvl 1, 0 XP)" },
-            { method: "POST", path: "/character/:id/sheet", description: "Push/sync Pathbuilder character sheet details" },
+            { method: "POST", path: "/character/:id/sheet", description: "Push/sync character sheet (supports raw Pathbuilder export, numeric/flat stats, or CharacterSheetDetails)" },
             { method: "PATCH", path: "/character/:id", description: "Update character details (XP/Lvl protected)" },
-            { method: "PATCH", path: "/character/:id/sheet", description: "Update/sync Pathbuilder character sheet details" },
+            { method: "PATCH", path: "/character/:id/sheet", description: "Update/sync character sheet (supports raw Pathbuilder export, numeric/flat stats, or CharacterSheetDetails)" },
 
             { method: "GET", path: "/worlds", description: "List all campaign worlds" },
             { method: "GET", path: "/world/:id", description: "Get details for a specific world" },

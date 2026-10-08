@@ -745,13 +745,18 @@ export const updateCharacterSheet = mutation({
             shieldCurrentHP: v.optional(v.number()),
             shieldMaxHP: v.optional(v.number()),
         })),
-        // Support both simplified hp { current, max, temp } and full hitPoints
-        hp: v.optional(v.object({
-            current: v.number(),
-            max: v.number(),
-            temp: v.optional(v.number()),
-            temporary: v.optional(v.number()),
-        })),
+        // Support raw Pathbuilder build object
+        build: v.optional(v.any()),
+        // Support both simplified hp (number or object) and full hitPoints
+        hp: v.optional(v.union(
+            v.number(),
+            v.object({
+                current: v.number(),
+                max: v.number(),
+                temp: v.optional(v.number()),
+                temporary: v.optional(v.number()),
+            })
+        )),
         hitPoints: v.optional(v.object({
             max: v.number(),
             current: v.number(),
@@ -762,46 +767,36 @@ export const updateCharacterSheet = mutation({
             bonusHP: v.optional(v.number()),
         })),
         saves: v.optional(v.object({
-            fortitude: v.optional(v.object({
+            fortitude: v.optional(v.union(v.number(), v.object({
                 bonus: v.number(),
                 proficiency: v.optional(v.union(v.literal('U'), v.literal('T'), v.literal('E'), v.literal('M'), v.literal('L'))),
                 profValue: v.optional(v.number()),
                 itemBonus: v.optional(v.number()),
-            })),
-            reflex: v.optional(v.object({
+            }))),
+            reflex: v.optional(v.union(v.number(), v.object({
                 bonus: v.number(),
                 proficiency: v.optional(v.union(v.literal('U'), v.literal('T'), v.literal('E'), v.literal('M'), v.literal('L'))),
                 profValue: v.optional(v.number()),
                 itemBonus: v.optional(v.number()),
-            })),
-            will: v.optional(v.object({
+            }))),
+            will: v.optional(v.union(v.number(), v.object({
                 bonus: v.number(),
                 proficiency: v.optional(v.union(v.literal('U'), v.literal('T'), v.literal('E'), v.literal('M'), v.literal('L'))),
                 profValue: v.optional(v.number()),
                 itemBonus: v.optional(v.number()),
-            })),
-            perception: v.optional(v.object({
+            }))),
+            perception: v.optional(v.union(v.number(), v.object({
                 bonus: v.number(),
                 proficiency: v.optional(v.union(v.literal('U'), v.literal('T'), v.literal('E'), v.literal('M'), v.literal('L'))),
                 profValue: v.optional(v.number()),
                 itemBonus: v.optional(v.number()),
-            })),
+            }))),
         })),
-        abilities: v.optional(v.object({
-            str: v.number(),
-            dex: v.number(),
-            con: v.number(),
-            int: v.number(),
-            wis: v.number(),
-            cha: v.number(),
-        })),
-        skills: v.optional(v.record(v.string(), v.object({
-            name: v.string(),
-            modifier: v.number(),
-            proficiency: v.optional(v.union(v.literal('U'), v.literal('T'), v.literal('E'), v.literal('M'), v.literal('L'))),
-            ability: v.optional(v.string()),
-            isLore: v.optional(v.boolean()),
-        }))),
+        abilities: v.optional(v.record(v.string(), v.number())),
+        skills: v.optional(v.union(
+            v.record(v.string(), v.any()),
+            v.array(v.any())
+        )),
         conditions: v.optional(v.array(v.object({
             name: v.string(),
             value: v.optional(v.number()),
@@ -878,22 +873,74 @@ export const updateCharacterSheet = mutation({
             throw new Error('Unauthorized: You do not own this character')
         }
 
+        // Check for raw Pathbuilder build object
+        const rawBuild = args.build || (args.rawExport && (args.rawExport.build || args.rawExport.character || args.rawExport));
+
+        // Normalize Ability Scores
+        let normalizedAbilities = args.abilities ? {
+            str: args.abilities.str ?? 10,
+            dex: args.abilities.dex ?? 10,
+            con: args.abilities.con ?? 10,
+            int: args.abilities.int ?? 10,
+            wis: args.abilities.wis ?? 10,
+            cha: args.abilities.cha ?? 10,
+        } : undefined;
+
+        if (!normalizedAbilities && rawBuild?.abilities) {
+            normalizedAbilities = {
+                str: rawBuild.abilities.str ?? 10,
+                dex: rawBuild.abilities.dex ?? 10,
+                con: rawBuild.abilities.con ?? 10,
+                int: rawBuild.abilities.int ?? 10,
+                wis: rawBuild.abilities.wis ?? 10,
+                cha: rawBuild.abilities.cha ?? 10,
+            };
+        }
+
         // Normalize Hit Points
-        let normalizedHitPoints = args.hitPoints
-        if (!normalizedHitPoints && args.hp) {
-            normalizedHitPoints = {
-                max: args.hp.max,
-                current: args.hp.current,
-                temporary: args.hp.temp ?? args.hp.temporary ?? 0,
-                dieSize: undefined,
-                ancestryHP: undefined,
-                classHP: undefined,
-                bonusHP: undefined,
+        let normalizedHitPoints = args.hitPoints;
+        if (!normalizedHitPoints && args.hp !== undefined) {
+            if (typeof args.hp === 'number') {
+                normalizedHitPoints = {
+                    max: args.hp,
+                    current: args.hp,
+                    temporary: 0,
+                    dieSize: undefined,
+                    ancestryHP: undefined,
+                    classHP: undefined,
+                    bonusHP: undefined,
+                };
+            } else if (args.hp && typeof args.hp === 'object') {
+                normalizedHitPoints = {
+                    max: args.hp.max,
+                    current: args.hp.current,
+                    temporary: args.hp.temp ?? args.hp.temporary ?? 0,
+                    dieSize: undefined,
+                    ancestryHP: undefined,
+                    classHP: undefined,
+                    bonusHP: undefined,
+                };
             }
+        }
+        if (!normalizedHitPoints && rawBuild?.attributes) {
+            const bAttrs = rawBuild.attributes;
+            const conMod = normalizedAbilities ? Math.floor((normalizedAbilities.con - 10) / 2) : 0;
+            const charLvl = args.level ?? char.lvl ?? 1;
+            const calcMax = (bAttrs.ancestryhp || 0) + ((bAttrs.classhp || 8) + conMod + (bAttrs.bonushpperlevel || 0)) * charLvl + (bAttrs.bonushp || 0);
+            const maxHp = bAttrs.hp || rawBuild.hp || calcMax || 20;
+            normalizedHitPoints = {
+                max: maxHp,
+                current: rawBuild.currentHp ?? maxHp,
+                temporary: rawBuild.tempHp ?? 0,
+                dieSize: undefined,
+                ancestryHP: bAttrs.ancestryhp,
+                classHP: bAttrs.classhp,
+                bonusHP: bAttrs.bonushp,
+            };
         }
 
         // Normalize Armor Class
-        let normalizedArmorClass = args.armorClass
+        let normalizedArmorClass = args.armorClass;
         if (!normalizedArmorClass && args.ac !== undefined) {
             normalizedArmorClass = {
                 total: args.ac,
@@ -903,6 +950,129 @@ export const updateCharacterSheet = mutation({
                 shieldHardness: undefined,
                 shieldCurrentHP: undefined,
                 shieldMaxHP: undefined,
+            };
+        } else if (!normalizedArmorClass && rawBuild) {
+            const acVal = rawBuild.ac ?? rawBuild.attributes?.acTotal ?? 10;
+            normalizedArmorClass = {
+                total: acVal,
+                shieldBonus: undefined,
+                unarmoredProf: undefined,
+                equippedArmorName: undefined,
+                shieldHardness: undefined,
+                shieldCurrentHP: undefined,
+                shieldMaxHP: undefined,
+            };
+        }
+
+        // Normalize Saves
+        let normalizedSaves: Record<string, any> | undefined = undefined;
+        if (args.saves) {
+            normalizedSaves = {};
+            for (const key of ['fortitude', 'reflex', 'will', 'perception'] as const) {
+                const s = args.saves[key];
+                if (typeof s === 'number') {
+                    normalizedSaves[key] = { bonus: s, proficiency: 'T' };
+                } else if (s && typeof s === 'object') {
+                    normalizedSaves[key] = s;
+                }
+            }
+        }
+        if (!normalizedSaves && rawBuild?.proficiencies) {
+            const charLvl = args.level ?? char.lvl ?? 1;
+            const toProfCode = (v: number): 'U' | 'T' | 'E' | 'M' | 'L' => v === 8 ? 'L' : v === 6 ? 'M' : v === 4 ? 'E' : v === 2 ? 'T' : 'U';
+            const calcSaveBonus = (profVal: number, abilityMod: number) => {
+                if (profVal === 0) return abilityMod;
+                return charLvl + profVal + abilityMod;
+            };
+            const conMod = normalizedAbilities ? Math.floor((normalizedAbilities.con - 10) / 2) : 0;
+            const dexMod = normalizedAbilities ? Math.floor((normalizedAbilities.dex - 10) / 2) : 0;
+            const wisMod = normalizedAbilities ? Math.floor((normalizedAbilities.wis - 10) / 2) : 0;
+            const p = rawBuild.proficiencies;
+            normalizedSaves = {
+                fortitude: { bonus: calcSaveBonus(p.fortitude || 0, conMod), proficiency: toProfCode(p.fortitude || 0), profValue: p.fortitude },
+                reflex: { bonus: calcSaveBonus(p.reflex || 0, dexMod), proficiency: toProfCode(p.reflex || 0), profValue: p.reflex },
+                will: { bonus: calcSaveBonus(p.will || 0, wisMod), proficiency: toProfCode(p.will || 0), profValue: p.will },
+                perception: { bonus: calcSaveBonus(p.perception || 0, wisMod), proficiency: toProfCode(p.perception || 0), profValue: p.perception },
+            };
+        }
+
+        // Normalize Skills
+        let normalizedSkills: Record<string, any> | undefined = undefined;
+        if (Array.isArray(args.skills)) {
+            normalizedSkills = {};
+            for (const sk of args.skills) {
+                if (sk && typeof sk === 'object' && sk.name) {
+                    normalizedSkills[sk.name] = {
+                        name: sk.name,
+                        modifier: typeof sk.modifier === 'number' ? sk.modifier : (typeof sk.bonus === 'number' ? sk.bonus : 0),
+                        proficiency: sk.proficiency,
+                        ability: sk.ability,
+                        isLore: sk.isLore,
+                    };
+                }
+            }
+        } else if (args.skills && typeof args.skills === 'object') {
+            normalizedSkills = {};
+            for (const [key, val] of Object.entries(args.skills)) {
+                if (typeof val === 'number') {
+                    normalizedSkills[key] = {
+                        name: key,
+                        modifier: val,
+                        proficiency: 'T',
+                    };
+                } else if (val && typeof val === 'object') {
+                    normalizedSkills[key] = {
+                        name: (val as any).name || key,
+                        modifier: typeof (val as any).modifier === 'number' ? (val as any).modifier : (typeof (val as any).bonus === 'number' ? (val as any).bonus : 0),
+                        proficiency: (val as any).proficiency,
+                        ability: (val as any).ability,
+                        isLore: (val as any).isLore,
+                    };
+                }
+            }
+        }
+        if (!normalizedSkills && rawBuild?.proficiencies) {
+            const charLvl = args.level ?? char.lvl ?? 1;
+            const toProfCode = (v: number): 'U' | 'T' | 'E' | 'M' | 'L' => v === 8 ? 'L' : v === 6 ? 'M' : v === 4 ? 'E' : v === 2 ? 'T' : 'U';
+            const SKILL_ABILITIES: Record<string, 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha'> = {
+                acrobatics: 'dex', arcana: 'int', athletics: 'str', crafting: 'int',
+                deception: 'cha', diplomacy: 'cha', intimidation: 'cha', medicine: 'wis',
+                nature: 'wis', occultism: 'int', performance: 'cha', religion: 'wis',
+                society: 'int', stealth: 'dex', survival: 'wis', thievery: 'dex'
+            };
+            normalizedSkills = {};
+            for (const [sKey, abKey] of Object.entries(SKILL_ABILITIES)) {
+                const profVal = rawBuild.proficiencies[sKey];
+                if (profVal !== undefined) {
+                    const abScore = normalizedAbilities ? normalizedAbilities[abKey] : 10;
+                    const abMod = Math.floor(((abScore || 10) - 10) / 2);
+                    const bonus = profVal === 0 ? abMod : charLvl + profVal + abMod;
+                    const capName = sKey.charAt(0).toUpperCase() + sKey.slice(1);
+                    normalizedSkills[capName] = {
+                        name: capName,
+                        modifier: bonus,
+                        proficiency: toProfCode(profVal),
+                        ability: abKey,
+                        isLore: false,
+                    };
+                }
+            }
+            if (Array.isArray(rawBuild.lores)) {
+                for (const loreItem of rawBuild.lores) {
+                    const loreName = Array.isArray(loreItem) ? loreItem[0] : (typeof loreItem === 'string' ? loreItem : loreItem?.name);
+                    const profVal = Array.isArray(loreItem) ? loreItem[1] : (loreItem?.prof || 2);
+                    if (loreName) {
+                        const intMod = normalizedAbilities ? Math.floor(((normalizedAbilities.int || 10) - 10) / 2) : 0;
+                        const bonus = profVal === 0 ? intMod : charLvl + (Number(profVal) || 2) + intMod;
+                        normalizedSkills[loreName] = {
+                            name: loreName,
+                            modifier: bonus,
+                            proficiency: toProfCode(Number(profVal) || 2),
+                            ability: 'int',
+                            isLore: true,
+                        };
+                    }
+                }
             }
         }
 
@@ -930,6 +1100,18 @@ export const updateCharacterSheet = mutation({
                     ? args.money.totalInGold
                     : Math.round((gp + (pp * 10) + (sp / 10) + (cp / 100)) * 100) / 100,
             }
+        } else if (rawBuild?.money && typeof rawBuild.money === 'object') {
+            const cp = rawBuild.money.cp || 0
+            const sp = rawBuild.money.sp || 0
+            const gp = rawBuild.money.gp || 0
+            const pp = rawBuild.money.pp || 0
+            normalizedMoney = {
+                cp,
+                sp,
+                gp,
+                pp,
+                totalInGold: Math.round((gp + (pp * 10) + (sp / 10) + (cp / 100)) * 100) / 100,
+            }
         }
 
         // Normalize Gear
@@ -942,6 +1124,24 @@ export const updateCharacterSheet = mutation({
             }
         } else if (args.gear) {
             normalizedGear = args.gear
+        } else if (rawBuild) {
+            const weapons: any[] = []
+            if (Array.isArray(rawBuild.weapons)) {
+                for (const w of rawBuild.weapons) {
+                    const wName = typeof w === 'string' ? w : (Array.isArray(w) ? w[0] : (w.name || w[0]))
+                    const qty = typeof w === 'object' && !Array.isArray(w) && w.qty ? w.qty : (Array.isArray(w) && typeof w[1] === 'number' ? w[1] : 1)
+                    if (wName) weapons.push({ name: wName, qty })
+                }
+            }
+            const equipment: any[] = []
+            if (Array.isArray(rawBuild.equipment)) {
+                for (const item of rawBuild.equipment) {
+                    const itemName = typeof item === 'string' ? item : (Array.isArray(item) ? item[0] : (item.name || item[0]))
+                    const qty = typeof item === 'object' && !Array.isArray(item) && item.qty ? item.qty : (Array.isArray(item) && typeof item[1] === 'number' ? item[1] : 1)
+                    if (itemName) equipment.push({ name: itemName, qty })
+                }
+            }
+            normalizedGear = { weapons, armor: [], equipment }
         }
 
         // Existing details check
@@ -971,9 +1171,9 @@ export const updateCharacterSheet = mutation({
             speed: args.speed ?? existing?.speed,
             hitPoints: normalizedHitPoints ?? existing?.hitPoints,
             armorClass: normalizedArmorClass ?? existing?.armorClass,
-            saves: args.saves ?? existing?.saves,
-            abilities: args.abilities ?? existing?.abilities,
-            skills: args.skills ?? existing?.skills,
+            saves: normalizedSaves ?? existing?.saves,
+            abilities: normalizedAbilities ?? existing?.abilities,
+            skills: normalizedSkills ?? existing?.skills,
             conditions: args.conditions ?? existing?.conditions,
             money: normalizedMoney ?? existing?.money,
             gear: normalizedGear ?? existing?.gear,
