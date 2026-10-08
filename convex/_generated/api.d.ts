@@ -27,6 +27,7 @@ import type * as migrations from "../migrations.js";
 import type * as moneyHelpers from "../moneyHelpers.js";
 import type * as notifications from "../notifications.js";
 import type * as planning from "../planning.js";
+import type * as questSyncHelpers from "../questSyncHelpers.js";
 import type * as quests from "../quests.js";
 import type * as quotes from "../quotes.js";
 import type * as roles from "../roles.js";
@@ -61,6 +62,7 @@ declare const fullApi: ApiFromModules<{
   moneyHelpers: typeof moneyHelpers;
   notifications: typeof notifications;
   planning: typeof planning;
+  questSyncHelpers: typeof questSyncHelpers;
   quests: typeof quests;
   quotes: typeof quotes;
   roles: typeof roles;
