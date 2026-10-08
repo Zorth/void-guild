@@ -460,11 +460,16 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
       // Place it right after targetCombatant
       const nextBelow = combatants[targetIndex + 1]
       if (nextBelow) {
-        newInitiative = Math.floor((targetCombatant.initiative + nextBelow.initiative) / 2)
-        if (newInitiative === targetCombatant.initiative) {
+        if (targetCombatant.initiative - nextBelow.initiative > 1) {
+          newInitiative = Math.floor((targetCombatant.initiative + nextBelow.initiative) / 2)
+        } else {
           newInitiative = targetCombatant.initiative - 1
         }
       } else {
+        newInitiative = targetCombatant.initiative - 1
+      }
+      // Ensure strictly lower than targetCombatant
+      if (newInitiative >= targetCombatant.initiative) {
         newInitiative = targetCombatant.initiative - 1
       }
     } else {
@@ -472,11 +477,16 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
       // Place it right before targetCombatant
       const prevAbove = combatants[targetIndex - 1]
       if (prevAbove) {
-        newInitiative = Math.floor((prevAbove.initiative + targetCombatant.initiative) / 2)
-        if (newInitiative === targetCombatant.initiative) {
+        if (prevAbove.initiative - targetCombatant.initiative > 1) {
+          newInitiative = Math.floor((prevAbove.initiative + targetCombatant.initiative) / 2)
+        } else {
           newInitiative = targetCombatant.initiative + 1
         }
       } else {
+        newInitiative = targetCombatant.initiative + 1
+      }
+      // Ensure strictly higher than targetCombatant
+      if (newInitiative <= targetCombatant.initiative) {
         newInitiative = targetCombatant.initiative + 1
       }
     }

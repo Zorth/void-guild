@@ -24,8 +24,7 @@ import {
 import { toast } from 'sonner'
 import { useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
-import { Id, Doc } from '@/convex/_generated/dataModel'
-import { cn } from '@/lib/utils'
+import { Doc } from '@/convex/_generated/dataModel'
 
 interface CharacterStatsEditModalProps {
   character: Doc<'characters'>
