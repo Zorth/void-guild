@@ -1366,11 +1366,14 @@ export const getCharacterProfile = query({
     })
 
     // Calculate "Best Friend" / Most played with companion:
-    // Count how many locked sessions this character attended together with each other character (excluding GM character)
+    // Count how many locked sessions this character attended as a player together with each other character (excluding GM character)
     const companionCounts = new Map<string, number>()
     for (const s of lockedAttendedSessions) {
       if (!Array.isArray(s.characters)) continue
       const gmCharId = s.gmCharacter ? s.gmCharacter.toString() : null
+      // If this character was the GM character for this session, do not count companions for this session
+      if (args.characterId === gmCharId) continue
+
       for (const charId of s.characters) {
         const charIdStr = charId.toString()
         // Do not count oneself, and do not count the GM character
@@ -1427,8 +1430,10 @@ export const getCharacterProfile = query({
     }
 
     // Prepare session history list (sorted descending by date)
+    // Filter out sessions where this character was the GM character (only player sessions count for character session history)
     // Filter out private sessions if caller is not authorized
     const visibleSessions = attendingSessions.filter((s) => {
+      if (s.gmCharacter === args.characterId) return false
       if (!s.isPrivate) return true
       if (identity && identity.subject === s.owner) return true
       if (isAdminUser) return true
