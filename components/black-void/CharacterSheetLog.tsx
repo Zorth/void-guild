@@ -30,10 +30,12 @@ import {
   Dices,
   Save,
   Wallet,
+  Download,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import ServiceListingDialog from '@/components/black-void/ServiceListingDialog'
+import ManualCharacterImportDialog from '@/components/black-void/ManualCharacterImportDialog'
 import { useState, useMemo, useEffect } from 'react'
 
 interface CharacterSheetLogProps {
@@ -74,6 +76,7 @@ function formatGpAmount(amount: number): string {
 export default function CharacterSheetLog({ characterId }: CharacterSheetLogProps) {
   const [editingService, setEditingService] = useState<any | null>(null)
   const [isMarkingAll, setIsMarkingAll] = useState(false)
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
 
   // Manual currency states
   const [ppVal, setPpVal] = useState<string>('0')
@@ -1479,7 +1482,7 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
       {/* 8. MANUAL CURRENCY ADJUSTMENT FIELD AT THE BOTTOM */}
       <Card className="border-amber-500/40 bg-gradient-to-b from-amber-950/20 via-card/80 to-background shadow-lg overflow-hidden">
         <CardHeader className="p-3.5 sm:p-5 border-b border-border/30">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 text-amber-300">
                 <Wallet className="h-5 w-5 text-amber-400 shrink-0" />
@@ -1489,8 +1492,20 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
                 Directly adjust and save your character&apos;s coin purse (Platinum, Gold, Silver, Copper).
               </CardDescription>
             </div>
-            <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-mono font-bold self-start sm:self-auto">
-              Total: {formatGpAmount(calculatedManualGold)}
+            <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsImportModalOpen(true)}
+                className="h-8 px-3 text-xs font-semibold border-purple-500/40 bg-purple-950/20 hover:bg-purple-500/20 text-purple-300 hover:text-purple-200 gap-1.5 shadow-sm"
+              >
+                <Download className="h-3.5 w-3.5 text-purple-400" />
+                <span>Manual Character Import</span>
+              </Button>
+              <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-mono font-bold">
+                Total: {formatGpAmount(calculatedManualGold)}
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -1633,6 +1648,12 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
           editingService={editingService}
         />
       )}
+
+      <ManualCharacterImportDialog
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        characterId={characterId}
+      />
     </div>
   )
 }

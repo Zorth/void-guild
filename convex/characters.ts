@@ -441,6 +441,351 @@ export const updatePartyCharacterStats = mutation({
   },
 })
 
+export const importCharacterSheet = mutation({
+  args: {
+    characterId: v.id('characters'),
+    build: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) {
+      throw new Error('Not authenticated')
+    }
+
+    const char = await ctx.db.get(args.characterId)
+    if (!char) {
+      throw new Error('Character not found')
+    }
+
+    const isAdminUser = await isAdmin(ctx)
+    if (char.userId !== identity.subject && !isAdminUser) {
+      throw new Error('Unauthorized: You do not own this character')
+    }
+
+    const rawBuild = args.build?.build || args.build?.character || args.build
+    if (!rawBuild || typeof rawBuild !== 'object') {
+      throw new Error('Invalid Pathbuilder build object')
+    }
+
+    // 1. Normalize Abilities
+    let normalizedAbilities = undefined
+    if (rawBuild.abilities && typeof rawBuild.abilities === 'object') {
+      normalizedAbilities = {
+        str: Number(rawBuild.abilities.str) || 10,
+        dex: Number(rawBuild.abilities.dex) || 10,
+        con: Number(rawBuild.abilities.con) || 10,
+        int: Number(rawBuild.abilities.int) || 10,
+        wis: Number(rawBuild.abilities.wis) || 10,
+        cha: Number(rawBuild.abilities.cha) || 10,
+      }
+    }
+
+    // 2. Normalize Hit Points
+    let normalizedHitPoints = undefined
+    if (rawBuild.attributes) {
+      const bAttrs = rawBuild.attributes
+      const conMod = normalizedAbilities ? Math.floor((normalizedAbilities.con - 10) / 2) : 0
+      const charLvl = Number(rawBuild.level) || char.lvl || 1
+      const calcMax =
+        (Number(bAttrs.ancestryhp) || 0) +
+        ((Number(bAttrs.classhp) || 8) + conMod + (Number(bAttrs.bonushpperlevel) || 0)) * charLvl +
+        (Number(bAttrs.bonushp) || 0)
+      const maxHp = Number(bAttrs.hp) || Number(rawBuild.hp) || calcMax || 20
+      normalizedHitPoints = {
+        max: maxHp,
+        current: Number(rawBuild.currentHp) ?? maxHp,
+        temporary: Number(rawBuild.tempHp) || 0,
+        dieSize: undefined,
+        ancestryHP: bAttrs.ancestryhp !== undefined ? Number(bAttrs.ancestryhp) : undefined,
+        classHP: bAttrs.classhp !== undefined ? Number(bAttrs.classhp) : undefined,
+        bonusHP: bAttrs.bonushp !== undefined ? Number(bAttrs.bonushp) : undefined,
+      }
+    }
+
+    // 3. Normalize Armor Class
+    let normalizedArmorClass = undefined
+    const acTotalVal = Number(rawBuild.acTotal?.acTotal) || Number(rawBuild.ac) || Number(rawBuild.attributes?.acTotal) || 10
+    const shieldBonusVal = rawBuild.acTotal?.shieldBonus ? Number(rawBuild.acTotal.shieldBonus) : undefined
+    let equippedArmorName: string | undefined = undefined
+    if (Array.isArray(rawBuild.armor)) {
+      const wornArmor = rawBuild.armor.find((a: any) => a && (a.worn === true || a.worn === 'true'))
+      if (wornArmor) {
+        equippedArmorName = wornArmor.display || wornArmor.name || undefined
+      }
+    }
+    normalizedArmorClass = {
+      total: acTotalVal,
+      shieldBonus: shieldBonusVal,
+      unarmoredProf: undefined,
+      equippedArmorName,
+      shieldHardness: undefined,
+      shieldCurrentHP: undefined,
+      shieldMaxHP: undefined,
+    }
+
+    // 4. Normalize Saves
+    let normalizedSaves: Record<string, any> | undefined = undefined
+    if (rawBuild.proficiencies) {
+      const charLvl = Number(rawBuild.level) || char.lvl || 1
+      const toProfCode = (v: number): 'U' | 'T' | 'E' | 'M' | 'L' =>
+        v === 8 ? 'L' : v === 6 ? 'M' : v === 4 ? 'E' : v === 2 ? 'T' : 'U'
+      const calcSaveBonus = (profVal: number, abilityMod: number) => {
+        if (profVal === 0) return abilityMod
+        return charLvl + profVal + abilityMod
+      }
+      const conMod = normalizedAbilities ? Math.floor((normalizedAbilities.con - 10) / 2) : 0
+      const dexMod = normalizedAbilities ? Math.floor((normalizedAbilities.dex - 10) / 2) : 0
+      const wisMod = normalizedAbilities ? Math.floor((normalizedAbilities.wis - 10) / 2) : 0
+      const p = rawBuild.proficiencies
+      normalizedSaves = {
+        fortitude: {
+          bonus: calcSaveBonus(Number(p.fortitude) || 0, conMod),
+          proficiency: toProfCode(Number(p.fortitude) || 0),
+          profValue: Number(p.fortitude) || 0,
+        },
+        reflex: {
+          bonus: calcSaveBonus(Number(p.reflex) || 0, dexMod),
+          proficiency: toProfCode(Number(p.reflex) || 0),
+          profValue: Number(p.reflex) || 0,
+        },
+        will: {
+          bonus: calcSaveBonus(Number(p.will) || 0, wisMod),
+          proficiency: toProfCode(Number(p.will) || 0),
+          profValue: Number(p.will) || 0,
+        },
+        perception: {
+          bonus: calcSaveBonus(Number(p.perception) || 0, wisMod),
+          proficiency: toProfCode(Number(p.perception) || 0),
+          profValue: Number(p.perception) || 0,
+        },
+      }
+    }
+
+    // 5. Normalize Skills
+    let normalizedSkills: Record<string, any> | undefined = undefined
+    if (rawBuild.proficiencies) {
+      const charLvl = Number(rawBuild.level) || char.lvl || 1
+      const toProfCode = (v: number): 'U' | 'T' | 'E' | 'M' | 'L' =>
+        v === 8 ? 'L' : v === 6 ? 'M' : v === 4 ? 'E' : v === 2 ? 'T' : 'U'
+      const SKILL_ABILITIES: Record<string, 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha'> = {
+        acrobatics: 'dex',
+        arcana: 'int',
+        athletics: 'str',
+        crafting: 'int',
+        deception: 'cha',
+        diplomacy: 'cha',
+        intimidation: 'cha',
+        medicine: 'wis',
+        nature: 'wis',
+        occultism: 'int',
+        performance: 'cha',
+        religion: 'wis',
+        society: 'int',
+        stealth: 'dex',
+        survival: 'wis',
+        thievery: 'dex',
+      }
+      normalizedSkills = {}
+      for (const [sKey, abKey] of Object.entries(SKILL_ABILITIES)) {
+        const profVal = rawBuild.proficiencies[sKey]
+        if (profVal !== undefined) {
+          const abScore = normalizedAbilities ? normalizedAbilities[abKey] : 10
+          const abMod = Math.floor(((abScore || 10) - 10) / 2)
+          const bonus = Number(profVal) === 0 ? abMod : charLvl + Number(profVal) + abMod
+          const capName = sKey.charAt(0).toUpperCase() + sKey.slice(1)
+          normalizedSkills[capName] = {
+            name: capName,
+            modifier: bonus,
+            proficiency: toProfCode(Number(profVal)),
+            ability: abKey,
+            isLore: false,
+          }
+        }
+      }
+      if (Array.isArray(rawBuild.lores)) {
+        for (const loreItem of rawBuild.lores) {
+          const loreName = Array.isArray(loreItem)
+            ? loreItem[0]
+            : typeof loreItem === 'string'
+            ? loreItem
+            : loreItem?.name
+          const profVal = Array.isArray(loreItem) ? loreItem[1] : loreItem?.prof || 2
+          if (loreName) {
+            const intMod = normalizedAbilities ? Math.floor(((normalizedAbilities.int || 10) - 10) / 2) : 0
+            const bonus = Number(profVal) === 0 ? intMod : charLvl + (Number(profVal) || 2) + intMod
+            normalizedSkills[loreName] = {
+              name: String(loreName),
+              modifier: bonus,
+              proficiency: toProfCode(Number(profVal) || 2),
+              ability: 'int',
+              isLore: true,
+            }
+          }
+        }
+      }
+    }
+
+    // 6. Normalize Money
+    let normalizedMoney = undefined
+    if (rawBuild.money && typeof rawBuild.money === 'object') {
+      const cp = Number(rawBuild.money.cp) || 0
+      const sp = Number(rawBuild.money.sp) || 0
+      const gp = Number(rawBuild.money.gp) || 0
+      const pp = Number(rawBuild.money.pp) || 0
+      normalizedMoney = {
+        cp,
+        sp,
+        gp,
+        pp,
+        totalInGold: Math.round((gp + pp * 10 + sp / 10 + cp / 100) * 100) / 100,
+      }
+    }
+
+    // 7. Normalize Gear
+    let normalizedGear: any = undefined
+    const weapons: any[] = []
+    if (Array.isArray(rawBuild.weapons)) {
+      for (const w of rawBuild.weapons) {
+        if (!w) continue
+        const wName = typeof w === 'string' ? w : Array.isArray(w) ? w[0] : w.display || w.name || w[0]
+        const qty =
+          typeof w === 'object' && !Array.isArray(w) && w.qty
+            ? Number(w.qty) || 1
+            : Array.isArray(w) && typeof w[1] === 'number'
+            ? w[1]
+            : 1
+        if (wName) {
+          weapons.push({
+            name: String(wName),
+            die: typeof w === 'object' && !Array.isArray(w) ? w.die : undefined,
+            damageType: typeof w === 'object' && !Array.isArray(w) ? w.damageType : undefined,
+            attackBonus: typeof w === 'object' && !Array.isArray(w) && typeof w.attack === 'number' ? w.attack : undefined,
+            potency: typeof w === 'object' && !Array.isArray(w) && typeof w.pot === 'number' ? w.pot : undefined,
+            striking: typeof w === 'object' && !Array.isArray(w) && w.str ? String(w.str) : null,
+            runes: typeof w === 'object' && !Array.isArray(w) && Array.isArray(w.runes) ? w.runes.map(String) : [],
+            traits: typeof w === 'object' && !Array.isArray(w) && Array.isArray(w.traits) ? w.traits.map(String) : [],
+            qty,
+          })
+        }
+      }
+    }
+
+    const armor: any[] = []
+    if (Array.isArray(rawBuild.armor)) {
+      for (const a of rawBuild.armor) {
+        if (!a) continue
+        const aName = a.display || a.name
+        if (aName) {
+          armor.push({
+            name: String(aName),
+            acBonus: typeof a.acBonus === 'number' ? a.acBonus : undefined,
+            potency: typeof a.pot === 'number' ? a.pot : undefined,
+            resilient: a.res ? String(a.res) : undefined,
+            runes: Array.isArray(a.runes) ? a.runes.map(String) : [],
+            worn: Boolean(a.worn),
+            qty: Number(a.qty) || 1,
+          })
+        }
+      }
+    }
+
+    const equipment: any[] = []
+    if (Array.isArray(rawBuild.equipment)) {
+      for (const item of rawBuild.equipment) {
+        if (!item) continue
+        const itemName = typeof item === 'string' ? item : Array.isArray(item) ? item[0] : item.name || item[0]
+        const qty =
+          typeof item === 'object' && !Array.isArray(item) && item.qty
+            ? Number(item.qty) || 1
+            : Array.isArray(item) && typeof item[1] === 'number'
+            ? item[1]
+            : 1
+        if (itemName) {
+          equipment.push({ name: String(itemName), qty })
+        }
+      }
+    }
+    normalizedGear = { weapons, armor, equipment }
+
+    // 8. Build Summary
+    const featsList = Array.isArray(rawBuild.feats)
+      ? rawBuild.feats
+          .map((f: any) => (Array.isArray(f) ? f[0] : typeof f === 'string' ? f : f?.name))
+          .filter(Boolean)
+          .map(String)
+      : []
+    const specialsList = Array.isArray(rawBuild.specials) ? rawBuild.specials.filter(Boolean).map(String) : []
+    const languagesList = Array.isArray(rawBuild.languages) ? rawBuild.languages.filter(Boolean).map(String) : []
+
+    const buildSummary = {
+      feats: featsList,
+      specials: specialsList,
+      languages: languagesList,
+    }
+
+    // Existing characterDetails
+    const existing = await ctx.db
+      .query('characterDetails')
+      .withIndex('by_characterId', (q) => q.eq('characterId', args.characterId))
+      .first()
+
+    const now = Date.now()
+    // Do NOT save pathbuilderId to character per user request ("the id isn't linked to a character so don't save it")
+    const detailsRecord = {
+      characterId: args.characterId,
+      system: (rawBuild.system as string) || existing?.system || 'PF2e',
+      name: (rawBuild.name as string) || existing?.name || char.name,
+      level: Number(rawBuild.level) || existing?.level || char.lvl,
+      xp: Number(rawBuild.xp) || existing?.xp || char.xp,
+      ancestry: (rawBuild.ancestry as string) || existing?.ancestry || char.ancestry,
+      heritage: (rawBuild.heritage as string) || existing?.heritage,
+      background: (rawBuild.background as string) || existing?.background,
+      class: (rawBuild.class as string) || existing?.class || char.class,
+      dualClass: rawBuild.dualClass !== undefined ? (rawBuild.dualClass as string | null) : existing?.dualClass,
+      keyAbility: (rawBuild.keyability as any) || existing?.keyAbility,
+      alignment: (rawBuild.alignment as string) || existing?.alignment,
+      deity: (rawBuild.deity as string) || existing?.deity,
+      size: typeof rawBuild.size === 'string' ? rawBuild.size : rawBuild.sizeName || existing?.size,
+      speed: Number(rawBuild.attributes?.speed) || existing?.speed,
+      hitPoints: normalizedHitPoints ?? existing?.hitPoints,
+      armorClass: normalizedArmorClass ?? existing?.armorClass,
+      saves: normalizedSaves ?? existing?.saves,
+      abilities: normalizedAbilities ?? existing?.abilities,
+      skills: normalizedSkills ?? existing?.skills,
+      money: normalizedMoney ?? existing?.money,
+      gear: normalizedGear ?? existing?.gear,
+      buildSummary: buildSummary ?? existing?.buildSummary,
+      rawExport: rawBuild,
+      lastSyncedAt: now,
+    }
+
+    if (existing) {
+      await ctx.db.patch(existing._id, detailsRecord)
+    } else {
+      await ctx.db.insert('characterDetails', detailsRecord)
+    }
+
+    // Optionally update character ancestry / class if available and different
+    const charProfilePatch: { ancestry?: string; class?: string } = {}
+    if (rawBuild.ancestry && rawBuild.ancestry !== char.ancestry) {
+      charProfilePatch.ancestry = String(rawBuild.ancestry)
+    }
+    if (rawBuild.class && rawBuild.class !== char.class) {
+      charProfilePatch.class = String(rawBuild.class)
+    }
+    if (Object.keys(charProfilePatch).length > 0) {
+      await ctx.db.patch(args.characterId, charProfilePatch)
+    }
+
+    return {
+      success: true,
+      characterName: rawBuild.name || char.name,
+      money: normalizedMoney,
+      lastSyncedAt: now,
+    }
+  },
+})
+
 
 async function assertUniqueCharacterName(
   ctx: MutationCtx,

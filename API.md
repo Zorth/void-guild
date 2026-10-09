@@ -49,6 +49,7 @@ https://guild.tarragon.be/api/external/v1
 * **POST** `/character/:characterId/sheet` - Push/sync character sheet data (Owner/Admin). Accepts raw Pathbuilder exports (`build` or `rawExport`), simplified flat stats (`hp: number`, `ac: number`, `abilities: record`, `saves: record`, `skills: record`, `money: number`), or full structured `CharacterSheetDetails`.
 * **PATCH** `/character/:characterId` - Update character details (Owner/Admin only; XP and Level cannot be modified via API). Body: `{ name?, ancestry?, class?, websiteLink? }`.
 * **PATCH** `/character/:characterId/sheet` - Update/sync character sheet data (Owner/Admin). Same flexible payload support as `POST`.
+* **GET** `/api/pathbuilder?id=:exportId` - Fetch public Pathbuilder 2e character export by numeric ID (authenticated user session).
 
 ### Worlds & Quests
 * **GET** `/worlds` - List all campaign worlds.
