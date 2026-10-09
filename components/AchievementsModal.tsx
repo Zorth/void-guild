@@ -88,6 +88,9 @@ export default function AchievementsModal({ open, onOpenChange }: AchievementsMo
     return true
   })
 
+  const unlockedVisibleCount = visibleAchievements.filter((a) => a.isUnlocked).length
+  const totalVisibleCount = visibleAchievements.length
+
   const filteredAchievements = visibleAchievements.filter((a) => {
     if (filter === 'unlocked') return a.isUnlocked
     if (filter === 'hidden') return a.isHidden
@@ -95,7 +98,7 @@ export default function AchievementsModal({ open, onOpenChange }: AchievementsMo
   })
 
   const progressPercentage =
-    data && data.totalCount > 0 ? Math.round((data.unlockedCount / data.totalCount) * 100) : 0
+    totalVisibleCount > 0 ? Math.round((unlockedVisibleCount / totalVisibleCount) * 100) : 0
 
   const renderReward = (item: Achievement, isSubItem = false) => {
     const hasReward = Boolean(item.reward && item.reward.trim() !== '')
@@ -228,7 +231,7 @@ export default function AchievementsModal({ open, onOpenChange }: AchievementsMo
               <div className="flex justify-between text-xs font-semibold">
                 <span className="text-muted-foreground">Overall Progress</span>
                 <span className="text-purple-400 font-bold">
-                  {data.unlockedCount} / {data.totalCount} Unlocked ({progressPercentage}%)
+                  {unlockedVisibleCount} / {totalVisibleCount} Unlocked ({progressPercentage}%)
                 </span>
               </div>
               <div className="w-full bg-muted/40 h-2 rounded-full overflow-hidden border border-border/30">
@@ -265,7 +268,7 @@ export default function AchievementsModal({ open, onOpenChange }: AchievementsMo
                     : 'bg-muted/30 hover:bg-muted/60 border-border/50 text-muted-foreground'
                 )}
               >
-                Unlocked ({data?.unlockedCount || 0})
+                Unlocked ({unlockedVisibleCount})
               </button>
               <button
                 type="button"

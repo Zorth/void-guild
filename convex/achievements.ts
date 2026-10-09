@@ -959,13 +959,17 @@ export const syncAndGetAchievements = mutation({
     }
 
     const normalDefs = ACHIEVEMENTS_REGISTRY.filter((a) => a.category === 'normal')
-    const unlockedNormalCount = normalDefs.filter((a) => unlockedMap.has(a.id)).length
+    const totalUnlockedCount = unlockedMap.size
+    // Total viewable achievements: normal achievements + unlocked secret/hidden achievements (or all secret achievements if admin)
+    const hiddenDefs = ACHIEVEMENTS_REGISTRY.filter((a) => a.category === 'hidden')
+    const viewableHiddenCount = isAdmin ? hiddenDefs.length : hiddenDefs.filter((a) => unlockedMap.has(a.id)).length
+    const totalViewableCount = normalDefs.length + viewableHiddenCount
 
     return {
       achievements: result,
       isAdmin,
-      unlockedCount: unlockedNormalCount,
-      totalCount: normalDefs.length,
+      unlockedCount: totalUnlockedCount,
+      totalCount: totalViewableCount,
     }
   },
 })
