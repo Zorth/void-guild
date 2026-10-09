@@ -537,12 +537,34 @@ export default defineSchema({
     }).index('by_mapId', ['mapId']),
     mapGridNotes: defineTable({
         mapId: v.id('worldMaps'),
-        cellKey: v.string(), // "col,row"
+        cellKey: v.string(), // "col,row" or point identifier
+        x: v.optional(v.number()), // Normalized 0-100% coordinate
+        y: v.optional(v.number()),
         userId: v.string(), // Clerk subject of the note creator
         authorName: v.optional(v.string()),
         note: v.string(),
         updatedAt: v.number(),
     }).index('by_mapId_cellKey', ['mapId', 'cellKey'])
+      .index('by_mapId', ['mapId']),
+    mapCellFills: defineTable({
+        mapId: v.id('worldMaps'),
+        cellKey: v.string(), // "col,row"
+        terrainType: v.string(), // "water", "forest", "hills", "mountain", "snow", "sand", "stone", "plains", "swamp", etc.
+        color: v.string(), // Hex color e.g. "#3b82f6"
+        userId: v.string(),
+        updatedAt: v.number(),
+    }).index('by_mapId_cellKey', ['mapId', 'cellKey'])
+      .index('by_mapId', ['mapId']),
+    mapCellRoads: defineTable({
+        mapId: v.id('worldMaps'),
+        fromCellKey: v.string(), // "col,row"
+        toCellKey: v.string(), // "col,row"
+        roadKey: v.string(), // normalized "minKey--maxKey"
+        color: v.optional(v.string()), // Road line color (default amber/stone e.g. "#d97706")
+        style: v.optional(v.union(v.literal('solid'), v.literal('dashed'))),
+        userId: v.string(),
+        updatedAt: v.number(),
+    }).index('by_mapId_roadKey', ['mapId', 'roadKey'])
       .index('by_mapId', ['mapId']),
 })
 

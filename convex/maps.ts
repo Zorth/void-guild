@@ -91,6 +91,16 @@ export const getMapFullData = query({
       .withIndex('by_mapId', (q) => q.eq('mapId', args.mapId))
       .collect()
 
+    const cellFills = await ctx.db
+      .query('mapCellFills')
+      .withIndex('by_mapId', (q) => q.eq('mapId', args.mapId))
+      .collect()
+
+    const cellRoads = await ctx.db
+      .query('mapCellRoads')
+      .withIndex('by_mapId', (q) => q.eq('mapId', args.mapId))
+      .collect()
+
     const pins = isOwnerOrAdmin ? rawPins : rawPins.filter((p) => !p.gmOnly)
     const areas = isOwnerOrAdmin ? rawAreas : rawAreas.filter((a) => !a.gmOnly)
 
@@ -100,6 +110,8 @@ export const getMapFullData = query({
       pins,
       areas,
       notes,
+      cellFills,
+      cellRoads,
     }
   },
 })
@@ -578,12 +590,14 @@ export const deleteArea = mutation({
   },
 })
 
-// --- GRID CELL NOTES (Players & GMs) ---
+// --- GRID & MAP NOTES (Players & GMs) ---
 
 export const saveGridNote = mutation({
   args: {
     mapId: v.id('worldMaps'),
     cellKey: v.string(),
+    x: v.optional(v.number()),
+    y: v.optional(v.number()),
     note: v.string(),
     authorName: v.optional(v.string()),
   },
@@ -596,23 +610,37 @@ export const saveGridNote = mutation({
       .withIndex('by_mapId_cellKey', (q) => q.eq('mapId', args.mapId).eq('cellKey', args.cellKey))
       .first()
 
+    const map = await ctx.db.get(args.mapId)
+    const world = map ? await ctx.db.get(map.worldId) : null
+    const isAdminUser = await isAdmin(ctx)
+    const isWorldOwner = Boolean(world && world.owner === user.subject)
+    const canManageExisting = Boolean(existing && (existing.userId === user.subject || isWorldOwner || isAdminUser))
+
     if (!args.note.trim()) {
-      if (existing && existing.userId === user.subject) {
+      if (existing && canManageExisting) {
         await ctx.db.delete(existing._id)
       }
       return
     }
 
     if (existing) {
+      if (!canManageExisting) {
+        throw new Error('Unauthorized to edit this note')
+      }
       await ctx.db.patch(existing._id, {
         note: args.note.trim(),
         authorName: args.authorName || user.name || 'Anonymous',
+        x: args.x !== undefined ? args.x : existing.x,
+        y: args.y !== undefined ? args.y : existing.y,
         updatedAt: Date.now(),
       })
+      return existing._id
     } else {
-      await ctx.db.insert('mapGridNotes', {
+      return await ctx.db.insert('mapGridNotes', {
         mapId: args.mapId,
         cellKey: args.cellKey,
+        x: args.x,
+        y: args.y,
         userId: user.subject,
         authorName: args.authorName || user.name || 'Anonymous',
         note: args.note.trim(),
@@ -621,3 +649,134 @@ export const saveGridNote = mutation({
     }
   },
 })
+
+export const deleteGridNote = mutation({
+  args: {
+    noteId: v.id('mapGridNotes'),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    const existing = await ctx.db.get(args.noteId)
+    if (!existing) return
+
+    const map = await ctx.db.get(existing.mapId)
+    const world = map ? await ctx.db.get(map.worldId) : null
+    const isAdminUser = await isAdmin(ctx)
+    const isWorldOwner = Boolean(world && world.owner === user.subject)
+
+    if (existing.userId !== user.subject && !isWorldOwner && !isAdminUser) {
+      throw new Error('Unauthorized to delete this note')
+    }
+
+    await ctx.db.delete(args.noteId)
+  },
+})
+
+// --- CELL FILLS (Biome / Palette Painting) ---
+
+export const setCellFill = mutation({
+  args: {
+    mapId: v.id('worldMaps'),
+    cellKey: v.string(),
+    terrainType: v.string(),
+    color: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    const existing = await ctx.db
+      .query('mapCellFills')
+      .withIndex('by_mapId_cellKey', (q) => q.eq('mapId', args.mapId).eq('cellKey', args.cellKey))
+      .first()
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        terrainType: args.terrainType,
+        color: args.color,
+        userId: user.subject,
+        updatedAt: Date.now(),
+      })
+      return existing._id
+    } else {
+      return await ctx.db.insert('mapCellFills', {
+        mapId: args.mapId,
+        cellKey: args.cellKey,
+        terrainType: args.terrainType,
+        color: args.color,
+        userId: user.subject,
+        updatedAt: Date.now(),
+      })
+    }
+  },
+})
+
+export const clearCellFill = mutation({
+  args: {
+    mapId: v.id('worldMaps'),
+    cellKey: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    const existing = await ctx.db
+      .query('mapCellFills')
+      .withIndex('by_mapId_cellKey', (q) => q.eq('mapId', args.mapId).eq('cellKey', args.cellKey))
+      .first()
+
+    if (existing) {
+      await ctx.db.delete(existing._id)
+    }
+  },
+})
+
+// --- CELL ROADS (Hex-to-Hex Connections) ---
+
+export const toggleCellRoad = mutation({
+  args: {
+    mapId: v.id('worldMaps'),
+    fromCellKey: v.string(),
+    toCellKey: v.string(),
+    color: v.optional(v.string()),
+    style: v.optional(v.union(v.literal('solid'), v.literal('dashed'))),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    if (args.fromCellKey === args.toCellKey) {
+      throw new Error('Cannot connect a hex to itself')
+    }
+
+    // Canonical key regardless of click order e.g. "1,2--1,3" vs "1,3--1,2"
+    const roadKey = [args.fromCellKey, args.toCellKey].sort().join('--')
+
+    const existing = await ctx.db
+      .query('mapCellRoads')
+      .withIndex('by_mapId_roadKey', (q) => q.eq('mapId', args.mapId).eq('roadKey', roadKey))
+      .first()
+
+    if (existing) {
+      // Toggle off / delete
+      await ctx.db.delete(existing._id)
+      return { action: 'removed', roadKey }
+    } else {
+      // Toggle on / insert
+      const id = await ctx.db.insert('mapCellRoads', {
+        mapId: args.mapId,
+        fromCellKey: args.fromCellKey,
+        toCellKey: args.toCellKey,
+        roadKey,
+        color: args.color || '#f59e0b',
+        style: args.style || 'solid',
+        userId: user.subject,
+        updatedAt: Date.now(),
+      })
+      return { action: 'created', roadKey, id }
+    }
+  },
+})
+

@@ -649,16 +649,6 @@ export default function AttendingCharactersList({
                                       <Flame className="h-2.5 w-2.5 fill-orange-500 text-orange-500" />
                                       {rel.worldStreak} world streak
                                     </span>
-                                  ) : (rel.worldCount ?? 0) >= 10 ? (
-                                    <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-300 border border-purple-500/25 hover:bg-purple-500/25 transition-colors">
-                                      <Trophy className="h-2.5 w-2.5 text-purple-500" />
-                                      {rel.worldCount}x world
-                                    </span>
-                                  ) : (rel.worldCount ?? 0) >= 5 ? (
-                                    <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25 hover:bg-amber-500/25 transition-colors">
-                                      <Star className="h-2.5 w-2.5 fill-amber-500 text-amber-500" />
-                                      {rel.worldCount}x world
-                                    </span>
                                   ) : (
                                     <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25 hover:bg-blue-500/25 transition-colors">
                                       <Globe className="h-2.5 w-2.5" />
@@ -674,16 +664,6 @@ export default function AttendingCharactersList({
                                       <span className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
                                         <Flame className="h-4 w-4 fill-orange-500 text-orange-500" />
                                         {rel.worldStreak}-Session World Streak!
-                                      </span>
-                                    ) : (rel.worldCount ?? 0) >= 10 ? (
-                                      <span className="flex items-center gap-1 text-purple-600 dark:text-purple-400">
-                                        <Trophy className="h-4 w-4 text-purple-500" />
-                                        World Veteran! ({rel.worldCount}x)
-                                      </span>
-                                    ) : (rel.worldCount ?? 0) >= 5 ? (
-                                      <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
-                                        <Star className="h-4 w-4 fill-amber-500 text-amber-500" />
-                                        Frequent Visitor! ({rel.worldCount}x)
                                       </span>
                                     ) : (
                                       <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
@@ -718,16 +698,6 @@ export default function AttendingCharactersList({
                                     <Flame className="h-2.5 w-2.5 fill-orange-500 text-orange-500" />
                                     {rel.streak} streak
                                   </span>
-                                ) : rel.count >= 10 ? (
-                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-300 border border-purple-500/25 hover:bg-purple-500/25 transition-colors">
-                                    <Trophy className="h-2.5 w-2.5 text-purple-500" />
-                                    {rel.count}x
-                                  </span>
-                                ) : rel.count >= 5 ? (
-                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25 hover:bg-amber-500/25 transition-colors">
-                                    <Star className="h-2.5 w-2.5 fill-amber-500 text-amber-500" />
-                                    {rel.count}x
-                                  </span>
                                 ) : (
                                   <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25 hover:bg-blue-500/25 transition-colors">
                                     <Users className="h-2.5 w-2.5" />
@@ -754,16 +724,6 @@ export default function AttendingCharactersList({
                                       <span className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
                                         <Flame className="h-4 w-4 fill-orange-500 text-orange-500" />
                                         {rel.streak}-Session Streak!
-                                      </span>
-                                    ) : rel.count >= 10 ? (
-                                      <span className="flex items-center gap-1 text-purple-600 dark:text-purple-400">
-                                        <Trophy className="h-4 w-4 text-purple-500" />
-                                        Battle-hardened Companions! ({rel.count}x)
-                                      </span>
-                                    ) : rel.count >= 5 ? (
-                                      <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
-                                        <Star className="h-4 w-4 fill-amber-500 text-amber-500" />
-                                        Frequent Adventurers! ({rel.count}x)
                                       </span>
                                     ) : (
                                       <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">

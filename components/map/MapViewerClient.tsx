@@ -4,13 +4,13 @@ import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
-import { useAuth } from '@clerk/nextjs'
+import { useAuth, useUser } from '@clerk/nextjs'
 import Link from 'next/link'
 import { 
   ZoomIn, ZoomOut, Maximize2, Layers, MapPin, Eye, Edit3, Plus, 
   Trash2, Settings, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Map, FileText, Check, X, Grid, Lock, Unlock, Move, HelpCircle, Copy,
   Castle, Crown, Skull, Swords, Shield, Mountain, Tent, Beer, Anchor, Flame, TreePine, Sparkles, BookOpen, Coins, Compass, Gem, Crosshair, Flag, Ghost, EyeOff, Ruler, Search, RotateCcw, RefreshCw,
-  Upload, ExternalLink
+  Upload, ExternalLink, User, Paintbrush, Route, Eraser
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -45,6 +45,18 @@ export const PIN_ICONS = [
   { name: 'Flag', label: 'Settlement / Clan', icon: Flag },
   { name: 'Ghost', label: 'Crypt / Tomb', icon: Ghost },
   { name: 'Eye', label: 'Watchtower / Lookout', icon: Eye },
+] as const
+
+export const TERRAIN_PALETTE = [
+  { id: 'water', label: 'Water', color: '#0284c7', border: '#0369a1' },
+  { id: 'forest', label: 'Forest', color: '#15803d', border: '#166534' },
+  { id: 'plains', label: 'Plains', color: '#65a30d', border: '#4d7c0f' },
+  { id: 'hills', label: 'Hills', color: '#a16207', border: '#854d0e' },
+  { id: 'mountain', label: 'Mountain', color: '#78716c', border: '#57534e' },
+  { id: 'snow', label: 'Snow', color: '#e0f2fe', border: '#bae6fd' },
+  { id: 'sand', label: 'Sand', color: '#eab308', border: '#ca8a04' },
+  { id: 'swamp', label: 'Swamp', color: '#3f6212', border: '#365314' },
+  { id: 'stone', label: 'Stone', color: '#475569', border: '#334155' },
 ] as const
 
 export function renderPinIcon(iconName?: string, className = "h-4 w-4 text-white") {
@@ -229,6 +241,7 @@ export default function MapViewerClient() {
   const params = useParams()
   const router = useRouter()
   const { userId } = useAuth()
+  const { user: clerkUser } = useUser()
 
   const worldName = decodeURIComponent(params.worldname as string)
   const mapSlug = params.mapSlug ? decodeURIComponent(params.mapSlug as string) : undefined
@@ -259,13 +272,24 @@ export default function MapViewerClient() {
   const toggleCellRevealMutation = useMutation(api.maps.toggleCellReveal)
   const bulkRevealCellsMutation = useMutation(api.maps.bulkRevealCells)
   const saveGridNoteMutation = useMutation(api.maps.saveGridNote)
+  const deleteGridNoteMutation = useMutation(api.maps.deleteGridNote)
+  const setCellFillMutation = useMutation(api.maps.setCellFill)
+  const clearCellFillMutation = useMutation(api.maps.clearCellFill)
+  const toggleCellRoadMutation = useMutation(api.maps.toggleCellRoad)
   const refreshMapImageMutation = useMutation(api.maps.refreshMapImage)
 
   // View state
   const isOwner = world ? userId === world.owner : false
   const [isEditMode, setIsEditMode] = useState(false)
   const [isRefreshingImage, setIsRefreshingImage] = useState(false)
-  const [activeTool, setActiveTool] = useState<'view' | 'add_pin' | 'add_area' | 'reveal_hex' | 'hide_hex' | 'grid_note' | 'align_grid' | 'ruler'>('view')
+  const [activeTool, setActiveTool] = useState<
+    'view' | 'add_pin' | 'add_area' | 'reveal_hex' | 'hide_hex' | 'grid_note' | 'align_grid' | 'ruler' | 'paint_terrain' | 'draw_road'
+  >('view')
+
+  // Terrain painting state
+  const [selectedTerrain, setSelectedTerrain] = useState<string>('forest')
+  // Road drawing state: first clicked cell waiting for target cell
+  const [roadStartCellKey, setRoadStartCellKey] = useState<string | null>(null)
 
   // Live grid calibration / offset state
   const [liveGridOffset, setLiveGridOffset] = useState<{ x: number; y: number } | null>(null)
@@ -322,6 +346,18 @@ export default function MapViewerClient() {
   const [isLayerDialogOpen, setIsLayerDialogOpen] = useState(false)
   const [isNoteDialogOpen, setIsNoteDialogOpen] = useState(false)
   const [isLayersMenuOpen, setIsLayersMenuOpen] = useState(false)
+
+  // Player Notes Visibility & Menu state
+  const [showPlayerNotes, setShowPlayerNotes] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('void_map_show_notes')
+      if (stored !== null) return stored === 'true'
+    }
+    return true
+  })
+  const [isNotesMenuOpen, setIsNotesMenuOpen] = useState(false)
+  const [selectedNoteCoords, setSelectedNoteCoords] = useState<{ x: number; y: number } | null>(null)
+  const [selectedNoteData, setSelectedNoteData] = useState<any>(null)
 
   // Map Processor Picker State
   const [isProcessorPickerOpen, setIsProcessorPickerOpen] = useState(false)
@@ -564,6 +600,10 @@ export default function MapViewerClient() {
     imageUrl: '',
     tileUrl: '',
     hideFromMenu: false,
+    gridType: 'hex' as 'none' | 'hex' | 'hex_flat' | 'square',
+    gridSize: 100,
+    width: 2000,
+    height: 2000,
   })
 
   // New Layer Draft
@@ -1035,6 +1075,13 @@ export default function MapViewerClient() {
         ...prev,
         points: [...prev.points, coords],
       }))
+    } else if (activeTool === 'grid_note') {
+      const generatedKey = `point_${coords.x.toFixed(2)}_${coords.y.toFixed(2)}`
+      setSelectedCellKey(generatedKey)
+      setSelectedNoteCoords({ x: coords.x, y: coords.y })
+      setSelectedNoteData(null)
+      setDraftNote('')
+      setIsNoteDialogOpen(true)
     }
   }
 
@@ -1120,6 +1167,24 @@ export default function MapViewerClient() {
     })
     return map
   }, [fullData?.notes])
+
+  const noteObjMap = useMemo(() => {
+    const map: Record<string, any> = {}
+    fullData?.notes.forEach((n) => {
+      map[n.cellKey] = n
+    })
+    return map
+  }, [fullData?.notes])
+
+  // Lookup for colored cell fills
+  const cellFillsMap = useMemo(() => {
+    const map: Record<string, { terrainType: string; color: string }> = {}
+    fullData?.cellFills?.forEach((f) => {
+      map[f.cellKey] = { terrainType: f.terrainType, color: f.color }
+    })
+    return map
+  }, [fullData?.cellFills])
+
 
   // Search & Filtered Pins for Locations Directory
   const filteredPins = useMemo(() => {
@@ -1332,11 +1397,65 @@ export default function MapViewerClient() {
     return []
   }, [gridType, currentGridSize, currentOffsetX, currentOffsetY, mapWidth, mapHeight])
 
+  // Lookup for cell center coordinates { cx, cy } by cell key
+  const cellCenterMap = useMemo(() => {
+    const map: Record<string, { cx: number; cy: number }> = {}
+    gridCells.forEach((cell) => {
+      map[cell.key] = { cx: cell.cx, cy: cell.cy }
+    })
+    return map
+  }, [gridCells])
+
   // Cell click handler (Exploration reveal or Player Note)
   const handleCellClick = (cellKey: string, e: React.MouseEvent) => {
     e.stopPropagation()
     if (hasDraggedRef.current || activeTool === 'align_grid') return
     if (!currentMap) return
+
+    if (activeTool === 'paint_terrain') {
+      if (selectedTerrain === 'eraser') {
+        clearCellFillMutation({ mapId: currentMap._id, cellKey }).catch(() => toast.error('Failed to clear cell'))
+      } else {
+        const item = TERRAIN_PALETTE.find((t) => t.id === selectedTerrain)
+        if (item) {
+          setCellFillMutation({
+            mapId: currentMap._id,
+            cellKey,
+            terrainType: item.id,
+            color: item.color,
+          }).catch(() => toast.error('Failed to paint cell'))
+        }
+      }
+      return
+    }
+
+    if (activeTool === 'draw_road') {
+      if (!roadStartCellKey) {
+        setRoadStartCellKey(cellKey)
+        toast.info(`Selected start hex (${cellKey}). Click another hex to connect road!`)
+      } else {
+        if (roadStartCellKey === cellKey) {
+          setRoadStartCellKey(null)
+          toast.info('Cancelled road connection')
+          return
+        }
+        toggleCellRoadMutation({
+          mapId: currentMap._id,
+          fromCellKey: roadStartCellKey,
+          toCellKey: cellKey,
+        })
+          .then((res) => {
+            if (res.action === 'created') {
+              toast.success('Road connected!')
+            } else {
+              toast.info('Road removed')
+            }
+          })
+          .catch((err) => toast.error(err.message || 'Failed to connect road'))
+        setRoadStartCellKey(null)
+      }
+      return
+    }
 
     if (isEditMode && activeTool === 'reveal_hex') {
       if (!revealedSet.has(cellKey)) {
@@ -1346,10 +1465,24 @@ export default function MapViewerClient() {
       if (revealedSet.has(cellKey)) {
         bulkRevealCellsMutation({ mapId: currentMap._id, cellKeys: [cellKey], reveal: false })
       }
-    } else if (activeTool === 'grid_note' || !isEditMode) {
+    } else if (activeTool === 'grid_note' || (showPlayerNotes && !!notesMap[cellKey])) {
       // Open note dialog for cell
       setSelectedCellKey(cellKey)
-      setDraftNote(notesMap[cellKey] || '')
+      const existingNote = noteObjMap[cellKey]
+      setSelectedNoteData(existingNote || null)
+      setDraftNote(existingNote?.note || notesMap[cellKey] || '')
+      if (existingNote?.x !== undefined && existingNote?.y !== undefined) {
+        setSelectedNoteCoords({ x: existingNote.x, y: existingNote.y })
+      } else {
+        const foundCell = gridCells.find((c) => c.key === cellKey)
+        if (foundCell) {
+          const xPct = Number(((foundCell.cx / mapWidth) * 100).toFixed(2))
+          const yPct = Number(((foundCell.cy / mapHeight) * 100).toFixed(2))
+          setSelectedNoteCoords({ x: xPct, y: yPct })
+        } else {
+          setSelectedNoteCoords(null)
+        }
+      }
       setIsNoteDialogOpen(true)
     }
   }
@@ -1510,19 +1643,62 @@ export default function MapViewerClient() {
     setIsReshapingAddPointMode(false)
   }
 
-  // Save Grid Note Handler
+  // Open Note by object
+  const handleOpenNote = (noteObj: any) => {
+    setSelectedCellKey(noteObj.cellKey)
+    setSelectedNoteData(noteObj)
+    setDraftNote(noteObj.note || '')
+    if (noteObj.x !== undefined && noteObj.y !== undefined) {
+      setSelectedNoteCoords({ x: noteObj.x, y: noteObj.y })
+    } else {
+      const foundCell = gridCells.find((c) => c.key === noteObj.cellKey)
+      if (foundCell) {
+        const xPct = Number(((foundCell.cx / mapWidth) * 100).toFixed(2))
+        const yPct = Number(((foundCell.cy / mapHeight) * 100).toFixed(2))
+        setSelectedNoteCoords({ x: xPct, y: yPct })
+      } else {
+        setSelectedNoteCoords(null)
+      }
+    }
+    setIsNoteDialogOpen(true)
+  }
+
+  // Save Note Handler
   const handleSaveNote = async () => {
     if (!currentMap || !selectedCellKey) return
+    const authorName = clerkUser?.firstName || clerkUser?.fullName || clerkUser?.username || 'Adventurer'
     try {
       await saveGridNoteMutation({
         mapId: currentMap._id,
         cellKey: selectedCellKey,
+        x: selectedNoteCoords?.x,
+        y: selectedNoteCoords?.y,
         note: draftNote,
+        authorName,
       })
       toast.success('Note saved!')
       setIsNoteDialogOpen(false)
-    } catch (err) {
-      toast.error('Failed to save note')
+      setActiveTool('view')
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save note')
+    }
+  }
+
+  // Delete Note Handler
+  const handleDeleteNote = async (noteId?: Id<'mapGridNotes'>) => {
+    const idToDelete = noteId || selectedNoteData?._id
+    if (!idToDelete) {
+      // If no ID exists yet (unsaved), simply close dialog
+      setIsNoteDialogOpen(false)
+      return
+    }
+    try {
+      await deleteGridNoteMutation({ noteId: idToDelete })
+      toast.success('Note deleted')
+      setIsNoteDialogOpen(false)
+      setSelectedNoteData(null)
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete note')
     }
   }
 
@@ -1541,6 +1717,10 @@ export default function MapViewerClient() {
         imageUrl: newMapDraft.imageUrl || undefined,
         tileUrl: newMapDraft.tileUrl || undefined,
         hideFromMenu: newMapDraft.hideFromMenu,
+        gridType: newMapDraft.gridType,
+        gridSize: newMapDraft.gridSize || 100,
+        width: newMapDraft.width || 2000,
+        height: newMapDraft.height || 2000,
       })
       toast.success('Map created!')
       setIsNewMapDialogOpen(false)
@@ -1952,6 +2132,74 @@ export default function MapViewerClient() {
             </Button>
           )}
 
+          {/* PAINT TERRAIN BUTTON */}
+          {gridType !== 'none' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`h-9 gap-1.5 bg-slate-950 dark:bg-slate-950 text-slate-100 hover:text-white hover:bg-slate-900 dark:hover:bg-slate-900 border border-slate-700/80 shadow-xl backdrop-blur-md ${
+                activeTool === 'paint_terrain' ? 'text-emerald-400 border-emerald-500/80 bg-slate-900 dark:bg-slate-900 ring-2 ring-emerald-500/60' : ''
+              }`}
+              onClick={() => {
+                setActiveTool(activeTool === 'paint_terrain' ? 'view' : 'paint_terrain')
+              }}
+              title="Paint Hex Colors / Biomes"
+            >
+              <Paintbrush className="h-4 w-4 text-emerald-400" />
+              <span className="hidden sm:inline font-medium">Paint</span>
+            </Button>
+          )}
+
+          {/* CONNECT ROADS BUTTON */}
+          {gridType !== 'none' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`h-9 gap-1.5 bg-slate-950 dark:bg-slate-950 text-slate-100 hover:text-white hover:bg-slate-900 dark:hover:bg-slate-900 border border-slate-700/80 shadow-xl backdrop-blur-md ${
+                activeTool === 'draw_road' ? 'text-amber-400 border-amber-500/80 bg-slate-900 dark:bg-slate-900 ring-2 ring-amber-500/60' : ''
+              }`}
+              onClick={() => {
+                setActiveTool(activeTool === 'draw_road' ? 'view' : 'draw_road')
+                setRoadStartCellKey(null)
+              }}
+              title="Connect Hex Roads / Trails"
+            >
+              <Route className="h-4 w-4 text-amber-400" />
+              <span className="hidden sm:inline font-medium">Roads</span>
+              {fullData?.cellRoads && fullData.cellRoads.length > 0 && (
+                <span className="ml-0.5 px-1.5 py-0.2 bg-slate-800 border border-slate-700 rounded-full text-[10px] font-mono text-amber-300">
+                  {fullData.cellRoads.length}
+                </span>
+              )}
+            </Button>
+          )}
+
+          {/* NOTES MENU BUTTON */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`h-9 gap-1.5 bg-slate-950 dark:bg-slate-950 text-slate-100 hover:text-white hover:bg-slate-900 dark:hover:bg-slate-900 border border-slate-700/80 shadow-xl backdrop-blur-md ${
+              isNotesMenuOpen ? 'ring-2 ring-amber-500/60 bg-slate-900 dark:bg-slate-900 text-amber-300' : ''
+            }`}
+            onClick={() => {
+              setIsNotesMenuOpen(!isNotesMenuOpen)
+              if (isLocationsMenuOpen) setIsLocationsMenuOpen(false)
+              if (isLayersMenuOpen) setIsLayersMenuOpen(false)
+            }}
+            title="Notes on Map"
+          >
+            <FileText className={`h-4 w-4 ${showPlayerNotes ? 'text-amber-400' : 'text-slate-500'}`} />
+            <span className="hidden sm:inline font-medium">Notes</span>
+            {fullData?.notes && fullData.notes.length > 0 && (
+              <span className="ml-0.5 px-1.5 py-0.2 bg-slate-800 border border-slate-700 rounded-full text-[10px] font-mono text-amber-400">
+                {fullData.notes.length}
+              </span>
+            )}
+            {!showPlayerNotes && (
+              <EyeOff className="h-3 w-3 text-slate-500 ml-0.5" />
+            )}
+          </Button>
+
           {/* LAYERS TOGGLE */}
           <Button
             variant="ghost"
@@ -2049,6 +2297,15 @@ export default function MapViewerClient() {
             title="Draw Polygon Area"
           >
             <Plus className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={activeTool === 'grid_note' ? 'secondary' : 'ghost'}
+            size="icon"
+            className={`h-9 w-9 ${activeTool === 'grid_note' ? 'bg-slate-800 text-amber-300' : 'text-amber-400 hover:text-amber-300 hover:bg-slate-900'}`}
+            onClick={() => setActiveTool(activeTool === 'grid_note' ? 'view' : 'grid_note')}
+            title="Add Map / Cell Note (Click on Map)"
+          >
+            <FileText className="h-4 w-4" />
           </Button>
           {gridType !== 'none' && (
             <Button
@@ -2334,6 +2591,23 @@ export default function MapViewerClient() {
             </Button>
           </CardHeader>
           <CardContent className="p-4 space-y-3 max-h-[60vh] overflow-y-auto">
+            {/* Player Notes Layer Toggle */}
+            <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <FileText className="h-3.5 w-3.5 text-amber-400" />
+                <span className="font-medium text-slate-200">Player Notes</span>
+              </div>
+              <Switch
+                checked={showPlayerNotes}
+                onCheckedChange={(val) => {
+                  setShowPlayerNotes(val)
+                  if (typeof window !== 'undefined') {
+                    localStorage.setItem('void_map_show_notes', String(val))
+                  }
+                }}
+              />
+            </div>
+
             {fullData?.layers.length === 0 ? (
               <p className="text-xs text-slate-400 italic">No extra layers created.</p>
             ) : (
@@ -2390,6 +2664,129 @@ export default function MapViewerClient() {
                   </a>
                 </Button>
               </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* NOTES MENU PANEL */}
+      {isNotesMenuOpen && (
+        <Card className="absolute top-16 right-4 z-40 w-80 bg-slate-950 dark:bg-slate-950 backdrop-blur-md border-slate-700/80 shadow-2xl flex flex-col max-h-[75vh] text-slate-100">
+          <CardHeader className="py-3 px-4 flex flex-row items-center justify-between border-b border-slate-800 shrink-0">
+            <CardTitle className="text-sm font-bold flex items-center gap-2 text-slate-100">
+              <FileText className="h-4 w-4 text-amber-400" /> Map Notes ({fullData?.notes?.length || 0})
+            </CardTitle>
+            <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-white" onClick={() => setIsNotesMenuOpen(false)}>
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </CardHeader>
+
+          {/* Visibility toggle & Add Note action */}
+          <div className="p-3 border-b border-slate-800 space-y-2 shrink-0 bg-slate-900/40">
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center gap-1.5">
+                <Eye className="h-3.5 w-3.5 text-slate-400" />
+                <span className="font-medium text-slate-200">Show Notes on Map</span>
+              </div>
+              <Switch
+                checked={showPlayerNotes}
+                onCheckedChange={(val) => {
+                  setShowPlayerNotes(val)
+                  if (typeof window !== 'undefined') {
+                    localStorage.setItem('void_map_show_notes', String(val))
+                  }
+                }}
+              />
+            </div>
+            <Button
+              size="sm"
+              className={`w-full text-xs h-8 gap-1.5 ${
+                activeTool === 'grid_note'
+                  ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold'
+                  : 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30'
+              }`}
+              onClick={() => {
+                setActiveTool(activeTool === 'grid_note' ? 'view' : 'grid_note')
+                if (!showPlayerNotes) {
+                  setShowPlayerNotes(true)
+                  if (typeof window !== 'undefined') {
+                    localStorage.setItem('void_map_show_notes', 'true')
+                  }
+                }
+              }}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {activeTool === 'grid_note' ? 'Placing Note (Click Map)' : 'Add Note to Map'}
+            </Button>
+          </div>
+
+          <CardContent className="p-2 space-y-1.5 overflow-y-auto flex-1">
+            {!fullData?.notes || fullData.notes.length === 0 ? (
+              <div className="text-center py-6 px-4 space-y-1">
+                <FileText className="h-6 w-6 text-slate-600 mx-auto" />
+                <p className="text-xs text-slate-400 italic">No notes have been added yet.</p>
+                <p className="text-[11px] text-slate-500">Click &ldquo;Add Note to Map&rdquo; or click any cell to create one.</p>
+              </div>
+            ) : (
+              fullData.notes.map((note) => {
+                const isAuthor = clerkUser && note.userId === clerkUser.id
+                const canManage = isAuthor || isOwner
+                return (
+                  <div
+                    key={note._id}
+                    className="p-2 rounded-lg hover:bg-slate-900 border border-transparent hover:border-slate-800 transition-colors cursor-pointer group flex items-start justify-between gap-2"
+                    onClick={() => {
+                      // Pan to note position if coordinates exist
+                      if (note.x !== undefined && note.y !== undefined) {
+                        const targetPxX = (note.x / 100) * mapWidth - mapWidth / 2
+                        const targetPxY = (note.y / 100) * mapHeight - mapHeight / 2
+                        const newScale = Math.max(scaleRef.current, 1.2)
+                        scaleRef.current = newScale
+                        setScale(newScale)
+                        positionRef.current = { x: -targetPxX * newScale, y: -targetPxY * newScale }
+                        setPosition({ x: -targetPxX * newScale, y: -targetPxY * newScale })
+                      }
+                      handleOpenNote(note)
+                    }}
+                  >
+                    <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                      <div className="h-6 w-6 rounded-md bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0 mt-0.5">
+                        <FileText className="h-3.5 w-3.5 text-amber-400" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium text-slate-200 line-clamp-2 leading-snug">
+                          {note.note}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500">
+                          {note.authorName && (
+                            <span className="flex items-center gap-1 text-slate-400">
+                              <User className="h-2.5 w-2.5" />
+                              {note.authorName}
+                            </span>
+                          )}
+                          <span>
+                            {new Date(note.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    {canManage && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDeleteNote(note._id)
+                        }}
+                        title="Delete note"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                )
+              })
             )}
           </CardContent>
         </Card>
@@ -2603,6 +3000,120 @@ export default function MapViewerClient() {
             className="h-7 text-xs px-2.5 bg-slate-900 border border-slate-700 text-slate-200 hover:text-white hover:bg-slate-800"
             onClick={() => {
               setRulerPoints(null)
+              setActiveTool('view')
+            }}
+          >
+            Done
+          </Button>
+        </div>
+      )}
+
+      {/* NOTE PLACEMENT ACTIVE BOTTOM HUD */}
+      {activeTool === 'grid_note' && (
+        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-30 flex items-center gap-3 bg-slate-950/95 dark:bg-slate-950/95 backdrop-blur-md px-4 py-2 rounded-full border border-amber-500/60 shadow-2xl text-slate-100">
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-100">
+            <FileText className="h-4 w-4 text-amber-400" />
+            <span>Click any cell or spot on the map to add a note</span>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs px-2.5 bg-slate-900 border border-slate-700 text-slate-200 hover:text-white hover:bg-slate-800"
+            onClick={() => setActiveTool('view')}
+          >
+            Done
+          </Button>
+        </div>
+      )}
+
+      {/* TERRAIN PAINTING ACTIVE BOTTOM HUD & PALETTE */}
+      {activeTool === 'paint_terrain' && (
+        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-30 flex flex-col items-center gap-2 bg-slate-950/95 dark:bg-slate-950/95 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-emerald-500/60 shadow-2xl text-slate-100 max-w-xl">
+          <div className="flex items-center justify-between w-full gap-3 border-b border-slate-800 pb-1.5">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
+              <Paintbrush className="h-4 w-4" />
+              <span>Paint Hex Biome</span>
+            </div>
+            <span className="text-[11px] text-slate-400 hidden sm:inline">Click any grid cell to color it</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 text-xs px-2 bg-slate-900 border border-slate-700 text-slate-200 hover:text-white hover:bg-slate-800"
+              onClick={() => setActiveTool('view')}
+            >
+              Done
+            </Button>
+          </div>
+          {/* Biome Palette Swatches */}
+          <div className="flex items-center gap-1.5 flex-wrap justify-center pt-0.5">
+            {TERRAIN_PALETTE.map((terrain) => {
+              const isSelected = selectedTerrain === terrain.id
+              return (
+                <button
+                  key={terrain.id}
+                  type="button"
+                  onClick={() => setSelectedTerrain(terrain.id)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition-all border ${
+                    isSelected
+                      ? 'ring-2 ring-white scale-105 shadow-md text-white'
+                      : 'opacity-80 hover:opacity-100 hover:scale-102 text-slate-200'
+                  }`}
+                  style={{
+                    backgroundColor: terrain.color,
+                    borderColor: terrain.border,
+                  }}
+                  title={`Paint ${terrain.label}`}
+                >
+                  <span className="capitalize drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                    {terrain.label}
+                  </span>
+                </button>
+              )
+            })}
+            <button
+              type="button"
+              onClick={() => setSelectedTerrain('eraser')}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all ${
+                selectedTerrain === 'eraser'
+                  ? 'bg-red-500/30 border-red-400 text-red-200 ring-2 ring-red-400'
+                  : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'
+              }`}
+              title="Clear hex color"
+            >
+              <Eraser className="h-3 w-3" />
+              <span>Clear</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ROAD DRAWING ACTIVE BOTTOM HUD */}
+      {activeTool === 'draw_road' && (
+        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-30 flex items-center gap-3 bg-slate-950/95 dark:bg-slate-950/95 backdrop-blur-md px-4 py-2 rounded-full border border-amber-500/60 shadow-2xl text-slate-100">
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-100">
+            <Route className="h-4 w-4 text-amber-400" />
+            <span>
+              {roadStartCellKey
+                ? `Start selected (${roadStartCellKey}). Click adjacent or target hex to connect!`
+                : 'Click 1st hex, then click 2nd hex to draw/remove road'}
+            </span>
+          </div>
+          {roadStartCellKey && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs px-2 text-slate-400 hover:text-red-400"
+              onClick={() => setRoadStartCellKey(null)}
+            >
+              Cancel Start
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs px-2.5 bg-slate-900 border border-slate-700 text-slate-200 hover:text-white hover:bg-slate-800"
+            onClick={() => {
+              setRoadStartCellKey(null)
               setActiveTool('view')
             }}
           >
@@ -3035,34 +3546,50 @@ export default function MapViewerClient() {
               className="absolute inset-0 pointer-events-none overflow-hidden select-none"
               style={{ width: `${mapWidth}px`, height: `${mapHeight}px`, zIndex: 10 }}
             >
+              {/* 1. RENDER CELL POLYGONS & BIOME FILLS */}
               {gridCells.map((cell) => {
                 const isRevealed = revealedSet.has(cell.key)
                 const isHidden = isExplorationMap && !isRevealed
                 const hasNote = !!notesMap[cell.key]
-                const canShowNote = hasNote && (!isHidden || isOwner)
+                const canShowNote = showPlayerNotes && hasNote && (!isHidden || isOwner)
+                const cellFill = cellFillsMap[cell.key]
 
-                // 100% solid fully opaque dark slate for hidden cells - zero transparency, map cannot be seen through it
-                const fillColor = isHidden ? '#020617' : 'transparent'
+                // Cell fill color logic:
+                // If cell is hidden by exploration fog of war -> 100% solid dark slate
+                // Otherwise if cell has terrain fill painted -> use painted color with subtle opacity
+                // Otherwise -> transparent
+                let fillColor = 'transparent'
+                if (isHidden) {
+                  fillColor = '#020617'
+                } else if (cellFill) {
+                  fillColor = cellFill.color
+                }
 
-                // Hover styling: Hidden cells NEVER reveal or become semi-transparent on hover
+                const isStartRoadCell = roadStartCellKey === cell.key
+
+                // Hover styling
                 let hoverClass = ''
                 if (isHidden) {
                   if (isEditMode && activeTool === 'reveal_hex') {
-                    // GM targeting outline only - fill remains 100% opaque #020617
                     hoverClass = 'cursor-pointer hover:stroke-emerald-400 hover:stroke-2'
-                  } else if (isEditMode && activeTool === 'grid_note') {
+                  } else if (activeTool === 'grid_note') {
                     hoverClass = 'cursor-pointer hover:stroke-amber-400 hover:stroke-2'
                   } else {
-                    // Players or view mode: strictly no hover effect
                     hoverClass = 'cursor-default'
                   }
                 } else {
                   // Revealed cell
-                  if (isEditMode) {
+                  if (activeTool === 'paint_terrain') {
+                    hoverClass = 'cursor-pointer hover:stroke-emerald-400 hover:stroke-2 hover:opacity-90'
+                  } else if (activeTool === 'draw_road') {
+                    hoverClass = isStartRoadCell
+                      ? 'cursor-pointer stroke-amber-400 stroke-2'
+                      : 'cursor-pointer hover:stroke-amber-400 hover:stroke-2'
+                  } else if (activeTool === 'grid_note') {
+                    hoverClass = 'cursor-pointer hover:fill-amber-500/20 hover:stroke-amber-400'
+                  } else if (isEditMode) {
                     if (activeTool === 'hide_hex') {
                       hoverClass = 'cursor-pointer hover:fill-red-500/25 hover:stroke-red-400 hover:stroke-2'
-                    } else if (activeTool === 'grid_note') {
-                      hoverClass = 'cursor-pointer hover:fill-amber-500/20 hover:stroke-amber-400'
                     } else {
                       hoverClass = 'cursor-pointer hover:fill-white/5'
                     }
@@ -3072,20 +3599,27 @@ export default function MapViewerClient() {
                 }
 
                 // Clicks pass through revealed cells to pins and areas underneath when not in editing mode
-                const shouldCaptureClicks = isHidden || (isEditMode && (activeTool === 'hide_hex' || activeTool === 'grid_note'))
+                const shouldCaptureClicks =
+                  isHidden ||
+                  activeTool === 'paint_terrain' ||
+                  activeTool === 'draw_road' ||
+                  activeTool === 'grid_note' ||
+                  (isEditMode && activeTool === 'hide_hex')
 
                 return (
                   <g key={cell.key}>
                     <polygon
                       points={cell.points}
                       fill={fillColor}
-                      stroke="rgba(255, 255, 255, 0.18)"
-                      strokeWidth="1"
+                      fillOpacity={cellFill && !isHidden ? 0.72 : 1}
+                      stroke={isStartRoadCell ? '#f59e0b' : 'rgba(255, 255, 255, 0.22)'}
+                      strokeWidth={isStartRoadCell ? '2.5' : '1'}
                       vectorEffect="non-scaling-stroke"
                       className={`transition-colors duration-150 ${hoverClass}`}
                       style={{ pointerEvents: shouldCaptureClicks ? 'auto' : 'none' }}
                       onClick={(e) => handleCellClick(cell.key, e)}
                     >
+                      {cellFill && <title>{`${cellFill.terrainType.toUpperCase()} (${cell.key})`}</title>}
                       {canShowNote && <title>{notesMap[cell.key]}</title>}
                     </polygon>
                     {canShowNote && (
@@ -3104,8 +3638,93 @@ export default function MapViewerClient() {
                   </g>
                 )
               })}
+
+              {/* 2. RENDER HEX-TO-HEX ROADS */}
+              {fullData?.cellRoads &&
+                fullData.cellRoads.map((road) => {
+                  const fromCoord = cellCenterMap[road.fromCellKey]
+                  const toCoord = cellCenterMap[road.toCellKey]
+                  if (!fromCoord || !toCoord) return null
+
+                  // Fog of War concealment for non-owners
+                  if (isExplorationMap && !isOwner) {
+                    const fromHidden = !revealedSet.has(road.fromCellKey)
+                    const toHidden = !revealedSet.has(road.toCellKey)
+                    if (fromHidden && toHidden) return null
+                  }
+
+                  const isDashed = road.style === 'dashed'
+                  const roadColor = road.color || '#d97706'
+
+                  return (
+                    <g key={road._id} className="pointer-events-none">
+                      {/* Dark under-stroke for high contrast on any background */}
+                      <line
+                        x1={fromCoord.cx}
+                        y1={fromCoord.cy}
+                        x2={toCoord.cx}
+                        y2={toCoord.cy}
+                        stroke="#090d16"
+                        strokeWidth="5"
+                        strokeLinecap="round"
+                        opacity={0.8}
+                      />
+                      {/* Main road line */}
+                      <line
+                        x1={fromCoord.cx}
+                        y1={fromCoord.cy}
+                        x2={toCoord.cx}
+                        y2={toCoord.cy}
+                        stroke={roadColor}
+                        strokeWidth="3"
+                        strokeDasharray={isDashed ? '6,4' : undefined}
+                        strokeLinecap="round"
+                      />
+                      {/* Waypoint circles at centers */}
+                      <circle cx={fromCoord.cx} cy={fromCoord.cy} r="2.5" fill={roadColor} stroke="#090d16" strokeWidth="1" />
+                      <circle cx={toCoord.cx} cy={toCoord.cy} r="2.5" fill={roadColor} stroke="#090d16" strokeWidth="1" />
+                    </g>
+                  )
+                })}
             </svg>
           )}
+
+          {/* FREEFORM PLAYER NOTE PINS (For notes with x, y coordinates or gridless maps) */}
+          {showPlayerNotes && fullData?.notes && fullData.notes.map((note) => {
+            // If the note has an x and y coordinate (either freeform or persisted cell coords)
+            if (note.x === undefined || note.y === undefined) return null
+            // If the map has a grid and this note corresponds to a grid cell that is currently hidden by fog of war for non-owners, conceal it
+            if (gridType !== 'none' && isExplorationMap && !isOwner) {
+              const matchingCell = gridCells.find((c) => c.key === note.cellKey)
+              if (matchingCell && !revealedSet.has(matchingCell.key)) return null
+            }
+
+            return (
+              <div
+                key={`freeform_note_${note._id}`}
+                className="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-auto cursor-pointer group z-20"
+                style={{
+                  left: `${note.x}%`,
+                  top: `${note.y}%`,
+                }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleOpenNote(note)
+                }}
+              >
+                <div className="flex flex-col items-center relative">
+                  <div className="p-1.5 rounded-full bg-amber-500 text-slate-950 shadow-lg border border-slate-900 drop-shadow-[0_0_8px_rgba(245,158,11,0.7)] group-hover:scale-125 transition-transform">
+                    <FileText className="h-3.5 w-3.5" />
+                  </div>
+                  {(scale > 0.8) && (
+                    <span className="mt-1 bg-slate-950/95 backdrop-blur-md px-2 py-0.5 rounded-md text-[10px] font-medium text-amber-200 line-clamp-1 max-w-[120px] whitespace-nowrap shadow-md border border-amber-500/40">
+                      {note.note}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )
+          })}
         </div>
       </div>
 
@@ -3369,25 +3988,104 @@ export default function MapViewerClient() {
         </DialogContent>
       </Dialog>
 
-      {/* DIALOG: GRID NOTE */}
+      {/* DIALOG: MAP & CELL NOTE */}
       <Dialog open={isNoteDialogOpen} onOpenChange={setIsNoteDialogOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FileText className="h-4 w-4 text-amber-400" /> Cell Note ({selectedCellKey})
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <Textarea
-              value={draftNote}
-              onChange={(e) => setDraftNote(e.target.value)}
-              placeholder="Write player note or location observation..."
-              className="min-h-[120px] text-xs font-mono"
-            />
-          </div>
-          <DialogFooter>
-            <Button size="sm" onClick={handleSaveNote}>Save Note</Button>
-          </DialogFooter>
+          {(() => {
+            const isAuthor = clerkUser && selectedNoteData?.userId === clerkUser.id
+            const isNew = !selectedNoteData
+            const canEdit = isNew || isAuthor || isOwner
+            const canDelete = !isNew && (isAuthor || isOwner)
+
+            return (
+              <>
+                <DialogHeader>
+                  <div className="flex items-center justify-between pr-4">
+                    <DialogTitle className="flex items-center gap-2 text-base font-bold text-slate-100">
+                      <FileText className="h-4 w-4 text-amber-400" />
+                      Map Note
+                    </DialogTitle>
+                    {selectedCellKey && (
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-slate-300">
+                        {selectedCellKey.startsWith('point_') ? 'Coordinate Marker' : `Cell: ${selectedCellKey}`}
+                      </span>
+                    )}
+                  </div>
+                </DialogHeader>
+
+                <div className="space-y-3 pt-1">
+                  {selectedNoteData && (
+                    <div className="flex items-center justify-between text-[11px] text-slate-400 bg-slate-900/60 p-2 rounded-md border border-slate-800">
+                      <span className="flex items-center gap-1.5 text-slate-300">
+                        <User className="h-3 w-3 text-amber-400" />
+                        By <strong className="text-slate-100">{selectedNoteData.authorName || 'Adventurer'}</strong>
+                        {isAuthor && <span className="text-[10px] text-amber-400 font-mono">(You)</span>}
+                      </span>
+                      <span>
+                        {new Date(selectedNoteData.updatedAt).toLocaleDateString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
+                      </span>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="text-xs font-bold text-muted-foreground block mb-1">
+                      {canEdit ? 'Note Content' : 'Note Content (Read Only)'}
+                    </label>
+                    <Textarea
+                      value={draftNote}
+                      onChange={(e) => setDraftNote(e.target.value)}
+                      readOnly={!canEdit}
+                      placeholder={canEdit ? "Write location observation, secret clues, or adventure notes..." : "No note written."}
+                      className={`min-h-[140px] text-xs font-sans ${
+                        !canEdit ? 'bg-slate-900/40 border-slate-800 text-slate-300 cursor-default' : ''
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <DialogFooter className="pt-2 flex items-center justify-between sm:justify-between w-full">
+                  <div>
+                    {canDelete && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-xs text-destructive hover:bg-destructive/10 gap-1"
+                        onClick={() => handleDeleteNote(selectedNoteData._id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Delete Note
+                      </Button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs"
+                      onClick={() => setIsNoteDialogOpen(false)}
+                    >
+                      {canEdit ? 'Cancel' : 'Close'}
+                    </Button>
+                    {canEdit && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-8 text-xs bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold"
+                        onClick={handleSaveNote}
+                      >
+                        Save Note
+                      </Button>
+                    )}
+                  </div>
+                </DialogFooter>
+              </>
+            )
+          })()}
         </DialogContent>
       </Dialog>
 
@@ -3447,7 +4145,7 @@ export default function MapViewerClient() {
             </div>
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="font-bold text-muted-foreground">Background Image URL (Fallback / Standalone)</label>
+                <label className="font-bold text-muted-foreground">Background Image URL (Optional)</label>
                 <Button
                   type="button"
                   variant="ghost"
@@ -3472,8 +4170,39 @@ export default function MapViewerClient() {
                   }
                 }}
                 onBlur={(e) => checkAndFetchProcessorTiles(e.target.value, 'newMap')}
-                placeholder="https://maps.tarragon.be/overworld.webp"
+                placeholder="Leave blank for an empty player hex/grid canvas"
               />
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                Leave empty to create a blank player canvas where hexes can be painted and connected with roads.
+              </p>
+            </div>
+            {/* Grid & Dimensions */}
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border/40">
+              <div>
+                <label className="font-bold text-muted-foreground block mb-1">Grid Type</label>
+                <Select
+                  value={newMapDraft.gridType}
+                  onValueChange={(val: any) => setNewMapDraft({ ...newMapDraft, gridType: val })}
+                >
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hex">Pointy Hex Grid</SelectItem>
+                    <SelectItem value="hex_flat">Flat-top Hex Grid</SelectItem>
+                    <SelectItem value="square">Square Grid</SelectItem>
+                    <SelectItem value="none">No Grid</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="font-bold text-muted-foreground block mb-1">Grid Size (px)</label>
+                <Input
+                  type="number"
+                  min="25"
+                  className="h-8 text-xs font-mono"
+                  value={newMapDraft.gridSize}
+                  onChange={(e) => setNewMapDraft({ ...newMapDraft, gridSize: Math.max(25, Number(e.target.value)) })}
+                />
+              </div>
             </div>
             <div className="flex items-center justify-between pt-2">
               <span className="font-bold">Set as World Home Map</span>
