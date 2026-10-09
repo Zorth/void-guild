@@ -1089,19 +1089,120 @@ export default function MapViewerClient() {
   }
 
   // Grid / Hex Cell Calculation
+  const isInfinite = !!currentMap?.isInfiniteGrid
+
+  // Calculate required virtual dimension for infinite grid so it expands smoothly if cells reach far
+  const requiredInfiniteDim = useMemo(() => {
+    if (!currentMap?.isInfiniteGrid) return 10000
+    let maxAbsC = 0
+    let maxAbsR = 0
+    const checkKey = (key?: string) => {
+      if (!key || key.startsWith('point_')) return
+      const parts = key.split(',')
+      if (parts.length === 2) {
+        const c = Number(parts[0])
+        const r = Number(parts[1])
+        if (!isNaN(c) && !isNaN(r)) {
+          maxAbsC = Math.max(maxAbsC, Math.abs(c))
+          maxAbsR = Math.max(maxAbsR, Math.abs(r))
+        }
+      }
+    }
+    fullData?.cellFills?.forEach((f) => checkKey(f.cellKey))
+    fullData?.cellRoads?.forEach((r) => {
+      checkKey(r.fromCellKey)
+      checkKey(r.toCellKey)
+    })
+    fullData?.notes?.forEach((n) => checkKey(n.cellKey))
+    currentMap?.revealedCells?.forEach((k) => checkKey(k))
+
+    const neededWidth = (maxAbsC + 15) * 2 * (currentGridSize || 100)
+    const neededHeight = (maxAbsR + 15) * 2 * (currentGridSize || 100)
+    return Math.max(10000, neededWidth, neededHeight)
+  }, [currentMap?.isInfiniteGrid, currentGridSize, fullData?.cellFills, fullData?.cellRoads, fullData?.notes, currentMap?.revealedCells])
+
   // Priority: if naturalDimensions detected and currentMap is on default 2000x2000, use natural dimensions.
-  const mapWidth = (currentMap?.width && currentMap.width !== 2000)
+  const mapWidth = isInfinite
+    ? requiredInfiniteDim
+    : (currentMap?.width && currentMap.width !== 2000)
     ? currentMap.width
     : (naturalDimensions?.width || currentMap?.width || 2000)
-  const mapHeight = (currentMap?.height && currentMap.height !== 2000)
+  const mapHeight = isInfinite
+    ? requiredInfiniteDim
+    : (currentMap?.height && currentMap.height !== 2000)
     ? currentMap.height
     : (naturalDimensions?.height || currentMap?.height || 2000)
 
   const fitMapToViewport = (w = mapWidth, h = mapHeight) => {
-    if (!viewportRef.current || !w || !h) return
+    if (!viewportRef.current) return
     const vw = viewportRef.current.clientWidth || window.innerWidth
     const vh = viewportRef.current.clientHeight || (window.innerHeight - 60)
     const padding = vw < 640 ? 16 : 48
+
+    if (currentMap?.isInfiniteGrid) {
+      // Find bounding box of active cells, or fallback to center cluster
+      let minC = -6
+      let maxC = 6
+      let minR = -5
+      let maxR = 5
+      const activeCoords: { c: number; r: number }[] = []
+      const addCoord = (key?: string) => {
+        if (!key || key.startsWith('point_')) return
+        const parts = key.split(',')
+        if (parts.length === 2) {
+          const c = Number(parts[0])
+          const r = Number(parts[1])
+          if (!isNaN(c) && !isNaN(r)) activeCoords.push({ c, r })
+        }
+      }
+      fullData?.cellFills?.forEach((f) => addCoord(f.cellKey))
+      fullData?.cellRoads?.forEach((r) => {
+        addCoord(r.fromCellKey)
+        addCoord(r.toCellKey)
+      })
+      fullData?.notes?.forEach((n) => addCoord(n.cellKey))
+      currentMap?.revealedCells?.forEach((k) => addCoord(k))
+
+      if (activeCoords.length > 0) {
+        const allC = activeCoords.map((pt) => pt.c)
+        const allR = activeCoords.map((pt) => pt.r)
+        minC = Math.min(...allC) - 2
+        maxC = Math.max(...allC) + 2
+        minR = Math.min(...allR) - 2
+        maxR = Math.max(...allR) + 2
+      }
+
+      const effectiveGridSize = Math.max(25, currentGridSize)
+      const R = effectiveGridSize / Math.sqrt(3)
+      const deltaY = 1.5 * R
+      const gridW = Math.max(1, (maxC - minC + 1) * effectiveGridSize)
+      const gridH = Math.max(1, (maxR - minR + 1) * deltaY)
+
+      const scaleX = (vw - padding) / gridW
+      const scaleY = (vh - padding) / gridH
+      const fitScale = Math.min(Math.max(Math.min(scaleX, scaleY), 0.2), 1.0)
+      const finalScale = Number(fitScale.toFixed(4))
+
+      const centerC = (minC + maxC) / 2
+      const centerR = (minR + maxR) / 2
+      const ox = mapWidth / 2 + currentOffsetX
+      const oy = mapHeight / 2 + currentOffsetY
+      const targetPxX = ox + centerC * effectiveGridSize - mapWidth / 2
+      const targetPxY = oy + centerR * deltaY - mapHeight / 2
+
+      const posX = -targetPxX * finalScale
+      const posY = -targetPxY * finalScale
+
+      scaleRef.current = finalScale
+      positionRef.current = { x: posX, y: posY }
+      if (containerRef.current) {
+        containerRef.current.style.transform = `translate(${posX}px, ${posY}px) scale(${finalScale})`
+      }
+      setScale(finalScale)
+      setPosition({ x: posX, y: posY })
+      return
+    }
+
     const scaleX = (vw - padding) / w
     const scaleY = (vh - padding) / h
     const fitScale = Math.min(scaleX, scaleY, 1)
@@ -1147,7 +1248,7 @@ export default function MapViewerClient() {
   }, [currentMap?._id])
 
   const gridSize = currentMap?.gridSize || 100
-  const gridType = currentMap?.gridType || 'none'
+  const gridType = (currentMap?.isInfiniteGrid && (!currentMap?.gridType || currentMap?.gridType === 'none')) ? 'hex' : (currentMap?.gridType || 'none')
   const isExplorationMap = currentMap?.isExplorationMap || false
 
   // Automatically deactivate ruler tool if no grid is configured on the map
@@ -1264,8 +1365,9 @@ export default function MapViewerClient() {
   const getCellGeometry = useCallback(
     (c: number, r: number) => {
       const effectiveGridSize = Math.max(25, currentGridSize)
-      const ox = currentOffsetX
-      const oy = currentOffsetY
+      const isInfinite = !!currentMap?.isInfiniteGrid
+      const ox = isInfinite ? (mapWidth / 2 + currentOffsetX) : currentOffsetX
+      const oy = isInfinite ? (mapHeight / 2 + currentOffsetY) : currentOffsetY
 
       if (gridType === 'hex') {
         const W = effectiveGridSize
@@ -1313,53 +1415,77 @@ export default function MapViewerClient() {
       }
       return null
     },
-    [gridType, currentGridSize, currentOffsetX, currentOffsetY]
+    [gridType, currentGridSize, currentOffsetX, currentOffsetY, currentMap?.isInfiniteGrid, mapWidth, mapHeight]
   )
 
-  // Exact gapless interlocking honeycomb and square grid calculation with dynamic viewport bounds for infinite grid maps
+  // Auto-expanding hex/square grid calculation with automatic padding in all directions
   const gridCells = useMemo(() => {
     if (gridType === 'none') return []
     const effectiveGridSize = Math.max(25, currentGridSize)
-    const ox = currentOffsetX
-    const oy = currentOffsetY
-    const pad = 2
-
     const isInfinite = !!currentMap?.isInfiniteGrid
+    const ox = isInfinite ? (mapWidth / 2 + currentOffsetX) : currentOffsetX
+    const oy = isInfinite ? (mapHeight / 2 + currentOffsetY) : currentOffsetY
+    const pad = 2
 
     let minC = 0
     let maxC = 0
     let minR = 0
     let maxR = 0
 
-    if (isInfinite && viewportRef.current) {
-      // Calculate visible bounds in map coordinate space based on current pan and zoom
-      const vw = viewportRef.current.clientWidth || 1920
-      const vh = viewportRef.current.clientHeight || 1080
-      const leftMap = (vw / 2 - position.x - vw / 2) / scale + mapWidth / 2
-      const rightMap = leftMap + vw / scale
-      const topMap = (vh / 2 - position.y - vh / 2) / scale + mapHeight / 2
-      const bottomMap = topMap + vh / scale
+    if (isInfinite) {
+      // 1. Collect all active cells (painted terrain, roads, player notes, revealed fog)
+      const activeCoords: { c: number; r: number }[] = []
+      const seen = new Set<string>()
 
-      if (gridType === 'hex') {
-        const W = effectiveGridSize
-        const deltaY = 1.5 * (W / Math.sqrt(3))
-        minC = Math.floor((leftMap - ox) / W) - pad
-        maxC = Math.ceil((rightMap - ox) / W) + pad
-        minR = Math.floor((topMap - oy) / deltaY) - pad
-        maxR = Math.ceil((bottomMap - oy) / deltaY) + pad
-      } else if (gridType === 'hex_flat') {
-        const H = effectiveGridSize
-        const deltaX = 1.5 * (H / Math.sqrt(3))
-        minC = Math.floor((leftMap - ox) / deltaX) - pad
-        maxC = Math.ceil((rightMap - ox) / deltaX) + pad
-        minR = Math.floor((topMap - oy) / H) - pad
-        maxR = Math.ceil((bottomMap - oy) / H) + pad
-      } else if (gridType === 'square') {
-        const size = effectiveGridSize
-        minC = Math.floor((leftMap - ox) / size) - pad
-        maxC = Math.ceil((rightMap - ox) / size) + pad
-        minR = Math.floor((topMap - oy) / size) - pad
-        maxR = Math.ceil((bottomMap - oy) / size) + pad
+      const addKey = (key?: string) => {
+        if (!key || seen.has(key) || key.startsWith('point_')) return
+        seen.add(key)
+        const parts = key.split(',')
+        if (parts.length === 2) {
+          const c = Number(parts[0])
+          const r = Number(parts[1])
+          if (!isNaN(c) && !isNaN(r)) {
+            activeCoords.push({ c, r })
+          }
+        }
+      }
+
+      if (fullData?.cellFills) {
+        fullData.cellFills.forEach((f) => addKey(f.cellKey))
+      }
+      if (fullData?.cellRoads) {
+        fullData.cellRoads.forEach((r) => {
+          addKey(r.fromCellKey)
+          addKey(r.toCellKey)
+        })
+      }
+      if (fullData?.notes) {
+        fullData.notes.forEach((n) => addKey(n.cellKey))
+      }
+      if (currentMap?.revealedCells) {
+        currentMap.revealedCells.forEach((k) => addKey(k))
+      }
+
+      // 2. Automatically add enough padding hexes in all directions (5 hexes padding)
+      const PADDING = 5
+      if (activeCoords.length === 0) {
+        // Initial fresh map: centered cluster around (0,0)
+        minC = -6
+        maxC = 6
+        minR = -5
+        maxR = 5
+      } else {
+        const allC = activeCoords.map((pt) => pt.c)
+        const allR = activeCoords.map((pt) => pt.r)
+        const minActiveC = Math.min(...allC)
+        const maxActiveC = Math.max(...allC)
+        const minActiveR = Math.min(...allR)
+        const maxActiveR = Math.max(...allR)
+
+        minC = Math.min(minActiveC - PADDING, -6)
+        maxC = Math.max(maxActiveC + PADDING, 6)
+        minR = Math.min(minActiveR - PADDING, -5)
+        maxR = Math.max(maxActiveR + PADDING, 5)
       }
     } else {
       // Standard bounded map: tile over the map dimensions [0..mapWidth, 0..mapHeight]
@@ -1386,9 +1512,9 @@ export default function MapViewerClient() {
       }
     }
 
-    // Safeguard max columns / rows per render batch to 200 for 60fps SVG rendering
-    const colCount = Math.min(Math.max(0, maxC - minC + 1), 200)
-    const rowCount = Math.min(Math.max(0, maxR - minR + 1), 200)
+    // Limit columns and rows to 500 to keep rendering performant
+    const colCount = Math.min(Math.max(0, maxC - minC + 1), 500)
+    const rowCount = Math.min(Math.max(0, maxR - minR + 1), 500)
 
     const cellMap = new Map<string, { key: string; c: number; r: number; cx: number; cy: number; points: string }>()
 
@@ -1404,7 +1530,7 @@ export default function MapViewerClient() {
       }
     }
 
-    // Also include any cells that have painted terrain, notes, or road endpoints even if just outside current window
+    // Always include explicit cells with terrain fills, notes, or roads
     const explicitKeys = new Set<string>()
     if (fullData?.cellFills) {
       fullData.cellFills.forEach((f) => explicitKeys.add(f.cellKey))
@@ -1446,9 +1572,7 @@ export default function MapViewerClient() {
     mapWidth,
     mapHeight,
     currentMap?.isInfiniteGrid,
-    position.x,
-    position.y,
-    scale,
+    currentMap?.revealedCells,
     fullData?.cellFills,
     fullData?.cellRoads,
     fullData?.notes,
@@ -2816,7 +2940,16 @@ export default function MapViewerClient() {
                     className="p-2 rounded-lg hover:bg-slate-900 border border-transparent hover:border-slate-800 transition-colors cursor-pointer group flex items-start justify-between gap-2"
                     onClick={() => {
                       // Pan to note position if coordinates exist
-                      if (note.x !== undefined && note.y !== undefined) {
+                      const cellCoord = note.cellKey ? cellCenterMap[note.cellKey] : null
+                      if (cellCoord) {
+                        const targetPxX = cellCoord.cx - mapWidth / 2
+                        const targetPxY = cellCoord.cy - mapHeight / 2
+                        const newScale = Math.max(scaleRef.current, 1.2)
+                        scaleRef.current = newScale
+                        setScale(newScale)
+                        positionRef.current = { x: -targetPxX * newScale, y: -targetPxY * newScale }
+                        setPosition({ x: -targetPxX * newScale, y: -targetPxY * newScale })
+                      } else if (note.x !== undefined && note.y !== undefined) {
                         const targetPxX = (note.x / 100) * mapWidth - mapWidth / 2
                         const targetPxY = (note.y / 100) * mapHeight - mapHeight / 2
                         const newScale = Math.max(scaleRef.current, 1.2)
@@ -3217,7 +3350,7 @@ export default function MapViewerClient() {
       {/* CANVAS CONTAINER */}
       <div
         ref={viewportRef}
-        className={`w-full h-full ${activeTool === 'align_grid' ? 'cursor-move' : activeTool === 'ruler' ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing'} flex items-center justify-center overflow-hidden`}
+        className={`w-full h-full ${activeTool === 'align_grid' ? 'cursor-move' : activeTool === 'ruler' ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing'} flex items-center justify-center overflow-hidden ${currentMap?.isInfiniteGrid ? 'bg-[#475569]' : ''}`}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -3227,7 +3360,7 @@ export default function MapViewerClient() {
       >
         <div
           ref={containerRef}
-          className="relative shrink-0 origin-center shadow-2xl"
+          className={`relative shrink-0 origin-center ${currentMap?.isInfiniteGrid ? 'shadow-none' : 'shadow-2xl'}`}
           style={{
             transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
             width: `${mapWidth}px`,
@@ -3248,7 +3381,7 @@ export default function MapViewerClient() {
               onLoad={handleImageLoad}
             />
           ) : currentMap?.isInfiniteGrid ? (
-            <div className="absolute inset-0 w-full h-full bg-[#070b12]" />
+            <div className="absolute inset-0 w-full h-full bg-[#475569]" />
           ) : !currentMap?.tileUrl ? (
             <div className="absolute inset-0 w-full h-full bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-700 font-bold text-2xl">
               No Map Image Set
@@ -3692,9 +3825,9 @@ export default function MapViewerClient() {
                     <polygon
                       points={cell.points}
                       fill={fillColor}
-                      fillOpacity={cellFill && !isHidden ? 0.72 : 1}
-                      stroke={isStartRoadCell ? '#f59e0b' : 'rgba(255, 255, 255, 0.22)'}
-                      strokeWidth={isStartRoadCell ? '2.5' : '1'}
+                      fillOpacity={cellFill && !isHidden ? 0.78 : 1}
+                      stroke={isStartRoadCell ? '#f59e0b' : currentMap?.isInfiniteGrid ? 'rgba(255, 255, 255, 0.35)' : 'rgba(255, 255, 255, 0.22)'}
+                      strokeWidth={isStartRoadCell ? '2.5' : currentMap?.isInfiniteGrid ? '1.2' : '1'}
                       vectorEffect="non-scaling-stroke"
                       className={`transition-colors duration-150 ${hoverClass}`}
                       style={{ pointerEvents: shouldCaptureClicks ? 'auto' : 'none' }}
@@ -3772,22 +3905,24 @@ export default function MapViewerClient() {
 
           {/* FREEFORM PLAYER NOTE PINS (For notes with x, y coordinates or gridless maps) */}
           {showPlayerNotes && fullData?.notes && fullData.notes.map((note) => {
-            // If the note has an x and y coordinate (either freeform or persisted cell coords)
-            if (note.x === undefined || note.y === undefined) return null
+            const cellCoord = note.cellKey ? cellCenterMap[note.cellKey] : null
+            // If the note has no pixel or percentage position
+            if (!cellCoord && (note.x === undefined || note.y === undefined)) return null
             // If the map has a grid and this note corresponds to a grid cell that is currently hidden by fog of war for non-owners, conceal it
             if (gridType !== 'none' && isExplorationMap && !isOwner) {
               const matchingCell = gridCells.find((c) => c.key === note.cellKey)
               if (matchingCell && !revealedSet.has(matchingCell.key)) return null
             }
 
+            const stylePos = cellCoord
+              ? { left: `${cellCoord.cx}px`, top: `${cellCoord.cy}px` }
+              : { left: `${note.x}%`, top: `${note.y}%` }
+
             return (
               <div
                 key={`freeform_note_${note._id}`}
                 className="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-auto cursor-pointer group z-20"
-                style={{
-                  left: `${note.x}%`,
-                  top: `${note.y}%`,
-                }}
+                style={stylePos}
                 onClick={(e) => {
                   e.stopPropagation()
                   handleOpenNote(note)
