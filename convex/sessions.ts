@@ -8,6 +8,7 @@ import { formatUserDisplayName } from './users'
 import { adjustCharacterMoney } from './moneyHelpers'
 import { syncActiveSessionsForQuestChange } from './questSyncHelpers'
 import { evaluateAndSyncUserAchievements } from './achievements'
+import { removeUserAvailabilityOnDate } from './planning'
 
 /**
  * XP gain based on session level and character level.
@@ -720,6 +721,18 @@ export const createSession = mutation({
       questId: args.isIntro ? undefined : args.questId,
     })
 
+    if (args.date) {
+      // Remove GM's availability on this day
+      await removeUserAvailabilityOnDate(ctx, identity.subject, args.date)
+      // Remove any initial characters' owners' availability on this day
+      for (const charId of args.characters) {
+        const charDoc = await ctx.db.get(charId)
+        if (charDoc?.userId) {
+          await removeUserAvailabilityOnDate(ctx, charDoc.userId, args.date)
+        }
+      }
+    }
+
     await ctx.scheduler.runAfter(0, internal.discord.syncSessionToDiscord, {
         sessionId
     })
@@ -774,6 +787,16 @@ export const updateSession = mutation({
       isIntro: args.isIntro ?? false,
       questId: args.isIntro ? undefined : args.questId,
     })
+
+    if (args.date) {
+      await removeUserAvailabilityOnDate(ctx, session.owner, args.date)
+      for (const charId of args.characters) {
+        const charDoc = await ctx.db.get(charId)
+        if (charDoc?.userId) {
+          await removeUserAvailabilityOnDate(ctx, charDoc.userId, args.date)
+        }
+      }
+    }
 
     await ctx.scheduler.runAfter(0, internal.discord.syncSessionToDiscord, {
         sessionId: args.sessionId
@@ -991,6 +1014,10 @@ export const joinSession = mutation({
       interestedPlayers: (session.interestedPlayers || []).filter(p => p.userId !== user.subject)
     })
 
+    if (session.date) {
+      await removeUserAvailabilityOnDate(ctx, user.subject, session.date)
+    }
+
     await ctx.scheduler.runAfter(0, internal.discord.syncSessionToDiscord, {
         sessionId: args.sessionId
     })
@@ -1201,6 +1228,10 @@ export const joinIntroSession = mutation({
       interestedPlayers: (session.interestedPlayers || []).filter((p) => p.userId !== user.subject),
     })
 
+    if (session.date) {
+      await removeUserAvailabilityOnDate(ctx, user.subject, session.date)
+    }
+
     await ctx.scheduler.runAfter(0, internal.discord.syncSessionToDiscord, {
       sessionId: args.sessionId,
     })
@@ -1250,6 +1281,10 @@ export const adminAddCharacterToSession = mutation({
         characters: [...session.characters, args.characterId],
         interestedPlayers: (session.interestedPlayers || []).filter(p => p.userId !== character.userId)
       })
+
+      if (session.date) {
+        await removeUserAvailabilityOnDate(ctx, character.userId, session.date)
+      }
 
       await ctx.scheduler.runAfter(0, internal.discord.syncSessionToDiscord, {
           sessionId: args.sessionId
@@ -1326,6 +1361,10 @@ export const inviteCharacterToSession = mutation({
         (p) => p.userId !== character.userId
       ),
     })
+
+    if (session.date) {
+      await removeUserAvailabilityOnDate(ctx, character.userId, session.date)
+    }
 
     await ctx.scheduler.runAfter(0, internal.discord.syncSessionToDiscord, {
       sessionId: args.sessionId,

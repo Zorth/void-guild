@@ -41,6 +41,40 @@ export const cleanupOldAvailability = mutation({
     }
 })
 
+/**
+ * Removes availability records for a user on the calendar day of a given timestamp.
+ * Matches by Europe/Brussels calendar day within ±36 hours, or exact timestamp match.
+ */
+export async function removeUserAvailabilityOnDate(
+  ctx: { db: any },
+  userId: string,
+  targetTimestamp?: number
+) {
+  if (!targetTimestamp) return
+
+  const targetDate = new Date(targetTimestamp)
+  const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Brussels' })
+  const targetDayStr = formatter.format(targetDate)
+
+  const windowMs = 36 * 60 * 60 * 1000
+  const minDate = targetTimestamp - windowMs
+  const maxDate = targetTimestamp + windowMs
+
+  const userAvails = await ctx.db
+    .query('availability')
+    .withIndex('by_user_date', (q: any) =>
+      q.eq('userId', userId).gte('date', minDate).lte('date', maxDate)
+    )
+    .collect()
+
+  for (const record of userAvails) {
+    const recordDayStr = formatter.format(new Date(record.date))
+    if (recordDayStr === targetDayStr || record.date === targetTimestamp) {
+      await ctx.db.delete(record._id)
+    }
+  }
+}
+
 export const toggleAvailability = mutation({
   args: { date: v.number() },
   handler: async (ctx, args) => {
