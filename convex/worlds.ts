@@ -726,9 +726,10 @@ export async function getUserWorldStreaksMap(
   const allSessions = await ctx.db.query('sessions').collect()
   const lockedSessions = allSessions.filter((s: any) => s.locked)
   const sortedLockedSessions = [...lockedSessions].sort((a: any, b: any) => {
-    const dateA = a.date || a._creationTime
-    const dateB = b.date || b._creationTime
-    return dateA - dateB
+    const dateA = a.date ?? a._creationTime
+    const dateB = b.date ?? b._creationTime
+    if (dateA !== dateB) return dateA - dateB
+    return a._creationTime - b._creationTime
   })
 
   const worldStreaksMap: Record<string, number> = {}
@@ -738,7 +739,7 @@ export async function getUserWorldStreaksMap(
 
   for (const char of characters) {
     const charSessions = sortedLockedSessions.filter(
-      (s: any) => s.characters && s.characters.includes(char._id)
+      (s: any) => (s.characters && s.characters.includes(char._id)) || s.gmCharacter === char._id
     )
 
     let currentWorld: string | null = null

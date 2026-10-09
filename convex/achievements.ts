@@ -1,4 +1,4 @@
-import { mutation, query } from './_generated/server'
+import { mutation, query, MutationCtx } from './_generated/server'
 import { Doc, Id } from './_generated/dataModel'
 import { v } from 'convex/values'
 
@@ -548,341 +548,355 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
   },
 ]
 
+export async function evaluateAndSyncUserAchievements(
+  ctx: MutationCtx,
+  userId: string,
+  preloadedSessions?: Doc<'sessions'>[]
+) {
+  const userDoc = await ctx.db
+    .query('users')
+    .withIndex('by_userId', (q) => q.eq('userId', userId))
+    .first()
+
+  const characters = await ctx.db
+    .query('characters')
+    .withIndex('by_userId', (q) => q.eq('userId', userId))
+    .collect()
+
+  const charIds = new Set(characters.map((c) => String(c._id)))
+
+  // Single query for sessions table to compute all session-related metrics
+  const allSessions = preloadedSessions || (await ctx.db.query('sessions').collect())
+  const allLockedSessions = allSessions.filter((s) => s.locked)
+
+  let sessionsPlayedCount = (userDoc?.extraSessionsPlayed || 0)
+  let sessionsRanCount = (userDoc?.extraSessionsRan || 0)
+
+  for (const s of allLockedSessions) {
+    if (s.owner === userId) {
+      sessionsRanCount += 1
+    }
+    if (s.characters && s.characters.some((id) => charIds.has(String(id)))) {
+      sessionsPlayedCount += 1
+    }
+  }
+
+  // Received Commendations calculation
+  const commendationCounts = {
+    total: 0,
+    roleplay: 0,
+    tactics: 0,
+    clutch: 0,
+    heroic: 0,
+    gm: 0,
+  }
+
+  for (const char of characters) {
+    const comms = await ctx.db
+      .query('commendations')
+      .withIndex('by_toCharacter', (q) => q.eq('toCharacterId', char._id))
+      .collect()
+
+    for (const c of comms) {
+      commendationCounts.total += 1
+      if (c.category in commendationCounts) {
+        commendationCounts[c.category as keyof typeof commendationCounts] += 1
+      }
+    }
+  }
+
+  // Given Commendations calculation
+  const givenCommendationsDocs = await ctx.db
+    .query('commendations')
+    .withIndex('by_fromUserId', (q) => q.eq('fromUserId', userId))
+    .collect()
+
+  const givenCommendationCounts = {
+    total: givenCommendationsDocs.length,
+    gm: givenCommendationsDocs.filter((c) => c.category === 'gm').length,
+  }
+
+  // Interested sessions calculation
+  let isInterestedCount = 0
+  for (const s of allSessions) {
+    if (s.interestedPlayers && s.interestedPlayers.some((p) => p.userId === userId)) {
+      isInterestedCount += 1
+    }
+  }
+
+  // Availability calculation
+  const userAvailabilityDocs = await ctx.db
+    .query('availability')
+    .withIndex('by_user_date', (q) => q.eq('userId', userId))
+    .collect()
+
+  const availabilityDaysCount = new Set(userAvailabilityDocs.map((a) => a.date)).size
+
+  // Streak calculations
+  const sortedLockedSessions = [...allLockedSessions].sort((a, b) => {
+    const dateA = a.date ?? a._creationTime
+    const dateB = b.date ?? b._creationTime
+    if (dateA !== dateB) return dateA - dateB
+    return a._creationTime - b._creationTime
+  })
+
+  let maxWorldStreak = 0
+  let maxCharacterStreak = 0
+
+  const isAttendingSession = (charId: Id<'characters'> | string, s: typeof sortedLockedSessions[0]) => {
+    const inChars = Boolean(s.characters && s.characters.some((c) => String(c) === String(charId)))
+    const isGM = Boolean(s.gmCharacter && String(s.gmCharacter) === String(charId))
+    return inChars || isGM
+  }
+
+  for (const char of characters) {
+    const charSessions = sortedLockedSessions.filter((s) => isAttendingSession(char._id, s))
+
+    // World Streak per character
+    let currentWorld: string | null = null
+    let currentWorldStreak = 0
+    for (const s of charSessions) {
+      const wId = s.world ? String(s.world) : null
+      if (wId && wId === currentWorld) {
+        currentWorldStreak++
+      } else {
+        currentWorld = wId
+        currentWorldStreak = wId ? 1 : 0
+      }
+      if (currentWorldStreak > maxWorldStreak) {
+        maxWorldStreak = currentWorldStreak
+      }
+    }
+
+    // Mutual character streak with companion characters
+    const companionIds = new Set<string>()
+    for (const s of charSessions) {
+      const sessionChars = [
+        ...(s.characters || []),
+        ...(s.gmCharacter ? [s.gmCharacter as Id<'characters'>] : [])
+      ]
+      for (const cId of sessionChars) {
+        if (String(cId) !== String(char._id)) {
+          companionIds.add(String(cId))
+        }
+      }
+    }
+
+    for (const compId of companionIds) {
+      const relevantSessions = sortedLockedSessions.filter(
+        (s) => isAttendingSession(char._id, s) || isAttendingSession(compId, s)
+      )
+      let mutualStreak = 0
+      for (const s of relevantSessions) {
+        const hasChar = isAttendingSession(char._id, s)
+        const hasComp = isAttendingSession(compId, s)
+        if (hasChar && hasComp) {
+          mutualStreak++
+          if (mutualStreak > maxCharacterStreak) {
+            maxCharacterStreak = mutualStreak
+          }
+        } else {
+          mutualStreak = 0
+        }
+      }
+    }
+  }
+
+  // Loot calculation
+  let claimedLootCount = 0
+  for (const s of allSessions) {
+    if (s.loot) {
+      for (const item of s.loot) {
+        if (item.claimedBy && charIds.has(String(item.claimedBy))) {
+          claimedLootCount += 1
+        }
+      }
+    }
+  }
+
+  // Unique worlds played calculation
+  const uniqueWorldsSet = new Set<string>()
+  for (const s of allLockedSessions) {
+    const isPlayerInSession = s.characters && s.characters.some((id) => charIds.has(String(id)))
+    const isGmInSession = s.owner === userId
+    if ((isPlayerInSession || isGmInSession) && s.world) {
+      uniqueWorldsSet.add(String(s.world))
+    }
+  }
+  const uniqueWorldsCount = uniqueWorldsSet.size
+
+  // Black Void & Void Objective metrics
+  let hasVoidObjectiveContribution = false
+  let hasAuctionListing = false
+  let hasServiceListing = false
+  let hasCharacterQuest = false
+  let hasCreatedBet = false
+  let hasAcceptedBet = false
+  let hasWonBet = false
+  let hasLostBet = false
+
+  for (const char of characters) {
+    if (!hasVoidObjectiveContribution) {
+      const contrib = await ctx.db
+        .query('voidObjectiveContributions')
+        .withIndex('by_character', (q) => q.eq('characterId', char._id))
+        .first()
+      if (contrib && contrib.amount > 0) {
+        hasVoidObjectiveContribution = true
+      }
+    }
+
+    if (!hasAuctionListing || !hasServiceListing) {
+      const listings = await ctx.db
+        .query('blackVoidListings')
+        .withIndex('by_characterId', (q) => q.eq('characterId', char._id))
+        .collect()
+      for (const l of listings) {
+        if (l.type === 'item') hasAuctionListing = true
+        if (l.type === 'service') hasServiceListing = true
+      }
+    }
+
+    if (!hasCharacterQuest) {
+      const charQuest = await ctx.db
+        .query('quests')
+        .withIndex('by_characterId', (q) => q.eq('characterId', char._id))
+        .first()
+      if (charQuest) {
+        hasCharacterQuest = true
+      }
+    }
+
+    if (!hasCreatedBet) {
+      const bet = await ctx.db
+        .query('blackVoidBets')
+        .withIndex('by_senderCharacterId', (q) => q.eq('senderCharacterId', char._id))
+        .first()
+      if (bet) {
+        hasCreatedBet = true
+      }
+    }
+
+    if (!hasAcceptedBet) {
+      const bet = await ctx.db
+        .query('blackVoidBets')
+        .withIndex('by_acceptedByCharacterId', (q) => q.eq('acceptedByCharacterId', char._id))
+        .first()
+      if (bet) {
+        hasAcceptedBet = true
+      }
+    }
+
+    if (!hasWonBet) {
+      const bet = await ctx.db
+        .query('blackVoidBets')
+        .withIndex('by_winnerCharacterId', (q) => q.eq('winnerCharacterId', char._id))
+        .first()
+      if (bet) {
+        hasWonBet = true
+      }
+    }
+
+    if (!hasLostBet) {
+      const bet = await ctx.db
+        .query('blackVoidBets')
+        .withIndex('by_loserCharacterId', (q) => q.eq('loserCharacterId', char._id))
+        .first()
+      if (bet) {
+        hasLostBet = true
+      }
+    }
+  }
+
+  const evalData: UserEvaluationData = {
+    userId,
+    userDoc,
+    characters,
+    sessionsPlayedCount,
+    sessionsRanCount,
+    commendationCounts,
+    givenCommendationCounts,
+    isInterestedCount,
+    availabilityDaysCount,
+    maxCharacterStreak,
+    maxWorldStreak,
+    uniqueWorldsCount,
+    claimedLootCount,
+    hasVoidObjectiveContribution,
+    hasAuctionListing,
+    hasServiceListing,
+    hasCharacterQuest,
+    hasCreatedBet,
+    hasAcceptedBet,
+    hasWonBet,
+    hasLostBet,
+  }
+
+  // Existing unlocked records in database
+  const existingUnlockedDocs = await ctx.db
+    .query('unlockedAchievements')
+    .withIndex('by_userId', (q) => q.eq('userId', userId))
+    .collect()
+
+  const unlockedMap = new Map<string, { unlockedAt: number; notifiedAt?: number }>()
+  const unlockedAchievementIds = new Set<string>()
+
+  const STREAK_ACHIEVEMENT_IDS = new Set([
+    'character_streak_3',
+    'character_streak_5',
+    'character_streak_10',
+    'world_streak_3',
+    'world_streak_5',
+    'world_streak_10',
+  ])
+
+  for (const u of existingUnlockedDocs) {
+    if (STREAK_ACHIEVEMENT_IDS.has(u.achievementId)) {
+      const def = ACHIEVEMENTS_REGISTRY.find((a) => a.id === u.achievementId)
+      if (def && !def.checkEligibility(evalData)) {
+        await ctx.db.delete(u._id)
+        continue
+      }
+    }
+    unlockedMap.set(u.achievementId, { unlockedAt: u.unlockedAt, notifiedAt: u.notifiedAt })
+    unlockedAchievementIds.add(u.achievementId)
+  }
+
+  evalData.unlockedAchievementIds = unlockedAchievementIds
+
+  const now = Date.now()
+
+  // Auto-grant eligible achievements in database if not already persisted (multi-pass evaluation)
+  let newlyUnlocked = true
+  while (newlyUnlocked) {
+    newlyUnlocked = false
+    for (const def of ACHIEVEMENTS_REGISTRY) {
+      if (!unlockedMap.has(def.id)) {
+        if (def.checkEligibility(evalData)) {
+          await ctx.db.insert('unlockedAchievements', {
+            userId,
+            achievementId: def.id,
+            unlockedAt: now,
+          })
+          unlockedMap.set(def.id, { unlockedAt: now })
+          unlockedAchievementIds.add(def.id)
+          newlyUnlocked = true
+        }
+      }
+    }
+  }
+
+  return { userDoc, evalData, unlockedMap, unlockedAchievementIds }
+}
+
 export const syncAndGetAchievements = mutation({
   args: {},
   handler: async (ctx) => {
     const user = await ctx.auth.getUserIdentity()
     if (!user) return null
 
-    const userDoc = await ctx.db
-      .query('users')
-      .withIndex('by_userId', (q) => q.eq('userId', user.subject))
-      .first()
-
+    const { userDoc, unlockedMap, unlockedAchievementIds } = await evaluateAndSyncUserAchievements(ctx, user.subject)
     const isAdmin = userDoc?.isAdmin ?? false
-
-    const characters = await ctx.db
-      .query('characters')
-      .withIndex('by_userId', (q) => q.eq('userId', user.subject))
-      .collect()
-
-    const charIds = new Set(characters.map((c) => c._id))
-
-    // Single query for sessions table to compute all session-related metrics
-    const allSessions = await ctx.db.query('sessions').collect()
-    const allLockedSessions = allSessions.filter((s) => s.locked)
-
-    let sessionsPlayedCount = (userDoc?.extraSessionsPlayed || 0)
-    let sessionsRanCount = (userDoc?.extraSessionsRan || 0)
-
-    for (const s of allLockedSessions) {
-      if (s.owner === user.subject) {
-        sessionsRanCount += 1
-      }
-      if (s.characters && s.characters.some((id) => charIds.has(id))) {
-        sessionsPlayedCount += 1
-      }
-    }
-
-    // Received Commendations calculation
-    const commendationCounts = {
-      total: 0,
-      roleplay: 0,
-      tactics: 0,
-      clutch: 0,
-      heroic: 0,
-      gm: 0,
-    }
-
-    for (const char of characters) {
-      const comms = await ctx.db
-        .query('commendations')
-        .withIndex('by_toCharacter', (q) => q.eq('toCharacterId', char._id))
-        .collect()
-
-      for (const c of comms) {
-        commendationCounts.total += 1
-        if (c.category in commendationCounts) {
-          commendationCounts[c.category as keyof typeof commendationCounts] += 1
-        }
-      }
-    }
-
-    // Given Commendations calculation
-    const givenCommendationsDocs = await ctx.db
-      .query('commendations')
-      .withIndex('by_fromUserId', (q) => q.eq('fromUserId', user.subject))
-      .collect()
-
-    const givenCommendationCounts = {
-      total: givenCommendationsDocs.length,
-      gm: givenCommendationsDocs.filter((c) => c.category === 'gm').length,
-    }
-
-    // Interested sessions calculation
-    let isInterestedCount = 0
-    for (const s of allSessions) {
-      if (s.interestedPlayers && s.interestedPlayers.some((p) => p.userId === user.subject)) {
-        isInterestedCount += 1
-      }
-    }
-
-    // Availability calculation
-    const userAvailabilityDocs = await ctx.db
-      .query('availability')
-      .withIndex('by_user_date', (q) => q.eq('userId', user.subject))
-      .collect()
-
-    const availabilityDaysCount = new Set(userAvailabilityDocs.map((a) => a.date)).size
-
-    // Streak calculations
-    const sortedLockedSessions = [...allLockedSessions].sort((a, b) => {
-      const dateA = a.date || a._creationTime
-      const dateB = b.date || b._creationTime
-      return dateA - dateB
-    })
-
-    let maxWorldStreak = 0
-    let maxCharacterStreak = 0
-
-    const isAttendingPlayerSession = (charId: Id<'characters'>, s: typeof sortedLockedSessions[0]) => {
-      return Boolean(s.characters && s.characters.includes(charId))
-    }
-
-    for (const char of characters) {
-      const charSessions = sortedLockedSessions.filter((s) => isAttendingPlayerSession(char._id, s))
-
-      // World Streak per character (only counting physical player character attendance)
-      let currentWorld: string | null = null
-      let currentWorldStreak = 0
-      for (const s of charSessions) {
-        const wId = s.world ? s.world.toString() : null
-        if (wId && wId === currentWorld) {
-          currentWorldStreak++
-        } else {
-          currentWorld = wId
-          currentWorldStreak = wId ? 1 : 0
-        }
-        if (currentWorldStreak > maxWorldStreak) {
-          maxWorldStreak = currentWorldStreak
-        }
-      }
-
-      // Mutual character streak with companion characters (only player characters, not GM characters)
-      const companionIds = new Set<Id<'characters'>>()
-      for (const s of charSessions) {
-        if (s.characters) {
-          for (const cId of s.characters) {
-            if (cId !== char._id) {
-              companionIds.add(cId)
-            }
-          }
-        }
-      }
-
-      for (const compId of companionIds) {
-        const relevantSessions = sortedLockedSessions.filter(
-          (s) => isAttendingPlayerSession(char._id, s) || isAttendingPlayerSession(compId, s)
-        )
-        let mutualStreak = 0
-        for (const s of relevantSessions) {
-          const hasChar = isAttendingPlayerSession(char._id, s)
-          const hasComp = isAttendingPlayerSession(compId, s)
-          if (hasChar && hasComp) {
-            mutualStreak++
-            if (mutualStreak > maxCharacterStreak) {
-              maxCharacterStreak = mutualStreak
-            }
-          } else {
-            mutualStreak = 0
-          }
-        }
-      }
-    }
-
-    // Loot calculation
-    let claimedLootCount = 0
-    for (const s of allSessions) {
-      if (s.loot) {
-        for (const item of s.loot) {
-          if (item.claimedBy && charIds.has(item.claimedBy)) {
-            claimedLootCount += 1
-          }
-        }
-      }
-    }
-
-    // Unique worlds played calculation
-    const uniqueWorldsSet = new Set<string>()
-    for (const s of allLockedSessions) {
-      const isPlayerInSession = s.characters && s.characters.some((id) => charIds.has(id))
-      const isGmInSession = s.owner === user.subject
-      if ((isPlayerInSession || isGmInSession) && s.world) {
-        uniqueWorldsSet.add(s.world.toString())
-      }
-    }
-    const uniqueWorldsCount = uniqueWorldsSet.size
-
-    // Black Void & Void Objective metrics
-    let hasVoidObjectiveContribution = false
-    let hasAuctionListing = false
-    let hasServiceListing = false
-    let hasCharacterQuest = false
-    let hasCreatedBet = false
-    let hasAcceptedBet = false
-    let hasWonBet = false
-    let hasLostBet = false
-
-    for (const char of characters) {
-      if (!hasVoidObjectiveContribution) {
-        const contrib = await ctx.db
-          .query('voidObjectiveContributions')
-          .withIndex('by_character', (q) => q.eq('characterId', char._id))
-          .first()
-        if (contrib && contrib.amount > 0) {
-          hasVoidObjectiveContribution = true
-        }
-      }
-
-      if (!hasAuctionListing || !hasServiceListing) {
-        const listings = await ctx.db
-          .query('blackVoidListings')
-          .withIndex('by_characterId', (q) => q.eq('characterId', char._id))
-          .collect()
-        for (const l of listings) {
-          if (l.type === 'item') hasAuctionListing = true
-          if (l.type === 'service') hasServiceListing = true
-        }
-      }
-
-      if (!hasCharacterQuest) {
-        const charQuest = await ctx.db
-          .query('quests')
-          .withIndex('by_characterId', (q) => q.eq('characterId', char._id))
-          .first()
-        if (charQuest) {
-          hasCharacterQuest = true
-        }
-      }
-
-      if (!hasCreatedBet) {
-        const bet = await ctx.db
-          .query('blackVoidBets')
-          .withIndex('by_senderCharacterId', (q) => q.eq('senderCharacterId', char._id))
-          .first()
-        if (bet) {
-          hasCreatedBet = true
-        }
-      }
-
-      if (!hasAcceptedBet) {
-        const bet = await ctx.db
-          .query('blackVoidBets')
-          .withIndex('by_acceptedByCharacterId', (q) => q.eq('acceptedByCharacterId', char._id))
-          .first()
-        if (bet) {
-          hasAcceptedBet = true
-        }
-      }
-
-      if (!hasWonBet) {
-        const bet = await ctx.db
-          .query('blackVoidBets')
-          .withIndex('by_winnerCharacterId', (q) => q.eq('winnerCharacterId', char._id))
-          .first()
-        if (bet) {
-          hasWonBet = true
-        }
-      }
-
-      if (!hasLostBet) {
-        const bet = await ctx.db
-          .query('blackVoidBets')
-          .withIndex('by_loserCharacterId', (q) => q.eq('loserCharacterId', char._id))
-          .first()
-        if (bet) {
-          hasLostBet = true
-        }
-      }
-    }
-
-    const evalData: UserEvaluationData = {
-      userId: user.subject,
-      userDoc,
-      characters,
-      sessionsPlayedCount,
-      sessionsRanCount,
-      commendationCounts,
-      givenCommendationCounts,
-      isInterestedCount,
-      availabilityDaysCount,
-      maxCharacterStreak,
-      maxWorldStreak,
-      uniqueWorldsCount,
-      claimedLootCount,
-      hasVoidObjectiveContribution,
-      hasAuctionListing,
-      hasServiceListing,
-      hasCharacterQuest,
-      hasCreatedBet,
-      hasAcceptedBet,
-      hasWonBet,
-      hasLostBet,
-    }
-
-    // Existing unlocked records in database
-    const existingUnlockedDocs = await ctx.db
-      .query('unlockedAchievements')
-      .withIndex('by_userId', (q) => q.eq('userId', user.subject))
-      .collect()
-
-    const unlockedMap = new Map<string, { unlockedAt: number; notifiedAt?: number }>()
-    const unlockedAchievementIds = new Set<string>()
-
-    const STREAK_ACHIEVEMENT_IDS = new Set([
-      'character_streak_3',
-      'character_streak_5',
-      'character_streak_10',
-      'world_streak_3',
-      'world_streak_5',
-      'world_streak_10',
-    ])
-
-    for (const u of existingUnlockedDocs) {
-      if (STREAK_ACHIEVEMENT_IDS.has(u.achievementId)) {
-        const def = ACHIEVEMENTS_REGISTRY.find((a) => a.id === u.achievementId)
-        if (def && !def.checkEligibility(evalData)) {
-          await ctx.db.delete(u._id)
-          continue
-        }
-      }
-      unlockedMap.set(u.achievementId, { unlockedAt: u.unlockedAt, notifiedAt: u.notifiedAt })
-      unlockedAchievementIds.add(u.achievementId)
-    }
-
-    evalData.unlockedAchievementIds = unlockedAchievementIds
-
-    const now = Date.now()
-
-    // Auto-grant eligible achievements in database if not already persisted (multi-pass evaluation)
-    let newlyUnlocked = true
-    while (newlyUnlocked) {
-      newlyUnlocked = false
-      for (const def of ACHIEVEMENTS_REGISTRY) {
-        if (!unlockedMap.has(def.id)) {
-          if (def.checkEligibility(evalData)) {
-            await ctx.db.insert('unlockedAchievements', {
-              userId: user.subject,
-              achievementId: def.id,
-              unlockedAt: now,
-            })
-            unlockedMap.set(def.id, { unlockedAt: now })
-            unlockedAchievementIds.add(def.id)
-            newlyUnlocked = true
-          }
-        }
-      }
-    }
 
     // Filter achievements to return based on category & admin status
     const result = []
@@ -992,8 +1006,10 @@ export const getUserUnlockedAchievementIds = query({
 })
 
 export const adminRecalculateAllUserStreakAchievements = mutation({
-  args: {},
-  handler: async (ctx) => {
+  args: {
+    targetUserId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
     if (!user) throw new Error('Not authenticated')
 
@@ -1007,113 +1023,21 @@ export const adminRecalculateAllUserStreakAchievements = mutation({
     }
 
     const allSessions = await ctx.db.query('sessions').collect()
-    const allLockedSessions = allSessions.filter((s) => s.locked)
 
-    const sortedLockedSessions = [...allLockedSessions].sort((a, b) => {
-      const dateA = a.date || a._creationTime
-      const dateB = b.date || b._creationTime
-      return dateA - dateB
-    })
-
-    const isAttendingPlayerSession = (charId: Id<'characters'>, s: typeof sortedLockedSessions[0]) => {
-      return Boolean(s.characters && s.characters.includes(charId))
+    let targetUserIds: string[] = []
+    if (args.targetUserId) {
+      targetUserIds = [args.targetUserId]
+    } else {
+      const allUsers = await ctx.db.query('users').collect()
+      targetUserIds = allUsers.map((u) => u.userId)
     }
 
-    const allUnlocked = await ctx.db.query('unlockedAchievements').collect()
-    const STREAK_ACHIEVEMENT_IDS = new Set([
-      'character_streak_3',
-      'character_streak_5',
-      'character_streak_10',
-      'world_streak_3',
-      'world_streak_5',
-      'world_streak_10',
-    ])
-
-    const streakUnlocked = allUnlocked.filter((u) => STREAK_ACHIEVEMENT_IDS.has(u.achievementId))
-
-    const userMap = new Map<string, typeof streakUnlocked>()
-    for (const u of streakUnlocked) {
-      const list = userMap.get(u.userId) || []
-      list.push(u)
-      userMap.set(u.userId, list)
+    let processedUsersCount = 0
+    for (const uId of targetUserIds) {
+      await evaluateAndSyncUserAchievements(ctx, uId, allSessions)
+      processedUsersCount++
     }
 
-    let deletedCount = 0
-
-    for (const [targetUserId, records] of userMap.entries()) {
-      const targetChars = await ctx.db
-        .query('characters')
-        .withIndex('by_userId', (q) => q.eq('userId', targetUserId))
-        .collect()
-
-      let maxWorldStreak = 0
-      let maxCharacterStreak = 0
-
-      for (const char of targetChars) {
-        const charSessions = sortedLockedSessions.filter((s) => isAttendingPlayerSession(char._id, s))
-
-        let currentWorld: string | null = null
-        let currentWorldStreak = 0
-        for (const s of charSessions) {
-          const wId = s.world ? s.world.toString() : null
-          if (wId && wId === currentWorld) {
-            currentWorldStreak++
-          } else {
-            currentWorld = wId
-            currentWorldStreak = wId ? 1 : 0
-          }
-          if (currentWorldStreak > maxWorldStreak) {
-            maxWorldStreak = currentWorldStreak
-          }
-        }
-
-        const companionIds = new Set<Id<'characters'>>()
-        for (const s of charSessions) {
-          if (s.characters) {
-            for (const cId of s.characters) {
-              if (cId !== char._id) {
-                companionIds.add(cId)
-              }
-            }
-          }
-        }
-
-        for (const compId of companionIds) {
-          const relevantSessions = sortedLockedSessions.filter(
-            (s) => isAttendingPlayerSession(char._id, s) || isAttendingPlayerSession(compId, s)
-          )
-          let mutualStreak = 0
-          for (const s of relevantSessions) {
-            const hasChar = isAttendingPlayerSession(char._id, s)
-            const hasComp = isAttendingPlayerSession(compId, s)
-            if (hasChar && hasComp) {
-              mutualStreak++
-              if (mutualStreak > maxCharacterStreak) {
-                maxCharacterStreak = mutualStreak
-              }
-            } else {
-              mutualStreak = 0
-            }
-          }
-        }
-      }
-
-      for (const record of records) {
-        let isEligible = false
-        if (record.achievementId === 'character_streak_3') isEligible = maxCharacterStreak >= 3
-        if (record.achievementId === 'character_streak_5') isEligible = maxCharacterStreak >= 5
-        if (record.achievementId === 'character_streak_10') isEligible = maxCharacterStreak >= 10
-        if (record.achievementId === 'world_streak_3') isEligible = maxWorldStreak >= 3
-        if (record.achievementId === 'world_streak_5') isEligible = maxWorldStreak >= 5
-        if (record.achievementId === 'world_streak_10') isEligible = maxWorldStreak >= 10
-
-        if (!isEligible) {
-          await ctx.db.delete(record._id)
-          deletedCount++
-        }
-      }
-    }
-
-    return { success: true, deletedCount }
+    return { success: true, processedUsersCount }
   },
 })

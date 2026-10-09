@@ -1,4 +1,4 @@
-import { query, mutation, QueryCtx } from './_generated/server'
+import { query, mutation, QueryCtx, MutationCtx } from './_generated/server'
 import { v } from 'convex/values'
 import { Doc, Id } from './_generated/dataModel'
 import { internal } from './_generated/api'
@@ -7,6 +7,7 @@ import { applyContributionHelper } from './voidObjectives'
 import { formatUserDisplayName } from './users'
 import { adjustCharacterMoney } from './moneyHelpers'
 import { syncActiveSessionsForQuestChange } from './questSyncHelpers'
+import { evaluateAndSyncUserAchievements } from './achievements'
 
 /**
  * XP gain based on session level and character level.
@@ -336,9 +337,10 @@ export const getAttendingCharacterRelationships = query({
       .collect()
     
     lockedSessions.sort((a, b) => {
-      const dateA = a.date || a._creationTime
-      const dateB = b.date || b._creationTime
-      return dateA - dateB
+      const dateA = a.date ?? a._creationTime
+      const dateB = b.date ?? b._creationTime
+      if (dateA !== dateB) return dateA - dateB
+      return a._creationTime - b._creationTime
     })
 
     const currentSessionTime = currentSession.date || currentSession._creationTime
@@ -378,7 +380,9 @@ export const getAttendingCharacterRelationships = query({
     ]))
 
     const isAttending = (charId: string, s: Doc<'sessions'>) => {
-      return Array.isArray(s.characters) && s.characters.includes(charId as Id<'characters'>)
+      const inChars = Array.isArray(s.characters) && s.characters.includes(charId as Id<'characters'>)
+      const isGM = s.gmCharacter === charId
+      return inChars || isGM
     }
 
     for (const charId of allAttendingIds) {
@@ -389,11 +393,12 @@ export const getAttendingCharacterRelationships = query({
 
       if (charId !== args.userCharacterId) {
         const coPastSessions = pastSessions.filter(s => isAttending(args.userCharacterId, s) && isAttending(charId, s))
+        const bothInCurrent = isAttending(args.userCharacterId, currentSession) && isAttending(charId, currentSession)
 
-        count = coPastSessions.length
-        isNew = count === 0
+        count = coPastSessions.length + (bothInCurrent ? 1 : 0)
+        isNew = coPastSessions.length === 0
 
-        if (count > 0) {
+        if (coPastSessions.length > 0) {
           const last = coPastSessions[coPastSessions.length - 1]
           lastSessionInfo = {
             _id: last._id,
@@ -403,7 +408,6 @@ export const getAttendingCharacterRelationships = query({
           }
         }
 
-        const bothInCurrent = isAttending(args.userCharacterId, currentSession) && isAttending(charId, currentSession)
         if (bothInCurrent) {
           streak += 1
         }
@@ -425,22 +429,22 @@ export const getAttendingCharacterRelationships = query({
         }
       }
 
-      // World Stats for this character (only counting physical attendance)
+      // World Stats for this character
       const charPastSessions = pastSessions.filter(s => isAttending(charId, s))
-
-      const charWorldPastSessions = charPastSessions.filter(s => Boolean(currentSession.world) && s.world === currentSession.world)
-      const worldCount = charWorldPastSessions.length
-      const isNewToWorld = Boolean(currentSession.world) && worldCount === 0
+      const charWorldPastSessions = charPastSessions.filter(s => Boolean(currentSession.world) && String(s.world) === String(currentSession.world))
+      
+      const charInCurrent = isAttending(charId, currentSession)
+      const worldCount = charWorldPastSessions.length + (charInCurrent && currentSession.world ? 1 : 0)
+      const isNewToWorld = Boolean(currentSession.world) && charWorldPastSessions.length === 0
 
       let worldStreak = 0
       if (currentSession.world) {
-        const charInCurrent = isAttending(charId, currentSession)
         if (charInCurrent) {
           worldStreak += 1
         }
         for (let i = charPastSessions.length - 1; i >= 0; i--) {
           const s = charPastSessions[i]
-          if (s.world === currentSession.world) {
+          if (String(s.world) === String(currentSession.world)) {
             worldStreak += 1
           } else {
             break
@@ -1599,8 +1603,31 @@ export const lockSession = mutation({
       if (typeof pendingAmount === 'number' && pendingAmount > 0) {
         await applyContributionHelper(ctx, session, pendingAmount)
       }
+
+      await syncSessionAttendeesAchievements(ctx, session)
     }
 })
+
+async function syncSessionAttendeesAchievements(ctx: MutationCtx, session: Doc<'sessions'>) {
+  const userIds = new Set<string>()
+  if (session.owner) {
+    userIds.add(session.owner)
+  }
+  const charIds = [
+    ...(session.characters || []),
+    ...(session.gmCharacter ? [session.gmCharacter] : [])
+  ]
+  for (const cId of charIds) {
+    const char = await ctx.db.get(cId)
+    if (char && char.userId) {
+      userIds.add(char.userId)
+    }
+  }
+  const allSessions = await ctx.db.query('sessions').collect()
+  for (const uId of userIds) {
+    await evaluateAndSyncUserAchievements(ctx, uId, allSessions)
+  }
+}
 
 export const unlockSession = mutation({
     args: { sessionId: v.id('sessions') },
@@ -1638,6 +1665,7 @@ export const unlockSession = mutation({
       }
 
       await ctx.db.patch(args.sessionId, { locked: false, xpGains: [] })
+      await syncSessionAttendeesAchievements(ctx, session)
     }
 })
 
@@ -1674,6 +1702,8 @@ export const forceLockSession = mutation({
       if (typeof pendingAmount === 'number' && pendingAmount > 0) {
         await applyContributionHelper(ctx, session, pendingAmount)
       }
+
+      await syncSessionAttendeesAchievements(ctx, session)
     }
 })
 
@@ -1700,6 +1730,7 @@ export const forceUnlockSession = mutation({
       }
 
       await ctx.db.patch(args.sessionId, { locked: false, xpGains: [] })
+      await syncSessionAttendeesAchievements(ctx, session)
     }
 })
 

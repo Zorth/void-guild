@@ -931,17 +931,16 @@ export const getCharacterProfile = query({
 
     // Sort chronologically ascending
     allSessions.sort((a, b) => {
-      const dateA = a.date || a._creationTime
-      const dateB = b.date || b._creationTime
-      return dateA - dateB
+      const dateA = a.date ?? a._creationTime
+      const dateB = b.date ?? b._creationTime
+      if (dateA !== dateB) return dateA - dateB
+      return a._creationTime - b._creationTime
     })
 
     const isAttending = (s: typeof allSessions[0]) => {
-      return (
-        Array.isArray(s.characters) &&
-        s.characters.includes(args.characterId) &&
-        s.gmCharacter !== args.characterId
-      )
+      const inChars = Array.isArray(s.characters) && s.characters.includes(args.characterId)
+      const isGM = s.gmCharacter === args.characterId
+      return inChars || isGM
     }
 
     const attendingSessions = allSessions.filter(isAttending)
@@ -989,7 +988,14 @@ export const getCharacterProfile = query({
     // Attendance streak: consecutive locked sessions in the guild that this character attended
     // from the latest locked session backwards
     // Sessions where this character was the GM are ignored (do not break streak and do not increment streak)
-    const sortedLocked = allSessions.filter((s) => Boolean(s.locked))
+    const sortedLocked = allSessions
+      .filter((s) => Boolean(s.locked))
+      .sort((a, b) => {
+        const dateA = a.date ?? a._creationTime
+        const dateB = b.date ?? b._creationTime
+        if (dateA !== dateB) return dateA - dateB
+        return a._creationTime - b._creationTime
+      })
     let attendanceStreak = 0
     for (let i = sortedLocked.length - 1; i >= 0; i--) {
       const s = sortedLocked[i]
