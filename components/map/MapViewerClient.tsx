@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
@@ -8,7 +8,7 @@ import { useAuth, useUser } from '@clerk/nextjs'
 import Link from 'next/link'
 import { 
   ZoomIn, ZoomOut, Maximize2, Layers, MapPin, Eye, Edit3, Plus, 
-  Trash2, Settings, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Map, FileText, Check, X, Grid, Lock, Unlock, Move, HelpCircle, Copy,
+  Trash2, Settings, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Map as MapIcon, FileText, Check, X, Grid, Lock, Unlock, Move, HelpCircle, Copy,
   Castle, Crown, Skull, Swords, Shield, Mountain, Tent, Beer, Anchor, Flame, TreePine, Sparkles, BookOpen, Coins, Compass, Gem, Crosshair, Flag, Ghost, EyeOff, Ruler, Search, RotateCcw, RefreshCw,
   Upload, ExternalLink, User, Paintbrush, Route, Eraser
 } from 'lucide-react'
@@ -589,6 +589,7 @@ export default function MapViewerClient() {
     gridScale: 0,
     gridScaleUnit: 'miles',
     isExplorationMap: false,
+    isInfiniteGrid: false,
     hideFromMenu: false,
   })
 
@@ -600,6 +601,7 @@ export default function MapViewerClient() {
     imageUrl: '',
     tileUrl: '',
     hideFromMenu: false,
+    isInfiniteGrid: false,
     gridType: 'hex' as 'none' | 'hex' | 'hex_flat' | 'square',
     gridSize: 100,
     width: 2000,
@@ -649,6 +651,7 @@ export default function MapViewerClient() {
         gridScale: currentMap.gridScale || 0,
         gridScaleUnit: currentMap.gridScaleUnit || 'miles',
         isExplorationMap: currentMap.isExplorationMap || false,
+        isInfiniteGrid: currentMap.isInfiniteGrid || false,
         hideFromMenu: currentMap.hideFromMenu || false,
       })
     }
@@ -1257,145 +1260,200 @@ export default function MapViewerClient() {
     }
   }
 
-  // Exact gapless interlocking honeycomb and square grid calculation with border over-tiling
+  // Helper: compute cell center {cx, cy} and SVG polygon points for any (c, r) coordinate
+  const getCellGeometry = useCallback(
+    (c: number, r: number) => {
+      const effectiveGridSize = Math.max(25, currentGridSize)
+      const ox = currentOffsetX
+      const oy = currentOffsetY
+
+      if (gridType === 'hex') {
+        const W = effectiveGridSize
+        const R = W / Math.sqrt(3)
+        const deltaY = 1.5 * R
+        const isOdd = Math.abs(r) % 2 === 1
+        const cy = oy + R + r * deltaY
+        const cx = ox + (c + (isOdd ? 0.5 : 0)) * W + W / 2
+        const points = [
+          `${cx.toFixed(2)},${(cy - R).toFixed(2)}`,
+          `${(cx + W / 2).toFixed(2)},${(cy - R / 2).toFixed(2)}`,
+          `${(cx + W / 2).toFixed(2)},${(cy + R / 2).toFixed(2)}`,
+          `${cx.toFixed(2)},${(cy + R).toFixed(2)}`,
+          `${(cx - W / 2).toFixed(2)},${(cy + R / 2).toFixed(2)}`,
+          `${(cx - W / 2).toFixed(2)},${(cy - R / 2).toFixed(2)}`,
+        ].join(' ')
+        return { cx, cy, points }
+      } else if (gridType === 'hex_flat') {
+        const H = effectiveGridSize
+        const R = H / Math.sqrt(3)
+        const deltaX = 1.5 * R
+        const isOdd = Math.abs(c) % 2 === 1
+        const cx = ox + R + c * deltaX
+        const cy = oy + (r + (isOdd ? 0.5 : 0)) * H + H / 2
+        const points = [
+          `${(cx - R).toFixed(2)},${cy.toFixed(2)}`,
+          `${(cx - R / 2).toFixed(2)},${(cy - H / 2).toFixed(2)}`,
+          `${(cx + R / 2).toFixed(2)},${(cy - H / 2).toFixed(2)}`,
+          `${(cx + R).toFixed(2)},${cy.toFixed(2)}`,
+          `${(cx + R / 2).toFixed(2)},${(cy + H / 2).toFixed(2)}`,
+          `${(cx - R / 2).toFixed(2)},${(cy + H / 2).toFixed(2)}`,
+        ].join(' ')
+        return { cx, cy, points }
+      } else if (gridType === 'square') {
+        const size = effectiveGridSize
+        const x = ox + c * size
+        const y = oy + r * size
+        const points = [
+          `${x},${y}`,
+          `${x + size},${y}`,
+          `${x + size},${y + size}`,
+          `${x},${y + size}`,
+        ].join(' ')
+        return { cx: x + size / 2, cy: y + size / 2, points }
+      }
+      return null
+    },
+    [gridType, currentGridSize, currentOffsetX, currentOffsetY]
+  )
+
+  // Exact gapless interlocking honeycomb and square grid calculation with dynamic viewport bounds for infinite grid maps
   const gridCells = useMemo(() => {
     if (gridType === 'none') return []
     const effectiveGridSize = Math.max(25, currentGridSize)
     const ox = currentOffsetX
     const oy = currentOffsetY
+    const pad = 2
 
-    // Pad by 1 cell beyond borders so hexagons and grid lines cleanly tile across and cover image edges
-    const pad = 1
+    const isInfinite = !!currentMap?.isInfiniteGrid
 
-    if (gridType === 'hex') {
-      // Pointy-topped hexagon (Standard D&D / RPG)
-      // Width W = effectiveGridSize
-      // Circumradius R = W / sqrt(3)
-      // Height H = 2 * R = (2 / sqrt(3)) * W
-      // Vertical row step deltaY = 1.5 * R = (sqrt(3) / 2) * W
-      const W = effectiveGridSize
-      const R = W / Math.sqrt(3)
-      const deltaY = 1.5 * R
+    let minC = 0
+    let maxC = 0
+    let minR = 0
+    let maxR = 0
 
-      const minC = Math.floor(-ox / W) - pad
-      const maxC = Math.ceil((mapWidth - ox) / W) + pad
-      const minR = Math.floor(-oy / deltaY) - pad
-      const maxR = Math.ceil((mapHeight - oy) / deltaY) + pad
+    if (isInfinite && viewportRef.current) {
+      // Calculate visible bounds in map coordinate space based on current pan and zoom
+      const vw = viewportRef.current.clientWidth || 1920
+      const vh = viewportRef.current.clientHeight || 1080
+      const leftMap = (vw / 2 - position.x - vw / 2) / scale + mapWidth / 2
+      const rightMap = leftMap + vw / scale
+      const topMap = (vh / 2 - position.y - vh / 2) / scale + mapHeight / 2
+      const bottomMap = topMap + vh / scale
 
-      const colCount = Math.min(maxC - minC + 1, 180)
-      const rowCount = Math.min(maxR - minR + 1, 180)
-
-      const cells = []
-      for (let rIdx = 0; rIdx < rowCount; rIdx++) {
-        const r = minR + rIdx
-        const isOdd = Math.abs(r) % 2 === 1
-        const cy = oy + R + r * deltaY
-
-        for (let cIdx = 0; cIdx < colCount; cIdx++) {
-          const c = minC + cIdx
-          const cx = ox + (c + (isOdd ? 0.5 : 0)) * W + W / 2
-          const points = [
-            `${cx.toFixed(2)},${(cy - R).toFixed(2)}`,
-            `${(cx + W / 2).toFixed(2)},${(cy - R / 2).toFixed(2)}`,
-            `${(cx + W / 2).toFixed(2)},${(cy + R / 2).toFixed(2)}`,
-            `${cx.toFixed(2)},${(cy + R).toFixed(2)}`,
-            `${(cx - W / 2).toFixed(2)},${(cy + R / 2).toFixed(2)}`,
-            `${(cx - W / 2).toFixed(2)},${(cy - R / 2).toFixed(2)}`,
-          ].join(' ')
-
-          cells.push({
-            key: `${c},${r}`,
-            c,
-            r,
-            cx,
-            cy,
-            points,
-          })
-        }
+      if (gridType === 'hex') {
+        const W = effectiveGridSize
+        const deltaY = 1.5 * (W / Math.sqrt(3))
+        minC = Math.floor((leftMap - ox) / W) - pad
+        maxC = Math.ceil((rightMap - ox) / W) + pad
+        minR = Math.floor((topMap - oy) / deltaY) - pad
+        maxR = Math.ceil((bottomMap - oy) / deltaY) + pad
+      } else if (gridType === 'hex_flat') {
+        const H = effectiveGridSize
+        const deltaX = 1.5 * (H / Math.sqrt(3))
+        minC = Math.floor((leftMap - ox) / deltaX) - pad
+        maxC = Math.ceil((rightMap - ox) / deltaX) + pad
+        minR = Math.floor((topMap - oy) / H) - pad
+        maxR = Math.ceil((bottomMap - oy) / H) + pad
+      } else if (gridType === 'square') {
+        const size = effectiveGridSize
+        minC = Math.floor((leftMap - ox) / size) - pad
+        maxC = Math.ceil((rightMap - ox) / size) + pad
+        minR = Math.floor((topMap - oy) / size) - pad
+        maxR = Math.ceil((bottomMap - oy) / size) + pad
       }
-      return cells
-    } else if (gridType === 'hex_flat') {
-      // Flat-topped hexagon
-      const H = effectiveGridSize
-      const R = H / Math.sqrt(3)
-      const deltaX = 1.5 * R
+    } else {
+      // Standard bounded map: tile over the map dimensions [0..mapWidth, 0..mapHeight]
+      if (gridType === 'hex') {
+        const W = effectiveGridSize
+        const deltaY = 1.5 * (W / Math.sqrt(3))
+        minC = Math.floor(-ox / W) - pad
+        maxC = Math.ceil((mapWidth - ox) / W) + pad
+        minR = Math.floor(-oy / deltaY) - pad
+        maxR = Math.ceil((mapHeight - oy) / deltaY) + pad
+      } else if (gridType === 'hex_flat') {
+        const H = effectiveGridSize
+        const deltaX = 1.5 * (H / Math.sqrt(3))
+        minC = Math.floor(-ox / deltaX) - pad
+        maxC = Math.ceil((mapWidth - ox) / deltaX) + pad
+        minR = Math.floor(-oy / H) - pad
+        maxR = Math.ceil((mapHeight - oy) / H) + pad
+      } else if (gridType === 'square') {
+        const size = effectiveGridSize
+        minC = Math.floor(-ox / size) - pad
+        maxC = Math.ceil((mapWidth - ox) / size) + pad
+        minR = Math.floor(-oy / size) - pad
+        maxR = Math.ceil((mapHeight - oy) / size) + pad
+      }
+    }
 
-      const minC = Math.floor(-ox / deltaX) - pad
-      const maxC = Math.ceil((mapWidth - ox) / deltaX) + pad
-      const minR = Math.floor(-oy / H) - pad
-      const maxR = Math.ceil((mapHeight - oy) / H) + pad
+    // Safeguard max columns / rows per render batch to 200 for 60fps SVG rendering
+    const colCount = Math.min(Math.max(0, maxC - minC + 1), 200)
+    const rowCount = Math.min(Math.max(0, maxR - minR + 1), 200)
 
-      const colCount = Math.min(maxC - minC + 1, 180)
-      const rowCount = Math.min(maxR - minR + 1, 180)
+    const cellMap = new Map<string, { key: string; c: number; r: number; cx: number; cy: number; points: string }>()
 
-      const cells = []
+    for (let rIdx = 0; rIdx < rowCount; rIdx++) {
+      const r = minR + rIdx
       for (let cIdx = 0; cIdx < colCount; cIdx++) {
         const c = minC + cIdx
-        const isOdd = Math.abs(c) % 2 === 1
-        const cx = ox + R + c * deltaX
-
-        for (let rIdx = 0; rIdx < rowCount; rIdx++) {
-          const r = minR + rIdx
-          const cy = oy + (r + (isOdd ? 0.5 : 0)) * H + H / 2
-          const points = [
-            `${(cx - R).toFixed(2)},${cy.toFixed(2)}`,
-            `${(cx - R / 2).toFixed(2)},${(cy - H / 2).toFixed(2)}`,
-            `${(cx + R / 2).toFixed(2)},${(cy - H / 2).toFixed(2)}`,
-            `${(cx + R).toFixed(2)},${cy.toFixed(2)}`,
-            `${(cx + R / 2).toFixed(2)},${(cy + H / 2).toFixed(2)}`,
-            `${(cx - R / 2).toFixed(2)},${(cy + H / 2).toFixed(2)}`,
-          ].join(' ')
-
-          cells.push({
-            key: `${c},${r}`,
-            c,
-            r,
-            cx,
-            cy,
-            points,
-          })
+        const geom = getCellGeometry(c, r)
+        if (geom) {
+          const key = `${c},${r}`
+          cellMap.set(key, { key, c, r, cx: geom.cx, cy: geom.cy, points: geom.points })
         }
       }
-      return cells
-    } else if (gridType === 'square') {
-      const size = effectiveGridSize
-      const minC = Math.floor(-ox / size) - pad
-      const maxC = Math.ceil((mapWidth - ox) / size) + pad
-      const minR = Math.floor(-oy / size) - pad
-      const maxR = Math.ceil((mapHeight - oy) / size) + pad
-
-      const colCount = Math.min(maxC - minC + 1, 180)
-      const rowCount = Math.min(maxR - minR + 1, 180)
-
-      const cells = []
-      for (let rIdx = 0; rIdx < rowCount; rIdx++) {
-        const r = minR + rIdx
-        const y = oy + r * size
-
-        for (let cIdx = 0; cIdx < colCount; cIdx++) {
-          const c = minC + cIdx
-          const x = ox + c * size
-          const points = [
-            `${x},${y}`,
-            `${x + size},${y}`,
-            `${x + size},${y + size}`,
-            `${x},${y + size}`,
-          ].join(' ')
-
-          cells.push({
-            key: `${c},${r}`,
-            c,
-            r,
-            cx: x + size / 2,
-            cy: y + size / 2,
-            points,
-          })
-        }
-      }
-      return cells
     }
-    return []
-  }, [gridType, currentGridSize, currentOffsetX, currentOffsetY, mapWidth, mapHeight])
+
+    // Also include any cells that have painted terrain, notes, or road endpoints even if just outside current window
+    const explicitKeys = new Set<string>()
+    if (fullData?.cellFills) {
+      fullData.cellFills.forEach((f) => explicitKeys.add(f.cellKey))
+    }
+    if (fullData?.cellRoads) {
+      fullData.cellRoads.forEach((r) => {
+        explicitKeys.add(r.fromCellKey)
+        explicitKeys.add(r.toCellKey)
+      })
+    }
+    if (fullData?.notes) {
+      fullData.notes.forEach((n) => {
+        if (n.cellKey && !n.cellKey.startsWith('point_')) explicitKeys.add(n.cellKey)
+      })
+    }
+
+    explicitKeys.forEach((key) => {
+      if (!cellMap.has(key)) {
+        const parts = key.split(',')
+        if (parts.length === 2) {
+          const c = Number(parts[0])
+          const r = Number(parts[1])
+          if (!isNaN(c) && !isNaN(r)) {
+            const geom = getCellGeometry(c, r)
+            if (geom) {
+              cellMap.set(key, { key, c, r, cx: geom.cx, cy: geom.cy, points: geom.points })
+            }
+          }
+        }
+      }
+    })
+
+    return Array.from(cellMap.values())
+  }, [
+    gridType,
+    currentGridSize,
+    currentOffsetX,
+    currentOffsetY,
+    mapWidth,
+    mapHeight,
+    currentMap?.isInfiniteGrid,
+    position.x,
+    position.y,
+    scale,
+    fullData?.cellFills,
+    fullData?.cellRoads,
+    fullData?.notes,
+    getCellGeometry,
+  ])
 
   // Lookup for cell center coordinates { cx, cy } by cell key
   const cellCenterMap = useMemo(() => {
@@ -1403,8 +1461,27 @@ export default function MapViewerClient() {
     gridCells.forEach((cell) => {
       map[cell.key] = { cx: cell.cx, cy: cell.cy }
     })
+    // Also include cell centers for any road or fill keys not yet in gridCells
+    if (fullData?.cellRoads) {
+      fullData.cellRoads.forEach((r) => {
+        if (!map[r.fromCellKey]) {
+          const parts = r.fromCellKey.split(',')
+          if (parts.length === 2) {
+            const geom = getCellGeometry(Number(parts[0]), Number(parts[1]))
+            if (geom) map[r.fromCellKey] = { cx: geom.cx, cy: geom.cy }
+          }
+        }
+        if (!map[r.toCellKey]) {
+          const parts = r.toCellKey.split(',')
+          if (parts.length === 2) {
+            const geom = getCellGeometry(Number(parts[0]), Number(parts[1]))
+            if (geom) map[r.toCellKey] = { cx: geom.cx, cy: geom.cy }
+          }
+        }
+      })
+    }
     return map
-  }, [gridCells])
+  }, [gridCells, fullData?.cellRoads, getCellGeometry])
 
   // Cell click handler (Exploration reveal or Player Note)
   const handleCellClick = (cellKey: string, e: React.MouseEvent) => {
@@ -1714,13 +1791,14 @@ export default function MapViewerClient() {
         name: newMapDraft.name,
         slug: newMapDraft.slug,
         isHomeMap: newMapDraft.isHomeMap,
-        imageUrl: newMapDraft.imageUrl || undefined,
-        tileUrl: newMapDraft.tileUrl || undefined,
+        imageUrl: newMapDraft.isInfiniteGrid ? undefined : (newMapDraft.imageUrl || undefined),
+        tileUrl: newMapDraft.isInfiniteGrid ? undefined : (newMapDraft.tileUrl || undefined),
         hideFromMenu: newMapDraft.hideFromMenu,
+        isInfiniteGrid: newMapDraft.isInfiniteGrid,
         gridType: newMapDraft.gridType,
         gridSize: newMapDraft.gridSize || 100,
-        width: newMapDraft.width || 2000,
-        height: newMapDraft.height || 2000,
+        width: newMapDraft.isInfiniteGrid ? 10000 : (newMapDraft.width || 2000),
+        height: newMapDraft.isInfiniteGrid ? 10000 : (newMapDraft.height || 2000),
       })
       toast.success('Map created!')
       setIsNewMapDialogOpen(false)
@@ -1764,6 +1842,7 @@ export default function MapViewerClient() {
         gridScale: !isNaN(gridScaleVal) ? gridScaleVal : 0,
         gridScaleUnit: settingsDraft.gridScaleUnit,
         isExplorationMap: settingsDraft.isExplorationMap,
+        isInfiniteGrid: settingsDraft.isInfiniteGrid,
         hideFromMenu: settingsDraft.hideFromMenu,
       })
       setLiveGridOffset(null)
@@ -1888,7 +1967,7 @@ export default function MapViewerClient() {
       <div className="h-screen w-screen bg-slate-950 flex flex-col items-center justify-center gap-6 p-4">
         <div className="flex flex-col items-center text-center gap-2 max-w-md">
           <div className="h-16 w-16 rounded-full bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400 mb-2">
-            <Map className="h-8 w-8" />
+            <MapIcon className="h-8 w-8" />
           </div>
           <h2 className="text-2xl font-bold text-foreground">No Maps Created Yet</h2>
           <p className="text-sm text-muted-foreground">
@@ -2893,7 +2972,7 @@ export default function MapViewerClient() {
                             )}
                             {area.targetMapId && (
                               <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center gap-0.5">
-                                <Map className="h-2.5 w-2.5" /> Linked
+                                <MapIcon className="h-2.5 w-2.5" /> Linked
                               </span>
                             )}
                           </div>
@@ -3168,6 +3247,8 @@ export default function MapViewerClient() {
               draggable={false}
               onLoad={handleImageLoad}
             />
+          ) : currentMap?.isInfiniteGrid ? (
+            <div className="absolute inset-0 w-full h-full bg-[#070b12]" />
           ) : !currentMap?.tileUrl ? (
             <div className="absolute inset-0 w-full h-full bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-700 font-bold text-2xl">
               No Map Image Set
@@ -3809,7 +3890,7 @@ export default function MapViewerClient() {
                       if (target) router.push(`/world/${encodeURIComponent(world.name)}/map/${target.slug}`)
                     }}
                   >
-                    <Map className="h-3.5 w-3.5" />
+                    <MapIcon className="h-3.5 w-3.5" />
                     Open Linked Map
                   </Button>
                 </div>
@@ -4116,66 +4197,94 @@ export default function MapViewerClient() {
                 placeholder="capital-city"
               />
             </div>
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="font-bold text-muted-foreground">Tile Pyramid URL Template</label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-2 text-[11px] gap-1 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-950/40"
-                  onClick={() => handleOpenProcessorPicker('newMap')}
-                >
-                  <Layers className="h-3 w-3" />
-                  Browse Hosted Maps
-                </Button>
+            <div className="flex items-center justify-between p-2.5 rounded-lg border border-purple-500/30 bg-purple-950/20">
+              <div className="space-y-0.5 pr-2">
+                <span className="font-bold flex items-center gap-1.5 text-xs text-purple-200">
+                  <Grid className="h-3.5 w-3.5 text-purple-400" />
+                  Infinite Grid Map
+                </span>
+                <p className="text-[11px] text-muted-foreground">
+                  Creates an unbounded canvas with no background image, dedicated to infinite hex exploration, painting, and player notes.
+                </p>
               </div>
-              <Input
-                value={newMapDraft.tileUrl}
-                onChange={(e) => {
-                  const val = e.target.value
-                  setNewMapDraft({ ...newMapDraft, tileUrl: val })
+              <Switch
+                checked={newMapDraft.isInfiniteGrid}
+                onCheckedChange={(val) => {
+                  setNewMapDraft({
+                    ...newMapDraft,
+                    isInfiniteGrid: val,
+                    imageUrl: val ? '' : newMapDraft.imageUrl,
+                    tileUrl: val ? '' : newMapDraft.tileUrl,
+                    gridType: val && newMapDraft.gridType === 'none' ? 'hex' : newMapDraft.gridType,
+                  })
                 }}
-                onBlur={(e) => checkAndFetchProcessorTiles(e.target.value, 'newMap')}
-                placeholder="https://maps.tarragon.be/slug_tiles_files/{z}/{x}_{y}.webp"
               />
-              <p className="text-[10px] text-muted-foreground mt-0.5">
-                DeepZoom tile pyramid format. Fast LOD zoom.
-              </p>
             </div>
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="font-bold text-muted-foreground">Background Image URL (Optional)</label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-2 text-[11px] gap-1 text-purple-400 hover:text-purple-300 hover:bg-purple-950/40"
-                  asChild
-                >
-                  <a href="https://maps.tarragon.be" target="_blank" rel="noopener noreferrer" title="Upload new map image on maps.tarragon.be">
-                    <Upload className="h-3 w-3" />
-                    Upload to Processor
-                    <ExternalLink className="h-2.5 w-2.5 opacity-60" />
-                  </a>
-                </Button>
-              </div>
-              <Input
-                value={newMapDraft.imageUrl}
-                onChange={(e) => {
-                  const val = e.target.value
-                  setNewMapDraft({ ...newMapDraft, imageUrl: val })
-                  if (val.includes('.webp') || val.includes('_tiles')) {
-                    checkAndFetchProcessorTiles(val, 'newMap')
-                  }
-                }}
-                onBlur={(e) => checkAndFetchProcessorTiles(e.target.value, 'newMap')}
-                placeholder="Leave blank for an empty player hex/grid canvas"
-              />
-              <p className="text-[10px] text-muted-foreground mt-0.5">
-                Leave empty to create a blank player canvas where hexes can be painted and connected with roads.
-              </p>
-            </div>
+
+            {!newMapDraft.isInfiniteGrid && (
+              <>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-bold text-muted-foreground">Tile Pyramid URL Template</label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-[11px] gap-1 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-950/40"
+                      onClick={() => handleOpenProcessorPicker('newMap')}
+                    >
+                      <Layers className="h-3 w-3" />
+                      Browse Hosted Maps
+                    </Button>
+                  </div>
+                  <Input
+                    value={newMapDraft.tileUrl}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      setNewMapDraft({ ...newMapDraft, tileUrl: val })
+                    }}
+                    onBlur={(e) => checkAndFetchProcessorTiles(e.target.value, 'newMap')}
+                    placeholder="https://maps.tarragon.be/slug_tiles_files/{z}/{x}_{y}.webp"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    DeepZoom tile pyramid format. Fast LOD zoom.
+                  </p>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-bold text-muted-foreground">Background Image URL (Optional)</label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-[11px] gap-1 text-purple-400 hover:text-purple-300 hover:bg-purple-950/40"
+                      asChild
+                    >
+                      <a href="https://maps.tarragon.be" target="_blank" rel="noopener noreferrer" title="Upload new map image on maps.tarragon.be">
+                        <Upload className="h-3 w-3" />
+                        Upload to Processor
+                        <ExternalLink className="h-2.5 w-2.5 opacity-60" />
+                      </a>
+                    </Button>
+                  </div>
+                  <Input
+                    value={newMapDraft.imageUrl}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      setNewMapDraft({ ...newMapDraft, imageUrl: val })
+                      if (val.includes('.webp') || val.includes('_tiles')) {
+                        checkAndFetchProcessorTiles(val, 'newMap')
+                      }
+                    }}
+                    onBlur={(e) => checkAndFetchProcessorTiles(e.target.value, 'newMap')}
+                    placeholder="Leave blank for an empty player hex/grid canvas"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    Leave empty to create a blank player canvas where hexes can be painted and connected with roads.
+                  </p>
+                </div>
+              </>
+            )}
             {/* Grid & Dimensions */}
             <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border/40">
               <div>
@@ -4426,6 +4535,21 @@ export default function MapViewerClient() {
                 <Switch
                   checked={settingsDraft.isHomeMap}
                   onCheckedChange={(val) => setSettingsDraft({ ...settingsDraft, isHomeMap: val })}
+                />
+              </div>
+              <div className="flex items-center justify-between pt-2 border-t border-border/40">
+                <div className="space-y-0.5 pr-2">
+                  <span className="font-bold flex items-center gap-1.5 text-xs text-foreground">
+                    <Grid className="h-3.5 w-3.5 text-purple-400" />
+                    Infinite Grid Mode
+                  </span>
+                  <p className="text-[11px] text-muted-foreground">
+                    Enable unbounded hex grid rendering without background image constraints.
+                  </p>
+                </div>
+                <Switch
+                  checked={settingsDraft.isInfiniteGrid || false}
+                  onCheckedChange={(val) => setSettingsDraft({ ...settingsDraft, isInfiniteGrid: val })}
                 />
               </div>
               <div className="flex items-center justify-between pt-2 border-t border-border/40">
@@ -4760,7 +4884,7 @@ export default function MapViewerClient() {
                       if (target) router.push(`/world/${encodeURIComponent(world.name)}/map/${target.slug}`)
                     }}
                   >
-                    <Map className="h-3.5 w-3.5" />
+                    <MapIcon className="h-3.5 w-3.5" />
                     Open Linked Map
                   </Button>
                 </div>

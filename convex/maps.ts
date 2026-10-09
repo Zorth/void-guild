@@ -138,6 +138,7 @@ export const createMap = mutation({
     gridScale: v.optional(v.number()),
     gridScaleUnit: v.optional(v.string()),
     isExplorationMap: v.optional(v.boolean()),
+    isInfiniteGrid: v.optional(v.boolean()),
     hideFromMenu: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
@@ -185,6 +186,7 @@ export const createMap = mutation({
       gridScale: args.gridScale,
       gridScaleUnit: args.gridScaleUnit,
       isExplorationMap: args.isExplorationMap ?? false,
+      isInfiniteGrid: args.isInfiniteGrid ?? false,
       hideFromMenu: args.hideFromMenu ?? false,
       revealedCells: [],
     })
@@ -213,6 +215,7 @@ export const updateMapSettings = mutation({
     gridScale: v.optional(v.number()),
     gridScaleUnit: v.optional(v.string()),
     isExplorationMap: v.optional(v.boolean()),
+    isInfiniteGrid: v.optional(v.boolean()),
     hideFromMenu: v.optional(v.boolean()),
     imageUpdatedAt: v.optional(v.number()),
   },
@@ -261,6 +264,7 @@ export const updateMapSettings = mutation({
     if (args.gridScale !== undefined) patches.gridScale = args.gridScale
     if (args.gridScaleUnit !== undefined) patches.gridScaleUnit = args.gridScaleUnit
     if (args.isExplorationMap !== undefined) patches.isExplorationMap = args.isExplorationMap
+    if (args.isInfiniteGrid !== undefined) patches.isInfiniteGrid = args.isInfiniteGrid
     if (args.hideFromMenu !== undefined) patches.hideFromMenu = args.hideFromMenu
     if (args.imageUpdatedAt !== undefined) patches.imageUpdatedAt = args.imageUpdatedAt
 
