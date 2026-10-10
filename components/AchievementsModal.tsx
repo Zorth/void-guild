@@ -32,6 +32,9 @@ interface AchievementsData {
   isAdmin: boolean
   unlockedCount: number
   totalCount: number
+  totalRegistryCount?: number
+  normalCount?: number
+  unlockedNormalCount?: number
 }
 
 interface AchievementsModalProps {
@@ -88,8 +91,25 @@ export default function AchievementsModal({ open, onOpenChange }: AchievementsMo
     return true
   })
 
-  const unlockedVisibleCount = visibleAchievements.filter((a) => a.isUnlocked).length
-  const totalVisibleCount = visibleAchievements.length
+  // Normal achievements stats
+  const normalAchievements = achievements.filter((a) => !a.isHidden)
+  const totalNormalCount = data?.normalCount ?? normalAchievements.length
+  const unlockedNormalCount =
+    data?.unlockedNormalCount ?? normalAchievements.filter((a) => a.isUnlocked).length
+
+  const allNormalCompleted = totalNormalCount > 0 && unlockedNormalCount >= totalNormalCount
+
+  // Total count logic:
+  // If user completed all normal achievements (or admin view is active), include all hidden achievements (e.g. 34/50)
+  // Otherwise, only count visible achievements (normal + unlocked hidden)
+  const totalRegistryCount = data?.totalRegistryCount ?? achievements.length
+  const totalDisplayCount = isEffectiveAdmin || allNormalCompleted
+    ? totalRegistryCount
+    : (data?.totalCount ?? visibleAchievements.length)
+
+  const unlockedDisplayCount = isEffectiveAdmin || allNormalCompleted
+    ? (data?.unlockedCount ?? achievements.filter((a) => a.isUnlocked).length)
+    : visibleAchievements.filter((a) => a.isUnlocked).length
 
   const filteredAchievements = visibleAchievements.filter((a) => {
     if (filter === 'unlocked') return a.isUnlocked
@@ -98,7 +118,7 @@ export default function AchievementsModal({ open, onOpenChange }: AchievementsMo
   })
 
   const progressPercentage =
-    totalVisibleCount > 0 ? Math.round((unlockedVisibleCount / totalVisibleCount) * 100) : 0
+    totalDisplayCount > 0 ? Math.round((unlockedDisplayCount / totalDisplayCount) * 100) : 0
 
   const renderReward = (item: Achievement, isSubItem = false) => {
     const hasReward = Boolean(item.reward && item.reward.trim() !== '')
@@ -231,7 +251,7 @@ export default function AchievementsModal({ open, onOpenChange }: AchievementsMo
               <div className="flex justify-between text-xs font-semibold">
                 <span className="text-muted-foreground">Overall Progress</span>
                 <span className="text-purple-400 font-bold">
-                  {unlockedVisibleCount} / {totalVisibleCount} Unlocked ({progressPercentage}%)
+                  {unlockedDisplayCount} / {totalDisplayCount} Unlocked ({progressPercentage}%)
                 </span>
               </div>
               <div className="w-full bg-muted/40 h-2 rounded-full overflow-hidden border border-border/30">
@@ -268,7 +288,7 @@ export default function AchievementsModal({ open, onOpenChange }: AchievementsMo
                     : 'bg-muted/30 hover:bg-muted/60 border-border/50 text-muted-foreground'
                 )}
               >
-                Unlocked ({unlockedVisibleCount})
+                Unlocked ({unlockedDisplayCount})
               </button>
               <button
                 type="button"

@@ -959,17 +959,29 @@ export const syncAndGetAchievements = mutation({
     }
 
     const normalDefs = ACHIEVEMENTS_REGISTRY.filter((a) => a.category === 'normal')
-    const totalUnlockedCount = unlockedMap.size
-    // Total viewable achievements: normal achievements + unlocked secret/hidden achievements (or all secret achievements if admin)
     const hiddenDefs = ACHIEVEMENTS_REGISTRY.filter((a) => a.category === 'hidden')
+    const totalUnlockedCount = unlockedMap.size
+    const normalCount = normalDefs.length
+    const unlockedNormalCount = normalDefs.filter((a) => unlockedMap.has(a.id)).length
+    const totalRegistryCount = ACHIEVEMENTS_REGISTRY.length
+    const allNormalCompleted = normalCount > 0 && unlockedNormalCount >= normalCount
+
+    // Total viewable achievements:
+    // If all normal achievements completed or admin: full registry count (including hidden ones)
+    // Otherwise: normal achievements + unlocked secret/hidden achievements
     const viewableHiddenCount = isAdmin ? hiddenDefs.length : hiddenDefs.filter((a) => unlockedMap.has(a.id)).length
-    const totalViewableCount = normalDefs.length + viewableHiddenCount
+    const totalViewableCount = (isAdmin || allNormalCompleted)
+      ? totalRegistryCount
+      : normalDefs.length + viewableHiddenCount
 
     return {
       achievements: result,
       isAdmin,
       unlockedCount: totalUnlockedCount,
       totalCount: totalViewableCount,
+      totalRegistryCount,
+      normalCount,
+      unlockedNormalCount,
     }
   },
 })
