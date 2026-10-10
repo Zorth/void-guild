@@ -325,6 +325,7 @@ export default function MapViewerClient() {
   const [draggingPinId, setDraggingPinId] = useState<Id<'mapPins'> | null>(null)
   const [draggedPinOffset, setDraggedPinOffset] = useState<{ x: number; y: number } | null>(null)
   const pinDragStartRef = useRef<{ clientX: number; clientY: number; origX: number; origY: number; moved: boolean } | null>(null)
+  const hasDraggedPinRef = useRef(false)
 
   // Locations Directory state
   const [isLocationsMenuOpen, setIsLocationsMenuOpen] = useState(false)
@@ -804,6 +805,7 @@ export default function MapViewerClient() {
       const dy = (e.clientY - pinDragStartRef.current.clientY) / scale
       if (Math.hypot(dx, dy) > 4) {
         pinDragStartRef.current.moved = true
+        hasDraggedPinRef.current = true
         const dxPercent = (dx / mapWidth) * 100
         const dyPercent = (dy / mapHeight) * 100
         const newX = Math.min(100, Math.max(0, pinDragStartRef.current.origX + dxPercent))
@@ -849,10 +851,12 @@ export default function MapViewerClient() {
     }
 
     if (draggingPinId && pinDragStartRef.current) {
-      if (pinDragStartRef.current.moved && draggedPinOffset) {
+      const wasMoved = pinDragStartRef.current.moved
+      if (wasMoved && draggedPinOffset) {
         const pinToUpdate = draggingPinId
         const newX = Number(draggedPinOffset.x.toFixed(2))
         const newY = Number(draggedPinOffset.y.toFixed(2))
+        hasDraggedPinRef.current = true
         updatePinPositionMutation({
           pinId: pinToUpdate,
           x: newX,
@@ -860,13 +864,15 @@ export default function MapViewerClient() {
         })
           .then(() => toast.success('Pin repositioned'))
           .catch(() => toast.error('Failed to move pin'))
-      } else if (!pinDragStartRef.current.moved) {
-        const clickedPin = fullData?.pins.find((p) => p._id === draggingPinId)
-        if (clickedPin) setSelectedPin(clickedPin)
+      } else {
+        hasDraggedPinRef.current = false
       }
       setDraggingPinId(null)
       setDraggedPinOffset(null)
       pinDragStartRef.current = null
+      setTimeout(() => {
+        hasDraggedPinRef.current = false
+      }, 150)
       return
     }
 
@@ -954,6 +960,21 @@ export default function MapViewerClient() {
       return
     }
 
+    if (draggingPinId && pinDragStartRef.current && e.touches.length === 1) {
+      const dx = (e.touches[0].clientX - pinDragStartRef.current.clientX) / scale
+      const dy = (e.touches[0].clientY - pinDragStartRef.current.clientY) / scale
+      if (Math.hypot(dx, dy) > 4) {
+        pinDragStartRef.current.moved = true
+        hasDraggedPinRef.current = true
+        const dxPercent = (dx / mapWidth) * 100
+        const dyPercent = (dy / mapHeight) * 100
+        const newX = Math.min(100, Math.max(0, pinDragStartRef.current.origX + dxPercent))
+        const newY = Math.min(100, Math.max(0, pinDragStartRef.current.origY + dyPercent))
+        setDraggedPinOffset({ x: newX, y: newY })
+      }
+      return
+    }
+
     if (e.touches.length === 2 && touchDistanceRef.current !== null) {
       const dist = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
@@ -999,6 +1020,31 @@ export default function MapViewerClient() {
     }
     if (isMeasuring) {
       setIsMeasuring(false)
+      return
+    }
+    if (draggingPinId && pinDragStartRef.current) {
+      const wasMoved = pinDragStartRef.current.moved
+      if (wasMoved && draggedPinOffset) {
+        const pinToUpdate = draggingPinId
+        const newX = Number(draggedPinOffset.x.toFixed(2))
+        const newY = Number(draggedPinOffset.y.toFixed(2))
+        hasDraggedPinRef.current = true
+        updatePinPositionMutation({
+          pinId: pinToUpdate,
+          x: newX,
+          y: newY,
+        })
+          .then(() => toast.success('Pin repositioned'))
+          .catch(() => toast.error('Failed to move pin'))
+      } else {
+        hasDraggedPinRef.current = false
+      }
+      setDraggingPinId(null)
+      setDraggedPinOffset(null)
+      pinDragStartRef.current = null
+      setTimeout(() => {
+        hasDraggedPinRef.current = false
+      }, 150)
       return
     }
     setIsDragging(false)
@@ -3684,6 +3730,7 @@ export default function MapViewerClient() {
                 onMouseDown={(e) => {
                   if (isOwner && isEditMode && activeTool === 'view') {
                     e.stopPropagation()
+                    hasDraggedPinRef.current = false
                     pinDragStartRef.current = {
                       clientX: e.clientX,
                       clientY: e.clientY,
@@ -3694,9 +3741,23 @@ export default function MapViewerClient() {
                     setDraggingPinId(pin._id)
                   }
                 }}
+                onTouchStart={(e) => {
+                  if (isOwner && isEditMode && activeTool === 'view' && e.touches.length === 1) {
+                    e.stopPropagation()
+                    hasDraggedPinRef.current = false
+                    pinDragStartRef.current = {
+                      clientX: e.touches[0].clientX,
+                      clientY: e.touches[0].clientY,
+                      origX: pin.x,
+                      origY: pin.y,
+                      moved: false,
+                    }
+                    setDraggingPinId(pin._id)
+                  }
+                }}
                 onClick={(e) => {
                   e.stopPropagation()
-                  if (pinDragStartRef.current?.moved) return
+                  if (hasDraggedPinRef.current || pinDragStartRef.current?.moved) return
                   if (isOwner && isEditMode) {
                     setSelectedPin(pin)
                     return
