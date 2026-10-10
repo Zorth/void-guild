@@ -88,7 +88,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     reward: 'Sabon Classic Serif Font Cosmetic',
     chainId: 'sessions_played',
     tier: 1,
-    maxTier: 3,
+    maxTier: 4,
     checkEligibility: (data) => data.sessionsPlayedCount >= 1,
   },
   {
@@ -99,7 +99,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     reward: 'Medieval Sharp Font Cosmetic',
     chainId: 'sessions_played',
     tier: 2,
-    maxTier: 3,
+    maxTier: 4,
     checkEligibility: (data) => data.sessionsPlayedCount >= 5,
   },
   {
@@ -110,8 +110,19 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     reward: 'Taroca High-Fantasy Font Cosmetic',
     chainId: 'sessions_played',
     tier: 3,
-    maxTier: 3,
+    maxTier: 4,
     checkEligibility: (data) => data.sessionsPlayedCount >= 10,
+  },
+  {
+    id: 'legend_player_25',
+    title: 'Living Legend',
+    description: 'Played in 25 or more completed sessions.',
+    category: 'hidden',
+    reward: 'Handwritten Script Font Cosmetic',
+    chainId: 'sessions_played',
+    tier: 4,
+    maxTier: 4,
+    checkEligibility: (data) => data.sessionsPlayedCount >= 25,
   },
   {
     id: 'first_gm_session',

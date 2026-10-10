@@ -21,6 +21,7 @@ export const ACHIEVEMENT_INFO: Record<string, AchievementInfo> = {
   first_session: { title: 'Into the Void', category: 'normal' },
   veteran_player_5: { title: 'Seasoned Adventurer', category: 'hidden' },
   master_player_10: { title: 'Guild Champion', category: 'hidden' },
+  legend_player_25: { title: 'Living Legend', category: 'hidden' },
   first_gm_session: { title: 'Behind the Screen', category: 'normal' },
   veteran_gm_5: { title: 'Master Storyteller', category: 'hidden' },
   level_5_char: { title: 'Rising Power', category: 'normal' },
@@ -111,6 +112,13 @@ export const FONT_OPTIONS: CosmeticOption[] = [
     unlockedByDefault: false,
     requiredAchievementId: 'system_polymath',
     value: 'font-cinzel-dec',
+  },
+  {
+    id: 'handwritten',
+    name: 'Handwritten Script',
+    unlockedByDefault: false,
+    requiredAchievementId: 'legend_player_25',
+    value: 'font-handwritten',
   },
 ]
 
