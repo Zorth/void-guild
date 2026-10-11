@@ -136,9 +136,17 @@ export default function WorldClient() {
 
   useEffect(() => {
     if (userId) {
-      recordWorldVisit().then(() => syncAndGetAchievements()).catch(() => {})
+      const visitKey = `void_world_visited_${worldName}`
+      if (typeof window !== 'undefined' && sessionStorage.getItem(visitKey)) {
+        return
+      }
+      recordWorldVisit()
+        .then(() => {
+          if (typeof window !== 'undefined') sessionStorage.setItem(visitKey, '1')
+        })
+        .catch(() => {})
     }
-  }, [userId, recordWorldVisit, syncAndGetAchievements])
+  }, [userId, worldName, recordWorldVisit])
   
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming')
   const { pfFilter, dndFilter, setPfFilter, setDndFilter } = useSystemFilters()

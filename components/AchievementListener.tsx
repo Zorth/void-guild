@@ -37,6 +37,8 @@ function fireAchievementConfetti() {
   })
 }
 
+const ACHIEVEMENT_CHECK_INTERVAL_MS = 10 * 60 * 1000 // Throttle check to at most once per 10 minutes per session
+
 export default function AchievementListener() {
   const { isAuthenticated, isLoading } = useConvexAuth()
   const syncAndGetAchievements = useMutation(api.achievements.syncAndGetAchievements)
@@ -47,10 +49,20 @@ export default function AchievementListener() {
   useEffect(() => {
     if (isLoading || !isAuthenticated) return
 
+    const storageKey = 'void_last_achievement_check'
+    const lastCheck = typeof window !== 'undefined' ? sessionStorage.getItem(storageKey) : null
+    const now = Date.now()
+    if (lastCheck && now - Number(lastCheck) < ACHIEVEMENT_CHECK_INTERVAL_MS) {
+      return // Skip check: already checked within cooldown window
+    }
+
     const checkAndNotify = async () => {
       if (isCheckingRef.current) return
       isCheckingRef.current = true
       try {
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem(storageKey, String(Date.now()))
+        }
         const res = await syncAndGetAchievements()
         if (!res?.achievements) return
 

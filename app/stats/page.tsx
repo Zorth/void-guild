@@ -24,9 +24,17 @@ export default function StatsPage() {
 
     useEffect(() => {
       if (userId) {
-        recordLeaderboardVisit().then(() => syncAndGetAchievements()).catch(() => {});
+        const visitKey = 'void_leaderboard_visited'
+        if (typeof window !== 'undefined' && sessionStorage.getItem(visitKey)) {
+          return
+        }
+        recordLeaderboardVisit()
+          .then(() => {
+            if (typeof window !== 'undefined') sessionStorage.setItem(visitKey, '1')
+          })
+          .catch(() => {});
       }
-    }, [userId, recordLeaderboardVisit, syncAndGetAchievements]);
+    }, [userId, recordLeaderboardVisit]);
 
     const sortedCharacters = useMemo(() => {
       if (!characters) return [];
