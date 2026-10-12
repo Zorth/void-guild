@@ -60,7 +60,7 @@ export const getBettingData = query({
         openChallenges: [],
         activeMatches: [],
         recentBets: [],
-        record: { wins: 0, losses: 0 },
+        record: { wins: 0, losses: 0, net: 0 },
         availableOpponents: [],
       }
     }
@@ -73,7 +73,7 @@ export const getBettingData = query({
         openChallenges: [],
         activeMatches: [],
         recentBets: [],
-        record: { wins: 0, losses: 0 },
+        record: { wins: 0, losses: 0, net: 0 },
         availableOpponents: [],
       }
     }
@@ -161,13 +161,15 @@ export const getBettingData = query({
     const recentBets = await Promise.all(recentBetsRaw.map((b) => decorateBet(ctx, b)))
 
     // All-time win/loss record across every completed bet, not just the 20 shown
-    const record = { wins: 0, losses: 0 }
+    const record = { wins: 0, losses: 0, net: 0 }
     for (const b of map.values()) {
       if (b.status !== 'completed') continue
       if (b.winnerCharacterId === args.characterId) {
         record.wins++
+        record.net += b.wagerAmount
       } else if (b.loserCharacterId === args.characterId) {
         record.losses++
+        record.net -= b.wagerAmount
       }
     }
 
