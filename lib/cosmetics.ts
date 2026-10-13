@@ -22,7 +22,7 @@ export const ACHIEVEMENT_INFO: Record<string, AchievementInfo> = {
   veteran_player_5: { title: 'Seasoned Adventurer', category: 'hidden' },
   master_player_10: { title: 'Guild Champion', category: 'hidden' },
   legend_player_25: { title: 'Living Legend', category: 'hidden' },
-  first_gm_session: { title: 'Behind the Screen', category: 'normal' },
+  first_gm_session: { title: 'Behind the Screen', category: 'hidden' },
   veteran_gm_5: { title: 'Master Storyteller', category: 'hidden' },
   level_5_char: { title: 'Rising Power', category: 'normal' },
   level_10_char: { title: 'Legendary Hero', category: 'hidden' },

@@ -128,7 +128,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     id: 'first_gm_session',
     title: 'Behind the Screen',
     description: 'Ran your first session as a Gamemaster/Voidmaster.',
-    category: 'normal',
+    category: 'hidden',
     reward: 'Voidmaster Screen (Rotating Void Border) Cosmetic',
     chainId: 'sessions_ran',
     tier: 1,
