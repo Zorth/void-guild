@@ -369,18 +369,19 @@ export default function MapViewerClient() {
   }
 
   const handleSelectProcessorMap = (mapItem: any) => {
+    const chosenImageUrl = mapItem.svgUrl || mapItem.imageUrl || ''
     if (processorTargetMode === 'newMap') {
       setNewMapDraft((prev) => ({
         ...prev,
         name: prev.name || mapItem.slug.replace(/[-_]/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
         slug: prev.slug || mapItem.slug,
-        imageUrl: mapItem.imageUrl || '',
+        imageUrl: chosenImageUrl || prev.imageUrl,
         tileUrl: mapItem.tilesUrl || '',
       }))
     } else if (processorTargetMode === 'mapSettings') {
       setSettingsDraft((prev) => ({
         ...prev,
-        imageUrl: mapItem.imageUrl || prev.imageUrl,
+        imageUrl: chosenImageUrl || prev.imageUrl,
         tileUrl: mapItem.tilesUrl || '',
         width: mapItem.width || prev.width,
         height: mapItem.height || prev.height,
@@ -391,7 +392,7 @@ export default function MapViewerClient() {
       setNewLayerDraft((prev) => ({
         ...prev,
         name: prev.name || mapItem.slug.replace(/[-_]/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
-        imageUrl: mapItem.imageUrl || '',
+        imageUrl: chosenImageUrl || '',
         tileUrl: mapItem.tilesUrl || '',
         tileSize: mapItem.tileSize || 256,
         maxZoom: mapItem.maxZoom !== undefined ? mapItem.maxZoom : prev.maxZoom,
@@ -401,16 +402,16 @@ export default function MapViewerClient() {
     toast.success(`Selected "${mapItem.slug}" from Map Processor!`)
   }
 
-  // Helper to parse processor map info from an entered URL (e.g., if user pastes webp or tile URL)
+  // Helper to parse processor map info from an entered URL (e.g., if user pastes svg, webp, jpeg, or tile URL)
   const extractProcessorSlugAndBase = (url: string) => {
     const trimmed = (url || '').trim()
     if (!trimmed) return null
     try {
       const parsed = new URL(trimmed)
       const pathname = parsed.pathname
-      // Check for /<slug>.webp, /<slug>.svg, /<slug>_tiles_files/..., /<slug>_tiles.dzi, /<slug>_tiles
+      // Check for /<slug>.webp, /<slug>.svg, /<slug>.jpeg, /<slug>_tiles_files/..., /<slug>_tiles.dzi, /<slug>_tiles
       // Extracts the clean base map slug
-      const match = pathname.match(/^\/?([a-zA-Z0-9_-]+?)(?:_tiles(?:_files.*|\.dzi)?|\.(?:webp|svg|png|jpg|jpeg))?$/i)
+      const match = pathname.match(/^\/?([a-zA-Z0-9_-]+?)(?:_tiles(?:_files.*|\.dzi)?|\.(?:webp|svg|png|jpg|jpeg))?(?:\/.*)?$/i)
       if (match && match[1]) {
         let slug = match[1]
         // In case suffix wasn't fully stripped:
@@ -439,6 +440,8 @@ export default function MapViewerClient() {
       const mapItem = await res.json()
       if (!mapItem || (!mapItem.tilesUrl && !mapItem.hasTiles)) return
 
+      const chosenImageUrl = mapItem.svgUrl || mapItem.imageUrl || ''
+
       if (target === 'newMap') {
         setNewMapDraft((prev) => {
           // If tileUrl is already set and matches this map's tiles, no need to overwrite
@@ -447,7 +450,7 @@ export default function MapViewerClient() {
             ...prev,
             name: prev.name || mapItem.slug.replace(/[-_]/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
             slug: prev.slug || mapItem.slug,
-            imageUrl: mapItem.imageUrl || prev.imageUrl || '',
+            imageUrl: chosenImageUrl || prev.imageUrl || '',
             tileUrl: mapItem.tilesUrl || prev.tileUrl || '',
           }
         })
@@ -457,7 +460,7 @@ export default function MapViewerClient() {
           if (prev.tileUrl === mapItem.tilesUrl && prev.imageUrl) return prev
           return {
             ...prev,
-            imageUrl: mapItem.imageUrl || prev.imageUrl || '',
+            imageUrl: chosenImageUrl || prev.imageUrl || '',
             tileUrl: mapItem.tilesUrl || prev.tileUrl || '',
             width: mapItem.width || prev.width,
             height: mapItem.height || prev.height,
@@ -472,7 +475,7 @@ export default function MapViewerClient() {
           return {
             ...prev,
             name: prev.name || mapItem.slug.replace(/[-_]/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
-            imageUrl: mapItem.imageUrl || prev.imageUrl || '',
+            imageUrl: chosenImageUrl || prev.imageUrl || '',
             tileUrl: mapItem.tilesUrl || prev.tileUrl || '',
             tileSize: mapItem.tileSize || prev.tileSize || 256,
             maxZoom: mapItem.maxZoom !== undefined ? mapItem.maxZoom : prev.maxZoom,
@@ -4994,17 +4997,17 @@ export default function MapViewerClient() {
 
       {/* DIALOG: PROCESSOR MAPS PICKER */}
       <Dialog open={isProcessorPickerOpen} onOpenChange={setIsProcessorPickerOpen}>
-        <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="w-full sm:max-w-2xl max-h-[85vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <Layers className="h-5 w-5 text-cyan-400" />
+            <DialogTitle className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-2 text-base font-bold">
+                <Layers className="h-5 w-5 text-cyan-400 shrink-0" />
                 Hosted Maps on Map Processor
               </span>
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 text-xs gap-1 text-purple-400 hover:text-purple-300"
+                className="h-7 text-xs gap-1 text-purple-400 hover:text-purple-300 shrink-0"
                 asChild
               >
                 <a href="https://maps.tarragon.be" target="_blank" rel="noopener noreferrer">
@@ -5034,9 +5037,9 @@ export default function MapViewerClient() {
                 {processorMaps.map((item) => (
                   <div
                     key={item.slug}
-                    className="p-3 rounded-lg border border-border/60 bg-muted/20 hover:bg-muted/40 hover:border-cyan-500/50 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    className="p-3 rounded-lg border border-border/60 bg-muted/20 hover:bg-muted/40 hover:border-cyan-500/50 transition-all flex flex-col md:flex-row md:items-center justify-between gap-3 overflow-hidden"
                   >
-                    <div className="min-w-0 space-y-1">
+                    <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-sm text-foreground">{item.slug}</span>
                         {item.width && item.height && (
@@ -5051,30 +5054,43 @@ export default function MapViewerClient() {
                         )}
                         {item.svgUrl && (
                           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-950/60 border border-emerald-800/60 text-emerald-300">
-                            SVG
+                            SVG Available
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] font-mono text-muted-foreground truncate max-w-md">
-                        {item.tilesUrl || item.imageUrl}
+                      <p className="text-[11px] font-mono text-muted-foreground truncate w-full" title={item.tilesUrl || item.svgUrl || item.imageUrl}>
+                        {item.tilesUrl || item.svgUrl || item.imageUrl}
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0 self-end md:self-center">
                       {item.tilesUrl && (
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-7 px-2 text-[11px] text-slate-300 hover:text-white"
+                          className="h-7 px-2 text-[11px] text-slate-300 hover:text-white hover:bg-slate-800"
                           onClick={() => handleCopyLink(item.tilesUrl, 'Tile URL')}
-                          title="Copy tile URL"
+                          title="Copy tile pyramid URL template"
                         >
-                          <Copy className="h-3 w-3" />
+                          <Copy className="h-3 w-3 mr-1" />
+                          Tiles
+                        </Button>
+                      )}
+                      {(item.svgUrl || item.imageUrl) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-[11px] text-slate-300 hover:text-white hover:bg-slate-800"
+                          onClick={() => handleCopyLink(item.svgUrl || item.imageUrl, item.svgUrl ? 'SVG URL' : 'Image URL')}
+                          title={`Copy ${item.svgUrl ? 'SVG' : 'Image'} URL`}
+                        >
+                          <Copy className="h-3 w-3 mr-1" />
+                          {item.svgUrl ? 'SVG' : 'Image'}
                         </Button>
                       )}
                       <Button
                         size="sm"
-                        className="h-7 text-xs bg-cyan-600 hover:bg-cyan-500 text-white font-semibold"
+                        className="h-7 text-xs bg-cyan-600 hover:bg-cyan-500 text-white font-semibold shadow-sm"
                         onClick={() => handleSelectProcessorMap(item)}
                       >
                         Use This Map
