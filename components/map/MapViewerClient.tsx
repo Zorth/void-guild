@@ -53,6 +53,8 @@ export function renderPinIcon(iconName?: string, className = "h-4 w-4 text-white
   return <IconComp className={className} />
 }
 
+export const MAX_MAP_ZOOM = 32
+
 interface TilePyramidLayerProps {
   tileUrl: string
   mapWidth: number
@@ -340,6 +342,7 @@ export default function MapViewerClient() {
     }
     return true
   })
+  const [isTilePyramidEnabled, setIsTilePyramidEnabled] = useState(true)
   const [isNotesMenuOpen, setIsNotesMenuOpen] = useState(false)
   const [selectedNoteCoords, setSelectedNoteCoords] = useState<{ x: number; y: number } | null>(null)
   const [selectedNoteData, setSelectedNoteData] = useState<any>(null)
@@ -370,21 +373,32 @@ export default function MapViewerClient() {
 
   const handleSelectProcessorMap = (mapItem: any) => {
     const chosenImageUrl = mapItem.svgUrl || mapItem.imageUrl || ''
+    const isSvg = Boolean(mapItem.svgUrl || (chosenImageUrl && chosenImageUrl.toLowerCase().endsWith('.svg')))
+    // If the map is an SVG and tiles were generated from small native dimensions (e.g. < 500px),
+    // do NOT attach low-res raster tiles that would mask the vector SVG!
+    const isLowResTilePyramid = isSvg && mapItem.width && mapItem.width < 500
+    const finalTileUrl = isLowResTilePyramid ? '' : (mapItem.tilesUrl || '')
+    const defaultScaleMultiplier = isSvg && mapItem.width && mapItem.width < 500 ? 10 : 1
+    const chosenWidth = mapItem.width ? Math.round(mapItem.width * defaultScaleMultiplier) : undefined
+    const chosenHeight = mapItem.height ? Math.round(mapItem.height * defaultScaleMultiplier) : undefined
+
     if (processorTargetMode === 'newMap') {
       setNewMapDraft((prev) => ({
         ...prev,
         name: prev.name || mapItem.slug.replace(/[-_]/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
         slug: prev.slug || mapItem.slug,
         imageUrl: chosenImageUrl || prev.imageUrl,
-        tileUrl: mapItem.tilesUrl || '',
+        tileUrl: finalTileUrl,
+        width: chosenWidth || prev.width,
+        height: chosenHeight || prev.height,
       }))
     } else if (processorTargetMode === 'mapSettings') {
       setSettingsDraft((prev) => ({
         ...prev,
         imageUrl: chosenImageUrl || prev.imageUrl,
-        tileUrl: mapItem.tilesUrl || '',
-        width: mapItem.width || prev.width,
-        height: mapItem.height || prev.height,
+        tileUrl: finalTileUrl,
+        width: chosenWidth || prev.width,
+        height: chosenHeight || prev.height,
         tileSize: mapItem.tileSize || 256,
         maxZoom: mapItem.maxZoom !== undefined ? mapItem.maxZoom : prev.maxZoom,
       }))
@@ -393,13 +407,21 @@ export default function MapViewerClient() {
         ...prev,
         name: prev.name || mapItem.slug.replace(/[-_]/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
         imageUrl: chosenImageUrl || '',
-        tileUrl: mapItem.tilesUrl || '',
+        tileUrl: finalTileUrl,
         tileSize: mapItem.tileSize || 256,
         maxZoom: mapItem.maxZoom !== undefined ? mapItem.maxZoom : prev.maxZoom,
       }))
     }
     setIsProcessorPickerOpen(false)
-    toast.success(`Selected "${mapItem.slug}" from Map Processor!`)
+    if (isSvg) {
+      toast.success(
+        isLowResTilePyramid
+          ? `Selected vector SVG "${mapItem.slug}"! Pure vector mode enabled (${chosenWidth}×${chosenHeight}px).`
+          : `Selected vector SVG "${mapItem.slug}"!`
+      )
+    } else {
+      toast.success(`Selected "${mapItem.slug}" from Map Processor!`)
+    }
   }
 
   // Helper to parse processor map info from an entered URL (e.g., if user pastes svg, webp, jpeg, or tile URL)
@@ -441,47 +463,58 @@ export default function MapViewerClient() {
       if (!mapItem || (!mapItem.tilesUrl && !mapItem.hasTiles)) return
 
       const chosenImageUrl = mapItem.svgUrl || mapItem.imageUrl || ''
+      const isSvg = Boolean(mapItem.svgUrl || (chosenImageUrl && chosenImageUrl.toLowerCase().endsWith('.svg')))
+      const isLowResTilePyramid = isSvg && mapItem.width && mapItem.width < 500
+      const finalTileUrl = isLowResTilePyramid ? '' : (mapItem.tilesUrl || '')
+      const defaultScaleMultiplier = isSvg && mapItem.width && mapItem.width < 500 ? 10 : 1
+      const chosenWidth = mapItem.width ? Math.round(mapItem.width * defaultScaleMultiplier) : undefined
+      const chosenHeight = mapItem.height ? Math.round(mapItem.height * defaultScaleMultiplier) : undefined
 
       if (target === 'newMap') {
         setNewMapDraft((prev) => {
-          // If tileUrl is already set and matches this map's tiles, no need to overwrite
-          if (prev.tileUrl === mapItem.tilesUrl && prev.imageUrl) return prev
+          if (prev.tileUrl === finalTileUrl && prev.imageUrl) return prev
           return {
             ...prev,
             name: prev.name || mapItem.slug.replace(/[-_]/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
             slug: prev.slug || mapItem.slug,
             imageUrl: chosenImageUrl || prev.imageUrl || '',
-            tileUrl: mapItem.tilesUrl || prev.tileUrl || '',
+            tileUrl: finalTileUrl || prev.tileUrl || '',
+            width: chosenWidth || prev.width,
+            height: chosenHeight || prev.height,
           }
         })
-        toast.success(`Found map tiles for "${mapItem.slug}"!`)
+        toast.success(`Found map details for "${mapItem.slug}"!`)
       } else if (target === 'mapSettings') {
         setSettingsDraft((prev) => {
-          if (prev.tileUrl === mapItem.tilesUrl && prev.imageUrl) return prev
+          if (prev.tileUrl === finalTileUrl && prev.imageUrl) return prev
           return {
             ...prev,
             imageUrl: chosenImageUrl || prev.imageUrl || '',
-            tileUrl: mapItem.tilesUrl || prev.tileUrl || '',
-            width: mapItem.width || prev.width,
-            height: mapItem.height || prev.height,
+            tileUrl: finalTileUrl || prev.tileUrl || '',
+            width: chosenWidth || prev.width,
+            height: chosenHeight || prev.height,
             tileSize: mapItem.tileSize || prev.tileSize || 256,
             maxZoom: mapItem.maxZoom !== undefined ? mapItem.maxZoom : prev.maxZoom,
           }
         })
-        toast.success(`Found map tiles & dimensions for "${mapItem.slug}"!`)
+        toast.success(
+          isSvg
+            ? `Found vector SVG for "${mapItem.slug}"! Scaled to ${chosenWidth}×${chosenHeight}px.`
+            : `Found map tiles & dimensions for "${mapItem.slug}"!`
+        )
       } else if (target === 'layer') {
         setNewLayerDraft((prev) => {
-          if (prev.tileUrl === mapItem.tilesUrl && prev.imageUrl) return prev
+          if (prev.tileUrl === finalTileUrl && prev.imageUrl) return prev
           return {
             ...prev,
             name: prev.name || mapItem.slug.replace(/[-_]/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
             imageUrl: chosenImageUrl || prev.imageUrl || '',
-            tileUrl: mapItem.tilesUrl || prev.tileUrl || '',
+            tileUrl: finalTileUrl || prev.tileUrl || '',
             tileSize: mapItem.tileSize || prev.tileSize || 256,
             maxZoom: mapItem.maxZoom !== undefined ? mapItem.maxZoom : prev.maxZoom,
           }
         })
-        toast.success(`Found map tiles for layer "${mapItem.slug}"!`)
+        toast.success(`Found layer info for "${mapItem.slug}"!`)
       }
     } catch (err) {
       console.debug('No processor tiles found for entered URL:', err)
@@ -676,7 +709,7 @@ export default function MapViewerClient() {
         const currentScale = scaleRef.current
         const currentPos = positionRef.current
 
-        const newScale = Math.min(Math.max(currentScale * zoomFactor, 0.01), 8)
+        const newScale = Math.min(Math.max(currentScale * zoomFactor, 0.01), MAX_MAP_ZOOM)
         if (newScale === currentScale) return
         const k = newScale / currentScale
 
@@ -965,7 +998,7 @@ export default function MapViewerClient() {
         e.touches[0].clientY - e.touches[1].clientY
       )
       const delta = dist / touchDistanceRef.current
-      const newScale = Math.min(Math.max(scaleRef.current * delta, 0.01), 8)
+      const newScale = Math.min(Math.max(scaleRef.current * delta, 0.01), MAX_MAP_ZOOM)
       scaleRef.current = newScale
       if (containerRef.current) {
         containerRef.current.style.transform = `translate(${positionRef.current.x}px, ${positionRef.current.y}px) scale(${newScale})`
@@ -1037,7 +1070,7 @@ export default function MapViewerClient() {
 
   // Zoom controls
   const handleZoomIn = () => {
-    const newScale = Math.min(scaleRef.current * 1.25, 8)
+    const newScale = Math.min(scaleRef.current * 1.25, MAX_MAP_ZOOM)
     scaleRef.current = newScale
     if (containerRef.current) {
       containerRef.current.style.transform = `translate(${positionRef.current.x}px, ${positionRef.current.y}px) scale(${newScale})`
@@ -1152,15 +1185,20 @@ export default function MapViewerClient() {
     const nh = img.naturalHeight
     if (nw && nh && (nw !== naturalDimensions?.width || nh !== naturalDimensions?.height)) {
       setNaturalDimensions({ width: nw, height: nh })
-      fitMapToViewport(nw, nh)
+      const isSvg = Boolean(currentMap?.imageUrl?.toLowerCase().includes('.svg'))
+      const shouldScaleSvg = isSvg && nw < 800
+      const targetWidth = shouldScaleSvg ? Math.round(nw * 10) : nw
+      const targetHeight = shouldScaleSvg ? Math.round(nh * 10) : nh
+
+      fitMapToViewport(targetWidth, targetHeight)
       hasAutoFittedRef.current = true
 
-      // If the map is still stored with default 2000x2000 square dimensions, persist real dimensions
-      if (currentMap && isOwner && (currentMap.width === 2000 && currentMap.height === 2000) && nw > 0 && nh > 0) {
+      // If the map is still stored with default 2000x2000 square dimensions, persist real or scaled SVG dimensions
+      if (currentMap && isOwner && (currentMap.width === 2000 && currentMap.height === 2000) && targetWidth > 0 && targetHeight > 0) {
         updateMapSettingsMutation({
           mapId: currentMap._id,
-          width: nw,
-          height: nh,
+          width: targetWidth,
+          height: targetHeight,
         }).catch((err) => {
           console.warn('Could not auto-persist detected map dimensions:', err)
         })
@@ -1790,8 +1828,8 @@ export default function MapViewerClient() {
         name: settingsDraft.name,
         slug: settingsDraft.slug,
         isHomeMap: settingsDraft.isHomeMap,
-        imageUrl: settingsDraft.imageUrl || undefined,
-        tileUrl: settingsDraft.tileUrl || undefined,
+        imageUrl: settingsDraft.imageUrl.trim(),
+        tileUrl: settingsDraft.tileUrl.trim(),
         tileSize: !isNaN(tileSizeVal) && tileSizeVal > 0 ? tileSizeVal : 256,
         minZoom: !isNaN(minZoomVal) ? minZoomVal : 0,
         maxZoom: maxZoomVal !== undefined && !isNaN(maxZoomVal) ? maxZoomVal : undefined,
@@ -2630,6 +2668,22 @@ export default function MapViewerClient() {
               />
             </div>
 
+            {/* Tile Pyramid Layer Toggle if currentMap has tileUrl */}
+            {currentMap?.tileUrl && (
+              <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-800">
+                <div className="flex items-center gap-2">
+                  <Layers className="h-3.5 w-3.5 text-cyan-400" />
+                  <span className="font-medium text-slate-200">
+                    {currentMap.imageUrl?.toLowerCase().includes('.svg') ? 'Tile Pyramid Overlay' : 'DeepZoom Tiles'}
+                  </span>
+                </div>
+                <Switch
+                  checked={isTilePyramidEnabled}
+                  onCheckedChange={setIsTilePyramidEnabled}
+                />
+              </div>
+            )}
+
             {fullData?.layers.length === 0 ? (
               <p className="text-xs text-slate-400 italic">No extra layers created.</p>
             ) : (
@@ -3135,6 +3189,7 @@ export default function MapViewerClient() {
               src={getCacheBustedUrl(currentMap.imageUrl, currentMap.imageUpdatedAt)}
               alt={currentMap.name}
               className="absolute inset-0 w-full h-full max-w-none object-fill select-none pointer-events-none"
+              style={{ imageRendering: 'auto' }}
               draggable={false}
               onLoad={handleImageLoad}
             />
@@ -3145,7 +3200,7 @@ export default function MapViewerClient() {
           ) : null}
 
           {/* BASE MAP TILE PYRAMID */}
-          {currentMap?.tileUrl && (
+          {currentMap?.tileUrl && isTilePyramidEnabled && (
             <TilePyramidLayer
               tileUrl={currentMap.tileUrl}
               mapWidth={mapWidth}
@@ -4243,11 +4298,18 @@ export default function MapViewerClient() {
                 />
               </div>
             </div>
-            {/* TILE PYRAMID URL */}
+            {/* MAP IMAGE / VECTOR SVG URL */}
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="font-bold text-muted-foreground">Tile Pyramid URL Template</label>
-                <div className="flex items-center gap-1.5">
+              <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1.5">
+                <div className="flex items-center gap-2">
+                  <label className="font-bold text-muted-foreground">Map Image / Vector SVG URL</label>
+                  {settingsDraft.imageUrl.toLowerCase().includes('.svg') && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-950/60 border border-emerald-800/60 text-emerald-300">
+                      Vector SVG
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <Button
                     type="button"
                     variant="ghost"
@@ -4258,40 +4320,6 @@ export default function MapViewerClient() {
                     <Layers className="h-3 w-3" />
                     Browse Hosted Maps
                   </Button>
-                  {settingsDraft.tileUrl && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 px-2 text-[11px] gap-1 text-slate-300 hover:text-white hover:bg-slate-800"
-                      onClick={() => handleCopyLink(settingsDraft.tileUrl, 'Tile Pyramid URL')}
-                      title="Copy Tile URL to clipboard"
-                    >
-                      <Copy className="h-3 w-3" />
-                      Copy Tiles URL
-                    </Button>
-                  )}
-                </div>
-              </div>
-              <Input
-                value={settingsDraft.tileUrl}
-                onChange={(e) => {
-                  const val = e.target.value
-                  setSettingsDraft({ ...settingsDraft, tileUrl: val })
-                }}
-                onBlur={(e) => checkAndFetchProcessorTiles(e.target.value, 'mapSettings')}
-                placeholder="https://maps.tarragon.be/slug_tiles_files/{z}/{x}_{y}.webp"
-              />
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Supports DeepZoom WebP/JPEG tile pyramids for high performance and deep zoom levels.
-              </p>
-            </div>
-
-            {/* BACKGROUND IMAGE URL */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="font-bold text-muted-foreground">Background Image URL (Fallback / Standalone)</label>
-                <div className="flex items-center gap-1.5">
                   <Button
                     type="button"
                     variant="ghost"
@@ -4315,7 +4343,7 @@ export default function MapViewerClient() {
                       title="Copy Image URL to clipboard"
                     >
                       <Copy className="h-3 w-3" />
-                      Copy Image URL
+                      Copy URL
                     </Button>
                   )}
                   {currentMap?.imageUrl && (
@@ -4336,18 +4364,162 @@ export default function MapViewerClient() {
               </div>
               <Input
                 value={settingsDraft.imageUrl}
-                onChange={(e) => {
-                  const val = e.target.value
-                  setSettingsDraft({ ...settingsDraft, imageUrl: val })
-                  if (val.includes('.webp') || val.includes('_tiles')) {
-                    checkAndFetchProcessorTiles(val, 'mapSettings')
-                  }
-                }}
-                onBlur={(e) => checkAndFetchProcessorTiles(e.target.value, 'mapSettings')}
-                placeholder="https://maps.tarragon.be/kalogeron.webp"
+                onChange={(e) => setSettingsDraft({ ...settingsDraft, imageUrl: e.target.value })}
+                placeholder="https://maps.tarragon.be/hatham.svg"
               />
               <p className="text-[11px] text-muted-foreground mt-1">
-                Click <strong>Reload</strong> if the image was updated on the server at the same URL to clear the browser cache.
+                Direct image or vector SVG URL. SVGs render at infinite vector resolution without tiling.
+              </p>
+            </div>
+
+            {/* SVG VECTOR INFO & RESOLUTION PRESETS */}
+            {settingsDraft.imageUrl.toLowerCase().includes('.svg') && (
+              <div className="p-3 rounded-lg border border-emerald-800/60 bg-emerald-950/30 space-y-2">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-600 text-white shadow-sm">
+                      Vector SVG Mode
+                    </span>
+                    <span className="text-xs font-semibold text-emerald-300">Infinite Scaling Active</span>
+                  </div>
+                  {settingsDraft.tileUrl && (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      className="h-6 text-[11px] px-2 shadow-sm font-semibold"
+                      onClick={() => {
+                        setSettingsDraft((prev) => ({ ...prev, tileUrl: '' }))
+                        toast.success('Cleared tile pyramid to enable pure vector SVG!')
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" />
+                      Clear Tile Pyramid (Use Pure SVG)
+                    </Button>
+                  )}
+                </div>
+                <p className="text-[11px] text-emerald-200/80 leading-relaxed">
+                  {settingsDraft.tileUrl
+                    ? '⚠️ A tile pyramid is currently attached. Because tile pyramids are raster JPEGs, they will overlay the vector SVG and appear blurry or pixelated. Clear the tile pyramid to render directly in crisp vector SVG.'
+                    : '✨ Rendering directly in pure vector SVG! All paths, biomes, labels, and icons remain razor sharp at any zoom level.'}
+                </p>
+                <div className="pt-2 border-t border-emerald-800/40 flex items-center justify-between flex-wrap gap-2 text-xs">
+                  <span className="text-emerald-300 text-[11px] font-medium">
+                    Recommended Canvas Size:
+                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-6 text-[11px] px-2 border-emerald-700/60 text-emerald-200 hover:bg-emerald-900/50"
+                      onClick={() => {
+                        const baseDim = (naturalDimensions?.width && naturalDimensions.width < 1000)
+                          ? naturalDimensions.width
+                          : 284
+                        const w = Math.round(baseDim * 10)
+                        setSettingsDraft((prev) => ({ ...prev, width: w, height: w }))
+                        toast.success(`Set SVG canvas size to ${w}×${w}px (10×)`)
+                      }}
+                    >
+                      10× (2840px)
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-6 text-[11px] px-2 border-emerald-700/60 text-emerald-200 hover:bg-emerald-900/50"
+                      onClick={() => {
+                        const baseDim = (naturalDimensions?.width && naturalDimensions.width < 1000)
+                          ? naturalDimensions.width
+                          : 284
+                        const w = Math.round(baseDim * 15)
+                        setSettingsDraft((prev) => ({ ...prev, width: w, height: w }))
+                        toast.success(`Set SVG canvas size to ${w}×${w}px (15×)`)
+                      }}
+                    >
+                      15× (4260px)
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-6 text-[11px] px-2 border-emerald-700/60 text-emerald-200 hover:bg-emerald-900/50"
+                      onClick={() => {
+                        const baseDim = (naturalDimensions?.width && naturalDimensions.width < 1000)
+                          ? naturalDimensions.width
+                          : 284
+                        const w = Math.round(baseDim * 20)
+                        setSettingsDraft((prev) => ({ ...prev, width: w, height: w }))
+                        toast.success(`Set SVG canvas size to ${w}×${w}px (20×)`)
+                      }}
+                    >
+                      20× (5680px)
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TILE PYRAMID URL */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1.5">
+                <label className="font-bold text-muted-foreground flex items-center gap-1.5">
+                  <Layers className="h-3.5 w-3.5 text-cyan-400" />
+                  DeepZoom Tile Pyramid URL (Optional)
+                </label>
+                <div className="flex items-center gap-1.5">
+                  {settingsDraft.tileUrl ? (
+                    <>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-[11px] gap-1 text-slate-300 hover:text-white hover:bg-slate-800"
+                        onClick={() => handleCopyLink(settingsDraft.tileUrl, 'Tile Pyramid URL')}
+                        title="Copy Tile URL to clipboard"
+                      >
+                        <Copy className="h-3 w-3" />
+                        Copy Tiles URL
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-[11px] gap-1 text-destructive hover:bg-destructive/10"
+                        onClick={() => {
+                          setSettingsDraft((prev) => ({ ...prev, tileUrl: '' }))
+                          toast.success('Cleared tile pyramid template!')
+                        }}
+                        title="Remove tile pyramid URL"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        Clear Tiles
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-[11px] gap-1 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-950/40"
+                      onClick={() => checkAndFetchProcessorTiles(settingsDraft.imageUrl, 'mapSettings')}
+                      title="Check processor for tiles matching the current image URL"
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                      Detect Tiles
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <Input
+                value={settingsDraft.tileUrl}
+                onChange={(e) => setSettingsDraft({ ...settingsDraft, tileUrl: e.target.value })}
+                placeholder="https://maps.tarragon.be/slug_tiles_files/{z}/{x}_{y}.webp"
+                className="font-mono text-xs"
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Supports DeepZoom WebP/JPEG tile pyramids for massive raster maps. Leave blank for direct vector SVGs.
               </p>
             </div>
 
@@ -4370,23 +4542,47 @@ export default function MapViewerClient() {
               </div>
             </div>
             {naturalDimensions && (
-              <div className="flex items-center justify-between text-xs bg-muted/40 p-2 rounded-md border border-border/50">
+              <div className="flex items-center justify-between text-xs bg-muted/40 p-2 rounded-md border border-border/50 flex-wrap gap-2">
                 <span className="text-muted-foreground">
                   Detected Image Size: <strong className="text-foreground">{naturalDimensions.width} × {naturalDimensions.height} px</strong>
+                  {settingsDraft.imageUrl.toLowerCase().includes('.svg') && naturalDimensions.width < 1000 && (
+                    <span className="text-emerald-400 ml-1 font-normal">(Raw SVG viewBox)</span>
+                  )}
                 </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={() => setSettingsDraft({
-                    ...settingsDraft,
-                    width: naturalDimensions.width,
-                    height: naturalDimensions.height,
-                  })}
-                >
-                  Use Detected Size
-                </Button>
+                <div className="flex items-center gap-1.5">
+                  {settingsDraft.imageUrl.toLowerCase().includes('.svg') && naturalDimensions.width < 1000 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs border-emerald-700/60 text-emerald-300 hover:bg-emerald-950/50"
+                      onClick={() =>
+                        setSettingsDraft({
+                          ...settingsDraft,
+                          width: Math.round(naturalDimensions.width * 10),
+                          height: Math.round(naturalDimensions.height * 10),
+                        })
+                      }
+                    >
+                      Use 10× ({Math.round(naturalDimensions.width * 10)}×{Math.round(naturalDimensions.height * 10)})
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() =>
+                      setSettingsDraft({
+                        ...settingsDraft,
+                        width: naturalDimensions.width,
+                        height: naturalDimensions.height,
+                      })
+                    }
+                  >
+                    Use Detected Size
+                  </Button>
+                </div>
               </div>
             )}
 

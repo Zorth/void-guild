@@ -241,8 +241,12 @@ export const updateMapSettings = mutation({
       patches.slug = cleanSlug
     }
     if (args.isHomeMap !== undefined) patches.isHomeMap = args.isHomeMap
-    if (args.imageUrl !== undefined) patches.imageUrl = args.imageUrl
-    if (args.tileUrl !== undefined) patches.tileUrl = args.tileUrl
+    if (args.imageUrl !== undefined) {
+      patches.imageUrl = args.imageUrl.trim() ? args.imageUrl.trim() : undefined
+    }
+    if (args.tileUrl !== undefined) {
+      patches.tileUrl = args.tileUrl.trim() ? args.tileUrl.trim() : undefined
+    }
     if (args.tileSize !== undefined) patches.tileSize = args.tileSize
     if (args.minZoom !== undefined) patches.minZoom = args.minZoom
     if (args.maxZoom !== undefined) patches.maxZoom = args.maxZoom
@@ -258,7 +262,10 @@ export const updateMapSettings = mutation({
     if (args.hideFromMenu !== undefined) patches.hideFromMenu = args.hideFromMenu
     if (args.imageUpdatedAt !== undefined) patches.imageUpdatedAt = args.imageUpdatedAt
 
-    await ctx.db.patch(args.mapId, patches)
+    const isDiff = Object.keys(patches).some((key) => patches[key] !== (map as any)[key])
+    if (isDiff) {
+      await ctx.db.patch(args.mapId, patches)
+    }
   },
 })
 
@@ -411,8 +418,12 @@ export const updateLayer = mutation({
 
     const patches: any = {}
     if (args.name !== undefined) patches.name = args.name.trim()
-    if (args.imageUrl !== undefined) patches.imageUrl = args.imageUrl
-    if (args.tileUrl !== undefined) patches.tileUrl = args.tileUrl
+    if (args.imageUrl !== undefined) {
+      patches.imageUrl = args.imageUrl.trim() ? args.imageUrl.trim() : undefined
+    }
+    if (args.tileUrl !== undefined) {
+      patches.tileUrl = args.tileUrl.trim() ? args.tileUrl.trim() : undefined
+    }
     if (args.tileSize !== undefined) patches.tileSize = args.tileSize
     if (args.minZoom !== undefined) patches.minZoom = args.minZoom
     if (args.maxZoom !== undefined) patches.maxZoom = args.maxZoom
@@ -420,7 +431,10 @@ export const updateLayer = mutation({
     if (args.allowUserToggle !== undefined) patches.allowUserToggle = args.allowUserToggle
     if (args.imageUpdatedAt !== undefined) patches.imageUpdatedAt = args.imageUpdatedAt
 
-    await ctx.db.patch(args.layerId, patches)
+    const isDiff = Object.keys(patches).some((key) => patches[key] !== (layer as any)[key])
+    if (isDiff) {
+      await ctx.db.patch(args.layerId, patches)
+    }
   },
 })
 
