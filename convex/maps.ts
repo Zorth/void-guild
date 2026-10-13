@@ -91,11 +91,6 @@ export const getMapFullData = query({
       .withIndex('by_mapId', (q) => q.eq('mapId', args.mapId))
       .collect()
 
-    const cellFills = await ctx.db
-      .query('mapCellFills')
-      .withIndex('by_mapId', (q) => q.eq('mapId', args.mapId))
-      .collect()
-
     const cellRoads = await ctx.db
       .query('mapCellRoads')
       .withIndex('by_mapId', (q) => q.eq('mapId', args.mapId))
@@ -110,7 +105,6 @@ export const getMapFullData = query({
       pins,
       areas,
       notes,
-      cellFills,
       cellRoads,
     }
   },
@@ -138,7 +132,6 @@ export const createMap = mutation({
     gridScale: v.optional(v.number()),
     gridScaleUnit: v.optional(v.string()),
     isExplorationMap: v.optional(v.boolean()),
-    isInfiniteGrid: v.optional(v.boolean()),
     hideFromMenu: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
@@ -186,7 +179,6 @@ export const createMap = mutation({
       gridScale: args.gridScale,
       gridScaleUnit: args.gridScaleUnit,
       isExplorationMap: args.isExplorationMap ?? false,
-      isInfiniteGrid: args.isInfiniteGrid ?? false,
       hideFromMenu: args.hideFromMenu ?? false,
       revealedCells: [],
     })
@@ -215,7 +207,6 @@ export const updateMapSettings = mutation({
     gridScale: v.optional(v.number()),
     gridScaleUnit: v.optional(v.string()),
     isExplorationMap: v.optional(v.boolean()),
-    isInfiniteGrid: v.optional(v.boolean()),
     hideFromMenu: v.optional(v.boolean()),
     imageUpdatedAt: v.optional(v.number()),
   },
@@ -264,7 +255,6 @@ export const updateMapSettings = mutation({
     if (args.gridScale !== undefined) patches.gridScale = args.gridScale
     if (args.gridScaleUnit !== undefined) patches.gridScaleUnit = args.gridScaleUnit
     if (args.isExplorationMap !== undefined) patches.isExplorationMap = args.isExplorationMap
-    if (args.isInfiniteGrid !== undefined) patches.isInfiniteGrid = args.isInfiniteGrid
     if (args.hideFromMenu !== undefined) patches.hideFromMenu = args.hideFromMenu
     if (args.imageUpdatedAt !== undefined) patches.imageUpdatedAt = args.imageUpdatedAt
 
@@ -675,65 +665,6 @@ export const deleteGridNote = mutation({
     }
 
     await ctx.db.delete(args.noteId)
-  },
-})
-
-// --- CELL FILLS (Biome / Palette Painting) ---
-
-export const setCellFill = mutation({
-  args: {
-    mapId: v.id('worldMaps'),
-    cellKey: v.string(),
-    terrainType: v.string(),
-    color: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const user = await ctx.auth.getUserIdentity()
-    if (!user) throw new Error('Not authenticated')
-
-    const existing = await ctx.db
-      .query('mapCellFills')
-      .withIndex('by_mapId_cellKey', (q) => q.eq('mapId', args.mapId).eq('cellKey', args.cellKey))
-      .first()
-
-    if (existing) {
-      await ctx.db.patch(existing._id, {
-        terrainType: args.terrainType,
-        color: args.color,
-        userId: user.subject,
-        updatedAt: Date.now(),
-      })
-      return existing._id
-    } else {
-      return await ctx.db.insert('mapCellFills', {
-        mapId: args.mapId,
-        cellKey: args.cellKey,
-        terrainType: args.terrainType,
-        color: args.color,
-        userId: user.subject,
-        updatedAt: Date.now(),
-      })
-    }
-  },
-})
-
-export const clearCellFill = mutation({
-  args: {
-    mapId: v.id('worldMaps'),
-    cellKey: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const user = await ctx.auth.getUserIdentity()
-    if (!user) throw new Error('Not authenticated')
-
-    const existing = await ctx.db
-      .query('mapCellFills')
-      .withIndex('by_mapId_cellKey', (q) => q.eq('mapId', args.mapId).eq('cellKey', args.cellKey))
-      .first()
-
-    if (existing) {
-      await ctx.db.delete(existing._id)
-    }
   },
 })
 

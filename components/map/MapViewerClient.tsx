@@ -10,7 +10,7 @@ import {
   ZoomIn, ZoomOut, Maximize2, Layers, MapPin, Eye, Edit3, Plus, 
   Trash2, Settings, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Map as MapIcon, FileText, Check, X, Grid, Lock, Unlock, Move, HelpCircle, Copy,
   Castle, Crown, Skull, Swords, Shield, Mountain, Tent, Beer, Anchor, Flame, TreePine, Sparkles, BookOpen, Coins, Compass, Gem, Crosshair, Flag, Ghost, EyeOff, Ruler, Search, RotateCcw, RefreshCw,
-  Upload, ExternalLink, User, Paintbrush, Route, Eraser
+  Upload, ExternalLink, User, Route
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -45,18 +45,6 @@ export const PIN_ICONS = [
   { name: 'Flag', label: 'Settlement / Clan', icon: Flag },
   { name: 'Ghost', label: 'Crypt / Tomb', icon: Ghost },
   { name: 'Eye', label: 'Watchtower / Lookout', icon: Eye },
-] as const
-
-export const TERRAIN_PALETTE = [
-  { id: 'water', label: 'Water', color: '#0284c7', border: '#0369a1' },
-  { id: 'forest', label: 'Forest', color: '#15803d', border: '#166534' },
-  { id: 'plains', label: 'Plains', color: '#65a30d', border: '#4d7c0f' },
-  { id: 'hills', label: 'Hills', color: '#a16207', border: '#854d0e' },
-  { id: 'mountain', label: 'Mountain', color: '#78716c', border: '#57534e' },
-  { id: 'snow', label: 'Snow', color: '#e0f2fe', border: '#bae6fd' },
-  { id: 'sand', label: 'Sand', color: '#eab308', border: '#ca8a04' },
-  { id: 'swamp', label: 'Swamp', color: '#3f6212', border: '#365314' },
-  { id: 'stone', label: 'Stone', color: '#475569', border: '#334155' },
 ] as const
 
 export function renderPinIcon(iconName?: string, className = "h-4 w-4 text-white") {
@@ -273,8 +261,6 @@ export default function MapViewerClient() {
   const bulkRevealCellsMutation = useMutation(api.maps.bulkRevealCells)
   const saveGridNoteMutation = useMutation(api.maps.saveGridNote)
   const deleteGridNoteMutation = useMutation(api.maps.deleteGridNote)
-  const setCellFillMutation = useMutation(api.maps.setCellFill)
-  const clearCellFillMutation = useMutation(api.maps.clearCellFill)
   const toggleCellRoadMutation = useMutation(api.maps.toggleCellRoad)
   const refreshMapImageMutation = useMutation(api.maps.refreshMapImage)
 
@@ -283,11 +269,9 @@ export default function MapViewerClient() {
   const [isEditMode, setIsEditMode] = useState(false)
   const [isRefreshingImage, setIsRefreshingImage] = useState(false)
   const [activeTool, setActiveTool] = useState<
-    'view' | 'add_pin' | 'add_area' | 'reveal_hex' | 'hide_hex' | 'grid_note' | 'align_grid' | 'ruler' | 'paint_terrain' | 'draw_road'
+    'view' | 'add_pin' | 'add_area' | 'reveal_hex' | 'hide_hex' | 'grid_note' | 'align_grid' | 'ruler' | 'draw_road'
   >('view')
 
-  // Terrain painting state
-  const [selectedTerrain, setSelectedTerrain] = useState<string>('forest')
   // Road drawing state: first clicked cell waiting for target cell
   const [roadStartCellKey, setRoadStartCellKey] = useState<string | null>(null)
 
@@ -590,7 +574,6 @@ export default function MapViewerClient() {
     gridScale: 0,
     gridScaleUnit: 'miles',
     isExplorationMap: false,
-    isInfiniteGrid: false,
     hideFromMenu: false,
   })
 
@@ -602,7 +585,6 @@ export default function MapViewerClient() {
     imageUrl: '',
     tileUrl: '',
     hideFromMenu: false,
-    isInfiniteGrid: false,
     gridType: 'hex' as 'none' | 'hex' | 'hex_flat' | 'square',
     gridSize: 100,
     width: 2000,
@@ -652,7 +634,6 @@ export default function MapViewerClient() {
         gridScale: currentMap.gridScale || 0,
         gridScaleUnit: currentMap.gridScaleUnit || 'miles',
         isExplorationMap: currentMap.isExplorationMap || false,
-        isInfiniteGrid: currentMap.isInfiniteGrid || false,
         hideFromMenu: currentMap.hideFromMenu || false,
       })
     }
@@ -1134,48 +1115,11 @@ export default function MapViewerClient() {
     }
   }
 
-  // Grid / Hex Cell Calculation
-  const isInfinite = !!currentMap?.isInfiniteGrid
-
-  // Calculate required virtual dimension for infinite grid so it expands smoothly if cells reach far
-  const requiredInfiniteDim = useMemo(() => {
-    if (!currentMap?.isInfiniteGrid) return 10000
-    let maxAbsC = 0
-    let maxAbsR = 0
-    const checkKey = (key?: string) => {
-      if (!key || key.startsWith('point_')) return
-      const parts = key.split(',')
-      if (parts.length === 2) {
-        const c = Number(parts[0])
-        const r = Number(parts[1])
-        if (!isNaN(c) && !isNaN(r)) {
-          maxAbsC = Math.max(maxAbsC, Math.abs(c))
-          maxAbsR = Math.max(maxAbsR, Math.abs(r))
-        }
-      }
-    }
-    fullData?.cellFills?.forEach((f) => checkKey(f.cellKey))
-    fullData?.cellRoads?.forEach((r) => {
-      checkKey(r.fromCellKey)
-      checkKey(r.toCellKey)
-    })
-    fullData?.notes?.forEach((n) => checkKey(n.cellKey))
-    currentMap?.revealedCells?.forEach((k) => checkKey(k))
-
-    const neededWidth = (maxAbsC + 15) * 2 * (currentGridSize || 100)
-    const neededHeight = (maxAbsR + 15) * 2 * (currentGridSize || 100)
-    return Math.max(10000, neededWidth, neededHeight)
-  }, [currentMap?.isInfiniteGrid, currentGridSize, fullData?.cellFills, fullData?.cellRoads, fullData?.notes, currentMap?.revealedCells])
-
   // Priority: if naturalDimensions detected and currentMap is on default 2000x2000, use natural dimensions.
-  const mapWidth = isInfinite
-    ? requiredInfiniteDim
-    : (currentMap?.width && currentMap.width !== 2000)
+  const mapWidth = (currentMap?.width && currentMap.width !== 2000)
     ? currentMap.width
     : (naturalDimensions?.width || currentMap?.width || 2000)
-  const mapHeight = isInfinite
-    ? requiredInfiniteDim
-    : (currentMap?.height && currentMap.height !== 2000)
+  const mapHeight = (currentMap?.height && currentMap.height !== 2000)
     ? currentMap.height
     : (naturalDimensions?.height || currentMap?.height || 2000)
 
@@ -1184,70 +1128,6 @@ export default function MapViewerClient() {
     const vw = viewportRef.current.clientWidth || window.innerWidth
     const vh = viewportRef.current.clientHeight || (window.innerHeight - 60)
     const padding = vw < 640 ? 16 : 48
-
-    if (currentMap?.isInfiniteGrid) {
-      // Find bounding box of active cells, or fallback to center cluster
-      let minC = -6
-      let maxC = 6
-      let minR = -5
-      let maxR = 5
-      const activeCoords: { c: number; r: number }[] = []
-      const addCoord = (key?: string) => {
-        if (!key || key.startsWith('point_')) return
-        const parts = key.split(',')
-        if (parts.length === 2) {
-          const c = Number(parts[0])
-          const r = Number(parts[1])
-          if (!isNaN(c) && !isNaN(r)) activeCoords.push({ c, r })
-        }
-      }
-      fullData?.cellFills?.forEach((f) => addCoord(f.cellKey))
-      fullData?.cellRoads?.forEach((r) => {
-        addCoord(r.fromCellKey)
-        addCoord(r.toCellKey)
-      })
-      fullData?.notes?.forEach((n) => addCoord(n.cellKey))
-      currentMap?.revealedCells?.forEach((k) => addCoord(k))
-
-      if (activeCoords.length > 0) {
-        const allC = activeCoords.map((pt) => pt.c)
-        const allR = activeCoords.map((pt) => pt.r)
-        minC = Math.min(...allC) - 2
-        maxC = Math.max(...allC) + 2
-        minR = Math.min(...allR) - 2
-        maxR = Math.max(...allR) + 2
-      }
-
-      const effectiveGridSize = Math.max(25, currentGridSize)
-      const R = effectiveGridSize / Math.sqrt(3)
-      const deltaY = 1.5 * R
-      const gridW = Math.max(1, (maxC - minC + 1) * effectiveGridSize)
-      const gridH = Math.max(1, (maxR - minR + 1) * deltaY)
-
-      const scaleX = (vw - padding) / gridW
-      const scaleY = (vh - padding) / gridH
-      const fitScale = Math.min(Math.max(Math.min(scaleX, scaleY), 0.2), 1.0)
-      const finalScale = Number(fitScale.toFixed(4))
-
-      const centerC = (minC + maxC) / 2
-      const centerR = (minR + maxR) / 2
-      const ox = mapWidth / 2 + currentOffsetX
-      const oy = mapHeight / 2 + currentOffsetY
-      const targetPxX = ox + centerC * effectiveGridSize - mapWidth / 2
-      const targetPxY = oy + centerR * deltaY - mapHeight / 2
-
-      const posX = -targetPxX * finalScale
-      const posY = -targetPxY * finalScale
-
-      scaleRef.current = finalScale
-      positionRef.current = { x: posX, y: posY }
-      if (containerRef.current) {
-        containerRef.current.style.transform = `translate(${posX}px, ${posY}px) scale(${finalScale})`
-      }
-      setScale(finalScale)
-      setPosition({ x: posX, y: posY })
-      return
-    }
 
     const scaleX = (vw - padding) / w
     const scaleY = (vh - padding) / h
@@ -1294,7 +1174,7 @@ export default function MapViewerClient() {
   }, [currentMap?._id])
 
   const gridSize = currentMap?.gridSize || 100
-  const gridType = (currentMap?.isInfiniteGrid && (!currentMap?.gridType || currentMap?.gridType === 'none')) ? 'hex' : (currentMap?.gridType || 'none')
+  const gridType = currentMap?.gridType || 'none'
   const isExplorationMap = currentMap?.isExplorationMap || false
 
   // Automatically deactivate ruler tool if no grid is configured on the map
@@ -1325,15 +1205,6 @@ export default function MapViewerClient() {
     })
     return map
   }, [fullData?.notes])
-
-  // Lookup for colored cell fills
-  const cellFillsMap = useMemo(() => {
-    const map: Record<string, { terrainType: string; color: string }> = {}
-    fullData?.cellFills?.forEach((f) => {
-      map[f.cellKey] = { terrainType: f.terrainType, color: f.color }
-    })
-    return map
-  }, [fullData?.cellFills])
 
 
   // Search & Filtered Pins for Locations Directory
@@ -1411,9 +1282,8 @@ export default function MapViewerClient() {
   const getCellGeometry = useCallback(
     (c: number, r: number) => {
       const effectiveGridSize = Math.max(25, currentGridSize)
-      const isInfinite = !!currentMap?.isInfiniteGrid
-      const ox = isInfinite ? (mapWidth / 2 + currentOffsetX) : currentOffsetX
-      const oy = isInfinite ? (mapHeight / 2 + currentOffsetY) : currentOffsetY
+      const ox = currentOffsetX
+      const oy = currentOffsetY
 
       if (gridType === 'hex') {
         const W = effectiveGridSize
@@ -1461,16 +1331,15 @@ export default function MapViewerClient() {
       }
       return null
     },
-    [gridType, currentGridSize, currentOffsetX, currentOffsetY, currentMap?.isInfiniteGrid, mapWidth, mapHeight]
+    [gridType, currentGridSize, currentOffsetX, currentOffsetY]
   )
 
-  // Auto-expanding hex/square grid calculation with automatic padding in all directions
+  // Standard bounded map grid calculation with border over-tiling
   const gridCells = useMemo(() => {
     if (gridType === 'none') return []
     const effectiveGridSize = Math.max(25, currentGridSize)
-    const isInfinite = !!currentMap?.isInfiniteGrid
-    const ox = isInfinite ? (mapWidth / 2 + currentOffsetX) : currentOffsetX
-    const oy = isInfinite ? (mapHeight / 2 + currentOffsetY) : currentOffsetY
+    const ox = currentOffsetX
+    const oy = currentOffsetY
     const pad = 2
 
     let minC = 0
@@ -1478,84 +1347,27 @@ export default function MapViewerClient() {
     let minR = 0
     let maxR = 0
 
-    if (isInfinite) {
-      // 1. Collect all active cells (painted terrain, roads, player notes, revealed fog)
-      const activeCoords: { c: number; r: number }[] = []
-      const seen = new Set<string>()
-
-      const addKey = (key?: string) => {
-        if (!key || seen.has(key) || key.startsWith('point_')) return
-        seen.add(key)
-        const parts = key.split(',')
-        if (parts.length === 2) {
-          const c = Number(parts[0])
-          const r = Number(parts[1])
-          if (!isNaN(c) && !isNaN(r)) {
-            activeCoords.push({ c, r })
-          }
-        }
-      }
-
-      if (fullData?.cellFills) {
-        fullData.cellFills.forEach((f) => addKey(f.cellKey))
-      }
-      if (fullData?.cellRoads) {
-        fullData.cellRoads.forEach((r) => {
-          addKey(r.fromCellKey)
-          addKey(r.toCellKey)
-        })
-      }
-      if (fullData?.notes) {
-        fullData.notes.forEach((n) => addKey(n.cellKey))
-      }
-      if (currentMap?.revealedCells) {
-        currentMap.revealedCells.forEach((k) => addKey(k))
-      }
-
-      // 2. Automatically add enough padding hexes in all directions (5 hexes padding)
-      const PADDING = 5
-      if (activeCoords.length === 0) {
-        // Initial fresh map: centered cluster around (0,0)
-        minC = -6
-        maxC = 6
-        minR = -5
-        maxR = 5
-      } else {
-        const allC = activeCoords.map((pt) => pt.c)
-        const allR = activeCoords.map((pt) => pt.r)
-        const minActiveC = Math.min(...allC)
-        const maxActiveC = Math.max(...allC)
-        const minActiveR = Math.min(...allR)
-        const maxActiveR = Math.max(...allR)
-
-        minC = Math.min(minActiveC - PADDING, -6)
-        maxC = Math.max(maxActiveC + PADDING, 6)
-        minR = Math.min(minActiveR - PADDING, -5)
-        maxR = Math.max(maxActiveR + PADDING, 5)
-      }
-    } else {
-      // Standard bounded map: tile over the map dimensions [0..mapWidth, 0..mapHeight]
-      if (gridType === 'hex') {
-        const W = effectiveGridSize
-        const deltaY = 1.5 * (W / Math.sqrt(3))
-        minC = Math.floor(-ox / W) - pad
-        maxC = Math.ceil((mapWidth - ox) / W) + pad
-        minR = Math.floor(-oy / deltaY) - pad
-        maxR = Math.ceil((mapHeight - oy) / deltaY) + pad
-      } else if (gridType === 'hex_flat') {
-        const H = effectiveGridSize
-        const deltaX = 1.5 * (H / Math.sqrt(3))
-        minC = Math.floor(-ox / deltaX) - pad
-        maxC = Math.ceil((mapWidth - ox) / deltaX) + pad
-        minR = Math.floor(-oy / H) - pad
-        maxR = Math.ceil((mapHeight - oy) / H) + pad
-      } else if (gridType === 'square') {
-        const size = effectiveGridSize
-        minC = Math.floor(-ox / size) - pad
-        maxC = Math.ceil((mapWidth - ox) / size) + pad
-        minR = Math.floor(-oy / size) - pad
-        maxR = Math.ceil((mapHeight - oy) / size) + pad
-      }
+    // Standard bounded map: tile over the map dimensions [0..mapWidth, 0..mapHeight]
+    if (gridType === 'hex') {
+      const W = effectiveGridSize
+      const deltaY = 1.5 * (W / Math.sqrt(3))
+      minC = Math.floor(-ox / W) - pad
+      maxC = Math.ceil((mapWidth - ox) / W) + pad
+      minR = Math.floor(-oy / deltaY) - pad
+      maxR = Math.ceil((mapHeight - oy) / deltaY) + pad
+    } else if (gridType === 'hex_flat') {
+      const H = effectiveGridSize
+      const deltaX = 1.5 * (H / Math.sqrt(3))
+      minC = Math.floor(-ox / deltaX) - pad
+      maxC = Math.ceil((mapWidth - ox) / deltaX) + pad
+      minR = Math.floor(-oy / H) - pad
+      maxR = Math.ceil((mapHeight - oy) / H) + pad
+    } else if (gridType === 'square') {
+      const size = effectiveGridSize
+      minC = Math.floor(-ox / size) - pad
+      maxC = Math.ceil((mapWidth - ox) / size) + pad
+      minR = Math.floor(-oy / size) - pad
+      maxR = Math.ceil((mapHeight - oy) / size) + pad
     }
 
     // Limit columns and rows to 500 to keep rendering performant
@@ -1576,11 +1388,8 @@ export default function MapViewerClient() {
       }
     }
 
-    // Always include explicit cells with terrain fills, notes, or roads
+    // Always include explicit cells with notes or roads
     const explicitKeys = new Set<string>()
-    if (fullData?.cellFills) {
-      fullData.cellFills.forEach((f) => explicitKeys.add(f.cellKey))
-    }
     if (fullData?.cellRoads) {
       fullData.cellRoads.forEach((r) => {
         explicitKeys.add(r.fromCellKey)
@@ -1617,9 +1426,7 @@ export default function MapViewerClient() {
     currentOffsetY,
     mapWidth,
     mapHeight,
-    currentMap?.isInfiniteGrid,
     currentMap?.revealedCells,
-    fullData?.cellFills,
     fullData?.cellRoads,
     fullData?.notes,
     getCellGeometry,
@@ -1631,7 +1438,7 @@ export default function MapViewerClient() {
     gridCells.forEach((cell) => {
       map[cell.key] = { cx: cell.cx, cy: cell.cy }
     })
-    // Also include cell centers for any road or fill keys not yet in gridCells
+    // Also include cell centers for any road keys not yet in gridCells
     if (fullData?.cellRoads) {
       fullData.cellRoads.forEach((r) => {
         if (!map[r.fromCellKey]) {
@@ -1658,23 +1465,6 @@ export default function MapViewerClient() {
     e.stopPropagation()
     if (hasDraggedRef.current || activeTool === 'align_grid') return
     if (!currentMap) return
-
-    if (activeTool === 'paint_terrain') {
-      if (selectedTerrain === 'eraser') {
-        clearCellFillMutation({ mapId: currentMap._id, cellKey }).catch(() => toast.error('Failed to clear cell'))
-      } else {
-        const item = TERRAIN_PALETTE.find((t) => t.id === selectedTerrain)
-        if (item) {
-          setCellFillMutation({
-            mapId: currentMap._id,
-            cellKey,
-            terrainType: item.id,
-            color: item.color,
-          }).catch(() => toast.error('Failed to paint cell'))
-        }
-      }
-      return
-    }
 
     if (activeTool === 'draw_road') {
       if (!roadStartCellKey) {
@@ -1961,14 +1751,13 @@ export default function MapViewerClient() {
         name: newMapDraft.name,
         slug: newMapDraft.slug,
         isHomeMap: newMapDraft.isHomeMap,
-        imageUrl: newMapDraft.isInfiniteGrid ? undefined : (newMapDraft.imageUrl || undefined),
-        tileUrl: newMapDraft.isInfiniteGrid ? undefined : (newMapDraft.tileUrl || undefined),
+        imageUrl: newMapDraft.imageUrl || undefined,
+        tileUrl: newMapDraft.tileUrl || undefined,
         hideFromMenu: newMapDraft.hideFromMenu,
-        isInfiniteGrid: newMapDraft.isInfiniteGrid,
         gridType: newMapDraft.gridType,
         gridSize: newMapDraft.gridSize || 100,
-        width: newMapDraft.isInfiniteGrid ? 10000 : (newMapDraft.width || 2000),
-        height: newMapDraft.isInfiniteGrid ? 10000 : (newMapDraft.height || 2000),
+        width: newMapDraft.width || 2000,
+        height: newMapDraft.height || 2000,
       })
       toast.success('Map created!')
       setIsNewMapDialogOpen(false)
@@ -2012,7 +1801,6 @@ export default function MapViewerClient() {
         gridScale: !isNaN(gridScaleVal) ? gridScaleVal : 0,
         gridScaleUnit: settingsDraft.gridScaleUnit,
         isExplorationMap: settingsDraft.isExplorationMap,
-        isInfiniteGrid: settingsDraft.isInfiniteGrid,
         hideFromMenu: settingsDraft.hideFromMenu,
       })
       setLiveGridOffset(null)
@@ -2378,24 +2166,6 @@ export default function MapViewerClient() {
             >
               <Ruler className="h-4 w-4 text-cyan-400" />
               <span className="hidden sm:inline font-medium">Ruler</span>
-            </Button>
-          )}
-
-          {/* PAINT TERRAIN BUTTON */}
-          {gridType !== 'none' && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className={`h-9 gap-1.5 bg-slate-950 dark:bg-slate-950 text-slate-100 hover:text-white hover:bg-slate-900 dark:hover:bg-slate-900 border border-slate-700/80 shadow-xl backdrop-blur-md ${
-                activeTool === 'paint_terrain' ? 'text-emerald-400 border-emerald-500/80 bg-slate-900 dark:bg-slate-900 ring-2 ring-emerald-500/60' : ''
-              }`}
-              onClick={() => {
-                setActiveTool(activeTool === 'paint_terrain' ? 'view' : 'paint_terrain')
-              }}
-              title="Paint Hex Colors / Biomes"
-            >
-              <Paintbrush className="h-4 w-4 text-emerald-400" />
-              <span className="hidden sm:inline font-medium">Paint</span>
             </Button>
           )}
 
@@ -3284,67 +3054,6 @@ export default function MapViewerClient() {
         </div>
       )}
 
-      {/* TERRAIN PAINTING ACTIVE BOTTOM HUD & PALETTE */}
-      {activeTool === 'paint_terrain' && (
-        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-30 flex flex-col items-center gap-2 bg-slate-950/95 dark:bg-slate-950/95 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-emerald-500/60 shadow-2xl text-slate-100 max-w-xl">
-          <div className="flex items-center justify-between w-full gap-3 border-b border-slate-800 pb-1.5">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
-              <Paintbrush className="h-4 w-4" />
-              <span>Paint Hex Biome</span>
-            </div>
-            <span className="text-[11px] text-slate-400 hidden sm:inline">Click any grid cell to color it</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 text-xs px-2 bg-slate-900 border border-slate-700 text-slate-200 hover:text-white hover:bg-slate-800"
-              onClick={() => setActiveTool('view')}
-            >
-              Done
-            </Button>
-          </div>
-          {/* Biome Palette Swatches */}
-          <div className="flex items-center gap-1.5 flex-wrap justify-center pt-0.5">
-            {TERRAIN_PALETTE.map((terrain) => {
-              const isSelected = selectedTerrain === terrain.id
-              return (
-                <button
-                  key={terrain.id}
-                  type="button"
-                  onClick={() => setSelectedTerrain(terrain.id)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition-all border ${
-                    isSelected
-                      ? 'ring-2 ring-white scale-105 shadow-md text-white'
-                      : 'opacity-80 hover:opacity-100 hover:scale-102 text-slate-200'
-                  }`}
-                  style={{
-                    backgroundColor: terrain.color,
-                    borderColor: terrain.border,
-                  }}
-                  title={`Paint ${terrain.label}`}
-                >
-                  <span className="capitalize drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                    {terrain.label}
-                  </span>
-                </button>
-              )
-            })}
-            <button
-              type="button"
-              onClick={() => setSelectedTerrain('eraser')}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all ${
-                selectedTerrain === 'eraser'
-                  ? 'bg-red-500/30 border-red-400 text-red-200 ring-2 ring-red-400'
-                  : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'
-              }`}
-              title="Clear hex color"
-            >
-              <Eraser className="h-3 w-3" />
-              <span>Clear</span>
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* ROAD DRAWING ACTIVE BOTTOM HUD */}
       {activeTool === 'draw_road' && (
         <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-30 flex items-center gap-3 bg-slate-950/95 dark:bg-slate-950/95 backdrop-blur-md px-4 py-2 rounded-full border border-amber-500/60 shadow-2xl text-slate-100">
@@ -3396,7 +3105,7 @@ export default function MapViewerClient() {
       {/* CANVAS CONTAINER */}
       <div
         ref={viewportRef}
-        className={`w-full h-full ${activeTool === 'align_grid' ? 'cursor-move' : activeTool === 'ruler' ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing'} flex items-center justify-center overflow-hidden ${currentMap?.isInfiniteGrid ? 'bg-[#475569]' : ''}`}
+        className={`w-full h-full ${activeTool === 'align_grid' ? 'cursor-move' : activeTool === 'ruler' ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing'} flex items-center justify-center overflow-hidden`}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -3406,7 +3115,7 @@ export default function MapViewerClient() {
       >
         <div
           ref={containerRef}
-          className={`relative shrink-0 origin-center ${currentMap?.isInfiniteGrid ? 'shadow-none' : 'shadow-2xl'}`}
+          className="relative shrink-0 origin-center shadow-2xl"
           style={{
             transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
             width: `${mapWidth}px`,
@@ -3426,8 +3135,6 @@ export default function MapViewerClient() {
               draggable={false}
               onLoad={handleImageLoad}
             />
-          ) : currentMap?.isInfiniteGrid ? (
-            <div className="absolute inset-0 w-full h-full bg-[#475569]" />
           ) : !currentMap?.tileUrl ? (
             <div className="absolute inset-0 w-full h-full bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-700 font-bold text-2xl">
               No Map Image Set
@@ -3821,25 +3528,17 @@ export default function MapViewerClient() {
               className="absolute inset-0 pointer-events-none overflow-hidden select-none"
               style={{ width: `${mapWidth}px`, height: `${mapHeight}px`, zIndex: 10 }}
             >
-              {/* 1. RENDER CELL POLYGONS & BIOME FILLS */}
+              {/* 1. RENDER CELL POLYGONS */}
               {gridCells.map((cell) => {
                 const isRevealed = revealedSet.has(cell.key)
                 const isHidden = isExplorationMap && !isRevealed
                 const hasNote = !!notesMap[cell.key]
                 const canShowNote = showPlayerNotes && hasNote && (!isHidden || isOwner)
-                const cellFill = cellFillsMap[cell.key]
 
                 // Cell fill color logic:
                 // If cell is hidden by exploration fog of war -> 100% solid dark slate
-                // Otherwise if cell has terrain fill painted -> use painted color with subtle opacity
                 // Otherwise -> transparent
-                let fillColor = 'transparent'
-                if (isHidden) {
-                  fillColor = '#020617'
-                } else if (cellFill) {
-                  fillColor = cellFill.color
-                }
-
+                const fillColor = isHidden ? '#020617' : 'transparent'
                 const isStartRoadCell = roadStartCellKey === cell.key
 
                 // Hover styling
@@ -3854,9 +3553,7 @@ export default function MapViewerClient() {
                   }
                 } else {
                   // Revealed cell
-                  if (activeTool === 'paint_terrain') {
-                    hoverClass = 'cursor-pointer hover:stroke-emerald-400 hover:stroke-2 hover:opacity-90'
-                  } else if (activeTool === 'draw_road') {
+                  if (activeTool === 'draw_road') {
                     hoverClass = isStartRoadCell
                       ? 'cursor-pointer stroke-amber-400 stroke-2'
                       : 'cursor-pointer hover:stroke-amber-400 hover:stroke-2'
@@ -3876,7 +3573,6 @@ export default function MapViewerClient() {
                 // Clicks pass through revealed cells to pins and areas underneath when not in editing mode
                 const shouldCaptureClicks =
                   isHidden ||
-                  activeTool === 'paint_terrain' ||
                   activeTool === 'draw_road' ||
                   activeTool === 'grid_note' ||
                   (isEditMode && activeTool === 'hide_hex')
@@ -3886,15 +3582,13 @@ export default function MapViewerClient() {
                     <polygon
                       points={cell.points}
                       fill={fillColor}
-                      fillOpacity={cellFill && !isHidden ? 0.78 : 1}
-                      stroke={isStartRoadCell ? '#f59e0b' : currentMap?.isInfiniteGrid ? 'rgba(255, 255, 255, 0.35)' : 'rgba(255, 255, 255, 0.22)'}
-                      strokeWidth={isStartRoadCell ? '2.5' : currentMap?.isInfiniteGrid ? '1.2' : '1'}
+                      stroke={isStartRoadCell ? '#f59e0b' : 'rgba(255, 255, 255, 0.22)'}
+                      strokeWidth={isStartRoadCell ? '2.5' : '1'}
                       vectorEffect="non-scaling-stroke"
                       className={`transition-colors duration-150 ${hoverClass}`}
                       style={{ pointerEvents: shouldCaptureClicks ? 'auto' : 'none' }}
                       onClick={(e) => handleCellClick(cell.key, e)}
                     >
-                      {cellFill && <title>{`${cellFill.terrainType.toUpperCase()} (${cell.key})`}</title>}
                       {canShowNote && <title>{notesMap[cell.key]}</title>}
                     </polygon>
                     {canShowNote && (
@@ -4393,94 +4087,63 @@ export default function MapViewerClient() {
                 placeholder="capital-city"
               />
             </div>
-            <div className="flex items-center justify-between p-2.5 rounded-lg border border-purple-500/30 bg-purple-950/20">
-              <div className="space-y-0.5 pr-2">
-                <span className="font-bold flex items-center gap-1.5 text-xs text-purple-200">
-                  <Grid className="h-3.5 w-3.5 text-purple-400" />
-                  Infinite Grid Map
-                </span>
-                <p className="text-[11px] text-muted-foreground">
-                  Creates an unbounded canvas with no background image, dedicated to infinite hex exploration, painting, and player notes.
-                </p>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="font-bold text-muted-foreground">Tile Pyramid URL Template</label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-[11px] gap-1 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-950/40"
+                  onClick={() => handleOpenProcessorPicker('newMap')}
+                >
+                  <Layers className="h-3 w-3" />
+                  Browse Hosted Maps
+                </Button>
               </div>
-              <Switch
-                checked={newMapDraft.isInfiniteGrid}
-                onCheckedChange={(val) => {
-                  setNewMapDraft({
-                    ...newMapDraft,
-                    isInfiniteGrid: val,
-                    imageUrl: val ? '' : newMapDraft.imageUrl,
-                    tileUrl: val ? '' : newMapDraft.tileUrl,
-                    gridType: val && newMapDraft.gridType === 'none' ? 'hex' : newMapDraft.gridType,
-                  })
+              <Input
+                value={newMapDraft.tileUrl}
+                onChange={(e) => {
+                  const val = e.target.value
+                  setNewMapDraft({ ...newMapDraft, tileUrl: val })
                 }}
+                onBlur={(e) => checkAndFetchProcessorTiles(e.target.value, 'newMap')}
+                placeholder="https://maps.tarragon.be/slug_tiles_files/{z}/{x}_{y}.webp"
+              />
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                DeepZoom tile pyramid format. Fast LOD zoom.
+              </p>
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="font-bold text-muted-foreground">Background Image URL (Optional)</label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-[11px] gap-1 text-purple-400 hover:text-purple-300 hover:bg-purple-950/40"
+                  asChild
+                >
+                  <a href="https://maps.tarragon.be" target="_blank" rel="noopener noreferrer" title="Upload new map image on maps.tarragon.be">
+                    <Upload className="h-3 w-3" />
+                    Upload to Processor
+                    <ExternalLink className="h-2.5 w-2.5 opacity-60" />
+                  </a>
+                </Button>
+              </div>
+              <Input
+                value={newMapDraft.imageUrl}
+                onChange={(e) => {
+                  const val = e.target.value
+                  setNewMapDraft({ ...newMapDraft, imageUrl: val })
+                  if (val.includes('.webp') || val.includes('_tiles')) {
+                    checkAndFetchProcessorTiles(val, 'newMap')
+                  }
+                }}
+                onBlur={(e) => checkAndFetchProcessorTiles(e.target.value, 'newMap')}
+                placeholder="https://... image URL"
               />
             </div>
-
-            {!newMapDraft.isInfiniteGrid && (
-              <>
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="font-bold text-muted-foreground">Tile Pyramid URL Template</label>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 px-2 text-[11px] gap-1 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-950/40"
-                      onClick={() => handleOpenProcessorPicker('newMap')}
-                    >
-                      <Layers className="h-3 w-3" />
-                      Browse Hosted Maps
-                    </Button>
-                  </div>
-                  <Input
-                    value={newMapDraft.tileUrl}
-                    onChange={(e) => {
-                      const val = e.target.value
-                      setNewMapDraft({ ...newMapDraft, tileUrl: val })
-                    }}
-                    onBlur={(e) => checkAndFetchProcessorTiles(e.target.value, 'newMap')}
-                    placeholder="https://maps.tarragon.be/slug_tiles_files/{z}/{x}_{y}.webp"
-                  />
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
-                    DeepZoom tile pyramid format. Fast LOD zoom.
-                  </p>
-                </div>
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="font-bold text-muted-foreground">Background Image URL (Optional)</label>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 px-2 text-[11px] gap-1 text-purple-400 hover:text-purple-300 hover:bg-purple-950/40"
-                      asChild
-                    >
-                      <a href="https://maps.tarragon.be" target="_blank" rel="noopener noreferrer" title="Upload new map image on maps.tarragon.be">
-                        <Upload className="h-3 w-3" />
-                        Upload to Processor
-                        <ExternalLink className="h-2.5 w-2.5 opacity-60" />
-                      </a>
-                    </Button>
-                  </div>
-                  <Input
-                    value={newMapDraft.imageUrl}
-                    onChange={(e) => {
-                      const val = e.target.value
-                      setNewMapDraft({ ...newMapDraft, imageUrl: val })
-                      if (val.includes('.webp') || val.includes('_tiles')) {
-                        checkAndFetchProcessorTiles(val, 'newMap')
-                      }
-                    }}
-                    onBlur={(e) => checkAndFetchProcessorTiles(e.target.value, 'newMap')}
-                    placeholder="Leave blank for an empty player hex/grid canvas"
-                  />
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
-                    Leave empty to create a blank player canvas where hexes can be painted and connected with roads.
-                  </p>
-                </div>
-              </>
-            )}
             {/* Grid & Dimensions */}
             <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border/40">
               <div>
@@ -4731,21 +4394,6 @@ export default function MapViewerClient() {
                 <Switch
                   checked={settingsDraft.isHomeMap}
                   onCheckedChange={(val) => setSettingsDraft({ ...settingsDraft, isHomeMap: val })}
-                />
-              </div>
-              <div className="flex items-center justify-between pt-2 border-t border-border/40">
-                <div className="space-y-0.5 pr-2">
-                  <span className="font-bold flex items-center gap-1.5 text-xs text-foreground">
-                    <Grid className="h-3.5 w-3.5 text-purple-400" />
-                    Infinite Grid Mode
-                  </span>
-                  <p className="text-[11px] text-muted-foreground">
-                    Enable unbounded hex grid rendering without background image constraints.
-                  </p>
-                </div>
-                <Switch
-                  checked={settingsDraft.isInfiniteGrid || false}
-                  onCheckedChange={(val) => setSettingsDraft({ ...settingsDraft, isInfiniteGrid: val })}
                 />
               </div>
               <div className="flex items-center justify-between pt-2 border-t border-border/40">

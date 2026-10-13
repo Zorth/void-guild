@@ -492,7 +492,6 @@ export default defineSchema({
         gridScale: v.optional(v.number()), // Real-world distance per cell (e.g. 6 miles)
         gridScaleUnit: v.optional(v.string()), // Unit (e.g. "miles", "km", "ft")
         isExplorationMap: v.optional(v.boolean()),
-        isInfiniteGrid: v.optional(v.boolean()), // Infinite hex/square grid without static image
         revealedCells: v.optional(v.array(v.string())), // Array of "col,row" strings for revealed cells
         hideFromMenu: v.optional(v.boolean()), // Hide from top-left map dropdown for players
         imageUpdatedAt: v.optional(v.number()), // Timestamp to bust browser HTTP cache when image is updated at same URL
@@ -544,15 +543,6 @@ export default defineSchema({
         userId: v.string(), // Clerk subject of the note creator
         authorName: v.optional(v.string()),
         note: v.string(),
-        updatedAt: v.number(),
-    }).index('by_mapId_cellKey', ['mapId', 'cellKey'])
-      .index('by_mapId', ['mapId']),
-    mapCellFills: defineTable({
-        mapId: v.id('worldMaps'),
-        cellKey: v.string(), // "col,row"
-        terrainType: v.string(), // "water", "forest", "hills", "mountain", "snow", "sand", "stone", "plains", "swamp", etc.
-        color: v.string(), // Hex color e.g. "#3b82f6"
-        userId: v.string(),
         updatedAt: v.number(),
     }).index('by_mapId_cellKey', ['mapId', 'cellKey'])
       .index('by_mapId', ['mapId']),
