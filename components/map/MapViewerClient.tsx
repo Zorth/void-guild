@@ -10,7 +10,7 @@ import {
   ZoomIn, ZoomOut, Maximize2, Layers, MapPin, Eye, Edit3, Plus, 
   Trash2, Settings, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Map as MapIcon, FileText, Check, X, Grid, Lock, Unlock, Move, HelpCircle, Copy,
   Castle, Crown, Skull, Swords, Shield, Mountain, Tent, Beer, Anchor, Flame, TreePine, Sparkles, BookOpen, Coins, Compass, Gem, Crosshair, Flag, Ghost, EyeOff, Ruler, Search, RotateCcw, RefreshCw,
-  Upload, ExternalLink, User, Route
+  Upload, ExternalLink, User, SlidersHorizontal
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { toast } from 'sonner'
 import { Id } from '@/convex/_generated/dataModel'
 
@@ -263,7 +264,6 @@ export default function MapViewerClient() {
   const bulkRevealCellsMutation = useMutation(api.maps.bulkRevealCells)
   const saveGridNoteMutation = useMutation(api.maps.saveGridNote)
   const deleteGridNoteMutation = useMutation(api.maps.deleteGridNote)
-  const toggleCellRoadMutation = useMutation(api.maps.toggleCellRoad)
   const refreshMapImageMutation = useMutation(api.maps.refreshMapImage)
 
   // View state
@@ -271,11 +271,8 @@ export default function MapViewerClient() {
   const [isEditMode, setIsEditMode] = useState(false)
   const [isRefreshingImage, setIsRefreshingImage] = useState(false)
   const [activeTool, setActiveTool] = useState<
-    'view' | 'add_pin' | 'add_area' | 'reveal_hex' | 'hide_hex' | 'grid_note' | 'align_grid' | 'ruler' | 'draw_road'
+    'view' | 'add_pin' | 'add_area' | 'reveal_hex' | 'hide_hex' | 'grid_note' | 'align_grid' | 'ruler'
   >('view')
-
-  // Road drawing state: first clicked cell waiting for target cell
-  const [roadStartCellKey, setRoadStartCellKey] = useState<string | null>(null)
 
   // Live grid calibration / offset state
   const [liveGridOffset, setLiveGridOffset] = useState<{ x: number; y: number } | null>(null)
@@ -1429,14 +1426,8 @@ export default function MapViewerClient() {
       }
     }
 
-    // Always include explicit cells with notes or roads
+    // Always include explicit cells with notes
     const explicitKeys = new Set<string>()
-    if (fullData?.cellRoads) {
-      fullData.cellRoads.forEach((r) => {
-        explicitKeys.add(r.fromCellKey)
-        explicitKeys.add(r.toCellKey)
-      })
-    }
     if (fullData?.notes) {
       fullData.notes.forEach((n) => {
         if (n.cellKey && !n.cellKey.startsWith('point_')) explicitKeys.add(n.cellKey)
@@ -1468,7 +1459,6 @@ export default function MapViewerClient() {
     mapWidth,
     mapHeight,
     currentMap?.revealedCells,
-    fullData?.cellRoads,
     fullData?.notes,
     getCellGeometry,
   ])
@@ -1479,61 +1469,14 @@ export default function MapViewerClient() {
     gridCells.forEach((cell) => {
       map[cell.key] = { cx: cell.cx, cy: cell.cy }
     })
-    // Also include cell centers for any road keys not yet in gridCells
-    if (fullData?.cellRoads) {
-      fullData.cellRoads.forEach((r) => {
-        if (!map[r.fromCellKey]) {
-          const parts = r.fromCellKey.split(',')
-          if (parts.length === 2) {
-            const geom = getCellGeometry(Number(parts[0]), Number(parts[1]))
-            if (geom) map[r.fromCellKey] = { cx: geom.cx, cy: geom.cy }
-          }
-        }
-        if (!map[r.toCellKey]) {
-          const parts = r.toCellKey.split(',')
-          if (parts.length === 2) {
-            const geom = getCellGeometry(Number(parts[0]), Number(parts[1]))
-            if (geom) map[r.toCellKey] = { cx: geom.cx, cy: geom.cy }
-          }
-        }
-      })
-    }
     return map
-  }, [gridCells, fullData?.cellRoads, getCellGeometry])
+  }, [gridCells])
 
   // Cell click handler (Exploration reveal or Player Note)
   const handleCellClick = (cellKey: string, e: React.MouseEvent) => {
     e.stopPropagation()
     if (hasDraggedRef.current || activeTool === 'align_grid') return
     if (!currentMap) return
-
-    if (activeTool === 'draw_road') {
-      if (!roadStartCellKey) {
-        setRoadStartCellKey(cellKey)
-        toast.info(`Selected start hex (${cellKey}). Click another hex to connect road!`)
-      } else {
-        if (roadStartCellKey === cellKey) {
-          setRoadStartCellKey(null)
-          toast.info('Cancelled road connection')
-          return
-        }
-        toggleCellRoadMutation({
-          mapId: currentMap._id,
-          fromCellKey: roadStartCellKey,
-          toCellKey: cellKey,
-        })
-          .then((res) => {
-            if (res.action === 'created') {
-              toast.success('Road connected!')
-            } else {
-              toast.info('Road removed')
-            }
-          })
-          .catch((err) => toast.error(err.message || 'Failed to connect road'))
-        setRoadStartCellKey(null)
-      }
-      return
-    }
 
     if (isEditMode && activeTool === 'reveal_hex') {
       if (!revealedSet.has(cellKey)) {
@@ -2210,29 +2153,6 @@ export default function MapViewerClient() {
             </Button>
           )}
 
-          {/* CONNECT ROADS BUTTON */}
-          {gridType !== 'none' && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className={`h-9 gap-1.5 bg-slate-950 dark:bg-slate-950 text-slate-100 hover:text-white hover:bg-slate-900 dark:hover:bg-slate-900 border border-slate-700/80 shadow-xl backdrop-blur-md ${
-                activeTool === 'draw_road' ? 'text-amber-400 border-amber-500/80 bg-slate-900 dark:bg-slate-900 ring-2 ring-amber-500/60' : ''
-              }`}
-              onClick={() => {
-                setActiveTool(activeTool === 'draw_road' ? 'view' : 'draw_road')
-                setRoadStartCellKey(null)
-              }}
-              title="Connect Hex Roads / Trails"
-            >
-              <Route className="h-4 w-4 text-amber-400" />
-              <span className="hidden sm:inline font-medium">Roads</span>
-              {fullData?.cellRoads && fullData.cellRoads.length > 0 && (
-                <span className="ml-0.5 px-1.5 py-0.2 bg-slate-800 border border-slate-700 rounded-full text-[10px] font-mono text-amber-300">
-                  {fullData.cellRoads.length}
-                </span>
-              )}
-            </Button>
-          )}
 
           {/* NOTES MENU BUTTON */}
           <Button
@@ -2398,33 +2318,53 @@ export default function MapViewerClient() {
               >
                 <Lock className="h-4 w-4" />
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 text-emerald-400 hover:text-emerald-300 hover:bg-slate-900"
-                onClick={() => {
-                  if (!currentMap) return
-                  const allKeys = gridCells.map((cell) => cell.key)
-                  bulkRevealCellsMutation({ mapId: currentMap._id, cellKeys: allKeys, reveal: true })
-                  toast.success('Revealed all cells!')
-                }}
-                title="Reveal Entire Map"
-              >
-                <Eye className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 text-slate-400 hover:text-red-400 hover:bg-slate-900"
-                onClick={() => {
-                  if (!currentMap) return
-                  bulkRevealCellsMutation({ mapId: currentMap._id, cellKeys: currentMap.revealedCells || [], reveal: false })
-                  toast.success('Reset fog of war!')
-                }}
-                title="Reset Fog of War"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 text-slate-400 hover:text-cyan-300 hover:bg-slate-900"
+                    title="Bulk Fog Actions (Show/Hide All)"
+                  >
+                    <SlidersHorizontal className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent side="right" align="start" className="w-56 p-3 bg-slate-950 dark:bg-slate-950 border-slate-800 text-slate-100 shadow-xl space-y-2.5">
+                  <div className="space-y-0.5">
+                    <p className="text-xs font-bold text-slate-200">Bulk Fog Actions</p>
+                    <p className="text-[10px] text-slate-400">Reveal or cover the entire map</p>
+                  </div>
+                  <div className="space-y-1.5 pt-1 border-t border-slate-800">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-start text-xs h-8 border-emerald-800/60 text-emerald-300 hover:bg-emerald-950/50 hover:text-emerald-200"
+                      onClick={() => {
+                        if (!currentMap) return
+                        const allKeys = gridCells.map((cell) => cell.key)
+                        bulkRevealCellsMutation({ mapId: currentMap._id, cellKeys: allKeys, reveal: true })
+                        toast.success('Revealed all cells!')
+                      }}
+                    >
+                      <Eye className="h-3.5 w-3.5 mr-2" />
+                      Reveal All Tiles
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-start text-xs h-8 border-red-900/60 text-red-300 hover:bg-red-950/50 hover:text-red-200"
+                      onClick={() => {
+                        if (!currentMap) return
+                        bulkRevealCellsMutation({ mapId: currentMap._id, cellKeys: currentMap.revealedCells || [], reveal: false })
+                        toast.success('Covered all tiles (Fog reset)!')
+                      }}
+                    >
+                      <EyeOff className="h-3.5 w-3.5 mr-2" />
+                      Hide All Tiles (Cover Map)
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </>
           )}
           {activeTool === 'add_area' && areaDraft.points.length > 0 && (
@@ -3111,40 +3051,6 @@ export default function MapViewerClient() {
         </div>
       )}
 
-      {/* ROAD DRAWING ACTIVE BOTTOM HUD */}
-      {activeTool === 'draw_road' && (
-        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-30 flex items-center gap-3 bg-slate-950/95 dark:bg-slate-950/95 backdrop-blur-md px-4 py-2 rounded-full border border-amber-500/60 shadow-2xl text-slate-100">
-          <div className="flex items-center gap-2 text-xs font-medium text-slate-100">
-            <Route className="h-4 w-4 text-amber-400" />
-            <span>
-              {roadStartCellKey
-                ? `Start selected (${roadStartCellKey}). Click adjacent or target hex to connect!`
-                : 'Click 1st hex, then click 2nd hex to draw/remove road'}
-            </span>
-          </div>
-          {roadStartCellKey && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs px-2 text-slate-400 hover:text-red-400"
-              onClick={() => setRoadStartCellKey(null)}
-            >
-              Cancel Start
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs px-2.5 bg-slate-900 border border-slate-700 text-slate-200 hover:text-white hover:bg-slate-800"
-            onClick={() => {
-              setRoadStartCellKey(null)
-              setActiveTool('view')
-            }}
-          >
-            Done
-          </Button>
-        </div>
-      )}
 
       {/* ZOOM & VIEWPORT CONTROLS */}
       <div className="absolute bottom-6 right-6 z-30 flex flex-col gap-2 bg-slate-950 dark:bg-slate-950 backdrop-blur-md p-1.5 rounded-full border border-slate-700/80 shadow-xl text-slate-200">
@@ -3593,11 +3499,15 @@ export default function MapViewerClient() {
                 const hasNote = !!notesMap[cell.key]
                 const canShowNote = showPlayerNotes && hasNote && (!isHidden || isOwner)
 
-                // Cell fill color logic:
-                // If cell is hidden by exploration fog of war -> 100% solid dark slate
-                // Otherwise -> transparent
+                // Exploration mode transparency:
+                // For world owner: unrevealed hexes are slightly transparent (0.55 opacity) so they can see which hexes are being revealed vs covered.
+                // For non-owners / players: unrevealed hexes are 100% solid fog of war.
+                // Revealed hexes are transparent.
                 const fillColor = isHidden ? '#020617' : 'transparent'
-                const isStartRoadCell = roadStartCellKey === cell.key
+                const fillOpacity = isHidden ? (isOwner ? 0.55 : 1) : 0
+                const strokeColor = isOwner && isHidden
+                  ? 'rgba(148, 163, 184, 0.45)'
+                  : 'rgba(255, 255, 255, 0.22)'
 
                 // Hover styling
                 let hoverClass = ''
@@ -3611,11 +3521,7 @@ export default function MapViewerClient() {
                   }
                 } else {
                   // Revealed cell
-                  if (activeTool === 'draw_road') {
-                    hoverClass = isStartRoadCell
-                      ? 'cursor-pointer stroke-amber-400 stroke-2'
-                      : 'cursor-pointer hover:stroke-amber-400 hover:stroke-2'
-                  } else if (activeTool === 'grid_note') {
+                  if (activeTool === 'grid_note') {
                     hoverClass = 'cursor-pointer hover:fill-amber-500/20 hover:stroke-amber-400'
                   } else if (isEditMode) {
                     if (activeTool === 'hide_hex') {
@@ -3628,20 +3534,22 @@ export default function MapViewerClient() {
                   }
                 }
 
-                // Clicks pass through revealed cells to pins and areas underneath when not in editing mode
+                // Clicks pass through revealed cells to pins and areas underneath when not in editing mode.
+                // Hidden cells capture clicks for players to prevent interacting with concealed pins.
                 const shouldCaptureClicks =
-                  isHidden ||
-                  activeTool === 'draw_road' ||
+                  (!isOwner && isHidden) ||
                   activeTool === 'grid_note' ||
-                  (isEditMode && activeTool === 'hide_hex')
+                  (isEditMode && (activeTool === 'reveal_hex' || activeTool === 'hide_hex'))
 
                 return (
                   <g key={cell.key}>
                     <polygon
                       points={cell.points}
                       fill={fillColor}
-                      stroke={isStartRoadCell ? '#f59e0b' : 'rgba(255, 255, 255, 0.22)'}
-                      strokeWidth={isStartRoadCell ? '2.5' : '1'}
+                      fillOpacity={fillOpacity}
+                      stroke={strokeColor}
+                      strokeWidth="1"
+                      strokeDasharray={isOwner && isHidden ? '4 2' : undefined}
                       vectorEffect="non-scaling-stroke"
                       className={`transition-colors duration-150 ${hoverClass}`}
                       style={{ pointerEvents: shouldCaptureClicks ? 'auto' : 'none' }}
@@ -3665,54 +3573,6 @@ export default function MapViewerClient() {
                   </g>
                 )
               })}
-
-              {/* 2. RENDER HEX-TO-HEX ROADS */}
-              {fullData?.cellRoads &&
-                fullData.cellRoads.map((road) => {
-                  const fromCoord = cellCenterMap[road.fromCellKey]
-                  const toCoord = cellCenterMap[road.toCellKey]
-                  if (!fromCoord || !toCoord) return null
-
-                  // Fog of War concealment for non-owners
-                  if (isExplorationMap && !isOwner) {
-                    const fromHidden = !revealedSet.has(road.fromCellKey)
-                    const toHidden = !revealedSet.has(road.toCellKey)
-                    if (fromHidden && toHidden) return null
-                  }
-
-                  const isDashed = road.style === 'dashed'
-                  const roadColor = road.color || '#d97706'
-
-                  return (
-                    <g key={road._id} className="pointer-events-none">
-                      {/* Dark under-stroke for high contrast on any background */}
-                      <line
-                        x1={fromCoord.cx}
-                        y1={fromCoord.cy}
-                        x2={toCoord.cx}
-                        y2={toCoord.cy}
-                        stroke="#090d16"
-                        strokeWidth="5"
-                        strokeLinecap="round"
-                        opacity={0.8}
-                      />
-                      {/* Main road line */}
-                      <line
-                        x1={fromCoord.cx}
-                        y1={fromCoord.cy}
-                        x2={toCoord.cx}
-                        y2={toCoord.cy}
-                        stroke={roadColor}
-                        strokeWidth="3"
-                        strokeDasharray={isDashed ? '6,4' : undefined}
-                        strokeLinecap="round"
-                      />
-                      {/* Waypoint circles at centers */}
-                      <circle cx={fromCoord.cx} cy={fromCoord.cy} r="2.5" fill={roadColor} stroke="#090d16" strokeWidth="1" />
-                      <circle cx={toCoord.cx} cy={toCoord.cy} r="2.5" fill={roadColor} stroke="#090d16" strokeWidth="1" />
-                    </g>
-                  )
-                })}
             </svg>
           )}
 

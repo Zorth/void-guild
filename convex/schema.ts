@@ -546,17 +546,6 @@ export default defineSchema({
         updatedAt: v.number(),
     }).index('by_mapId_cellKey', ['mapId', 'cellKey'])
       .index('by_mapId', ['mapId']),
-    mapCellRoads: defineTable({
-        mapId: v.id('worldMaps'),
-        fromCellKey: v.string(), // "col,row"
-        toCellKey: v.string(), // "col,row"
-        roadKey: v.string(), // normalized "minKey--maxKey"
-        color: v.optional(v.string()), // Road line color (default amber/stone e.g. "#d97706")
-        style: v.optional(v.union(v.literal('solid'), v.literal('dashed'))),
-        userId: v.string(),
-        updatedAt: v.number(),
-    }).index('by_mapId_roadKey', ['mapId', 'roadKey'])
-      .index('by_mapId', ['mapId']),
 })
 
 

@@ -91,11 +91,6 @@ export const getMapFullData = query({
       .withIndex('by_mapId', (q) => q.eq('mapId', args.mapId))
       .collect()
 
-    const cellRoads = await ctx.db
-      .query('mapCellRoads')
-      .withIndex('by_mapId', (q) => q.eq('mapId', args.mapId))
-      .collect()
-
     const pins = isOwnerOrAdmin ? rawPins : rawPins.filter((p) => !p.gmOnly)
     const areas = isOwnerOrAdmin ? rawAreas : rawAreas.filter((a) => !a.gmOnly)
 
@@ -105,7 +100,6 @@ export const getMapFullData = query({
       pins,
       areas,
       notes,
-      cellRoads,
     }
   },
 })
@@ -682,50 +676,4 @@ export const deleteGridNote = mutation({
   },
 })
 
-// --- CELL ROADS (Hex-to-Hex Connections) ---
-
-export const toggleCellRoad = mutation({
-  args: {
-    mapId: v.id('worldMaps'),
-    fromCellKey: v.string(),
-    toCellKey: v.string(),
-    color: v.optional(v.string()),
-    style: v.optional(v.union(v.literal('solid'), v.literal('dashed'))),
-  },
-  handler: async (ctx, args) => {
-    const user = await ctx.auth.getUserIdentity()
-    if (!user) throw new Error('Not authenticated')
-
-    if (args.fromCellKey === args.toCellKey) {
-      throw new Error('Cannot connect a hex to itself')
-    }
-
-    // Canonical key regardless of click order e.g. "1,2--1,3" vs "1,3--1,2"
-    const roadKey = [args.fromCellKey, args.toCellKey].sort().join('--')
-
-    const existing = await ctx.db
-      .query('mapCellRoads')
-      .withIndex('by_mapId_roadKey', (q) => q.eq('mapId', args.mapId).eq('roadKey', roadKey))
-      .first()
-
-    if (existing) {
-      // Toggle off / delete
-      await ctx.db.delete(existing._id)
-      return { action: 'removed', roadKey }
-    } else {
-      // Toggle on / insert
-      const id = await ctx.db.insert('mapCellRoads', {
-        mapId: args.mapId,
-        fromCellKey: args.fromCellKey,
-        toCellKey: args.toCellKey,
-        roadKey,
-        color: args.color || '#f59e0b',
-        style: args.style || 'solid',
-        userId: user.subject,
-        updatedAt: Date.now(),
-      })
-      return { action: 'created', roadKey, id }
-    }
-  },
-})
 
