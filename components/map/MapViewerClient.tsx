@@ -3081,11 +3081,13 @@ export default function MapViewerClient() {
             const currentPinX = isDraggingThisPin && draggedPinOffset ? draggedPinOffset.x : pin.x
             const currentPinY = isDraggingThisPin && draggedPinOffset ? draggedPinOffset.y : pin.y
 
+            const canDragThisPin = isOwner && activeTool === 'view'
+
             return (
               <div
                 key={pin._id}
                 className={`absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-auto group ${
-                  isOwner && isEditMode && activeTool === 'view' ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
+                  canDragThisPin ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
                 }`}
                 style={{
                   left: `${currentPinX}%`,
@@ -3093,7 +3095,7 @@ export default function MapViewerClient() {
                   zIndex: isDraggingThisPin ? 40 : (isOwner && isEditMode ? 25 : 5),
                 }}
                 onMouseDown={(e) => {
-                  if (isOwner && isEditMode && activeTool === 'view') {
+                  if (canDragThisPin) {
                     e.stopPropagation()
                     hasDraggedPinRef.current = false
                     pinDragStartRef.current = {
@@ -3107,7 +3109,7 @@ export default function MapViewerClient() {
                   }
                 }}
                 onTouchStart={(e) => {
-                  if (isOwner && isEditMode && activeTool === 'view' && e.touches.length === 1) {
+                  if (canDragThisPin && e.touches.length === 1) {
                     e.stopPropagation()
                     hasDraggedPinRef.current = false
                     pinDragStartRef.current = {
@@ -3156,18 +3158,30 @@ export default function MapViewerClient() {
                   </span>
                 ) : (
                   <div className="flex flex-col items-center relative">
-                    <div
-                      className={`p-2 rounded-full shadow-lg border border-white/20 transition-transform ${
-                        isDraggingThisPin ? 'scale-125 ring-2 ring-amber-400' : 'group-hover:scale-110'
-                      }`}
-                      style={{ backgroundColor: pin.color || (isQuestPin ? '#f59e0b' : '#a855f7') }}
-                    >
-                      {isQuestPin ? (
-                        <img src="/quest.svg" alt="Quest" className="h-5 w-5 drop-shadow-[0_0_8px_rgba(245,158,11,0.9)]" />
-                      ) : (
-                        renderPinIcon(pin.icon, "h-5 w-5 text-white")
-                      )}
-                    </div>
+                    {isQuestPin ? (
+                      <div
+                        className={`transition-all ${
+                          isDraggingThisPin
+                            ? 'scale-125 drop-shadow-[0_0_12px_rgba(245,158,11,1)]'
+                            : 'group-hover:scale-125 drop-shadow-[0_0_8px_rgba(245,158,11,0.85)]'
+                        }`}
+                      >
+                        <img
+                          src="/quest.svg"
+                          alt="Quest"
+                          className="h-7 w-7 select-none pointer-events-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]"
+                        />
+                      </div>
+                    ) : (
+                      <div
+                        className={`p-2 rounded-full shadow-lg border border-white/20 transition-transform ${
+                          isDraggingThisPin ? 'scale-125 ring-2 ring-amber-400' : 'group-hover:scale-110'
+                        }`}
+                        style={{ backgroundColor: pin.color || '#a855f7' }}
+                      >
+                        {renderPinIcon(pin.icon, "h-5 w-5 text-white")}
+                      </div>
+                    )}
                     {pin.gmOnly && (
                       <div
                         className="absolute -top-1 -right-1 bg-amber-500 rounded-full p-0.5 shadow-md border border-slate-900"
@@ -3176,15 +3190,20 @@ export default function MapViewerClient() {
                         <EyeOff className="h-2.5 w-2.5 text-slate-950" />
                       </div>
                     )}
-                    {(scale > 0.8 || (pin.minZoom && scale >= pin.minZoom)) && (
-                      <span className={`mt-1 bg-slate-950/95 backdrop-blur-md px-2 py-0.5 rounded-md text-[10px] font-bold whitespace-nowrap shadow-md border flex items-center gap-1 ${
-                        isQuestPin ? 'text-amber-300 border-amber-500/40' : 'text-slate-100 border-slate-800'
-                      }`}>
-                        {isQuestPin && (
+                    {isQuestPin ? (
+                      /* Quest pins: quest name ONLY displays on hover */
+                      <div className="absolute top-full mt-1.5 z-30 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none">
+                        <span className="bg-slate-950/95 backdrop-blur-md px-2 py-0.5 rounded-md text-[10px] font-bold whitespace-nowrap shadow-xl border border-amber-500/50 text-amber-300 flex items-center gap-1">
                           <img src="/quest.svg" alt="" className="h-2.5 w-2.5 shrink-0" />
-                        )}
-                        {pin.title}
-                      </span>
+                          {pin.title}
+                        </span>
+                      </div>
+                    ) : (
+                      (scale > 0.8 || (pin.minZoom && scale >= pin.minZoom)) && (
+                        <span className="mt-1 bg-slate-950/95 backdrop-blur-md px-2 py-0.5 rounded-md text-[10px] font-bold whitespace-nowrap shadow-md border text-slate-100 border-slate-800 flex items-center gap-1">
+                          {pin.title}
+                        </span>
+                      )
                     )}
                   </div>
                 )}
