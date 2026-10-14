@@ -106,7 +106,25 @@ export const listSessions = query({
     },
     handler: async (ctx, args) => {
         const user = await validateKey(ctx, args.apiKey)
-        let sessions = await ctx.db.query('sessions').collect()
+        let sessions
+
+        const wId = args.worldId ? ctx.db.normalizeId('worlds', args.worldId) : null
+        if (wId) {
+            sessions = await ctx.db
+                .query('sessions')
+                .withIndex('by_world', (q) => q.eq('world', wId))
+                .collect()
+        } else if (args.past !== undefined) {
+            sessions = await ctx.db
+                .query('sessions')
+                .withIndex('by_locked', (q) => q.eq('locked', args.past!))
+                .collect()
+        } else {
+            sessions = await ctx.db
+                .query('sessions')
+                .withIndex('by_date')
+                .collect()
+        }
 
         // Private sessions are hidden from public list unless requester is owner or admin
         sessions = sessions.filter((s) => {
@@ -116,15 +134,11 @@ export const listSessions = query({
             return false
         })
 
-        if (args.past !== undefined) {
+        if (args.past !== undefined && wId) {
             sessions = sessions.filter((s) => s.locked === args.past)
         }
         if (args.isIntro !== undefined) {
             sessions = sessions.filter((s) => !!s.isIntro === args.isIntro)
-        }
-        if (args.worldId) {
-            const wId = ctx.db.normalizeId('worlds', args.worldId)
-            if (wId) sessions = sessions.filter((s) => s.world === wId)
         }
         if (args.system) {
             sessions = sessions.filter((s) => s.system === args.system)
@@ -265,23 +279,19 @@ export const addSessionLoot = mutation({
         const quantity = args.quantity || 1
         const newItems = []
 
-        const shouldExpandForEach = args.isPerCharacter ?? false
-        const attendingCount = Math.max((session.characters || []).length, 1)
-        const count = shouldExpandForEach ? quantity * attendingCount : quantity
-
-        for (let i = 0; i < count; i++) {
+        for (let i = 0; i < quantity; i++) {
             newItems.push({
                 id: crypto.randomUUID(),
                 name: args.name,
                 link: args.link,
                 valueGP: args.valueGP,
                 isGood: args.isGood,
-                isPerCharacter: shouldExpandForEach ? false : (args.isPerCharacter ?? false),
+                isPerCharacter: args.isPerCharacter ?? false,
             })
         }
 
         await ctx.db.patch(sId, { loot: [...loot, ...newItems] })
-        return { success: true, count }
+        return { success: true, count: quantity }
     },
 })
 

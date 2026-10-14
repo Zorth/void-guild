@@ -723,8 +723,10 @@ export async function getUserWorldStreaksMap(
     .withIndex('by_userId', (q: any) => q.eq('userId', userId))
     .collect()
 
-  const allSessions = await ctx.db.query('sessions').collect()
-  const lockedSessions = allSessions.filter((s: any) => s.locked)
+  const lockedSessions = await ctx.db
+    .query('sessions')
+    .withIndex('by_locked', (q: any) => q.eq('locked', true))
+    .collect()
   const sortedLockedSessions = [...lockedSessions].sort((a: any, b: any) => {
     const dateA = a.date ?? a._creationTime
     const dateB = b.date ?? b._creationTime

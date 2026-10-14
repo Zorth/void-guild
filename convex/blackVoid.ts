@@ -271,7 +271,10 @@ export const getUserBlackVoidNotifications = query({
                         return sum + itemTotal
                     }, 0)
                     const sharePerPlayer = totalLootValue / attendingCount
-                    const characterClaimedItems = lootList.filter((item) => item.claimedBy === char._id)
+                    const characterClaimedItems = lootList.filter((item) =>
+                        item.claimedBy === char._id ||
+                        (item.claimedByCharacters && item.claimedByCharacters.includes(char._id))
+                    )
                     const userClaimedValue = characterClaimedItems.reduce((sum, item) => {
                         const val = item.isGood ? item.valueGP : item.valueGP / 2
                         return sum + val
@@ -1080,7 +1083,10 @@ export const markAllCharacterTransactionsClaimed = mutation({
             }, 0)
 
             const sharePerPlayer = totalLootValue / attendingCount
-            const characterClaimedItems = lootList.filter((item) => item.claimedBy === args.characterId)
+            const characterClaimedItems = lootList.filter((item) =>
+                item.claimedBy === args.characterId ||
+                (item.claimedByCharacters && item.claimedByCharacters.includes(args.characterId))
+            )
             const userClaimedValue = characterClaimedItems.reduce((sum, item) => {
                 const val = item.isGood ? item.valueGP : item.valueGP / 2
                 return sum + val
@@ -1333,7 +1339,10 @@ export const getCharacterTransactions = query({
                 const sharePerPlayer = totalLootValue / attendingCount
 
                 // Items claimed by THIS character
-                const characterClaimedItems = lootList.filter((item) => item.claimedBy === args.characterId)
+                const characterClaimedItems = lootList.filter((item) =>
+                    item.claimedBy === args.characterId ||
+                    (item.claimedByCharacters && item.claimedByCharacters.includes(args.characterId))
+                )
 
                 // Total GP value of items claimed by THIS character
                 const userClaimedValue = characterClaimedItems.reduce((sum, item) => {

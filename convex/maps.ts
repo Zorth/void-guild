@@ -453,6 +453,7 @@ export const savePin = mutation({
     mapId: v.id('worldMaps'),
     pinId: v.optional(v.id('mapPins')),
     layerId: v.optional(v.id('mapLayers')),
+    questId: v.optional(v.id('quests')),
     x: v.number(),
     y: v.number(),
     title: v.string(),
@@ -474,6 +475,7 @@ export const savePin = mutation({
       if (!existingPin) throw new Error('Pin not found')
       const patches: any = {
         layerId: args.layerId,
+        questId: args.questId,
         x: args.x,
         y: args.y,
         title: args.title.trim(),
@@ -494,6 +496,7 @@ export const savePin = mutation({
       return await ctx.db.insert('mapPins', {
         mapId: args.mapId,
         layerId: args.layerId,
+        questId: args.questId,
         x: args.x,
         y: args.y,
         title: args.title.trim(),

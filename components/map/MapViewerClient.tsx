@@ -25,209 +25,23 @@ import { toast } from 'sonner'
 import { Id } from '@/convex/_generated/dataModel'
 import { formatWikiUrl } from '@/lib/utils'
 
-export const PIN_ICONS = [
-  { name: 'MapPin', label: 'Default Pin', icon: MapPin },
-  { name: 'Castle', label: 'Castle / Keep', icon: Castle },
-  { name: 'Crown', label: 'Capital / City', icon: Crown },
-  { name: 'Skull', label: 'Dungeon / Danger', icon: Skull },
-  { name: 'Swords', label: 'Battle / Conflict', icon: Swords },
-  { name: 'Shield', label: 'Guard / Outpost', icon: Shield },
-  { name: 'Mountain', label: 'Mountain / Peaks', icon: Mountain },
-  { name: 'Tent', label: 'Camp / Caravan', icon: Tent },
-  { name: 'Beer', label: 'Tavern / Inn', icon: Beer },
-  { name: 'Anchor', label: 'Port / Harbor', icon: Anchor },
-  { name: 'Flame', label: 'Forge / Fire', icon: Flame },
-  { name: 'TreePine', label: 'Forest / Woods', icon: TreePine },
-  { name: 'Sparkles', label: 'Magic / Arcane', icon: Sparkles },
-  { name: 'BookOpen', label: 'Library / Lore', icon: BookOpen },
-  { name: 'Coins', label: 'Market / Vault', icon: Coins },
-  { name: 'Compass', label: 'Waypoint', icon: Compass },
-  { name: 'Gem', label: 'Mine / Quarry', icon: Gem },
-  { name: 'Crosshair', label: 'Target / Bounty', icon: Crosshair },
-  { name: 'Flag', label: 'Settlement / Clan', icon: Flag },
-  { name: 'Ghost', label: 'Crypt / Tomb', icon: Ghost },
-  { name: 'Eye', label: 'Watchtower / Lookout', icon: Eye },
-] as const
+import { PIN_ICONS, renderPinIcon } from './pinIcons'
+import { TilePyramidLayer, MAX_MAP_ZOOM } from './TilePyramidLayer'
+import { MapProcessorPickerModal, ProcessorMapItem } from './modals/MapProcessorPickerModal'
+import { MapQuestsPanel } from './panels/MapQuestsPanel'
+import { MapLayersPanel } from './panels/MapLayersPanel'
+import { MapNotesPanel } from './panels/MapNotesPanel'
+import { MapLocationsPanel } from './panels/MapLocationsPanel'
+import { MapPinDetailsModal } from './modals/MapPinDetailsModal'
+import { MapPinFormModal } from './modals/MapPinFormModal'
+import { MapAreaDetailsModal, MapAreaFormModal } from './modals/MapAreaModals'
+import { MapNoteModal } from './modals/MapNoteModal'
+import { MapNewMapModal } from './modals/MapNewMapModal'
+import { MapSettingsModal, SettingsDraft } from './modals/MapSettingsModal'
+import { MapAddLayerModal } from './modals/MapAddLayerModal'
 
-export function renderPinIcon(iconName?: string, className = "h-4 w-4 text-white") {
-  const found = PIN_ICONS.find((item) => item.name === iconName)
-  const IconComp = found ? found.icon : MapPin
-  return <IconComp className={className} />
-}
+export { PIN_ICONS, renderPinIcon, MAX_MAP_ZOOM }
 
-export const MAX_MAP_ZOOM = 32
-
-interface TilePyramidLayerProps {
-  tileUrl: string
-  mapWidth: number
-  mapHeight: number
-  scale: number
-  position: { x: number; y: number }
-  containerRef: React.RefObject<HTMLDivElement | null>
-  viewportRef: React.RefObject<HTMLDivElement | null>
-  tileSize?: number
-  minZoom?: number
-  maxZoom?: number
-  imageUpdatedAt?: number
-  opacity?: number
-}
-
-function TilePyramidLayer({
-  tileUrl,
-  mapWidth,
-  mapHeight,
-  scale,
-  position,
-  containerRef,
-  viewportRef,
-  tileSize = 256,
-  minZoom = 0,
-  maxZoom,
-  imageUpdatedAt,
-  opacity = 1,
-}: TilePyramidLayerProps) {
-  // Normalize DeepZoom template URL if user pasted a .dzi URL
-  const normalizedTemplate = useMemo(() => {
-    let url = (tileUrl || '').trim()
-    if (url.endsWith('.dzi')) {
-      url = url.replace(/\.dzi$/, '_files/{z}/{x}_{y}.webp')
-    }
-    return url
-  }, [tileUrl])
-
-  // Calculate maximum LOD level in DeepZoom pyramid
-  const maxLevel = useMemo(() => {
-    if (maxZoom !== undefined && maxZoom > 0) return maxZoom
-    const maxDim = Math.max(mapWidth || 2000, mapHeight || 2000)
-    return Math.ceil(Math.log2(maxDim))
-  }, [mapWidth, mapHeight, maxZoom])
-
-  // Determine current optimal LOD level z based on display scale and screen DPI
-  // scale 1.0 = native resolution (level = maxLevel)
-  // We include a quality bias and account for devicePixelRatio (Retina / high-DPI displays)
-  // so tiles remain razor sharp and don't prematurely downsample into blurry lower mipmaps.
-  const targetLevel = useMemo(() => {
-    const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1
-    // Boost LOD selection for high-DPI screens or zoom transitions:
-    // +0.5 to prefer sharper higher-res tiles rather than dropping to blurry lower-res early
-    const dprBonus = Math.log2(Math.min(dpr, 2))
-    const computedLevel = maxLevel + Math.log2(Math.max(scale, 0.0001)) + dprBonus + 0.35
-    const clamped = Math.floor(computedLevel)
-    return Math.max(minZoom, Math.min(maxLevel, clamped))
-  }, [maxLevel, scale, minZoom])
-
-  // Calculate level dimensions and grid
-  const s = 1 / Math.pow(2, maxLevel - targetLevel)
-  const levelW = Math.ceil(mapWidth * s)
-  const levelH = Math.ceil(mapHeight * s)
-  const tSize = tileSize || 256
-
-  const numCols = Math.ceil(levelW / tSize)
-  const numRows = Math.ceil(levelH / tSize)
-
-  // Compute visible viewport bounds in map coordinate space [0..mapWidth, 0..mapHeight]
-  const visibleTiles = useMemo(() => {
-    let minCol = 0
-    let maxCol = Math.max(0, numCols - 1)
-    let minRow = 0
-    let maxRow = Math.max(0, numRows - 1)
-
-    if (containerRef.current && viewportRef.current) {
-      const vRect = viewportRef.current.getBoundingClientRect()
-      const cRect = containerRef.current.getBoundingClientRect()
-
-      if (vRect.width > 0 && vRect.height > 0 && cRect.width > 0 && cRect.height > 0) {
-        const visLeft = Math.max(0, (vRect.left - cRect.left) / scale)
-        const visRight = Math.min(mapWidth, (vRect.right - cRect.left) / scale)
-        const visTop = Math.max(0, (vRect.top - cRect.top) / scale)
-        const visBottom = Math.min(mapHeight, (vRect.bottom - cRect.top) / scale)
-
-        const lvlLeft = visLeft * s
-        const lvlRight = visRight * s
-        const lvlTop = visTop * s
-        const lvlBottom = visBottom * s
-
-        // 1 tile padding on all sides for smooth preloading during pan
-        minCol = Math.max(0, Math.floor(lvlLeft / tSize) - 1)
-        maxCol = Math.min(numCols - 1, Math.floor(lvlRight / tSize) + 1)
-        minRow = Math.max(0, Math.floor(lvlTop / tSize) - 1)
-        maxRow = Math.min(numRows - 1, Math.floor(lvlBottom / tSize) + 1)
-      }
-    }
-
-    const tiles: { col: number; row: number; left: number; top: number; width: number; height: number; url: string }[] = []
-
-    for (let col = minCol; col <= maxCol; col++) {
-      for (let row = minRow; row <= maxRow; row++) {
-        const xInLvl = col * tSize
-        const yInLvl = row * tSize
-        const wInLvl = Math.min(tSize, levelW - xInLvl)
-        const hInLvl = Math.min(tSize, levelH - yInLvl)
-        if (wInLvl <= 0 || hInLvl <= 0) continue
-
-        const nativeLeft = xInLvl / s
-        const nativeTop = yInLvl / s
-        const nativeW = wInLvl / s
-        const nativeH = hInLvl / s
-
-        let formattedUrl = normalizedTemplate
-          .replace(/\{z\}/g, String(targetLevel))
-          .replace(/\{x\}/g, String(col))
-          .replace(/\{y\}/g, String(row))
-
-        if (imageUpdatedAt) {
-          formattedUrl += (formattedUrl.includes('?') ? '&' : '?') + `t=${imageUpdatedAt}`
-        }
-
-        tiles.push({
-          col,
-          row,
-          left: nativeLeft,
-          top: nativeTop,
-          width: nativeW,
-          height: nativeH,
-          url: formattedUrl,
-        })
-      }
-    }
-
-    return tiles
-  }, [containerRef, viewportRef, mapWidth, mapHeight, scale, position, targetLevel, s, levelW, levelH, tSize, numCols, numRows, normalizedTemplate, imageUpdatedAt])
-
-  if (!normalizedTemplate) return null
-
-  return (
-    <div
-      className="absolute inset-0 pointer-events-none select-none overflow-hidden"
-      style={{ width: `${mapWidth}px`, height: `${mapHeight}px`, opacity }}
-    >
-      {visibleTiles.map((tile) => (
-        <img
-          key={`${targetLevel}_${tile.col}_${tile.row}`}
-          src={tile.url}
-          alt=""
-          loading="eager"
-          decoding="async"
-          draggable={false}
-          className="absolute select-none pointer-events-none"
-          style={{
-            left: `${tile.left}px`,
-            top: `${tile.top}px`,
-            width: `${tile.width}px`,
-            height: `${tile.height}px`,
-            objectFit: 'fill',
-            imageRendering: 'auto',
-            transform: 'translateZ(0)',
-            backfaceVisibility: 'hidden',
-          }}
-          onError={(e) => {
-            e.currentTarget.style.display = 'none'
-          }}
-        />
-      ))}
-    </div>
-  )
-}
 
 export default function MapViewerClient() {
   const params = useParams()
@@ -248,6 +62,10 @@ export default function MapViewerClient() {
   const fullData = useQuery(
     api.maps.getMapFullData,
     currentMap?._id ? { mapId: currentMap._id } : 'skip'
+  )
+  const worldQuests = useQuery(
+    api.quests.getQuestsByWorld,
+    world?._id ? { worldId: world._id } : 'skip'
   )
 
   // Mutations
@@ -341,6 +159,15 @@ export default function MapViewerClient() {
     }
     return true
   })
+  const [showQuestsLayer, setShowQuestsLayer] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('void_map_show_quests')
+      if (stored !== null) return stored === 'true'
+    }
+    return true
+  })
+  const [isQuestsMenuOpen, setIsQuestsMenuOpen] = useState(false)
+  const [questSearch, setQuestSearch] = useState('')
   const [isTilePyramidEnabled, setIsTilePyramidEnabled] = useState(true)
   const [isNotesMenuOpen, setIsNotesMenuOpen] = useState(false)
   const [selectedNoteCoords, setSelectedNoteCoords] = useState<{ x: number; y: number } | null>(null)
@@ -557,6 +384,7 @@ export default function MapViewerClient() {
     style: 'icon' | 'text_only'
     icon: string
     color: string
+    questId?: Id<'quests'>
     targetMapId?: Id<'worldMaps'>
     layerId?: Id<'mapLayers'>
     gmOnly?: boolean
@@ -592,7 +420,7 @@ export default function MapViewerClient() {
   })
 
   // Map Settings Draft
-  const [settingsDraft, setSettingsDraft] = useState({
+  const [settingsDraft, setSettingsDraft] = useState<SettingsDraft>({
     name: '',
     slug: '',
     isHomeMap: false,
@@ -600,14 +428,14 @@ export default function MapViewerClient() {
     tileUrl: '',
     tileSize: 256,
     minZoom: 0,
-    maxZoom: undefined as number | undefined,
+    maxZoom: undefined,
     width: 2000,
     height: 2000,
-    gridType: 'none' as 'none' | 'hex' | 'hex_flat' | 'square',
+    gridType: 'none',
     gridSize: 100,
     gridOffsetX: 0,
     gridOffsetY: 0,
-    gridScale: 0,
+    gridScale: undefined,
     gridScaleUnit: 'miles',
     isExplorationMap: false,
     hideFromMenu: false,
@@ -1574,6 +1402,7 @@ export default function MapViewerClient() {
         icon: pinDraft.icon,
         color: pinDraft.color,
         targetMapId: pinDraft.targetMapId,
+        questId: pinDraft.questId,
         gmOnly: pinDraft.gmOnly,
       })
       toast.success('Pin saved!')
@@ -1581,6 +1410,60 @@ export default function MapViewerClient() {
       setActiveTool('view')
     } catch (err) {
       toast.error('Failed to save pin')
+    }
+  }
+
+  // Drag and Drop Quest onto Map Canvas
+  const handleDragOverCanvas = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!isOwner) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+  }
+
+  const handleDropQuest = async (e: React.DragEvent<HTMLDivElement>) => {
+    if (!isOwner || !currentMap) return
+    e.preventDefault()
+
+    const rawData = e.dataTransfer.getData('application/json')
+    if (!rawData) return
+
+    try {
+      const data = JSON.parse(rawData)
+      if (data.type !== 'quest' || !data.questId) return
+
+      // Compute normalized drop coordinates (0 - 100%)
+      if (!containerRef.current) return
+      const rect = containerRef.current.getBoundingClientRect()
+      const clickX = e.clientX - rect.left
+      const clickY = e.clientY - rect.top
+      const xPct = Math.min(Math.max((clickX / rect.width) * 100, 0), 100)
+      const yPct = Math.min(Math.max((clickY / rect.height) * 100, 0), 100)
+      const coords = { x: Number(xPct.toFixed(2)), y: Number(yPct.toFixed(2)) }
+
+      // Check if this quest is already pinned on this map
+      const existingPin = fullData?.pins?.find((p) => p.questId === data.questId)
+
+      await savePinMutation({
+        mapId: currentMap._id,
+        pinId: existingPin ? existingPin._id : undefined,
+        x: coords.x,
+        y: coords.y,
+        title: data.title || 'Quest',
+        description: data.description || '',
+        style: 'icon',
+        icon: 'Quest',
+        color: '#f59e0b',
+        questId: data.questId as Id<'quests'>,
+      })
+
+      toast.success(
+        existingPin
+          ? `Moved quest "${data.title}" on map!`
+          : `Placed quest "${data.title}" on map!`
+      )
+    } catch (err) {
+      console.error('Failed to drop quest on map:', err)
+      toast.error('Failed to place quest on map')
     }
   }
 
@@ -2101,79 +1984,84 @@ export default function MapViewerClient() {
   return (
     <div className="fixed inset-0 z-0 h-dvh w-screen overflow-hidden bg-slate-950 text-foreground select-none touch-none">
       {/* TOP NAVIGATION BAR */}
-      <div className="absolute top-4 left-4 right-4 z-30 flex items-center justify-between pointer-events-none">
-        <div className="flex items-center gap-2 pointer-events-auto bg-slate-950 dark:bg-slate-950 backdrop-blur-md px-3 py-1.5 rounded-full border border-slate-700/80 shadow-xl text-slate-100">
-          <Button variant="ghost" size="sm" className="h-8 px-2 text-slate-200 hover:text-white hover:bg-slate-900" asChild>
+      <div className="absolute top-2 sm:top-4 left-2 sm:left-4 right-2 sm:right-4 z-30 flex items-center justify-between gap-2 pointer-events-none">
+        {/* LEFT CONTROLS (BREADCRUMB & MAP SELECTOR) */}
+        <div className="flex items-center gap-1 sm:gap-2 pointer-events-auto bg-slate-950 dark:bg-slate-950 backdrop-blur-md px-2 sm:px-3 py-1 sm:py-1.5 rounded-full border border-slate-700/80 shadow-xl text-slate-100 shrink min-w-0 max-w-[50%] sm:max-w-none">
+          <Button variant="ghost" size="sm" className="h-7 sm:h-8 px-1.5 sm:px-2 text-slate-200 hover:text-white hover:bg-slate-900 shrink-0" asChild>
             <Link href={`/world/${encodeURIComponent(world.name)}`}>
-              <ChevronLeft className="h-4 w-4 mr-1 text-slate-400" />
-              {world.name}
+              <ChevronLeft className="h-4 w-4 mr-0.5 sm:mr-1 text-slate-400" />
+              <span className="hidden sm:inline">{world.name}</span>
             </Link>
           </Button>
-          <span className="text-slate-500">/</span>
+          <span className="text-slate-500 shrink-0">/</span>
 
           {/* MAP SWITCHER DROPDOWN */}
-          <Select
-            value={currentMap?._id}
-            onValueChange={(val) => {
-              const target = worldMaps?.find((m) => m._id === val)
-              if (target) {
-                router.push(`/world/${encodeURIComponent(world.name)}/map/${target.slug}`)
-              }
-            }}
-            className="h-8 border-none bg-transparent focus:ring-0 text-sm font-bold text-purple-400 gap-2 px-2 hover:text-purple-300 cursor-pointer"
-          >
-            <SelectTrigger className="h-8 border-none bg-transparent focus:ring-0 text-sm font-bold text-purple-400 gap-2 px-2 hover:text-purple-300">
-              <SelectValue placeholder={currentMap?.name || "Select Map"} />
-            </SelectTrigger>
-            <SelectContent>
-              {dropdownMaps.map((m) => (
-                <SelectItem key={m._id} value={m._id}>
-                  <span className="flex items-center gap-1.5">
-                    <span>{m.name}</span>
-                    {m.isHomeMap && <span>🏠</span>}
-                    {m.hideFromMenu && isOwner && (
-                      <span className="text-[10px] text-amber-400 font-medium px-1.5 py-0.5 bg-amber-500/20 border border-amber-500/30 rounded inline-flex items-center gap-0.5">
-                        <EyeOff className="h-2.5 w-2.5" /> Hidden
-                      </span>
-                    )}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="min-w-0 shrink">
+            <Select
+              value={currentMap?._id}
+              onValueChange={(val) => {
+                const target = worldMaps?.find((m) => m._id === val)
+                if (target) {
+                  router.push(`/world/${encodeURIComponent(world.name)}/map/${target.slug}`)
+                }
+              }}
+              className="h-7 sm:h-8 border-none bg-transparent focus:ring-0 text-xs sm:text-sm font-bold text-purple-400 gap-1 px-1 sm:px-2 hover:text-purple-300 cursor-pointer max-w-[110px] sm:max-w-[200px] md:max-w-none truncate"
+            >
+              <SelectTrigger className="h-7 sm:h-8 border-none bg-transparent focus:ring-0 text-xs sm:text-sm font-bold text-purple-400 gap-1 px-1 sm:px-2 hover:text-purple-300">
+                <SelectValue placeholder={currentMap?.name || "Select Map"} />
+              </SelectTrigger>
+              <SelectContent>
+                {dropdownMaps.map((m) => (
+                  <SelectItem key={m._id} value={m._id}>
+                    <span className="flex items-center gap-1.5">
+                      <span>{m.name}</span>
+                      {m.isHomeMap && <span>🏠</span>}
+                      {m.hideFromMenu && isOwner && (
+                        <span className="text-[10px] text-amber-400 font-medium px-1.5 py-0.5 bg-amber-500/20 border border-amber-500/30 rounded inline-flex items-center gap-0.5">
+                          <EyeOff className="h-2.5 w-2.5" /> Hidden
+                        </span>
+                      )}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           {isOwner && (
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-slate-300 hover:text-white hover:bg-slate-900"
+              className="h-7 w-7 sm:h-8 sm:w-8 text-slate-300 hover:text-white hover:bg-slate-900 shrink-0"
               onClick={() => setIsNewMapDialogOpen(true)}
               title="Add New Map"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
           )}
         </div>
 
         {/* TOP RIGHT CONTROLS (LOCATIONS, RULER, LAYERS & SETTINGS) */}
-        <div className="flex items-center gap-2 pointer-events-auto">
+        <div className="flex items-center gap-1.5 sm:gap-2 pointer-events-auto overflow-x-auto max-w-[70%] sm:max-w-none no-scrollbar shrink-0 py-0.5">
           {/* LOCATIONS DIRECTORY BUTTON */}
           <Button
             variant="ghost"
             size="sm"
-            className={`h-9 gap-1.5 bg-slate-950 dark:bg-slate-950 text-slate-100 hover:text-white hover:bg-slate-900 dark:hover:bg-slate-900 border border-slate-700/80 shadow-xl backdrop-blur-md ${
+            className={`h-8 sm:h-9 px-2 sm:px-3 gap-1 sm:gap-1.5 bg-slate-950 dark:bg-slate-950 text-slate-100 hover:text-white hover:bg-slate-900 dark:hover:bg-slate-900 border border-slate-700/80 shadow-xl backdrop-blur-md shrink-0 ${
               isLocationsMenuOpen ? 'ring-2 ring-cyan-500/60 bg-slate-900 dark:bg-slate-900 text-cyan-300' : ''
             }`}
             onClick={() => {
               setIsLocationsMenuOpen(!isLocationsMenuOpen)
+              if (isQuestsMenuOpen) setIsQuestsMenuOpen(false)
+              if (isNotesMenuOpen) setIsNotesMenuOpen(false)
               if (isLayersMenuOpen) setIsLayersMenuOpen(false)
             }}
             title="Browse Map Locations"
           >
             <Compass className="h-4 w-4 text-cyan-400" />
-            <span className="hidden sm:inline font-medium">Locations</span>
+            <span className="hidden md:inline font-medium text-xs sm:text-sm">Locations</span>
             {fullData?.pins && fullData.pins.length > 0 && (
-              <span className="ml-0.5 px-1.5 py-0.2 bg-slate-800 border border-slate-700 rounded-full text-[10px] font-mono text-slate-300">
+              <span className="px-1 sm:px-1.5 py-0.2 bg-slate-800 border border-slate-700 rounded-full text-[10px] font-mono text-slate-300">
                 {fullData.pins.length}
               </span>
             )}
@@ -2184,7 +2072,7 @@ export default function MapViewerClient() {
             <Button
               variant="ghost"
               size="sm"
-              className={`h-9 gap-1.5 bg-slate-950 dark:bg-slate-950 text-slate-100 hover:text-white hover:bg-slate-900 dark:hover:bg-slate-900 border border-slate-700/80 shadow-xl backdrop-blur-md ${
+              className={`h-8 sm:h-9 px-2 sm:px-3 gap-1 sm:gap-1.5 bg-slate-950 dark:bg-slate-950 text-slate-100 hover:text-white hover:bg-slate-900 dark:hover:bg-slate-900 border border-slate-700/80 shadow-xl backdrop-blur-md shrink-0 ${
                 activeTool === 'ruler' ? 'text-cyan-400 border-cyan-500/80 bg-slate-900 dark:bg-slate-900 ring-2 ring-cyan-500/60' : ''
               }`}
               onClick={() => {
@@ -2198,34 +2086,61 @@ export default function MapViewerClient() {
               title="Measure Distance (Ruler)"
             >
               <Ruler className="h-4 w-4 text-cyan-400" />
-              <span className="hidden sm:inline font-medium">Ruler</span>
+              <span className="hidden md:inline font-medium text-xs sm:text-sm">Ruler</span>
             </Button>
           )}
 
+          {/* QUESTS MENU BUTTON */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`h-8 sm:h-9 px-2 sm:px-3 gap-1 sm:gap-1.5 bg-slate-950 dark:bg-slate-950 text-slate-100 hover:text-white hover:bg-slate-900 dark:hover:bg-slate-900 border border-slate-700/80 shadow-xl backdrop-blur-md shrink-0 ${
+              isQuestsMenuOpen ? 'ring-2 ring-amber-500/60 bg-slate-900 dark:bg-slate-900 text-amber-300' : ''
+            }`}
+            onClick={() => {
+              setIsQuestsMenuOpen(!isQuestsMenuOpen)
+              if (isNotesMenuOpen) setIsNotesMenuOpen(false)
+              if (isLocationsMenuOpen) setIsLocationsMenuOpen(false)
+              if (isLayersMenuOpen) setIsLayersMenuOpen(false)
+            }}
+            title="Quests on Map"
+          >
+            <img src="/quest.svg" alt="Quests" className={`h-4 w-4 shrink-0 ${!showQuestsLayer ? 'opacity-40 grayscale' : 'drop-shadow-[0_0_6px_rgba(245,158,11,0.6)]'}`} />
+            <span className="hidden md:inline font-medium text-xs sm:text-sm">Quests</span>
+            {worldQuests && worldQuests.length > 0 && (
+              <span className="px-1 sm:px-1.5 py-0.2 bg-slate-800 border border-slate-700 rounded-full text-[10px] font-mono text-amber-400">
+                {worldQuests.length}
+              </span>
+            )}
+            {!showQuestsLayer && (
+              <EyeOff className="h-3 w-3 text-slate-500" />
+            )}
+          </Button>
 
           {/* NOTES MENU BUTTON */}
           <Button
             variant="ghost"
             size="sm"
-            className={`h-9 gap-1.5 bg-slate-950 dark:bg-slate-950 text-slate-100 hover:text-white hover:bg-slate-900 dark:hover:bg-slate-900 border border-slate-700/80 shadow-xl backdrop-blur-md ${
+            className={`h-8 sm:h-9 px-2 sm:px-3 gap-1 sm:gap-1.5 bg-slate-950 dark:bg-slate-950 text-slate-100 hover:text-white hover:bg-slate-900 dark:hover:bg-slate-900 border border-slate-700/80 shadow-xl backdrop-blur-md shrink-0 ${
               isNotesMenuOpen ? 'ring-2 ring-amber-500/60 bg-slate-900 dark:bg-slate-900 text-amber-300' : ''
             }`}
             onClick={() => {
               setIsNotesMenuOpen(!isNotesMenuOpen)
+              if (isQuestsMenuOpen) setIsQuestsMenuOpen(false)
               if (isLocationsMenuOpen) setIsLocationsMenuOpen(false)
               if (isLayersMenuOpen) setIsLayersMenuOpen(false)
             }}
             title="Notes on Map"
           >
             <FileText className={`h-4 w-4 ${showPlayerNotes ? 'text-amber-400' : 'text-slate-500'}`} />
-            <span className="hidden sm:inline font-medium">Notes</span>
+            <span className="hidden md:inline font-medium text-xs sm:text-sm">Notes</span>
             {fullData?.notes && fullData.notes.length > 0 && (
-              <span className="ml-0.5 px-1.5 py-0.2 bg-slate-800 border border-slate-700 rounded-full text-[10px] font-mono text-amber-400">
+              <span className="px-1 sm:px-1.5 py-0.2 bg-slate-800 border border-slate-700 rounded-full text-[10px] font-mono text-amber-400">
                 {fullData.notes.length}
               </span>
             )}
             {!showPlayerNotes && (
-              <EyeOff className="h-3 w-3 text-slate-500 ml-0.5" />
+              <EyeOff className="h-3 w-3 text-slate-500" />
             )}
           </Button>
 
@@ -2233,26 +2148,28 @@ export default function MapViewerClient() {
           <Button
             variant="ghost"
             size="sm"
-            className={`h-9 gap-2 bg-slate-950 dark:bg-slate-950 text-slate-100 hover:text-white hover:bg-slate-900 dark:hover:bg-slate-900 border border-slate-700/80 shadow-xl backdrop-blur-md ${
+            className={`h-8 sm:h-9 px-2 sm:px-3 gap-1 sm:gap-2 bg-slate-950 dark:bg-slate-950 text-slate-100 hover:text-white hover:bg-slate-900 dark:hover:bg-slate-900 border border-slate-700/80 shadow-xl backdrop-blur-md shrink-0 ${
               isLayersMenuOpen ? 'ring-2 ring-purple-500/60 bg-slate-900 dark:bg-slate-900 text-purple-300' : ''
             }`}
             onClick={() => {
               setIsLayersMenuOpen(!isLayersMenuOpen)
+              if (isQuestsMenuOpen) setIsQuestsMenuOpen(false)
               if (isLocationsMenuOpen) setIsLocationsMenuOpen(false)
+              if (isNotesMenuOpen) setIsNotesMenuOpen(false)
             }}
             title="Toggle Map Layers"
           >
             <Layers className="h-4 w-4 text-purple-400" />
-            <span className="hidden sm:inline font-medium">Layers</span>
+            <span className="hidden md:inline font-medium text-xs sm:text-sm">Layers</span>
           </Button>
 
           {/* EDIT / VIEW MODE TOGGLE FOR OWNER */}
           {isOwner && (
-            <div className="flex items-center bg-slate-950 dark:bg-slate-950 backdrop-blur-md p-1 rounded-full border border-slate-700/80 shadow-xl">
+            <div className="flex items-center bg-slate-950 dark:bg-slate-950 backdrop-blur-md p-0.5 sm:p-1 rounded-full border border-slate-700/80 shadow-xl shrink-0">
               <Button
                 variant={!isEditMode ? 'secondary' : 'ghost'}
                 size="sm"
-                className={`h-7 rounded-full text-xs font-bold gap-1 px-3 ${
+                className={`h-6 sm:h-7 rounded-full text-[11px] sm:text-xs font-bold gap-1 px-2 sm:px-3 ${
                   !isEditMode ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
                 }`}
                 onClick={() => {
@@ -2261,17 +2178,17 @@ export default function MapViewerClient() {
                   setRulerPoints(null)
                 }}
               >
-                <Eye className="h-3.5 w-3.5" /> View
+                <Eye className="h-3.5 w-3.5" /> <span className="hidden sm:inline">View</span>
               </Button>
               <Button
                 variant={isEditMode ? 'secondary' : 'ghost'}
                 size="sm"
-                className={`h-7 rounded-full text-xs font-bold gap-1 px-3 text-purple-400 ${
+                className={`h-6 sm:h-7 rounded-full text-[11px] sm:text-xs font-bold gap-1 px-2 sm:px-3 text-purple-400 ${
                   isEditMode ? 'bg-slate-800 text-purple-300' : 'text-purple-400 hover:text-purple-300 hover:bg-slate-900'
                 }`}
                 onClick={() => setIsEditMode(true)}
               >
-                <Edit3 className="h-3.5 w-3.5" /> Edit
+                <Edit3 className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Edit</span>
               </Button>
             </div>
           )}
@@ -2281,7 +2198,7 @@ export default function MapViewerClient() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-9 w-9 bg-slate-950 dark:bg-slate-950 text-slate-100 hover:text-white hover:bg-slate-900 dark:hover:bg-slate-900 border border-slate-700/80 shadow-xl backdrop-blur-md"
+              className="h-8 w-8 sm:h-9 sm:w-9 bg-slate-950 dark:bg-slate-950 text-slate-100 hover:text-white hover:bg-slate-900 dark:hover:bg-slate-900 border border-slate-700/80 shadow-xl backdrop-blur-md shrink-0"
               onClick={() => setIsSettingsDialogOpen(true)}
               title="Map Settings"
             >
@@ -2629,440 +2546,148 @@ export default function MapViewerClient() {
       )}
 
       {/* LAYERS MENU PANEL */}
-      {isLayersMenuOpen && (
-        <Card className="absolute top-16 right-4 z-40 w-72 bg-slate-950 dark:bg-slate-950 backdrop-blur-md border-slate-700/80 shadow-2xl text-slate-100">
-          <CardHeader className="py-3 px-4 flex flex-row items-center justify-between border-b border-slate-800">
-            <CardTitle className="text-sm font-bold flex items-center gap-2 text-slate-100">
-              <Layers className="h-4 w-4 text-purple-400" /> Map Layers
-            </CardTitle>
-            <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-white" onClick={() => setIsLayersMenuOpen(false)}>
-              <X className="h-3.5 w-3.5" />
-            </Button>
-          </CardHeader>
-          <CardContent className="p-4 space-y-3 max-h-[60vh] overflow-y-auto">
-            {/* Player Notes Layer Toggle */}
-            <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <FileText className="h-3.5 w-3.5 text-amber-400" />
-                <span className="font-medium text-slate-200">Player Notes</span>
-              </div>
-              <Switch
-                checked={showPlayerNotes}
-                onCheckedChange={(val) => {
-                  setShowPlayerNotes(val)
-                  if (typeof window !== 'undefined') {
-                    localStorage.setItem('void_map_show_notes', String(val))
-                  }
-                }}
-              />
-            </div>
+      <MapLayersPanel
+        isOpen={isLayersMenuOpen}
+        onClose={() => setIsLayersMenuOpen(false)}
+        isOwner={isOwner}
+        layers={fullData?.layers}
+        enabledLayers={enabledLayers}
+        onToggleLayer={(layerId, val) => setEnabledLayers((prev) => ({ ...prev, [layerId]: val }))}
+        showQuestsLayer={showQuestsLayer}
+        onToggleQuestsLayer={(val) => {
+          setShowQuestsLayer(val)
+          if (typeof window !== 'undefined') localStorage.setItem('void_map_show_quests', String(val))
+        }}
+        showPlayerNotes={showPlayerNotes}
+        onTogglePlayerNotes={(val) => {
+          setShowPlayerNotes(val)
+          if (typeof window !== 'undefined') localStorage.setItem('void_map_show_notes', String(val))
+        }}
+        hasTilePyramid={!!currentMap?.tileUrl}
+        isSvgMap={!!currentMap?.imageUrl?.toLowerCase().includes('.svg')}
+        isTilePyramidEnabled={isTilePyramidEnabled}
+        onToggleTilePyramid={setIsTilePyramidEnabled}
+        onOpenAddLayer={() => setIsLayerDialogOpen(true)}
+        onDeleteLayer={(layerId) => deleteLayerMutation({ layerId })}
+      />
 
-            {/* Tile Pyramid Layer Toggle if currentMap has tileUrl */}
-            {currentMap?.tileUrl && (
-              <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-800">
-                <div className="flex items-center gap-2">
-                  <Layers className="h-3.5 w-3.5 text-cyan-400" />
-                  <span className="font-medium text-slate-200">
-                    {currentMap.imageUrl?.toLowerCase().includes('.svg') ? 'Tile Pyramid Overlay' : 'DeepZoom Tiles'}
-                  </span>
-                </div>
-                <Switch
-                  checked={isTilePyramidEnabled}
-                  onCheckedChange={setIsTilePyramidEnabled}
-                />
-              </div>
-            )}
-
-            {fullData?.layers.length === 0 ? (
-              <p className="text-xs text-slate-400 italic">No extra layers created.</p>
-            ) : (
-              fullData?.layers.map((layer) => {
-                const canToggle = isOwner || layer.allowUserToggle
-                return (
-                  <div key={layer._id} className="flex items-center justify-between text-xs">
-                    <span className="font-medium text-slate-200">{layer.name}</span>
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        disabled={!canToggle}
-                        checked={enabledLayers[layer._id] ?? layer.defaultEnabled}
-                        onCheckedChange={(val) =>
-                          setEnabledLayers((prev) => ({ ...prev, [layer._id]: val }))
-                        }
-                      />
-                      {isOwner && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-destructive hover:bg-destructive/10"
-                          onClick={() => deleteLayerMutation({ layerId: layer._id })}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                )
-              })
-            )}
-
-            {isOwner && (
-              <div className="space-y-1.5 mt-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full text-xs border border-dashed border-slate-700 text-slate-300 hover:text-white hover:bg-slate-900"
-                  onClick={() => setIsLayerDialogOpen(true)}
-                >
-                  <Plus className="h-3.5 w-3.5 mr-1" /> Add Layer
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="w-full h-7 text-[11px] gap-1 text-purple-400 hover:text-purple-300 hover:bg-purple-950/40"
-                  asChild
-                >
-                  <a href="https://maps.tarragon.be" target="_blank" rel="noopener noreferrer" title="Upload new layer image on maps.tarragon.be">
-                    <Upload className="h-3 w-3" />
-                    Upload new image
-                    <ExternalLink className="h-2.5 w-2.5 opacity-60" />
-                  </a>
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      {/* QUESTS MENU PANEL */}
+      <MapQuestsPanel
+        isOpen={isQuestsMenuOpen}
+        onClose={() => setIsQuestsMenuOpen(false)}
+        isOwner={isOwner}
+        worldQuests={worldQuests}
+        placedPins={fullData?.pins}
+        showQuestsLayer={showQuestsLayer}
+        onToggleQuestsLayer={(val) => {
+          setShowQuestsLayer(val)
+          if (typeof window !== 'undefined') localStorage.setItem('void_map_show_quests', String(val))
+        }}
+        onSelectQuest={(quest, placedPin) => {
+          if (placedPin) {
+            const targetPxX = (placedPin.x / 100) * mapWidth - mapWidth / 2
+            const targetPxY = (placedPin.y / 100) * mapHeight - mapHeight / 2
+            const newScale = Math.max(scaleRef.current, 1.2)
+            scaleRef.current = newScale
+            setScale(newScale)
+            positionRef.current = { x: -targetPxX * newScale, y: -targetPxY * newScale }
+            setPosition({ x: -targetPxX * newScale, y: -targetPxY * newScale })
+            setSelectedPin(placedPin)
+          } else {
+            setSelectedPin({
+              _id: `quest_preview_${quest._id}` as any,
+              questId: quest._id,
+              title: quest.name,
+              description: quest.description || '',
+              x: 50,
+              y: 50,
+              icon: 'Quest',
+              color: '#f59e0b',
+            })
+          }
+        }}
+      />
 
       {/* NOTES MENU PANEL */}
-      {isNotesMenuOpen && (
-        <Card className="absolute top-16 right-4 z-40 w-80 bg-slate-950 dark:bg-slate-950 backdrop-blur-md border-slate-700/80 shadow-2xl flex flex-col max-h-[75vh] text-slate-100">
-          <CardHeader className="py-3 px-4 flex flex-row items-center justify-between border-b border-slate-800 shrink-0">
-            <CardTitle className="text-sm font-bold flex items-center gap-2 text-slate-100">
-              <FileText className="h-4 w-4 text-amber-400" /> Map Notes ({fullData?.notes?.length || 0})
-            </CardTitle>
-            <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-white" onClick={() => setIsNotesMenuOpen(false)}>
-              <X className="h-3.5 w-3.5" />
-            </Button>
-          </CardHeader>
-
-          {/* Visibility toggle & Add Note action */}
-          <div className="p-3 border-b border-slate-800 space-y-2 shrink-0 bg-slate-900/40">
-            <div className="flex items-center justify-between text-xs">
-              <div className="flex items-center gap-1.5">
-                <Eye className="h-3.5 w-3.5 text-slate-400" />
-                <span className="font-medium text-slate-200">Show Notes on Map</span>
-              </div>
-              <Switch
-                checked={showPlayerNotes}
-                onCheckedChange={(val) => {
-                  setShowPlayerNotes(val)
-                  if (typeof window !== 'undefined') {
-                    localStorage.setItem('void_map_show_notes', String(val))
-                  }
-                }}
-              />
-            </div>
-            <Button
-              size="sm"
-              className={`w-full text-xs h-8 gap-1.5 ${
-                activeTool === 'grid_note'
-                  ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold'
-                  : 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30'
-              }`}
-              onClick={() => {
-                setActiveTool(activeTool === 'grid_note' ? 'view' : 'grid_note')
-                if (!showPlayerNotes) {
-                  setShowPlayerNotes(true)
-                  if (typeof window !== 'undefined') {
-                    localStorage.setItem('void_map_show_notes', 'true')
-                  }
-                }
-              }}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              {activeTool === 'grid_note' ? 'Placing Note (Click Map)' : 'Add Note to Map'}
-            </Button>
-          </div>
-
-          <CardContent className="p-2 space-y-1.5 overflow-y-auto flex-1">
-            {!fullData?.notes || fullData.notes.length === 0 ? (
-              <div className="text-center py-6 px-4 space-y-1">
-                <FileText className="h-6 w-6 text-slate-600 mx-auto" />
-                <p className="text-xs text-slate-400 italic">No notes have been added yet.</p>
-                <p className="text-[11px] text-slate-500">Click &ldquo;Add Note to Map&rdquo; or click any cell to create one.</p>
-              </div>
-            ) : (
-              fullData.notes.map((note) => {
-                const isAuthor = clerkUser && note.userId === clerkUser.id
-                const canManage = isAuthor || isOwner
-                return (
-                  <div
-                    key={note._id}
-                    className="p-2 rounded-lg hover:bg-slate-900 border border-transparent hover:border-slate-800 transition-colors cursor-pointer group flex items-start justify-between gap-2"
-                    onClick={() => {
-                      // Pan to note position if coordinates exist
-                      const cellCoord = note.cellKey ? cellCenterMap[note.cellKey] : null
-                      if (cellCoord) {
-                        const targetPxX = cellCoord.cx - mapWidth / 2
-                        const targetPxY = cellCoord.cy - mapHeight / 2
-                        const newScale = Math.max(scaleRef.current, 1.2)
-                        scaleRef.current = newScale
-                        setScale(newScale)
-                        positionRef.current = { x: -targetPxX * newScale, y: -targetPxY * newScale }
-                        setPosition({ x: -targetPxX * newScale, y: -targetPxY * newScale })
-                      } else if (note.x !== undefined && note.y !== undefined) {
-                        const targetPxX = (note.x / 100) * mapWidth - mapWidth / 2
-                        const targetPxY = (note.y / 100) * mapHeight - mapHeight / 2
-                        const newScale = Math.max(scaleRef.current, 1.2)
-                        scaleRef.current = newScale
-                        setScale(newScale)
-                        positionRef.current = { x: -targetPxX * newScale, y: -targetPxY * newScale }
-                        setPosition({ x: -targetPxX * newScale, y: -targetPxY * newScale })
-                      }
-                      handleOpenNote(note)
-                    }}
-                  >
-                    <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                      <div className="h-6 w-6 rounded-md bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0 mt-0.5">
-                        <FileText className="h-3.5 w-3.5 text-amber-400" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-medium text-slate-200 line-clamp-2 leading-snug">
-                          {note.note}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500">
-                          {note.authorName && (
-                            <span className="flex items-center gap-1 text-slate-400">
-                              <User className="h-2.5 w-2.5" />
-                              {note.authorName}
-                            </span>
-                          )}
-                          <span>
-                            {new Date(note.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                          </span>
-                          {note.wikiLink && (
-                            <a
-                              href={formatWikiUrl(note.wikiLink)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-[10px] text-purple-300 hover:text-purple-200 hover:underline"
-                              onClick={(e) => e.stopPropagation()}
-                              title="Open Void Wiki Article"
-                            >
-                              <BookOpen className="h-2.5 w-2.5" />
-                              Wiki
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    {canManage && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDeleteNote(note._id)
-                        }}
-                        title="Delete note"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    )}
-                  </div>
-                )
-              })
-            )}
-          </CardContent>
-        </Card>
-      )}
+      <MapNotesPanel
+        isOpen={isNotesMenuOpen}
+        onClose={() => setIsNotesMenuOpen(false)}
+        currentUserId={clerkUser?.id}
+        isOwner={isOwner}
+        notes={fullData?.notes}
+        showPlayerNotes={showPlayerNotes}
+        onTogglePlayerNotes={(val) => {
+          setShowPlayerNotes(val)
+          if (typeof window !== 'undefined') localStorage.setItem('void_map_show_notes', String(val))
+        }}
+        activeTool={activeTool}
+        onToggleAddNoteTool={() => {
+          setActiveTool(activeTool === 'grid_note' ? 'view' : 'grid_note')
+          if (!showPlayerNotes) {
+            setShowPlayerNotes(true)
+            if (typeof window !== 'undefined') localStorage.setItem('void_map_show_notes', 'true')
+          }
+        }}
+        onSelectNote={(note) => {
+          const cellCoord = note.cellKey ? cellCenterMap[note.cellKey] : null
+          if (cellCoord) {
+            const targetPxX = cellCoord.cx - mapWidth / 2
+            const targetPxY = cellCoord.cy - mapHeight / 2
+            const newScale = Math.max(scaleRef.current, 1.2)
+            scaleRef.current = newScale
+            setScale(newScale)
+            positionRef.current = { x: -targetPxX * newScale, y: -targetPxY * newScale }
+            setPosition({ x: -targetPxX * newScale, y: -targetPxY * newScale })
+          } else if (note.x !== undefined && note.y !== undefined) {
+            const targetPxX = (note.x / 100) * mapWidth - mapWidth / 2
+            const targetPxY = (note.y / 100) * mapHeight - mapHeight / 2
+            const newScale = Math.max(scaleRef.current, 1.2)
+            scaleRef.current = newScale
+            setScale(newScale)
+            positionRef.current = { x: -targetPxX * newScale, y: -targetPxY * newScale }
+            setPosition({ x: -targetPxX * newScale, y: -targetPxY * newScale })
+          }
+          handleOpenNote(note)
+        }}
+        onDeleteNote={handleDeleteNote}
+      />
 
       {/* LOCATIONS DIRECTORY SIDEBAR PANEL */}
-      {isLocationsMenuOpen && (
-        <Card className="absolute top-16 right-4 z-40 w-80 bg-slate-950 dark:bg-slate-950 backdrop-blur-md border-slate-700/80 shadow-2xl flex flex-col max-h-[75vh] text-slate-100">
-          <CardHeader className="py-3 px-4 flex flex-row items-center justify-between border-b border-slate-800 shrink-0">
-            <CardTitle className="text-sm font-bold flex items-center gap-2 text-slate-100">
-              <Compass className="h-4 w-4 text-cyan-400" /> Locations ({filteredPins.length + filteredAreas.length})
-            </CardTitle>
-            <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-white" onClick={() => setIsLocationsMenuOpen(false)}>
-              <X className="h-3.5 w-3.5" />
-            </Button>
-          </CardHeader>
-          <div className="flex border-b border-slate-800 shrink-0 bg-slate-900/50">
-            <button
-              type="button"
-              onClick={() => setLocationDirectoryTab('pins')}
-              className={`flex-1 py-2 text-xs font-bold text-center border-b-2 transition-colors ${
-                locationDirectoryTab === 'pins'
-                  ? 'border-cyan-400 text-cyan-300 bg-cyan-950/30'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Pins ({filteredPins.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setLocationDirectoryTab('areas')}
-              className={`flex-1 py-2 text-xs font-bold text-center border-b-2 transition-colors ${
-                locationDirectoryTab === 'areas'
-                  ? 'border-purple-400 text-purple-300 bg-purple-950/30'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Areas ({filteredAreas.length})
-            </button>
-          </div>
-          <div className="p-3 border-b border-slate-800 space-y-2 shrink-0">
-            <div className="relative">
-              <Search className="h-3.5 w-3.5 absolute left-2.5 top-2.5 text-slate-500" />
-              <Input
-                placeholder={locationDirectoryTab === 'pins' ? "Search pin locations..." : "Search areas..."}
-                className="h-8 pl-8 text-xs bg-slate-900 border-slate-700 text-slate-100 placeholder:text-slate-500"
-                value={locationSearch}
-                onChange={(e) => setLocationSearch(e.target.value)}
-              />
-            </div>
-            {fullData?.layers && fullData.layers.length > 0 && (
-              <Select value={locationFilterLayer} onValueChange={setLocationFilterLayer} className="h-7 text-xs bg-slate-900 border-slate-700 text-slate-200">
-                <SelectTrigger className="h-7 text-xs bg-slate-900 border-slate-700 text-slate-200"><SelectValue placeholder="All Layers" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Layers</SelectItem>
-                  {fullData.layers.map((l) => (
-                    <SelectItem key={l._id} value={l._id}>{l.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-          <CardContent className="p-2 space-y-1.5 overflow-y-auto flex-1">
-            {locationDirectoryTab === 'areas' ? (
-              filteredAreas.length === 0 ? (
-                <p className="text-xs text-slate-400 italic text-center py-6">No areas found.</p>
-              ) : (
-                filteredAreas.map((area) => {
-                  const areaLayer = fullData?.layers.find((l) => l._id === area.layerId)
-                  return (
-                    <div
-                      key={area._id}
-                      className="p-2 rounded-lg hover:bg-slate-900 border border-transparent hover:border-slate-800 transition-colors cursor-pointer group flex items-start justify-between gap-2"
-                      onClick={() => {
-                        // Center viewport on area centroid
-                        const avgX = area.points.reduce((acc, p) => acc + p.x, 0) / (area.points.length || 1)
-                        const avgY = area.points.reduce((acc, p) => acc + p.y, 0) / (area.points.length || 1)
-                        const targetPxX = (avgX / 100) * mapWidth - mapWidth / 2
-                        const targetPxY = (avgY / 100) * mapHeight - mapHeight / 2
-                        const newScale = Math.max(scaleRef.current, 1.2)
-                        scaleRef.current = newScale
-                        setScale(newScale)
-                        positionRef.current = { x: -targetPxX * newScale, y: -targetPxY * newScale }
-                        setPosition({ x: -targetPxX * newScale, y: -targetPxY * newScale })
-                        setSelectedArea(area)
-                      }}
-                    >
-                      <div className="flex items-start gap-2.5 min-w-0">
-                        <div
-                          className="h-6 w-6 rounded-md shadow-sm shrink-0 mt-0.5 border border-white/20 flex items-center justify-center"
-                          style={{ backgroundColor: area.color || '#a855f7' }}
-                        >
-                          <Maximize2 className="h-3 w-3 text-white" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-semibold text-xs truncate group-hover:text-purple-300 transition-colors text-slate-200">
-                              {area.name}
-                            </span>
-                            {area.gmOnly && (
-                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center gap-0.5">
-                                <EyeOff className="h-2.5 w-2.5" /> Secret
-                              </span>
-                            )}
-                            {area.targetMapId && (
-                              <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center gap-0.5">
-                                <MapIcon className="h-2.5 w-2.5" /> Linked
-                              </span>
-                            )}
-                          </div>
-                          {area.description && (
-                            <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">
-                              {area.description}
-                            </p>
-                          )}
-                          {areaLayer && (
-                            <span className="text-[10px] text-purple-400/80 mt-0.5 block">
-                              {areaLayer.name}
-                            </span>
-                          )}
-                          <span className="text-[10px] text-slate-500 mt-0.5 block">
-                            {area.points.length} vertices
-                          </span>
-                        </div>
-                      </div>
-                      <ChevronRight className="h-4 w-4 text-slate-500 group-hover:text-slate-200 shrink-0 mt-1" />
-                    </div>
-                  )
-                })
-              )
-            ) : filteredPins.length === 0 ? (
-              <p className="text-xs text-slate-400 italic text-center py-6">No locations found.</p>
-            ) : (
-              filteredPins.map((pin) => {
-                const pinLayer = fullData?.layers.find((l) => l._id === pin.layerId)
-                return (
-                  <div
-                    key={pin._id}
-                    className="p-2 rounded-lg hover:bg-slate-900 border border-transparent hover:border-slate-800 transition-colors cursor-pointer group flex items-start justify-between gap-2"
-                    onClick={() => {
-                      // Center viewport on pin
-                      const targetPxX = (pin.x / 100) * mapWidth - mapWidth / 2
-                      const targetPxY = (pin.y / 100) * mapHeight - mapHeight / 2
-                      const newScale = Math.max(scaleRef.current, 1.2)
-                      scaleRef.current = newScale
-                      setScale(newScale)
-                      positionRef.current = { x: -targetPxX * newScale, y: -targetPxY * newScale }
-                      setPosition({ x: -targetPxX * newScale, y: -targetPxY * newScale })
-                      setSelectedPin(pin)
-                    }}
-                  >
-                    <div className="flex items-start gap-2.5 min-w-0">
-                      <div
-                        className="p-1.5 rounded-full shadow-sm shrink-0 mt-0.5"
-                        style={{ backgroundColor: pin.color || '#a855f7' }}
-                      >
-                        {renderPinIcon(pin.icon, "h-3.5 w-3.5 text-white")}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-semibold text-xs truncate group-hover:text-purple-300 transition-colors text-slate-200">
-                            {pin.title}
-                          </span>
-                          {pin.gmOnly && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center gap-0.5">
-                              <EyeOff className="h-2.5 w-2.5" /> Secret
-                            </span>
-                          )}
-                        </div>
-                        {pin.description && (
-                          <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">
-                            {pin.description}
-                          </p>
-                        )}
-                        {pinLayer && (
-                          <span className="text-[10px] text-purple-400/80 mt-0.5 block">
-                            {pinLayer.name}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-slate-500 group-hover:text-slate-200 shrink-0 mt-1" />
-                  </div>
-                )
-              })
-            )}
-          </CardContent>
-        </Card>
-      )}
+      <MapLocationsPanel
+        isOpen={isLocationsMenuOpen}
+        onClose={() => setIsLocationsMenuOpen(false)}
+        locationDirectoryTab={locationDirectoryTab}
+        onChangeTab={setLocationDirectoryTab}
+        locationSearch={locationSearch}
+        onChangeLocationSearch={setLocationSearch}
+        locationFilterLayer={locationFilterLayer}
+        onChangeFilterLayer={setLocationFilterLayer}
+        layers={fullData?.layers}
+        filteredPins={filteredPins}
+        filteredAreas={filteredAreas}
+        onSelectPin={(pin) => {
+          const targetPxX = (pin.x / 100) * mapWidth - mapWidth / 2
+          const targetPxY = (pin.y / 100) * mapHeight - mapHeight / 2
+          const newScale = Math.max(scaleRef.current, 1.2)
+          scaleRef.current = newScale
+          setScale(newScale)
+          positionRef.current = { x: -targetPxX * newScale, y: -targetPxY * newScale }
+          setPosition({ x: -targetPxX * newScale, y: -targetPxY * newScale })
+          setSelectedPin(pin)
+        }}
+        onSelectArea={(area) => {
+          const avgX = area.points.reduce((acc, p) => acc + p.x, 0) / (area.points.length || 1)
+          const avgY = area.points.reduce((acc, p) => acc + p.y, 0) / (area.points.length || 1)
+          const targetPxX = (avgX / 100) * mapWidth - mapWidth / 2
+          const targetPxY = (avgY / 100) * mapHeight - mapHeight / 2
+          const newScale = Math.max(scaleRef.current, 1.2)
+          scaleRef.current = newScale
+          setScale(newScale)
+          positionRef.current = { x: -targetPxX * newScale, y: -targetPxY * newScale }
+          setPosition({ x: -targetPxX * newScale, y: -targetPxY * newScale })
+          setSelectedArea(area)
+        }}
+      />
 
       {/* RULER ACTIVE BOTTOM HUD */}
       {activeTool === 'ruler' && (
@@ -3137,6 +2762,8 @@ export default function MapViewerClient() {
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        onDragOver={handleDragOverCanvas}
+        onDrop={handleDropQuest}
       >
         <div
           ref={containerRef}
@@ -3150,6 +2777,8 @@ export default function MapViewerClient() {
             flexShrink: 0,
           }}
           onClick={handleCanvasClick}
+          onDragOver={handleDragOverCanvas}
+          onDrop={handleDropQuest}
         >
           {/* BASE MAP BACKGROUND IMAGE OR TILE PYRAMID */}
           {currentMap?.imageUrl ? (
@@ -3444,6 +3073,9 @@ export default function MapViewerClient() {
           {/* PINS */}
           {fullData?.pins.map((pin) => {
             if (pin.layerId && !enabledLayers[pin.layerId]) return null
+            const isQuestPin = Boolean(pin.questId || pin.icon === 'Quest')
+            if (isQuestPin && !showQuestsLayer) return null
+
             const showTextOnly = pin.style === 'text_only'
             const isDraggingThisPin = draggingPinId === pin._id
             const currentPinX = isDraggingThisPin && draggedPinOffset ? draggedPinOffset.x : pin.x
@@ -3512,6 +3144,9 @@ export default function MapViewerClient() {
               >
                 {showTextOnly ? (
                   <span className="bg-slate-950/95 backdrop-blur-md px-2 py-0.5 rounded-md border border-slate-700/80 text-xs font-bold shadow-lg text-purple-300 whitespace-nowrap flex items-center gap-1.5">
+                    {isQuestPin && (
+                      <img src="/quest.svg" alt="Quest" className="h-3.5 w-3.5 shrink-0 drop-shadow-[0_0_4px_rgba(245,158,11,0.8)]" />
+                    )}
                     {pin.title}
                     {pin.gmOnly && (
                       <span title="Secret (GM Only)">
@@ -3525,9 +3160,13 @@ export default function MapViewerClient() {
                       className={`p-2 rounded-full shadow-lg border border-white/20 transition-transform ${
                         isDraggingThisPin ? 'scale-125 ring-2 ring-amber-400' : 'group-hover:scale-110'
                       }`}
-                      style={{ backgroundColor: pin.color || '#a855f7' }}
+                      style={{ backgroundColor: pin.color || (isQuestPin ? '#f59e0b' : '#a855f7') }}
                     >
-                      {renderPinIcon(pin.icon, "h-5 w-5 text-white")}
+                      {isQuestPin ? (
+                        <img src="/quest.svg" alt="Quest" className="h-5 w-5 drop-shadow-[0_0_8px_rgba(245,158,11,0.9)]" />
+                      ) : (
+                        renderPinIcon(pin.icon, "h-5 w-5 text-white")
+                      )}
                     </div>
                     {pin.gmOnly && (
                       <div
@@ -3538,7 +3177,12 @@ export default function MapViewerClient() {
                       </div>
                     )}
                     {(scale > 0.8 || (pin.minZoom && scale >= pin.minZoom)) && (
-                      <span className="mt-1 bg-slate-950/95 backdrop-blur-md px-2 py-0.5 rounded-md text-[10px] font-bold text-slate-100 whitespace-nowrap shadow-md border border-slate-800">
+                      <span className={`mt-1 bg-slate-950/95 backdrop-blur-md px-2 py-0.5 rounded-md text-[10px] font-bold whitespace-nowrap shadow-md border flex items-center gap-1 ${
+                        isQuestPin ? 'text-amber-300 border-amber-500/40' : 'text-slate-100 border-slate-800'
+                      }`}>
+                        {isQuestPin && (
+                          <img src="/quest.svg" alt="" className="h-2.5 w-2.5 shrink-0" />
+                        )}
                         {pin.title}
                       </span>
                     )}
@@ -3695,99 +3339,42 @@ export default function MapViewerClient() {
       </div>
 
       {/* DIALOG: PIN DETAILS / EDIT */}
-      {selectedPin && (
-        <Dialog open={!!selectedPin} onOpenChange={() => setSelectedPin(null)}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <div className="flex items-start justify-between gap-3">
-                <DialogTitle className="flex items-center gap-2.5 text-lg font-bold">
-                  <div
-                    className="p-2 rounded-lg flex items-center justify-center shrink-0 shadow-md"
-                    style={{ backgroundColor: selectedPin.color || '#a855f7' }}
-                  >
-                    {renderPinIcon(selectedPin.icon, "h-5 w-5 text-white")}
-                  </div>
-                  <div className="min-w-0">
-                    <span className="break-words leading-tight block">{selectedPin.title}</span>
-                    {selectedPin.gmOnly && (
-                      <span className="inline-flex items-center gap-1 mt-1 text-[11px] font-mono text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">
-                        <EyeOff className="h-3 w-3" /> Secret (GM Only)
-                      </span>
-                    )}
-                  </div>
-                </DialogTitle>
-                {isOwner && (
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 gap-1 text-xs"
-                      onClick={() => {
-                        setPinDraft({
-                          id: selectedPin._id,
-                          x: selectedPin.x,
-                          y: selectedPin.y,
-                          title: selectedPin.title,
-                          description: selectedPin.description || '',
-                          style: selectedPin.style || 'icon',
-                          icon: selectedPin.icon || 'MapPin',
-                          color: selectedPin.color || '#a855f7',
-                          targetMapId: selectedPin.targetMapId,
-                          layerId: selectedPin.layerId,
-                          gmOnly: selectedPin.gmOnly || false,
-                        })
-                        setSelectedPin(null)
-                        setIsPinDialogOpen(true)
-                      }}
-                    >
-                      <Edit3 className="h-3.5 w-3.5" />
-                      Edit
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                      onClick={() => {
-                        deletePinMutation({ pinId: selectedPin._id })
-                        setSelectedPin(null)
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </DialogHeader>
-            <div className="space-y-4 text-sm leading-relaxed pt-2">
-              {selectedPin.description ? (
-                <p className="text-muted-foreground whitespace-pre-wrap">{selectedPin.description}</p>
-              ) : (
-                <p className="text-xs italic text-muted-foreground">No description provided.</p>
-              )}
-              {selectedPin.targetMapId && (
-                <div className="pt-2 border-t border-border/40">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="w-full gap-2 text-xs"
-                    onClick={() => {
-                      const target = worldMaps?.find((m) => m._id === selectedPin.targetMapId)
-                      if (target) router.push(`/world/${encodeURIComponent(world.name)}/map/${target.slug}`)
-                    }}
-                  >
-                    <MapIcon className="h-3.5 w-3.5" />
-                    Open Linked Map
-                  </Button>
-                </div>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+      <MapPinDetailsModal
+        selectedPin={selectedPin}
+        onClose={() => setSelectedPin(null)}
+        isOwner={isOwner}
+        worldQuests={worldQuests}
+        worldMaps={worldMaps}
+        onEditPin={(pin) => {
+          setPinDraft({
+            id: pin._id,
+            x: pin.x,
+            y: pin.y,
+            title: pin.title,
+            description: pin.description || '',
+            style: (pin.style === 'text_only' ? 'text_only' : 'icon'),
+            icon: pin.icon || 'MapPin',
+            color: pin.color || '#a855f7',
+            targetMapId: pin.targetMapId,
+            layerId: pin.layerId,
+            questId: pin.questId,
+            gmOnly: pin.gmOnly || false,
+          })
+          setSelectedPin(null)
+          setIsPinDialogOpen(true)
+        }}
+        onDeletePin={(pinId) => {
+          deletePinMutation({ pinId })
+          setSelectedPin(null)
+        }}
+        onNavigateToMap={(slug) => {
+          router.push(`/world/${encodeURIComponent(world.name)}/map/${slug}`)
+        }}
+      />
 
       {/* DIALOG: CREATE / EDIT PIN FORM */}
-      <Dialog
-        open={isPinDialogOpen}
+      <MapPinFormModal
+        isOpen={isPinDialogOpen}
         onOpenChange={(open) => {
           setIsPinDialogOpen(open)
           if (!open) {
@@ -3803,1135 +3390,102 @@ export default function MapViewerClient() {
             })
           }
         }}
-      >
-        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{pinDraft.id ? 'Edit Map Pin' : 'Add Map Pin'}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3.5 text-xs">
-            <div>
-              <label className="font-bold text-muted-foreground">Title</label>
-              <Input
-                value={pinDraft.title}
-                onChange={(e) => setPinDraft({ ...pinDraft, title: e.target.value })}
-                placeholder="Pin Title"
-              />
-            </div>
-            <div>
-              <label className="font-bold text-muted-foreground">Description</label>
-              <Textarea
-                value={pinDraft.description}
-                onChange={(e) => setPinDraft({ ...pinDraft, description: e.target.value })}
-                placeholder="Details, secrets, lore..."
-                rows={3}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="font-bold text-muted-foreground">Style</label>
-                <Select
-                  value={pinDraft.style}
-                  onValueChange={(val: any) => setPinDraft({ ...pinDraft, style: val })}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="icon">Icon Pin</SelectItem>
-                    <SelectItem value="text_only">Text Only</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="font-bold text-muted-foreground">Color</label>
-                <Input
-                  type="color"
-                  value={pinDraft.color}
-                  onChange={(e) => setPinDraft({ ...pinDraft, color: e.target.value })}
-                  className="h-9 p-1"
-                />
-              </div>
-            </div>
-
-            {/* Fantasy Icon Picker */}
-            {pinDraft.style === 'icon' && (
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="font-bold text-muted-foreground">Pin Icon</label>
-                  <span className="text-[11px] text-muted-foreground font-medium">
-                    {PIN_ICONS.find((i) => i.name === pinDraft.icon)?.label || pinDraft.icon}
-                  </span>
-                </div>
-                <div className="grid grid-cols-7 gap-1.5 p-2 bg-muted/20 border border-border/50 rounded-lg max-h-36 overflow-y-auto">
-                  {PIN_ICONS.map((item) => {
-                    const isSelected = pinDraft.icon === item.name
-                    const IconCmp = item.icon
-                    return (
-                      <button
-                        key={item.name}
-                        type="button"
-                        title={item.label}
-                        onClick={() => setPinDraft({ ...pinDraft, icon: item.name })}
-                        className={`h-9 w-9 rounded-md flex items-center justify-center transition-all ${
-                          isSelected
-                            ? 'bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2 ring-offset-background scale-105'
-                            : 'bg-background/80 hover:bg-accent text-muted-foreground hover:text-foreground border border-border/40'
-                        }`}
-                      >
-                        <IconCmp className="h-4 w-4" />
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Layer Selection (if layers present) */}
-            {fullData?.layers && fullData.layers.length > 0 && (
-              <div>
-                <label className="font-bold text-muted-foreground">Layer (Optional)</label>
-                <Select
-                  value={pinDraft.layerId || 'none'}
-                  onValueChange={(val) =>
-                    setPinDraft({ ...pinDraft, layerId: val === 'none' ? undefined : (val as Id<'mapLayers'>) })
-                  }
-                >
-                  <SelectTrigger><SelectValue placeholder="All Layers" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Default / All Layers</SelectItem>
-                    {fullData.layers.map((l) => (
-                      <SelectItem key={l._id} value={l._id}>
-                        {l.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            <div>
-              <label className="font-bold text-muted-foreground">Link to Map (Optional)</label>
-              <Select
-                value={pinDraft.targetMapId || 'none'}
-                onValueChange={(val) =>
-                  setPinDraft({ ...pinDraft, targetMapId: val === 'none' ? undefined : (val as Id<'worldMaps'>) })
-                }
-              >
-                <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {worldMaps?.map((m) => (
-                    <SelectItem key={m._id} value={m._id}>
-                      {m.name} {m.isHomeMap ? '🏠 ' : ''}{m.hideFromMenu ? '(Hidden)' : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* GM Secret Toggle */}
-            {isOwner && (
-              <div className="flex items-center justify-between border border-border/60 bg-muted/20 px-3 py-2.5 rounded-md">
-                <div className="space-y-0.5 pr-2">
-                  <span className="font-bold flex items-center gap-1.5 text-xs text-foreground">
-                    <EyeOff className="h-3.5 w-3.5 text-amber-400" />
-                    Secret Pin (GM Only)
-                  </span>
-                  <p className="text-[11px] text-muted-foreground">
-                    Only visible to GM. Completely hidden from players.
-                  </p>
-                </div>
-                <Switch
-                  checked={pinDraft.gmOnly || false}
-                  onCheckedChange={(val) => setPinDraft({ ...pinDraft, gmOnly: val })}
-                />
-              </div>
-            )}
-          </div>
-          <DialogFooter className="pt-2">
-            <Button size="sm" onClick={handleSavePin}>
-              {pinDraft.id ? 'Update Pin' : 'Save Pin'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        pinDraft={pinDraft}
+        onChangeDraft={setPinDraft}
+        isOwner={isOwner}
+        layers={fullData?.layers}
+        worldMaps={worldMaps}
+        worldQuests={worldQuests}
+        onSave={handleSavePin}
+      />
 
       {/* DIALOG: MAP & CELL NOTE */}
-      <Dialog open={isNoteDialogOpen} onOpenChange={setIsNoteDialogOpen}>
-        <DialogContent className="max-w-md">
-          {(() => {
-            const isAuthor = clerkUser && selectedNoteData?.userId === clerkUser.id
-            const isNew = !selectedNoteData
-            const canEdit = isNew || isAuthor || isOwner
-            const canDelete = !isNew && (isAuthor || isOwner)
-
-            return (
-              <>
-                <DialogHeader>
-                  <div className="flex items-center justify-between pr-4">
-                    <DialogTitle className="flex items-center gap-2 text-base font-bold text-slate-100">
-                      <FileText className="h-4 w-4 text-amber-400" />
-                      Map Note
-                    </DialogTitle>
-                    {selectedCellKey && (
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-slate-300">
-                        {selectedCellKey.startsWith('point_') ? 'Coordinate Marker' : `Cell: ${selectedCellKey}`}
-                      </span>
-                    )}
-                  </div>
-                </DialogHeader>
-
-                <div className="space-y-3 pt-1">
-                  {selectedNoteData && (
-                    <div className="flex items-center justify-between text-[11px] text-slate-400 bg-slate-900/60 p-2 rounded-md border border-slate-800">
-                      <span className="flex items-center gap-1.5 text-slate-300">
-                        <User className="h-3 w-3 text-amber-400" />
-                        By <strong className="text-slate-100">{selectedNoteData.authorName || 'Adventurer'}</strong>
-                        {isAuthor && <span className="text-[10px] text-amber-400 font-mono">(You)</span>}
-                      </span>
-                      <span>
-                        {new Date(selectedNoteData.updatedAt).toLocaleDateString(undefined, {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })}
-                      </span>
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="text-xs font-bold text-muted-foreground block mb-1">
-                      {canEdit ? 'Note Content' : 'Note Content (Read Only)'}
-                    </label>
-                    <Textarea
-                      value={draftNote}
-                      onChange={(e) => setDraftNote(e.target.value)}
-                      readOnly={!canEdit}
-                      placeholder={canEdit ? "Write location observation, secret clues, or adventure notes..." : "No note written."}
-                      className={`min-h-[140px] text-xs font-sans ${
-                        !canEdit ? 'bg-slate-900/40 border-slate-800 text-slate-300 cursor-default' : ''
-                      }`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-muted-foreground block mb-1">
-                      Wiki Link (Optional)
-                    </label>
-                    {canEdit ? (
-                      <div className="space-y-1">
-                        <div className="relative">
-                          <Input
-                            value={draftWikiLink}
-                            onChange={(e) => setDraftWikiLink(e.target.value)}
-                            placeholder="https://void.tarragon.be/notes/... or /notes/my-location"
-                            className="text-xs font-mono pr-8"
-                          />
-                          {draftWikiLink && (
-                            <a
-                              href={formatWikiUrl(draftWikiLink)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-purple-400 hover:text-purple-300"
-                              title="Test Wiki Link"
-                            >
-                              <ExternalLink className="h-3.5 w-3.5" />
-                            </a>
-                          )}
-                        </div>
-                        <p className="text-[10px] text-muted-foreground">
-                          Link to campaign lore, articles, or notes on{' '}
-                          <a
-                            href="https://void.tarragon.be"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-purple-400 hover:underline"
-                          >
-                            void.tarragon.be
-                          </a>
-                        </p>
-                      </div>
-                    ) : selectedNoteData?.wikiLink ? (
-                      <div className="pt-0.5">
-                        <a
-                          href={formatWikiUrl(selectedNoteData.wikiLink)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-purple-950/40 border border-purple-800/60 text-purple-200 hover:bg-purple-900/50 hover:text-purple-100 transition-colors text-xs font-medium w-full"
-                        >
-                          <BookOpen className="h-4 w-4 text-purple-400 shrink-0" />
-                          <span className="truncate flex-1 font-mono text-[11px]">{selectedNoteData.wikiLink}</span>
-                          <ExternalLink className="h-3.5 w-3.5 text-purple-400 shrink-0" />
-                        </a>
-                      </div>
-                    ) : (
-                      <p className="text-xs italic text-muted-foreground">No wiki link attached.</p>
-                    )}
-                  </div>
-                </div>
-
-                <DialogFooter className="pt-2 flex items-center justify-between sm:justify-between w-full">
-                  <div>
-                    {canDelete && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 text-xs text-destructive hover:bg-destructive/10 gap-1"
-                        onClick={() => handleDeleteNote(selectedNoteData._id)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" /> Delete Note
-                      </Button>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-8 text-xs"
-                      onClick={() => setIsNoteDialogOpen(false)}
-                    >
-                      {canEdit ? 'Cancel' : 'Close'}
-                    </Button>
-                    {canEdit && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="h-8 text-xs bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold"
-                        onClick={handleSaveNote}
-                      >
-                        Save Note
-                      </Button>
-                    )}
-                  </div>
-                </DialogFooter>
-              </>
-            )
-          })()}
-        </DialogContent>
-      </Dialog>
+      <MapNoteModal
+        isOpen={isNoteDialogOpen}
+        onOpenChange={setIsNoteDialogOpen}
+        selectedNoteData={selectedNoteData}
+        selectedCellKey={selectedCellKey}
+        draftNote={draftNote}
+        onChangeDraftNote={setDraftNote}
+        draftWikiLink={draftWikiLink}
+        onChangeDraftWikiLink={setDraftWikiLink}
+        currentUserId={clerkUser?.id}
+        isOwner={isOwner}
+        onSave={handleSaveNote}
+        onDelete={handleDeleteNote}
+      />
 
       {/* DIALOG: CREATE NEW MAP */}
-      <Dialog open={isNewMapDialogOpen} onOpenChange={setIsNewMapDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Create World Map</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 text-xs">
-            <div>
-              <label className="font-bold text-muted-foreground">Map Name</label>
-              <Input
-                value={newMapDraft.name}
-                onChange={(e) => {
-                  const name = e.target.value
-                  const slug = name.toLowerCase().replace(/\s+/g, '-')
-                  setNewMapDraft({ ...newMapDraft, name, slug })
-                }}
-                placeholder="Capital City, Underground Cave..."
-              />
-            </div>
-            <div>
-              <label className="font-bold text-muted-foreground">URL Slug</label>
-              <Input
-                value={newMapDraft.slug}
-                onChange={(e) => setNewMapDraft({ ...newMapDraft, slug: e.target.value })}
-                placeholder="capital-city"
-              />
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="font-bold text-muted-foreground">Tile Pyramid URL Template</label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-2 text-[11px] gap-1 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-950/40"
-                  onClick={() => handleOpenProcessorPicker('newMap')}
-                >
-                  <Layers className="h-3 w-3" />
-                  Browse Hosted Maps
-                </Button>
-              </div>
-              <Input
-                value={newMapDraft.tileUrl}
-                onChange={(e) => {
-                  const val = e.target.value
-                  setNewMapDraft({ ...newMapDraft, tileUrl: val })
-                }}
-                onBlur={(e) => checkAndFetchProcessorTiles(e.target.value, 'newMap')}
-                placeholder="https://maps.tarragon.be/slug_tiles_files/{z}/{x}_{y}.webp"
-              />
-              <p className="text-[10px] text-muted-foreground mt-0.5">
-                DeepZoom tile pyramid format. Fast LOD zoom.
-              </p>
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="font-bold text-muted-foreground">Background Image URL (Optional)</label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-2 text-[11px] gap-1 text-purple-400 hover:text-purple-300 hover:bg-purple-950/40"
-                  asChild
-                >
-                  <a href="https://maps.tarragon.be" target="_blank" rel="noopener noreferrer" title="Upload new map image on maps.tarragon.be">
-                    <Upload className="h-3 w-3" />
-                    Upload to Processor
-                    <ExternalLink className="h-2.5 w-2.5 opacity-60" />
-                  </a>
-                </Button>
-              </div>
-              <Input
-                value={newMapDraft.imageUrl}
-                onChange={(e) => {
-                  const val = e.target.value
-                  setNewMapDraft({ ...newMapDraft, imageUrl: val })
-                  if (val.includes('.webp') || val.includes('_tiles')) {
-                    checkAndFetchProcessorTiles(val, 'newMap')
-                  }
-                }}
-                onBlur={(e) => checkAndFetchProcessorTiles(e.target.value, 'newMap')}
-                placeholder="https://... image URL"
-              />
-            </div>
-            {/* Grid & Dimensions */}
-            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border/40">
-              <div>
-                <label className="font-bold text-muted-foreground block mb-1">Grid Type</label>
-                <Select
-                  value={newMapDraft.gridType}
-                  onValueChange={(val: any) => setNewMapDraft({ ...newMapDraft, gridType: val })}
-                >
-                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="hex">Pointy Hex Grid</SelectItem>
-                    <SelectItem value="hex_flat">Flat-top Hex Grid</SelectItem>
-                    <SelectItem value="square">Square Grid</SelectItem>
-                    <SelectItem value="none">No Grid</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="font-bold text-muted-foreground block mb-1">Grid Size (px)</label>
-                <Input
-                  type="number"
-                  min="25"
-                  className="h-8 text-xs font-mono"
-                  value={newMapDraft.gridSize}
-                  onChange={(e) => setNewMapDraft({ ...newMapDraft, gridSize: Math.max(25, Number(e.target.value)) })}
-                />
-              </div>
-            </div>
-            <div className="flex items-center justify-between pt-2">
-              <span className="font-bold">Set as World Home Map</span>
-              <Switch
-                checked={newMapDraft.isHomeMap}
-                onCheckedChange={(val) => setNewMapDraft({ ...newMapDraft, isHomeMap: val })}
-              />
-            </div>
-            <div className="flex items-center justify-between pt-2 border-t border-border/40">
-              <div className="space-y-0.5 pr-2">
-                <span className="font-bold flex items-center gap-1.5 text-xs text-foreground">
-                  <EyeOff className="h-3.5 w-3.5 text-amber-400" />
-                  Hide from Map Switcher
-                </span>
-                <p className="text-[11px] text-muted-foreground">
-                  Hidden from players in the dropdown. Navigable via linked markers.
-                </p>
-              </div>
-              <Switch
-                checked={newMapDraft.hideFromMenu || false}
-                onCheckedChange={(val) => setNewMapDraft({ ...newMapDraft, hideFromMenu: val })}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button size="sm" onClick={handleCreateNewMap}>Create Map</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <MapNewMapModal
+        isOpen={isNewMapDialogOpen}
+        onOpenChange={setIsNewMapDialogOpen}
+        draft={newMapDraft}
+        onChangeDraft={setNewMapDraft}
+        onOpenProcessorPicker={() => handleOpenProcessorPicker('newMap')}
+        onDetectTiles={(url) => checkAndFetchProcessorTiles(url, 'newMap')}
+        onCreateMap={handleCreateNewMap}
+      />
 
       {/* DIALOG: MAP SETTINGS */}
-      <Dialog open={isSettingsDialogOpen} onOpenChange={setIsSettingsDialogOpen}>
-        <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span>Map Settings</span>
-              {currentMap && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 text-destructive"
-                  onClick={() => {
-                    deleteMapMutation({ mapId: currentMap._id })
-                    setIsSettingsDialogOpen(false)
-                    router.push(`/world/${encodeURIComponent(world.name)}`)
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              )}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 text-xs">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="font-bold text-muted-foreground">Name</label>
-                <Input
-                  value={settingsDraft.name}
-                  onChange={(e) => setSettingsDraft({ ...settingsDraft, name: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="font-bold text-muted-foreground">Slug</label>
-                <Input
-                  value={settingsDraft.slug}
-                  onChange={(e) => setSettingsDraft({ ...settingsDraft, slug: e.target.value })}
-                />
-              </div>
-            </div>
-            {/* MAP IMAGE / VECTOR SVG URL */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1.5">
-                <div className="flex items-center gap-2">
-                  <label className="font-bold text-muted-foreground">Map Image / Vector SVG URL</label>
-                  {settingsDraft.imageUrl.toLowerCase().includes('.svg') && (
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-950/60 border border-emerald-800/60 text-emerald-300">
-                      Vector SVG
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-[11px] gap-1 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-950/40"
-                    onClick={() => handleOpenProcessorPicker('mapSettings')}
-                  >
-                    <Layers className="h-3 w-3" />
-                    Browse Hosted Maps
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-[11px] gap-1 text-purple-400 hover:text-purple-300 hover:bg-purple-950/40"
-                    asChild
-                  >
-                    <a href="https://maps.tarragon.be" target="_blank" rel="noopener noreferrer" title="Upload new map image on maps.tarragon.be">
-                      <Upload className="h-3 w-3" />
-                      Upload to Processor
-                      <ExternalLink className="h-2.5 w-2.5 opacity-60" />
-                    </a>
-                  </Button>
-                  {settingsDraft.imageUrl && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 px-2 text-[11px] gap-1 text-slate-300 hover:text-white hover:bg-slate-800"
-                      onClick={() => handleCopyLink(settingsDraft.imageUrl, 'Image URL')}
-                      title="Copy Image URL to clipboard"
-                    >
-                      <Copy className="h-3 w-3" />
-                      Copy URL
-                    </Button>
-                  )}
-                  {currentMap?.imageUrl && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 px-2 text-[11px] gap-1.5 text-purple-400 hover:text-purple-300 hover:bg-purple-950/40"
-                      onClick={handleForceRefreshImage}
-                      disabled={isRefreshingImage}
-                      title="Force reload latest image from host (bypasses browser HTTP cache)"
-                    >
-                      <RefreshCw className={`h-3 w-3 ${isRefreshingImage ? 'animate-spin' : ''}`} />
-                      Reload
-                    </Button>
-                  )}
-                </div>
-              </div>
-              <Input
-                value={settingsDraft.imageUrl}
-                onChange={(e) => setSettingsDraft({ ...settingsDraft, imageUrl: e.target.value })}
-                placeholder="https://maps.tarragon.be/hatham.svg"
-              />
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Direct image or vector SVG URL. SVGs render at infinite vector resolution without tiling.
-              </p>
-            </div>
-
-            {/* SVG VECTOR INFO & RESOLUTION PRESETS */}
-            {settingsDraft.imageUrl.toLowerCase().includes('.svg') && (
-              <div className="p-3 rounded-lg border border-emerald-800/60 bg-emerald-950/30 space-y-2">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-600 text-white shadow-sm">
-                      Vector SVG Mode
-                    </span>
-                    <span className="text-xs font-semibold text-emerald-300">Infinite Scaling Active</span>
-                  </div>
-                  {settingsDraft.tileUrl && (
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      className="h-6 text-[11px] px-2 shadow-sm font-semibold"
-                      onClick={() => {
-                        setSettingsDraft((prev) => ({ ...prev, tileUrl: '' }))
-                        toast.success('Cleared tile pyramid to enable pure vector SVG!')
-                      }}
-                    >
-                      <Trash2 className="h-3 w-3 mr-1" />
-                      Clear Tile Pyramid (Use Pure SVG)
-                    </Button>
-                  )}
-                </div>
-                <p className="text-[11px] text-emerald-200/80 leading-relaxed">
-                  {settingsDraft.tileUrl
-                    ? '⚠️ A tile pyramid is currently attached. Because tile pyramids are raster JPEGs, they will overlay the vector SVG and appear blurry or pixelated. Clear the tile pyramid to render directly in crisp vector SVG.'
-                    : '✨ Rendering directly in pure vector SVG! All paths, biomes, labels, and icons remain razor sharp at any zoom level.'}
-                </p>
-                <div className="pt-2 border-t border-emerald-800/40 flex items-center justify-between flex-wrap gap-2 text-xs">
-                  <span className="text-emerald-300 text-[11px] font-medium">
-                    Recommended Canvas Size:
-                  </span>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-6 text-[11px] px-2 border-emerald-700/60 text-emerald-200 hover:bg-emerald-900/50"
-                      onClick={() => {
-                        const baseDim = (naturalDimensions?.width && naturalDimensions.width < 1000)
-                          ? naturalDimensions.width
-                          : 284
-                        const w = Math.round(baseDim * 10)
-                        setSettingsDraft((prev) => ({ ...prev, width: w, height: w }))
-                        toast.success(`Set SVG canvas size to ${w}×${w}px (10×)`)
-                      }}
-                    >
-                      10× (2840px)
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-6 text-[11px] px-2 border-emerald-700/60 text-emerald-200 hover:bg-emerald-900/50"
-                      onClick={() => {
-                        const baseDim = (naturalDimensions?.width && naturalDimensions.width < 1000)
-                          ? naturalDimensions.width
-                          : 284
-                        const w = Math.round(baseDim * 15)
-                        setSettingsDraft((prev) => ({ ...prev, width: w, height: w }))
-                        toast.success(`Set SVG canvas size to ${w}×${w}px (15×)`)
-                      }}
-                    >
-                      15× (4260px)
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-6 text-[11px] px-2 border-emerald-700/60 text-emerald-200 hover:bg-emerald-900/50"
-                      onClick={() => {
-                        const baseDim = (naturalDimensions?.width && naturalDimensions.width < 1000)
-                          ? naturalDimensions.width
-                          : 284
-                        const w = Math.round(baseDim * 20)
-                        setSettingsDraft((prev) => ({ ...prev, width: w, height: w }))
-                        toast.success(`Set SVG canvas size to ${w}×${w}px (20×)`)
-                      }}
-                    >
-                      20× (5680px)
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TILE PYRAMID URL */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1.5">
-                <label className="font-bold text-muted-foreground flex items-center gap-1.5">
-                  <Layers className="h-3.5 w-3.5 text-cyan-400" />
-                  DeepZoom Tile Pyramid URL (Optional)
-                </label>
-                <div className="flex items-center gap-1.5">
-                  {settingsDraft.tileUrl ? (
-                    <>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 px-2 text-[11px] gap-1 text-slate-300 hover:text-white hover:bg-slate-800"
-                        onClick={() => handleCopyLink(settingsDraft.tileUrl, 'Tile Pyramid URL')}
-                        title="Copy Tile URL to clipboard"
-                      >
-                        <Copy className="h-3 w-3" />
-                        Copy Tiles URL
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 px-2 text-[11px] gap-1 text-destructive hover:bg-destructive/10"
-                        onClick={() => {
-                          setSettingsDraft((prev) => ({ ...prev, tileUrl: '' }))
-                          toast.success('Cleared tile pyramid template!')
-                        }}
-                        title="Remove tile pyramid URL"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                        Clear Tiles
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 px-2 text-[11px] gap-1 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-950/40"
-                      onClick={() => checkAndFetchProcessorTiles(settingsDraft.imageUrl, 'mapSettings')}
-                      title="Check processor for tiles matching the current image URL"
-                    >
-                      <RefreshCw className="h-3 w-3" />
-                      Detect Tiles
-                    </Button>
-                  )}
-                </div>
-              </div>
-              <Input
-                value={settingsDraft.tileUrl}
-                onChange={(e) => setSettingsDraft({ ...settingsDraft, tileUrl: e.target.value })}
-                placeholder="https://maps.tarragon.be/slug_tiles_files/{z}/{x}_{y}.webp"
-                className="font-mono text-xs"
-              />
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Supports DeepZoom WebP/JPEG tile pyramids for massive raster maps. Leave blank for direct vector SVGs.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="font-bold text-muted-foreground">Width (px)</label>
-                <Input
-                  type="number"
-                  value={settingsDraft.width}
-                  onChange={(e) => setSettingsDraft({ ...settingsDraft, width: Number(e.target.value) })}
-                />
-              </div>
-              <div>
-                <label className="font-bold text-muted-foreground">Height (px)</label>
-                <Input
-                  type="number"
-                  value={settingsDraft.height}
-                  onChange={(e) => setSettingsDraft({ ...settingsDraft, height: Number(e.target.value) })}
-                />
-              </div>
-            </div>
-            {naturalDimensions && (
-              <div className="flex items-center justify-between text-xs bg-muted/40 p-2 rounded-md border border-border/50 flex-wrap gap-2">
-                <span className="text-muted-foreground">
-                  Detected Image Size: <strong className="text-foreground">{naturalDimensions.width} × {naturalDimensions.height} px</strong>
-                  {settingsDraft.imageUrl.toLowerCase().includes('.svg') && naturalDimensions.width < 1000 && (
-                    <span className="text-emerald-400 ml-1 font-normal">(Raw SVG viewBox)</span>
-                  )}
-                </span>
-                <div className="flex items-center gap-1.5">
-                  {settingsDraft.imageUrl.toLowerCase().includes('.svg') && naturalDimensions.width < 1000 && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-xs border-emerald-700/60 text-emerald-300 hover:bg-emerald-950/50"
-                      onClick={() =>
-                        setSettingsDraft({
-                          ...settingsDraft,
-                          width: Math.round(naturalDimensions.width * 10),
-                          height: Math.round(naturalDimensions.height * 10),
-                        })
-                      }
-                    >
-                      Use 10× ({Math.round(naturalDimensions.width * 10)}×{Math.round(naturalDimensions.height * 10)})
-                    </Button>
-                  )}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() =>
-                      setSettingsDraft({
-                        ...settingsDraft,
-                        width: naturalDimensions.width,
-                        height: naturalDimensions.height,
-                      })
-                    }
-                  >
-                    Use Detected Size
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* World Home Map & Map Visibility */}
-            <div className="space-y-2 pt-1 border-t border-border/40">
-              <div className="flex items-center justify-between">
-                <span className="font-bold">Set as World Home Map</span>
-                <Switch
-                  checked={settingsDraft.isHomeMap}
-                  onCheckedChange={(val) => setSettingsDraft({ ...settingsDraft, isHomeMap: val })}
-                />
-              </div>
-              <div className="flex items-center justify-between pt-2 border-t border-border/40">
-                <div className="space-y-0.5 pr-2">
-                  <span className="font-bold flex items-center gap-1.5 text-xs text-foreground">
-                    <EyeOff className="h-3.5 w-3.5 text-amber-400" />
-                    Hide from Map Switcher
-                  </span>
-                  <p className="text-[11px] text-muted-foreground">
-                    Hidden from players in the top-left dropdown. Navigable via linked markers.
-                  </p>
-                </div>
-                <Switch
-                  checked={settingsDraft.hideFromMenu || false}
-                  onCheckedChange={(val) => setSettingsDraft({ ...settingsDraft, hideFromMenu: val })}
-                />
-              </div>
-            </div>
-            
-            {/* Grid & Exploration Settings */}
-            <div className="border border-border/50 rounded-lg p-3.5 bg-muted/20 space-y-3.5">
-              <div className="grid grid-cols-2 gap-3 items-end">
-                <div className="min-w-0">
-                  <label className="font-bold text-muted-foreground block mb-1">Grid Type</label>
-                  <Select
-                    value={settingsDraft.gridType}
-                    onValueChange={(val: any) => setSettingsDraft({ ...settingsDraft, gridType: val })}
-                    className="w-full min-w-0 h-9 bg-background/50 border-border/70"
-                  >
-                    <SelectTrigger className="w-full truncate"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      <SelectItem value="hex">Pointy Hex (Standard)</SelectItem>
-                      <SelectItem value="hex_flat">Flat-top Hex</SelectItem>
-                      <SelectItem value="square">Square Grid</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="min-w-0">
-                  <label className="font-bold text-muted-foreground block mb-1">Fog of War</label>
-                  <div className="flex items-center justify-between border border-border/70 bg-background/50 px-3 h-9 rounded-md">
-                    <span className="font-medium text-xs">Exploration Mode</span>
-                    <Switch
-                      checked={settingsDraft.isExplorationMap}
-                      onCheckedChange={(val) => setSettingsDraft({ ...settingsDraft, isExplorationMap: val })}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {settingsDraft.gridType !== 'none' && (
-                <div className="space-y-3 pt-2 border-t border-border/40">
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="font-bold text-muted-foreground">Grid Size (px)</label>
-                      <span className="text-[11px] font-mono text-muted-foreground">{settingsDraft.gridSize || 100}px</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="h-9 w-9 shrink-0"
-                        onClick={() => {
-                          const val = Math.max(25, (settingsDraft.gridSize || 100) - 5)
-                          setSettingsDraft({ ...settingsDraft, gridSize: val })
-                          setLiveGridSize(val)
-                        }}
-                      >
-                        -
-                      </Button>
-                      <Input
-                        type="number"
-                        className="font-mono text-center h-9"
-                        value={settingsDraft.gridSize}
-                        onChange={(e) => {
-                          const val = Number(e.target.value)
-                          setSettingsDraft({ ...settingsDraft, gridSize: val })
-                          setLiveGridSize(val)
-                        }}
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="h-9 w-9 shrink-0"
-                        onClick={() => {
-                          const val = (settingsDraft.gridSize || 100) + 5
-                          setSettingsDraft({ ...settingsDraft, gridSize: val })
-                          setLiveGridSize(val)
-                        }}
-                      >
-                        +
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="min-w-0">
-                      <label className="font-bold text-muted-foreground block mb-1">Grid Offset X (px)</label>
-                      <div className="flex items-center gap-1.5">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="h-9 w-9 shrink-0"
-                          onClick={() => {
-                            const val = (settingsDraft.gridOffsetX || 0) - 5
-                            setSettingsDraft({ ...settingsDraft, gridOffsetX: val })
-                            setLiveGridOffset({ x: val, y: settingsDraft.gridOffsetY || 0 })
-                          }}
-                          title="Nudge Left 5px"
-                        >
-                          <ChevronLeft className="h-4 w-4" />
-                        </Button>
-                        <Input
-                          type="number"
-                          className="font-mono text-center h-9"
-                          value={settingsDraft.gridOffsetX}
-                          onChange={(e) => {
-                            const val = Number(e.target.value)
-                            setSettingsDraft({ ...settingsDraft, gridOffsetX: val })
-                            setLiveGridOffset({ x: val, y: settingsDraft.gridOffsetY || 0 })
-                          }}
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="h-9 w-9 shrink-0"
-                          onClick={() => {
-                            const val = (settingsDraft.gridOffsetX || 0) + 5
-                            setSettingsDraft({ ...settingsDraft, gridOffsetX: val })
-                            setLiveGridOffset({ x: val, y: settingsDraft.gridOffsetY || 0 })
-                          }}
-                          title="Nudge Right 5px"
-                        >
-                          <ChevronRight className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="min-w-0">
-                      <label className="font-bold text-muted-foreground block mb-1">Grid Offset Y (px)</label>
-                      <div className="flex items-center gap-1.5">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="h-9 w-9 shrink-0"
-                          onClick={() => {
-                            const val = (settingsDraft.gridOffsetY || 0) - 5
-                            setSettingsDraft({ ...settingsDraft, gridOffsetY: val })
-                            setLiveGridOffset({ x: settingsDraft.gridOffsetX || 0, y: val })
-                          }}
-                          title="Nudge Up 5px"
-                        >
-                          <ChevronUp className="h-4 w-4" />
-                        </Button>
-                        <Input
-                          type="number"
-                          className="font-mono text-center h-9"
-                          value={settingsDraft.gridOffsetY}
-                          onChange={(e) => {
-                            const val = Number(e.target.value)
-                            setSettingsDraft({ ...settingsDraft, gridOffsetY: val })
-                            setLiveGridOffset({ x: settingsDraft.gridOffsetX || 0, y: val })
-                          }}
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="h-9 w-9 shrink-0"
-                          onClick={() => {
-                            const val = (settingsDraft.gridOffsetY || 0) + 5
-                            setSettingsDraft({ ...settingsDraft, gridOffsetY: val })
-                            setLiveGridOffset({ x: settingsDraft.gridOffsetX || 0, y: val })
-                          }}
-                          title="Nudge Down 5px"
-                        >
-                          <ChevronDown className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Map Scale / Distance Calibration */}
-                  <div className="pt-2 border-t border-border/40 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="font-bold text-muted-foreground flex items-center gap-1.5">
-                        <Ruler className="h-3.5 w-3.5 text-cyan-400" />
-                        Map Distance Scale (Optional)
-                      </label>
-                      <span className="text-[10px] text-muted-foreground">Used by Ruler tool</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[11px] text-muted-foreground block mb-1">
-                          Distance per {settingsDraft.gridType === 'square' ? 'Square' : 'Hex'}
-                        </label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="any"
-                          placeholder="e.g. 5, 24, 50"
-                          value={settingsDraft.gridScale || ''}
-                          onChange={(e) => setSettingsDraft({ ...settingsDraft, gridScale: Math.max(0, Number(e.target.value)) })}
-                          className="h-9 font-mono"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[11px] text-muted-foreground block mb-1">Scale Unit</label>
-                        <Select
-                          value={settingsDraft.gridScaleUnit || 'miles'}
-                          onValueChange={(val) => setSettingsDraft({ ...settingsDraft, gridScaleUnit: val })}
-                        >
-                          <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="miles">Miles (mi)</SelectItem>
-                            <SelectItem value="km">Kilometers (km)</SelectItem>
-                            <SelectItem value="feet">Feet (ft)</SelectItem>
-                            <SelectItem value="meters">Meters (m)</SelectItem>
-                            <SelectItem value="leagues">Leagues</SelectItem>
-                            <SelectItem value="days travel">Days Travel</SelectItem>
-                            <SelectItem value="hours travel">Hours Travel</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground/80">
-                      Example: 1 hex = {settingsDraft.gridScale || 1} {settingsDraft.gridScaleUnit || 'miles'}. When set, the Ruler measures real in-world travel distances.
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button size="sm" onClick={handleUpdateSettings}>Save Settings</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <MapSettingsModal
+        isOpen={isSettingsDialogOpen}
+        onOpenChange={setIsSettingsDialogOpen}
+        currentMap={currentMap}
+        settingsDraft={settingsDraft}
+        onChangeDraft={setSettingsDraft}
+        naturalDimensions={naturalDimensions}
+        isRefreshingImage={isRefreshingImage}
+        onForceRefreshImage={handleForceRefreshImage}
+        onOpenProcessorPicker={() => handleOpenProcessorPicker('mapSettings')}
+        onDetectTiles={(url) => checkAndFetchProcessorTiles(url, 'mapSettings')}
+        onCopyLink={handleCopyLink}
+        onDeleteMap={(mapId) => {
+          deleteMapMutation({ mapId })
+          setIsSettingsDialogOpen(false)
+          router.push(`/world/${encodeURIComponent(world.name)}`)
+        }}
+        onSaveSettings={handleUpdateSettings}
+        onUpdateLiveGridSize={setLiveGridSize}
+        onUpdateLiveGridOffset={setLiveGridOffset}
+      />
 
       {/* DIALOG: AREA DETAILS / EDIT */}
-      {selectedArea && (
-        <Dialog open={!!selectedArea} onOpenChange={() => setSelectedArea(null)}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <div className="flex items-start justify-between gap-3">
-                <DialogTitle className="flex items-center gap-2.5 text-lg font-bold">
-                  <div
-                    className="h-5 w-5 rounded-full shrink-0 shadow-sm border border-white/20"
-                    style={{ backgroundColor: selectedArea.color || '#a855f7' }}
-                  />
-                  <div className="min-w-0">
-                    <span className="break-words leading-tight block">{selectedArea.name}</span>
-                    {selectedArea.gmOnly && (
-                      <span className="inline-flex items-center gap-1 mt-1 text-[11px] font-mono text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">
-                        <EyeOff className="h-3 w-3" /> Secret (GM Only)
-                      </span>
-                    )}
-                  </div>
-                </DialogTitle>
-                {isOwner && (
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 gap-1 text-xs"
-                      onClick={() => {
-                        setAreaDraft({
-                          id: selectedArea._id,
-                          name: selectedArea.name,
-                          description: selectedArea.description || '',
-                          color: selectedArea.color || '#a855f7',
-                          fillOpacity: selectedArea.fillOpacity ?? 0.3,
-                          targetMapId: selectedArea.targetMapId,
-                          layerId: selectedArea.layerId,
-                          points: selectedArea.points || [],
-                          gmOnly: selectedArea.gmOnly || false,
-                        })
-                        setSelectedArea(null)
-                        setIsAreaDialogOpen(true)
-                      }}
-                      title="Edit Area Name, Lore & Link"
-                    >
-                      <Edit3 className="h-3.5 w-3.5" />
-                      Edit Details
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 gap-1 text-xs border-purple-500/40 text-purple-300 hover:text-white hover:bg-purple-950/50"
-                      onClick={() => {
-                        handleStartReshaping(selectedArea)
-                      }}
-                      title="Edit Polygon Shape & Vertices on Map"
-                    >
-                      <Maximize2 className="h-3.5 w-3.5" />
-                      Edit Shape
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                      onClick={() => {
-                        deleteAreaMutation({ areaId: selectedArea._id })
-                        setSelectedArea(null)
-                      }}
-                      title="Delete Area"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </DialogHeader>
-            <div className="space-y-4 text-sm leading-relaxed pt-2">
-              {selectedArea.description ? (
-                <p className="text-muted-foreground whitespace-pre-wrap">{selectedArea.description}</p>
-              ) : (
-                <p className="text-xs italic text-muted-foreground">No description provided for this area.</p>
-              )}
-              {selectedArea.targetMapId && (
-                <div className="pt-2 border-t border-border/40">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="w-full gap-2 text-xs"
-                    onClick={() => {
-                      const target = worldMaps?.find((m) => m._id === selectedArea.targetMapId)
-                      if (target) router.push(`/world/${encodeURIComponent(world.name)}/map/${target.slug}`)
-                    }}
-                  >
-                    <MapIcon className="h-3.5 w-3.5" />
-                    Open Linked Map
-                  </Button>
-                </div>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+      <MapAreaDetailsModal
+        selectedArea={selectedArea}
+        onClose={() => setSelectedArea(null)}
+        isOwner={isOwner}
+        worldMaps={worldMaps}
+        onEditArea={(area) => {
+          setAreaDraft({
+            id: area._id,
+            name: area.name,
+            description: area.description || '',
+            color: area.color || '#a855f7',
+            fillOpacity: area.fillOpacity ?? 0.3,
+            targetMapId: area.targetMapId,
+            layerId: area.layerId,
+            points: area.points || [],
+            gmOnly: area.gmOnly || false,
+          })
+          setSelectedArea(null)
+          setIsAreaDialogOpen(true)
+        }}
+        onReshapeArea={(area) => {
+          setSelectedArea(null)
+          handleStartReshaping(area)
+        }}
+        onDeleteArea={(areaId) => {
+          deleteAreaMutation({ areaId })
+          setSelectedArea(null)
+        }}
+        onNavigateToMap={(slug) => {
+          router.push(`/world/${encodeURIComponent(world.name)}/map/${slug}`)
+        }}
+      />
 
       {/* DIALOG: SAVE AREA DRAFT */}
-      <Dialog
-        open={isAreaDialogOpen}
+      <MapAreaFormModal
+        isOpen={isAreaDialogOpen}
         onOpenChange={(open) => {
           setIsAreaDialogOpen(open)
           if (!open) {
@@ -4945,352 +3499,41 @@ export default function MapViewerClient() {
             })
           }
         }}
-      >
-        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {areaDraft.id ? 'Edit Area Details' : `Save Polygon Area (${areaDraft.points.length} points)`}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3.5 text-xs">
-            <div>
-              <label className="font-bold text-muted-foreground">Area Name</label>
-              <Input
-                value={areaDraft.name}
-                onChange={(e) => setAreaDraft({ ...areaDraft, name: e.target.value })}
-                placeholder="Forbidden Forest, Whisper Plains..."
-              />
-            </div>
-            <div>
-              <label className="font-bold text-muted-foreground">Description</label>
-              <Textarea
-                value={areaDraft.description}
-                onChange={(e) => setAreaDraft({ ...areaDraft, description: e.target.value })}
-                placeholder="Area lore, hazards, details..."
-                rows={3}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="font-bold text-muted-foreground">Color</label>
-                <Input
-                  type="color"
-                  value={areaDraft.color}
-                  onChange={(e) => setAreaDraft({ ...areaDraft, color: e.target.value })}
-                  className="h-9 p-1"
-                />
-              </div>
-              <div>
-                <label className="font-bold text-muted-foreground">Opacity (0.1 - 1.0)</label>
-                <Input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="1"
-                  value={areaDraft.fillOpacity}
-                  onChange={(e) => setAreaDraft({ ...areaDraft, fillOpacity: Number(e.target.value) })}
-                />
-              </div>
-            </div>
-
-            {/* Layer selection if layers exist */}
-            {fullData?.layers && fullData.layers.length > 0 && (
-              <div>
-                <label className="font-bold text-muted-foreground">Layer (Optional)</label>
-                <Select
-                  value={areaDraft.layerId || 'none'}
-                  onValueChange={(val) =>
-                    setAreaDraft({ ...areaDraft, layerId: val === 'none' ? undefined : (val as Id<'mapLayers'>) })
-                  }
-                >
-                  <SelectTrigger><SelectValue placeholder="All Layers" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Default / All Layers</SelectItem>
-                    {fullData.layers.map((l) => (
-                      <SelectItem key={l._id} value={l._id}>
-                        {l.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            <div>
-              <label className="font-bold text-muted-foreground">Link to Map (Optional)</label>
-              <Select
-                value={areaDraft.targetMapId || 'none'}
-                onValueChange={(val) =>
-                  setAreaDraft({ ...areaDraft, targetMapId: val === 'none' ? undefined : (val as Id<'worldMaps'>) })
-                }
-              >
-                <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {worldMaps?.map((m) => (
-                    <SelectItem key={m._id} value={m._id}>
-                      {m.name} {m.isHomeMap ? '🏠 ' : ''}{m.hideFromMenu ? '(Hidden)' : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Polygon Shape & Reshape on Map */}
-            {areaDraft.id && (
-              <div className="flex items-center justify-between border border-border/60 bg-muted/20 px-3 py-2 rounded-md">
-                <div className="space-y-0.5 pr-2">
-                  <span className="font-bold flex items-center gap-1.5 text-xs text-foreground">
-                    <Maximize2 className="h-3.5 w-3.5 text-purple-400" />
-                    Polygon Shape ({areaDraft.points.length} points)
-                  </span>
-                  <p className="text-[11px] text-muted-foreground">
-                    Move vertices, insert points, or redraw directly on the map.
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs gap-1 border-purple-500/40 text-purple-300 hover:text-white hover:bg-purple-950/50 shrink-0"
-                  onClick={() => {
-                    const currentArea = fullData?.areas.find((a) => a._id === areaDraft.id)
-                    if (currentArea) {
-                      setIsAreaDialogOpen(false)
-                      handleStartReshaping(currentArea)
-                    }
-                  }}
-                >
-                  <Edit3 className="h-3 w-3" /> Reshape
-                </Button>
-              </div>
-            )}
-
-            {/* GM Secret Toggle */}
-            {isOwner && (
-              <div className="flex items-center justify-between border border-border/60 bg-muted/20 px-3 py-2.5 rounded-md">
-                <div className="space-y-0.5 pr-2">
-                  <span className="font-bold flex items-center gap-1.5 text-xs text-foreground">
-                    <EyeOff className="h-3.5 w-3.5 text-amber-400" />
-                    Secret Area (GM Only)
-                  </span>
-                  <p className="text-[11px] text-muted-foreground">
-                    Dashed outline. Hidden from players, visible only to GM.
-                  </p>
-                </div>
-                <Switch
-                  checked={areaDraft.gmOnly || false}
-                  onCheckedChange={(val) => setAreaDraft({ ...areaDraft, gmOnly: val })}
-                />
-              </div>
-            )}
-          </div>
-          <DialogFooter className="pt-2">
-            <Button size="sm" onClick={handleSaveArea}>
-              {areaDraft.id ? 'Update Area' : 'Save Area'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        areaDraft={areaDraft}
+        onChangeDraft={setAreaDraft}
+        isOwner={isOwner}
+        layers={fullData?.layers}
+        worldMaps={worldMaps}
+        onSave={handleSaveArea}
+        onReshape={() => {
+          const currentA = fullData?.areas.find((a) => a._id === areaDraft.id)
+          if (currentA) {
+            setIsAreaDialogOpen(false)
+            handleStartReshaping(currentA)
+          }
+        }}
+      />
 
       {/* DIALOG: ADD LAYER */}
-      <Dialog open={isLayerDialogOpen} onOpenChange={setIsLayerDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add Map Layer</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 text-xs">
-            <div>
-              <label className="font-bold text-muted-foreground">Layer Name</label>
-              <Input
-                value={newLayerDraft.name}
-                onChange={(e) => setNewLayerDraft({ ...newLayerDraft, name: e.target.value })}
-                placeholder="Political Borders, Underground, Weather..."
-              />
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="font-bold text-muted-foreground">Tile Pyramid URL Template</label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-2 text-[11px] gap-1 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-950/40"
-                  onClick={() => handleOpenProcessorPicker('layer')}
-                >
-                  <Layers className="h-3 w-3" />
-                  Browse Hosted Maps
-                </Button>
-              </div>
-              <Input
-                value={newLayerDraft.tileUrl}
-                onChange={(e) => {
-                  const val = e.target.value
-                  setNewLayerDraft({ ...newLayerDraft, tileUrl: val })
-                }}
-                onBlur={(e) => checkAndFetchProcessorTiles(e.target.value, 'layer')}
-                placeholder="https://maps.tarragon.be/borders_tiles_files/{z}/{x}_{y}.webp"
-              />
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="font-bold text-muted-foreground">Overlay Image URL (SVG / Transparent WebP / PNG)</label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-2 text-[11px] gap-1 text-purple-400 hover:text-purple-300 hover:bg-purple-950/40"
-                  asChild
-                >
-                  <a href="https://maps.tarragon.be" target="_blank" rel="noopener noreferrer" title="Upload new layer image on maps.tarragon.be">
-                    <Upload className="h-3 w-3" />
-                    Upload to Processor
-                    <ExternalLink className="h-2.5 w-2.5 opacity-60" />
-                  </a>
-                </Button>
-              </div>
-              <Input
-                value={newLayerDraft.imageUrl}
-                onChange={(e) => {
-                  const val = e.target.value
-                  setNewLayerDraft({ ...newLayerDraft, imageUrl: val })
-                  if (val.includes('.webp') || val.includes('_tiles')) {
-                    checkAndFetchProcessorTiles(val, 'layer')
-                  }
-                }}
-                onBlur={(e) => checkAndFetchProcessorTiles(e.target.value, 'layer')}
-                placeholder="https://maps.tarragon.be/borders.svg"
-              />
-            </div>
-            <div className="flex items-center justify-between pt-2">
-              <span className="font-bold">Enabled by Default</span>
-              <Switch
-                checked={newLayerDraft.defaultEnabled}
-                onCheckedChange={(val) => setNewLayerDraft({ ...newLayerDraft, defaultEnabled: val })}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="font-bold">Allow Users / Viewers to Toggle</span>
-              <Switch
-                checked={newLayerDraft.allowUserToggle}
-                onCheckedChange={(val) => setNewLayerDraft({ ...newLayerDraft, allowUserToggle: val })}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button size="sm" onClick={handleAddLayer}>Add Layer</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <MapAddLayerModal
+        isOpen={isLayerDialogOpen}
+        onOpenChange={setIsLayerDialogOpen}
+        draft={newLayerDraft}
+        onChangeDraft={setNewLayerDraft}
+        onOpenProcessorPicker={() => handleOpenProcessorPicker('layer')}
+        onDetectTiles={(url) => checkAndFetchProcessorTiles(url, 'layer')}
+        onAddLayer={handleAddLayer}
+      />
 
       {/* DIALOG: PROCESSOR MAPS PICKER */}
-      <Dialog open={isProcessorPickerOpen} onOpenChange={setIsProcessorPickerOpen}>
-        <DialogContent className="w-full sm:max-w-2xl max-h-[85vh] overflow-y-auto p-4 sm:p-6">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between gap-2">
-              <span className="flex items-center gap-2 text-base font-bold">
-                <Layers className="h-5 w-5 text-cyan-400 shrink-0" />
-                Hosted Maps on Map Processor
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs gap-1 text-purple-400 hover:text-purple-300 shrink-0"
-                asChild
-              >
-                <a href="https://maps.tarragon.be" target="_blank" rel="noopener noreferrer">
-                  <Upload className="h-3.5 w-3.5" />
-                  Open Processor ↗
-                </a>
-              </Button>
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-3 text-xs">
-            <p className="text-muted-foreground">
-              Select any hosted map below to automatically import its image URL, tile pyramid endpoint, and native dimensions.
-            </p>
-
-            {isLoadingProcessorMaps ? (
-              <div className="py-8 text-center text-muted-foreground space-y-2">
-                <RefreshCw className="h-5 w-5 animate-spin mx-auto text-cyan-400" />
-                <p>Loading hosted maps from processor...</p>
-              </div>
-            ) : processorMaps.length === 0 ? (
-              <div className="py-8 text-center text-muted-foreground bg-muted/20 border border-border/50 rounded-lg p-4">
-                No maps found on processor.
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {processorMaps.map((item) => (
-                  <div
-                    key={item.slug}
-                    className="p-3 rounded-lg border border-border/60 bg-muted/20 hover:bg-muted/40 hover:border-cyan-500/50 transition-all flex flex-col md:flex-row md:items-center justify-between gap-3 overflow-hidden"
-                  >
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold text-sm text-foreground">{item.slug}</span>
-                        {item.width && item.height && (
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300">
-                            {item.width}×{item.height}px
-                          </span>
-                        )}
-                        {item.maxZoom !== undefined && (
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-950/60 border border-purple-800/60 text-purple-300">
-                            Zoom 0–{item.maxZoom}
-                          </span>
-                        )}
-                        {item.svgUrl && (
-                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-950/60 border border-emerald-800/60 text-emerald-300">
-                            SVG Available
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] font-mono text-muted-foreground truncate w-full" title={item.tilesUrl || item.svgUrl || item.imageUrl}>
-                        {item.tilesUrl || item.svgUrl || item.imageUrl}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0 self-end md:self-center">
-                      {item.tilesUrl && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-[11px] text-slate-300 hover:text-white hover:bg-slate-800"
-                          onClick={() => handleCopyLink(item.tilesUrl, 'Tile URL')}
-                          title="Copy tile pyramid URL template"
-                        >
-                          <Copy className="h-3 w-3 mr-1" />
-                          Tiles
-                        </Button>
-                      )}
-                      {(item.svgUrl || item.imageUrl) && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-[11px] text-slate-300 hover:text-white hover:bg-slate-800"
-                          onClick={() => handleCopyLink(item.svgUrl || item.imageUrl, item.svgUrl ? 'SVG URL' : 'Image URL')}
-                          title={`Copy ${item.svgUrl ? 'SVG' : 'Image'} URL`}
-                        >
-                          <Copy className="h-3 w-3 mr-1" />
-                          {item.svgUrl ? 'SVG' : 'Image'}
-                        </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        className="h-7 text-xs bg-cyan-600 hover:bg-cyan-500 text-white font-semibold shadow-sm"
-                        onClick={() => handleSelectProcessorMap(item)}
-                      >
-                        Use This Map
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <MapProcessorPickerModal
+        isOpen={isProcessorPickerOpen}
+        onOpenChange={setIsProcessorPickerOpen}
+        isLoading={isLoadingProcessorMaps}
+        processorMaps={processorMaps}
+        onSelectMap={handleSelectProcessorMap}
+        onCopyLink={handleCopyLink}
+      />
     </div>
   )
 }

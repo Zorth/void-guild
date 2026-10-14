@@ -16,6 +16,7 @@ export async function syncActiveSessionsForQuestChange(
   options?: {
     affectedQuestId?: Id<'quests'>;
     isRemovedOrCompleted?: boolean;
+    excludeSessionId?: Id<'sessions'>;
   }
 ) {
   const unlockedSessions = await ctx.db
@@ -33,7 +34,12 @@ export async function syncActiveSessionsForQuestChange(
     let shouldSync = false;
 
     // If this quest was removed (deleted or completed) and this unlocked session had it selected:
-    if (options?.affectedQuestId && session.questId === options.affectedQuestId) {
+    // (Make sure not to clear questId on the completing session itself!)
+    if (
+      options?.affectedQuestId &&
+      session.questId === options.affectedQuestId &&
+      session._id !== options.excludeSessionId
+    ) {
       if (options.isRemovedOrCompleted) {
         await ctx.db.patch(session._id, { questId: undefined });
       }

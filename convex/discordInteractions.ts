@@ -26,7 +26,7 @@ export const getCharacterProfile = query({
     // Count how many locked (completed) sessions this character participated in
     const sessions = await ctx.db
       .query("sessions")
-      .filter(q => q.eq(q.field("locked"), true))
+      .withIndex("by_locked", (q) => q.eq("locked", true))
       .collect();
 
     const charSessions = sessions.filter(s => s.characters.includes(character._id));
@@ -106,10 +106,8 @@ export const searchWorld = query({
     // Find the next upcoming session (not locked, closest date, or planning)
     const sessions = await ctx.db
       .query("sessions")
-      .filter(q => q.and(
-        q.eq(q.field("world"), matchedWorld._id),
-        q.eq(q.field("locked"), false)
-      ))
+      .withIndex("by_world", (q) => q.eq("world", matchedWorld._id))
+      .filter((q) => q.eq(q.field("locked"), false))
       .collect();
 
     // Sort: 1. Dated sessions by date (soonest first), 2. Planning sessions
@@ -135,7 +133,7 @@ export const searchSessions = query({
   handler: async (ctx, args) => {
     const sessions = await ctx.db
       .query("sessions")
-      .filter((q) => q.eq(q.field("locked"), false))
+      .withIndex("by_locked", (q) => q.eq("locked", false))
       .collect();
 
     const worlds = await ctx.db.query("worlds").collect();

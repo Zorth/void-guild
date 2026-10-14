@@ -677,7 +677,7 @@ export const createSession = mutation({
 
     const gmWorld = await ctx.db
       .query('worlds')
-      .filter((q) => q.eq(q.field('owner'), identity.subject))
+      .withIndex('by_owner', (q) => q.eq('owner', identity.subject))
       .first()
 
     if (!gmWorld) {
@@ -891,25 +891,26 @@ export async function checkUserMonthlySessionEligibility(
     return { eligible: true, isFreeTier: true }
   }
 
-  // Fetch all sessions and filter to those in the target month where user's characters participated/joined
-  const allSessions = await ctx.db.query('sessions').collect()
+  // Calculate start and end epoch timestamps for the target month
+  const startOfMonth = new Date(targetYear, targetMonth, 1, 0, 0, 0, 0).getTime()
+  const endOfMonth = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59, 999).getTime()
 
-  const sessionsInTargetMonth = allSessions.filter((s) => {
+  // Fetch only sessions within target month using the by_date index
+  const sessionsInTargetMonth = await ctx.db
+    .query('sessions')
+    .withIndex('by_date', (q) => q.gte('date', startOfMonth).lte('date', endOfMonth))
+    .collect()
+
+  const userSessionsInTargetMonth = sessionsInTargetMonth.filter((s) => {
     // Only check non-cancelled / non-planning sessions with characters
     if (!s.characters || s.characters.length === 0) return false
-
     // Check if user has a character in this session
-    const hasUserChar = s.characters.some((id) => userCharIds.has(id))
-    if (!hasUserChar) return false
-
-    // Check if session date falls in the target calendar month
-    const sDate = s.date ? new Date(s.date) : new Date(s._creationTime)
-    return sDate.getFullYear() === targetYear && sDate.getMonth() === targetMonth
+    return s.characters.some((id) => userCharIds.has(id))
   })
 
   // Non-members can only join 1 free session per calendar month.
   // Members can play multiple sessions each month.
-  if (sessionsInTargetMonth.length >= 1) {
+  if (userSessionsInTargetMonth.length >= 1) {
     const monthName = targetDate.toLocaleString('en-US', { month: 'long' })
     return {
       eligible: false,
@@ -1623,6 +1624,8 @@ export const lockSession = mutation({
         }
       }
   
+      await ctx.db.patch(args.sessionId, { locked: true, xpGains })
+
       if (session.questId) {
         await ctx.db.patch(session.questId, {
           isCompleted: true,
@@ -1632,10 +1635,9 @@ export const lockSession = mutation({
         await syncActiveSessionsForQuestChange(ctx, session.world as Id<'worlds'> | undefined, {
           affectedQuestId: session.questId,
           isRemovedOrCompleted: true,
+          excludeSessionId: session._id,
         })
       }
-
-      await ctx.db.patch(args.sessionId, { locked: true, xpGains })
 
       // Apply pending void contribution if any directly within mutation transaction
       const pendingAmount = session.pendingVoidContribution ?? session.voidContribution
@@ -1722,6 +1724,8 @@ export const forceLockSession = mutation({
   
       if (session.locked) return
   
+      await ctx.db.patch(args.sessionId, { locked: true, xpGains: [] })
+
       if (session.questId) {
         await ctx.db.patch(session.questId, {
           isCompleted: true,
@@ -1731,10 +1735,9 @@ export const forceLockSession = mutation({
         await syncActiveSessionsForQuestChange(ctx, session.world as Id<'worlds'> | undefined, {
           affectedQuestId: session.questId,
           isRemovedOrCompleted: true,
+          excludeSessionId: session._id,
         })
       }
-
-      await ctx.db.patch(args.sessionId, { locked: true, xpGains: [] })
 
       // Apply pending void contribution if any directly within mutation transaction
       const pendingAmount = session.pendingVoidContribution ?? session.voidContribution
@@ -1830,18 +1833,14 @@ export const addLoot = mutation({
     const quantity = args.quantity || 1
     const newItems = []
 
-    const shouldExpandForEach = args.isPerCharacter ?? false
-    const attendingCount = Math.max((session.characters || []).length, 1)
-    const count = shouldExpandForEach ? quantity * attendingCount : quantity
-
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; i < quantity; i++) {
         newItems.push({
             id: crypto.randomUUID(),
             name: args.name,
             link: args.link,
             valueGP: args.valueGP,
             isGood: args.isGood,
-            isPerCharacter: shouldExpandForEach ? false : (args.isPerCharacter ?? false),
+            isPerCharacter: args.isPerCharacter ?? false,
         })
     }
 
@@ -1876,46 +1875,19 @@ export const editLoot = mutation({
       throw new Error('Only the session owner or an admin can edit loot.')
     }
 
-    const shouldExpandForEach = args.isPerCharacter ?? false
-    const attendingCount = Math.max((session.characters || []).length, 1)
-
-    const loot: any[] = []
-    for (const item of (session.loot || [])) {
+    const loot = (session.loot || []).map((item) => {
       if (item.id === args.lootId) {
-        if (shouldExpandForEach) {
-          // If edited to be "for each", expand to attendingCount items
-          loot.push({
-            ...item,
-            name: args.name,
-            link: args.link,
-            valueGP: args.valueGP,
-            isGood: args.isGood,
-            isPerCharacter: false,
-          })
-          for (let i = 1; i < attendingCount; i++) {
-            loot.push({
-              id: crypto.randomUUID(),
-              name: args.name,
-              link: args.link,
-              valueGP: args.valueGP,
-              isGood: args.isGood,
-              isPerCharacter: false,
-            })
-          }
-        } else {
-          loot.push({
-            ...item,
-            name: args.name,
-            link: args.link,
-            valueGP: args.valueGP,
-            isGood: args.isGood,
-            isPerCharacter: args.isPerCharacter ?? false,
-          })
+        return {
+          ...item,
+          name: args.name,
+          link: args.link,
+          valueGP: args.valueGP,
+          isGood: args.isGood,
+          isPerCharacter: args.isPerCharacter ?? false,
         }
-      } else {
-        loot.push(item)
       }
-    }
+      return item
+    })
 
     await ctx.db.patch(args.sessionId, { loot })
   },
@@ -1966,39 +1938,26 @@ export const claimLoot = mutation({
       throw new Error('Character is not part of this session')
     }
 
-    const attendingCount = Math.max((session.characters || []).length, 1)
-    const loot: any[] = []
-
-    for (const item of (session.loot || [])) {
+    const loot = (session.loot || []).map((item) => {
       if (item.id === args.lootId) {
-        if (item.claimedBy) {
-          throw new Error('Item already claimed')
-        }
         if (item.isPerCharacter) {
-          // If claiming a legacy or unexpanded item with isPerCharacter,
-          // claim this copy and generate the remaining (attendingCount - 1) copies so others can claim them
-          loot.push({
+          const currentClaimed = item.claimedByCharacters || (item.claimedBy ? [item.claimedBy] : [])
+          if (currentClaimed.includes(args.characterId)) {
+            throw new Error('Item already claimed by your character')
+          }
+          return {
             ...item,
-            claimedBy: args.characterId,
-            isPerCharacter: false,
-          })
-          for (let i = 1; i < attendingCount; i++) {
-            loot.push({
-              id: crypto.randomUUID(),
-              name: item.name,
-              link: item.link,
-              valueGP: item.valueGP,
-              isGood: item.isGood,
-              isPerCharacter: false,
-            })
+            claimedByCharacters: [...currentClaimed, args.characterId],
           }
         } else {
-          loot.push({ ...item, claimedBy: args.characterId })
+          if (item.claimedBy) {
+            throw new Error('Item already claimed')
+          }
+          return { ...item, claimedBy: args.characterId }
         }
-      } else {
-        loot.push(item)
       }
-    }
+      return item
+    })
 
     await ctx.db.patch(args.sessionId, { loot })
   },
@@ -2008,6 +1967,7 @@ export const unclaimLoot = mutation({
   args: {
     sessionId: v.id('sessions'),
     lootId: v.string(),
+    characterId: v.optional(v.id('characters')),
   },
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
@@ -2019,17 +1979,30 @@ export const unclaimLoot = mutation({
     const lootItem = (session.loot || []).find(item => item.id === args.lootId)
     if (!lootItem) throw new Error('Loot item not found')
 
-    if (!lootItem.claimedBy) return
-
-    const character = await ctx.db.get(lootItem.claimedBy)
     const isAdminUser = await isAdmin(ctx)
-    if (character?.userId !== user.subject && session.owner !== user.subject && !isAdminUser) {
-      throw new Error('You do not have permission to unclaim this item')
-    }
 
     const loot = (session.loot || []).map((item) => {
       if (item.id === args.lootId) {
-        return { ...item, claimedBy: undefined }
+        if (item.isPerCharacter) {
+          const currentClaimed = item.claimedByCharacters || (item.claimedBy ? [item.claimedBy] : [])
+          // If a specific characterId was requested to unclaim
+          const targetCharId = args.characterId || (currentClaimed.length === 1 ? currentClaimed[0] : undefined)
+          if (!targetCharId) {
+            // If user owns session or is admin and no charId specified, or has characters in currentClaimed
+            return {
+              ...item,
+              claimedBy: undefined,
+              claimedByCharacters: [],
+            }
+          }
+          return {
+            ...item,
+            claimedBy: undefined,
+            claimedByCharacters: currentClaimed.filter((id) => id !== targetCharId),
+          }
+        } else {
+          return { ...item, claimedBy: undefined }
+        }
       }
       return item
     })

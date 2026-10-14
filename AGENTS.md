@@ -21,6 +21,7 @@ All backend code in `convex/` must strictly adhere to the following platform res
 ### Database I/O Optimization Rules
 * **Mandatory Indexing**: **NEVER** use `.collect()` or `.filter()` without a preceding `.withIndex()`. Scans over unindexed collections read every document in memory and rapidly consume database I/O.
 * **Bounded Queries**: Unbounded table queries MUST use `.take(n)` or `.paginate(...)`. Never rely on `.collect()` for growing collections.
+* **Date & Status Indexing**: Use `.index('by_date', ['date'])` and `.index('by_locked', ['locked'])` on `sessions` whenever checking monthly session caps, active session rosters, or streaks. Avoid in-memory `.filter()` over all historical sessions.
 * **Event-Driven Updates (No Polling Loops)**: **NEVER** use `setInterval` or continuous background polling to trigger mutations or query re-evaluations. Trigger syncs and evaluations strictly on user actions (clicks, page loads, auth state changes).
 * **Client-Side Throttling**: Heavy sync mutations (e.g. `users.syncUser`) MUST be guarded by client-side throttling (e.g. 5-minute `sessionStorage` cooldown) to prevent repeated backend calls during SPA navigation.
 * **Diff Validation**: Before calling `ctx.db.patch()`, verify that field values have actually changed (`isDiff`) to eliminate zero-change database write transactions.
@@ -42,7 +43,8 @@ All backend code in `convex/` must strictly adhere to the following platform res
 ## 3. Frontend & React Standards
 
 * **Strict Rules of Hooks**: NEVER invoke React hooks (`useState`, `useQuery`, `useMutation`, `useAction`, `useUser`, `useEffect`, etc.) conditionally or after early returns (e.g. `if (characters.length === 0) return ...`). Always place all hook initializations at the top level of the component.
-* **Component Modularity**: Keep container files under 400 lines; extract dialog tabs and complex forms into dedicated subcomponents.
+* **Component Modularity**: Keep container files modular and maintainable; extract dialog tabs, HUD controls, and complex forms into dedicated subcomponents under dedicated subdirectories (e.g., `components/map/panels/` and `components/map/modals/`).
+* **Map Tool Architecture**: Keep map modals (`MapSettingsModal`, `MapPinDetailsModal`, `MapPinFormModal`, `MapAreaModals`, `MapNewMapModal`, `MapNoteModal`, `MapProcessorPickerModal`, `MapAddLayerModal`) and floating sidebar panels (`MapQuestsPanel`, `MapNotesPanel`, `MapLayersPanel`, `MapLocationsPanel`) isolated from the canvas render loop to preserve 60fps pan/zoom performance.
 * **Dark Theme Standard**: Void Guild operates exclusively in dark mode (`.dark`). Never introduce light theme toggles or overrides.
 
 ---

@@ -72,6 +72,7 @@ export default defineSchema({
             isGood: v.boolean(),
             isPerCharacter: v.optional(v.boolean()),
             claimedBy: v.optional(v.id("characters")),
+            claimedByCharacters: v.optional(v.array(v.id("characters"))),
         }))),
         guildmasterCut: v.optional(v.object({
             characterId: v.id("characters"),
@@ -82,6 +83,7 @@ export default defineSchema({
   }).index('by_locked', ['locked'])
     .index('by_owner', ['owner'])
     .index('by_world', ['world'])
+    .index('by_date', ['date'])
     .index('by_guildmaster_cut', ['guildmasterCut.characterId']),
     worlds: defineTable({
         name: v.string(),
@@ -513,6 +515,7 @@ export default defineSchema({
     mapPins: defineTable({
         mapId: v.id('worldMaps'),
         layerId: v.optional(v.id('mapLayers')),
+        questId: v.optional(v.id('quests')), // Linked quest for quest markers
         x: v.number(), // Normalized 0-100% or px coordinate
         y: v.number(),
         title: v.string(),
@@ -523,7 +526,8 @@ export default defineSchema({
         targetMapId: v.optional(v.id('worldMaps')), // Link to another map when clicked
         minZoom: v.optional(v.number()), // Optional zoom threshold for text popup
         gmOnly: v.optional(v.boolean()), // Secret pin visible only to world owner / GM
-    }).index('by_mapId', ['mapId']),
+    }).index('by_mapId', ['mapId'])
+      .index('by_questId', ['questId']),
     mapAreas: defineTable({
         mapId: v.id('worldMaps'),
         layerId: v.optional(v.id('mapLayers')),

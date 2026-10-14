@@ -21,6 +21,7 @@ interface LootItem {
     isGood: boolean;
     isPerCharacter?: boolean;
     claimedBy?: Id<'characters'>;
+    claimedByCharacters?: Id<'characters'>[];
 }
 
 interface LootListProps {
@@ -157,9 +158,9 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
         }
     }
 
-    const handleUnclaim = async (lootId: string) => {
+    const handleUnclaim = async (lootId: string, characterId?: Id<'characters'>) => {
         try {
-            await unclaimLoot({ sessionId: session._id, lootId })
+            await unclaimLoot({ sessionId: session._id, lootId, characterId })
             toast.success('Loot unclaimed')
         } catch (e) {
             toast.error('Failed to unclaim loot')
@@ -196,7 +197,12 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
         const sharePerPlayer = totalValue / attendingCount
 
         const userClaimedValue = loot
-            .filter(item => item.claimedBy && userCharacterIds.has(item.claimedBy))
+            .filter(item => {
+                if (item.isPerCharacter) {
+                    return Boolean(userCharacterInSession && item.claimedByCharacters?.includes(userCharacterInSession._id))
+                }
+                return Boolean(item.claimedBy && userCharacterIds.has(item.claimedBy))
+            })
             .reduce((sum, item) => {
                 const val = item.isGood ? item.valueGP : item.valueGP / 2
                 return sum + val
@@ -212,7 +218,7 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
             userClaimedValue,
             guildmasterCutValue,
         }
-    }, [loot, session.attendingCharacters.length, userCharacterIds])
+    }, [loot, session.attendingCharacters.length, userCharacterIds, userCharacterInSession])
 
     const currentNetMoneyGP = calculations ? Math.round(calculations.userFinalShare * 100) / 100 : 0
     const isClaimed = Boolean(claimStatus?.isClaimed)
@@ -331,7 +337,7 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                                         <label htmlFor="isPerCharacter" className="text-sm font-medium cursor-pointer flex items-center gap-1.5">
                                             For <span className="font-bold underline text-primary">EACH</span> character
                                             <span className="text-xs text-muted-foreground font-normal">
-                                                {`(Creates 1 item for each character${session.attendingCharacters.length > 0 ? ` - ${session.attendingCharacters.length} total` : ''})`}
+                                                (Creates 1 shared entry that all session characters can claim)
                                             </span>
                                         </label>
                                     </div>
@@ -436,11 +442,21 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                             {formatGP(calculations.userFinalShare)}
                         </div>
 
-                        {loot.filter(item => item.claimedBy && userCharacterIds.has(item.claimedBy)).length > 0 && (
+                        {loot.filter(item => {
+                            if (item.isPerCharacter) {
+                                return Boolean(userCharacterInSession && item.claimedByCharacters?.includes(userCharacterInSession._id))
+                            }
+                            return Boolean(item.claimedBy && userCharacterIds.has(item.claimedBy))
+                        }).length > 0 && (
                             <div className="my-2.5 text-xs text-muted-foreground space-y-1 bg-background/40 p-2.5 rounded border border-border/30 text-left">
                                 <div className="font-semibold text-[11px] text-foreground/80 mb-1">Claimed Items (Deducted):</div>
                                 {loot
-                                    .filter(item => item.claimedBy && userCharacterIds.has(item.claimedBy))
+                                    .filter(item => {
+                                        if (item.isPerCharacter) {
+                                            return Boolean(userCharacterInSession && item.claimedByCharacters?.includes(userCharacterInSession._id))
+                                        }
+                                        return Boolean(item.claimedBy && userCharacterIds.has(item.claimedBy))
+                                    })
                                     .map((item) => {
                                         const val = item.isGood ? item.valueGP : item.valueGP / 2
                                         return (
@@ -571,8 +587,58 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center gap-2 shrink-0">
-                                        {item.claimedBy ? (
+                                    <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                                        {item.isPerCharacter ? (
+                                            <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                                                {/* If user's character has claimed this per-character item */}
+                                                {userCharacterInSession && item.claimedByCharacters?.includes(userCharacterInSession._id) ? (
+                                                    <div className="flex items-center gap-1.5 bg-primary/10 text-primary px-2 py-1 rounded-md border border-primary/20">
+                                                        <User className="h-3 w-3 text-primary" />
+                                                        <span className="text-[10px] font-bold">You Claimed</span>
+                                                        <button 
+                                                            onClick={() => handleUnclaim(item.id, userCharacterInSession._id)}
+                                                            className="hover:text-destructive transition-colors ml-0.5"
+                                                            title="Unclaim for yourself"
+                                                        >
+                                                            <X className="h-3 w-3" />
+                                                        </button>
+                                                    </div>
+                                                ) : userCharacterInSession ? (
+                                                    <Button 
+                                                        size="sm" 
+                                                        variant="outline" 
+                                                        className="h-7 text-[10px] font-bold px-2 gap-1 border-primary/30 text-primary hover:bg-primary/10"
+                                                        onClick={() => handleClaim(item.id, userCharacterInSession._id)}
+                                                    >
+                                                        Claim
+                                                    </Button>
+                                                ) : null}
+
+                                                {/* If other characters claimed it, display small indicator / tags */}
+                                                {(item.claimedByCharacters?.length || 0) > 0 && (
+                                                    <div className="flex items-center gap-1 flex-wrap">
+                                                        {item.claimedByCharacters?.map((cId) => {
+                                                            if (userCharacterInSession && cId === userCharacterInSession._id) return null
+                                                            const otherChar = session.attendingCharacters.find(c => c._id === cId)
+                                                            return (
+                                                                <div key={cId} className="flex items-center gap-1 bg-muted/50 px-1.5 py-0.5 rounded text-[10px] text-muted-foreground border border-border/40">
+                                                                    <span>{otherChar?.name || 'Claimed'}</span>
+                                                                    {session.canManage && (
+                                                                        <button 
+                                                                            onClick={() => handleUnclaim(item.id, cId)}
+                                                                            className="hover:text-destructive transition-colors ml-0.5"
+                                                                            title={`Unclaim for ${otherChar?.name || 'character'}`}
+                                                                        >
+                                                                            <X className="h-2.5 w-2.5" />
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : item.claimedBy ? (
                                             <div className="flex items-center gap-1.5 bg-muted/50 px-2 py-1 rounded-md border border-border/40">
                                                 <User className={cn("h-3 w-3", isClaimedByMe ? "text-primary" : "text-muted-foreground")} />
                                                 <span className={cn("text-[10px] font-bold truncate max-w-[80px]", isClaimedByMe ? "text-primary" : "text-muted-foreground")}>
@@ -666,15 +732,15 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                                         Is &quot;Good&quot; (Trade good - 100% full value, no 50% resale penalty)
                                     </label>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <Checkbox id="isPerCharacterEdit" checked={isPerCharacter} onCheckedChange={(val) => setIsPerCharacter(!!val)} />
-                                    <label htmlFor="isPerCharacterEdit" className="text-sm font-medium cursor-pointer flex items-center gap-1.5">
-                                        For <span className="font-bold underline text-primary">EACH</span> character
-                                        <span className="text-xs text-muted-foreground font-normal">
-                                            {`(Creates 1 item for each character${session.attendingCharacters.length > 0 ? ` - ${session.attendingCharacters.length} total` : ''})`}
-                                        </span>
-                                    </label>
-                                </div>
+                                    <div className="flex items-center gap-2">
+                                        <Checkbox id="isPerCharacterEdit" checked={isPerCharacter} onCheckedChange={(val) => setIsPerCharacter(!!val)} />
+                                        <label htmlFor="isPerCharacterEdit" className="text-sm font-medium cursor-pointer flex items-center gap-1.5">
+                                            For <span className="font-bold underline text-primary">EACH</span> character
+                                            <span className="text-xs text-muted-foreground font-normal">
+                                                (Creates 1 shared entry that all session characters can claim)
+                                            </span>
+                                        </label>
+                                    </div>
                             </div>
                         </div>
                         <DialogFooter>

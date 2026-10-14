@@ -720,6 +720,8 @@ export async function evaluateAndSyncUserAchievements(
       for (const item of s.loot) {
         if (item.claimedBy && charIds.has(String(item.claimedBy))) {
           claimedLootCount += 1
+        } else if (item.claimedByCharacters && item.claimedByCharacters.some((cId: any) => charIds.has(String(cId)))) {
+          claimedLootCount += 1
         }
       }
     }
