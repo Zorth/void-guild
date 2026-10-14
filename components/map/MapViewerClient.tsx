@@ -114,6 +114,8 @@ export default function MapViewerClient() {
 
   const [isDragging, setIsDragging] = useState(false)
   const isDraggingRef = useRef(false)
+  const isRightDraggingRef = useRef(false)
+  const hasRightDraggedRef = useRef(false)
   const rafPanIdRef = useRef<number | null>(null)
   const pendingPanPosRef = useRef<{ x: number; y: number } | null>(null)
   const dragStartRef = useRef({ x: 0, y: 0 })
@@ -604,7 +606,16 @@ export default function MapViewerClient() {
 
   // Mouse pan & interaction handlers
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button !== 0) return // Left click only
+    // Right-click drag (e.button === 2): Always allows panning the map (e.g. while using ruler)
+    if (e.button === 2) {
+      isRightDraggingRef.current = true
+      hasRightDraggedRef.current = false
+      dragOriginRef.current = { x: e.clientX, y: e.clientY }
+      dragStartRef.current = { x: e.clientX - positionRef.current.x, y: e.clientY - positionRef.current.y }
+      return
+    }
+
+    if (e.button !== 0) return // Left click only for remaining interactions
     if (activeTool === 'add_area' && areaDraft.points.length > 0) return // Polygon drawing
 
     if (activeTool === 'ruler') {
@@ -647,7 +658,7 @@ export default function MapViewerClient() {
     if (isMeasuring && activeTool === 'ruler') {
       const p = getCanvasPixelCoordinates(e as unknown as React.MouseEvent<HTMLDivElement>)
       setRulerPoints((prev) => prev ? { start: prev.start, current: p } : null)
-      return
+      if (!isRightDraggingRef.current) return
     }
 
     if (draggingPinId && pinDragStartRef.current) {
@@ -665,12 +676,15 @@ export default function MapViewerClient() {
       return
     }
 
-    if (!isDragging) return
+    if (!isDraggingRef.current && !isRightDraggingRef.current) return
     if (Math.hypot(e.clientX - dragOriginRef.current.x, e.clientY - dragOriginRef.current.y) > 5) {
       hasDraggedRef.current = true
+      if (isRightDraggingRef.current) {
+        hasRightDraggedRef.current = true
+      }
     }
 
-    if (activeTool === 'align_grid') {
+    if (activeTool === 'align_grid' && !isRightDraggingRef.current) {
       const dx = (e.clientX - dragGridStartRef.current.x) / scale
       const dy = (e.clientY - dragGridStartRef.current.y) / scale
       setLiveGridOffset({
@@ -688,7 +702,16 @@ export default function MapViewerClient() {
     }
   }
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (e: React.MouseEvent) => {
+    // End right-click dragging
+    if (e.button === 2 || isRightDraggingRef.current) {
+      if (isRightDraggingRef.current) {
+        isRightDraggingRef.current = false
+        setPosition(positionRef.current)
+      }
+      if (e.button === 2) return
+    }
+
     if (draggedVertexIndex !== null) {
       setDraggedVertexIndex(null)
       return
@@ -1234,13 +1257,16 @@ export default function MapViewerClient() {
         const isOdd = Math.abs(r) % 2 === 1
         const cy = oy + R + r * deltaY
         const cx = ox + (c + (isOdd ? 0.5 : 0)) * W + W / 2
+        // Microscopic 0.35px dilation to eliminate subpixel rasterization seams when zooming out
+        const dR = R + 0.35
+        const dW = W + 0.4
         const points = [
-          `${cx.toFixed(2)},${(cy - R).toFixed(2)}`,
-          `${(cx + W / 2).toFixed(2)},${(cy - R / 2).toFixed(2)}`,
-          `${(cx + W / 2).toFixed(2)},${(cy + R / 2).toFixed(2)}`,
-          `${cx.toFixed(2)},${(cy + R).toFixed(2)}`,
-          `${(cx - W / 2).toFixed(2)},${(cy + R / 2).toFixed(2)}`,
-          `${(cx - W / 2).toFixed(2)},${(cy - R / 2).toFixed(2)}`,
+          `${cx.toFixed(3)},${(cy - dR).toFixed(3)}`,
+          `${(cx + dW / 2).toFixed(3)},${(cy - dR / 2).toFixed(3)}`,
+          `${(cx + dW / 2).toFixed(3)},${(cy + dR / 2).toFixed(3)}`,
+          `${cx.toFixed(3)},${(cy + dR).toFixed(3)}`,
+          `${(cx - dW / 2).toFixed(3)},${(cy + dR / 2).toFixed(3)}`,
+          `${(cx - dW / 2).toFixed(3)},${(cy - dR / 2).toFixed(3)}`,
         ].join(' ')
         return { cx, cy, points }
       } else if (gridType === 'hex_flat') {
@@ -1250,24 +1276,29 @@ export default function MapViewerClient() {
         const isOdd = Math.abs(c) % 2 === 1
         const cx = ox + R + c * deltaX
         const cy = oy + (r + (isOdd ? 0.5 : 0)) * H + H / 2
+        // Microscopic 0.35px dilation to eliminate subpixel rasterization seams when zooming out
+        const dR = R + 0.35
+        const dH = H + 0.4
         const points = [
-          `${(cx - R).toFixed(2)},${cy.toFixed(2)}`,
-          `${(cx - R / 2).toFixed(2)},${(cy - H / 2).toFixed(2)}`,
-          `${(cx + R / 2).toFixed(2)},${(cy - H / 2).toFixed(2)}`,
-          `${(cx + R).toFixed(2)},${cy.toFixed(2)}`,
-          `${(cx + R / 2).toFixed(2)},${(cy + H / 2).toFixed(2)}`,
-          `${(cx - R / 2).toFixed(2)},${(cy + H / 2).toFixed(2)}`,
+          `${(cx - dR).toFixed(3)},${cy.toFixed(3)}`,
+          `${(cx - dR / 2).toFixed(3)},${(cy - dH / 2).toFixed(3)}`,
+          `${(cx + dR / 2).toFixed(3)},${(cy - dH / 2).toFixed(3)}`,
+          `${(cx + dR).toFixed(3)},${cy.toFixed(3)}`,
+          `${(cx + dR / 2).toFixed(3)},${(cy + dH / 2).toFixed(3)}`,
+          `${(cx - dR / 2).toFixed(3)},${(cy + dH / 2).toFixed(3)}`,
         ].join(' ')
         return { cx, cy, points }
       } else if (gridType === 'square') {
         const size = effectiveGridSize
         const x = ox + c * size
         const y = oy + r * size
+        // 0.35px overlap for square tiles
+        const dSize = size + 0.35
         const points = [
           `${x},${y}`,
-          `${x + size},${y}`,
-          `${x + size},${y + size}`,
-          `${x},${y + size}`,
+          `${x + dSize},${y}`,
+          `${x + dSize},${y + dSize}`,
+          `${x},${y + dSize}`,
         ].join(' ')
         return { cx: x + size / 2, cy: y + size / 2, points }
       }
@@ -2800,6 +2831,13 @@ export default function MapViewerClient() {
         onTouchEnd={handleTouchEnd}
         onDragOver={handleDragOverCanvas}
         onDrop={handleDropQuest}
+        onContextMenu={(e) => {
+          if (hasRightDraggedRef.current || isRightDraggingRef.current) {
+            e.preventDefault()
+            e.stopPropagation()
+            hasRightDraggedRef.current = false
+          }
+        }}
       >
         <div
           ref={containerRef}
@@ -3268,8 +3306,8 @@ export default function MapViewerClient() {
                 // Revealed hexes are transparent.
                 const fillColor = isHidden ? '#020617' : 'transparent'
                 const fillOpacity = isHidden ? (isOwner ? 0.55 : 1) : 0
-                const strokeColor = isOwner && isHidden
-                  ? 'rgba(148, 163, 184, 0.45)'
+                const strokeColor = isHidden
+                  ? (isOwner ? 'rgba(148, 163, 184, 0.45)' : '#020617')
                   : 'rgba(255, 255, 255, 0.22)'
 
                 // Hover styling
@@ -3311,7 +3349,8 @@ export default function MapViewerClient() {
                       fill={fillColor}
                       fillOpacity={fillOpacity}
                       stroke={strokeColor}
-                      strokeWidth="1"
+                      strokeWidth={isHidden && !isOwner ? "1.5" : "1"}
+                      strokeLinejoin="round"
                       strokeDasharray={isOwner && isHidden ? '4 2' : undefined}
                       vectorEffect="non-scaling-stroke"
                       className={`transition-colors duration-150 ${hoverClass}`}
