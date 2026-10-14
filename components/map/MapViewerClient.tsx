@@ -113,6 +113,9 @@ export default function MapViewerClient() {
   positionRef.current = position
 
   const [isDragging, setIsDragging] = useState(false)
+  const isDraggingRef = useRef(false)
+  const rafPanIdRef = useRef<number | null>(null)
+  const pendingPanPosRef = useRef<{ x: number; y: number } | null>(null)
   const dragStartRef = useRef({ x: 0, y: 0 })
   const dragOriginRef = useRef({ x: 0, y: 0 })
   const hasDraggedRef = useRef(false)
@@ -612,6 +615,7 @@ export default function MapViewerClient() {
     }
 
     setIsDragging(true)
+    isDraggingRef.current = true
     hasDraggedRef.current = false
     dragOriginRef.current = { x: e.clientX, y: e.clientY }
 
@@ -682,7 +686,6 @@ export default function MapViewerClient() {
     if (containerRef.current) {
       containerRef.current.style.transform = `translate(${newX}px, ${newY}px) scale(${scaleRef.current})`
     }
-    setPosition({ x: newX, y: newY })
   }
 
   const handleMouseUp = () => {
@@ -731,6 +734,10 @@ export default function MapViewerClient() {
       return
     }
 
+    if (isDraggingRef.current) {
+      isDraggingRef.current = false
+      setPosition(positionRef.current)
+    }
     setIsDragging(false)
   }
 
@@ -764,6 +771,7 @@ export default function MapViewerClient() {
       }
     } else if (e.touches.length === 1) {
       setIsDragging(true)
+      isDraggingRef.current = true
       hasDraggedRef.current = false
       dragOriginRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
 
@@ -905,7 +913,6 @@ export default function MapViewerClient() {
       if (containerRef.current) {
         containerRef.current.style.transform = `translate(${newX}px, ${newY}px) scale(${scaleRef.current})`
       }
-      setPosition({ x: newX, y: newY })
     }
   }
 
@@ -951,6 +958,10 @@ export default function MapViewerClient() {
         hasDraggedPinRef.current = false
       }, 150)
       return
+    }
+    if (isDraggingRef.current) {
+      isDraggingRef.current = false
+      setPosition(positionRef.current)
     }
     setIsDragging(false)
     touchDistanceRef.current = null
@@ -2800,6 +2811,7 @@ export default function MapViewerClient() {
             minWidth: `${mapWidth}px`,
             minHeight: `${mapHeight}px`,
             flexShrink: 0,
+            willChange: isDragging ? 'transform' : 'auto',
           }}
           onClick={handleCanvasClick}
           onDragOver={handleDragOverCanvas}

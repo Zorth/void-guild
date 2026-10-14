@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react'
 
-export const MAX_MAP_ZOOM = 32
+export const MAX_MAP_ZOOM = 8
 
 export interface TilePyramidLayerProps {
   tileUrl: string
@@ -17,7 +17,7 @@ export interface TilePyramidLayerProps {
   opacity?: number
 }
 
-export function TilePyramidLayer({
+export const TilePyramidLayer = React.memo(function TilePyramidLayer({
   tileUrl,
   mapWidth,
   mapHeight,
@@ -169,4 +169,4 @@ export function TilePyramidLayer({
       ))}
     </div>
   )
-}
+})

@@ -1401,13 +1401,14 @@ export const getAvailableCharactersToInvite = query({
       }
     }
 
-    const allChars = await ctx.db.query('characters').collect()
+    const matchingChars = await ctx.db
+      .query('characters')
+      .withIndex('by_system', (q) => q.eq('system', session.system))
+      .collect()
     const sessionCharSet = new Set(session.characters)
 
-    // Filter characters matching system and not already in this session
-    const matching = allChars.filter(
-      (c) => c.system === session.system && !sessionCharSet.has(c._id)
-    )
+    // Filter characters not already in this session
+    const matching = matchingChars.filter((c) => !sessionCharSet.has(c._id))
 
     // Resolve owner usernames/names for easier identification
     const userIds = Array.from(new Set(matching.map((c) => c.userId)))

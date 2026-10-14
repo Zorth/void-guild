@@ -28,7 +28,8 @@ export default defineSchema({
         })),
     }).index('by_userId', ['userId'])
       .index('by_name', ['name'])
-      .index('by_rank', ['rank']),
+      .index('by_rank', ['rank'])
+      .index('by_system', ['system']),
     sessions: defineTable({
         date: v.optional(v.number()),
         world: v.id("worlds"),
