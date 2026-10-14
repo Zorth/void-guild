@@ -706,9 +706,7 @@ export default function MapViewerClient() {
           pinId: pinToUpdate,
           x: newX,
           y: newY,
-        })
-          .then(() => toast.success('Pin repositioned'))
-          .catch(() => toast.error('Failed to move pin'))
+        }).catch(() => toast.error('Failed to move pin'))
       } else {
         hasDraggedPinRef.current = false
       }
@@ -919,9 +917,7 @@ export default function MapViewerClient() {
           pinId: pinToUpdate,
           x: newX,
           y: newY,
-        })
-          .then(() => toast.success('Pin repositioned'))
-          .catch(() => toast.error('Failed to move pin'))
+        }).catch(() => toast.error('Failed to move pin'))
       } else {
         hasDraggedPinRef.current = false
       }
