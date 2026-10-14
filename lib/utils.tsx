@@ -208,4 +208,15 @@ export function getSessionWikiUrl(date: Date | number | string | null | undefine
   return `https://void.tarragon.be/notes/${dateStr}-${worldSlug}`
 }
 
+export function formatWikiUrl(linkOrPath?: string | null): string {
+  if (!linkOrPath) return ''
+  const trimmed = linkOrPath.trim()
+  if (!trimmed) return ''
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed
+  }
+  const cleanPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`
+  return `https://void.tarragon.be${cleanPath}`
+}
+
 

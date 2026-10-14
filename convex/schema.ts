@@ -543,6 +543,7 @@ export default defineSchema({
         userId: v.string(), // Clerk subject of the note creator
         authorName: v.optional(v.string()),
         note: v.string(),
+        wikiLink: v.optional(v.string()), // Link or path to Void Wiki (https://void.tarragon.be)
         updatedAt: v.number(),
     }).index('by_mapId_cellKey', ['mapId', 'cellKey'])
       .index('by_mapId', ['mapId']),

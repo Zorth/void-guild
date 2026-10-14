@@ -23,6 +23,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { toast } from 'sonner'
 import { Id } from '@/convex/_generated/dataModel'
+import { formatWikiUrl } from '@/lib/utils'
 
 export const PIN_ICONS = [
   { name: 'MapPin', label: 'Default Pin', icon: MapPin },
@@ -318,6 +319,7 @@ export default function MapViewerClient() {
 
   // Touch pinch zoom state
   const touchDistanceRef = useRef<number | null>(null)
+  const touchCenterRef = useRef<{ x: number; y: number } | null>(null)
 
   // Layer Visibility State
   const [enabledLayers, setEnabledLayers] = useState<Record<string, boolean>>({})
@@ -532,6 +534,7 @@ export default function MapViewerClient() {
   const [selectedArea, setSelectedArea] = useState<any>(null)
   const [selectedCellKey, setSelectedCellKey] = useState<string | null>(null)
   const [draftNote, setDraftNote] = useState('')
+  const [draftWikiLink, setDraftWikiLink] = useState('')
 
   // Reshaping polygon area state
   const [reshapingArea, setReshapingArea] = useState<{
@@ -917,6 +920,10 @@ export default function MapViewerClient() {
         e.touches[0].clientY - e.touches[1].clientY
       )
       touchDistanceRef.current = dist
+      touchCenterRef.current = {
+        x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+        y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+      }
     } else if (e.touches.length === 1) {
       setIsDragging(true)
       hasDraggedRef.current = false
@@ -990,18 +997,55 @@ export default function MapViewerClient() {
     }
 
     if (e.touches.length === 2 && touchDistanceRef.current !== null) {
+      const container = containerRef.current
       const dist = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
         e.touches[0].clientY - e.touches[1].clientY
       )
-      const delta = dist / touchDistanceRef.current
-      const newScale = Math.min(Math.max(scaleRef.current * delta, 0.01), MAX_MAP_ZOOM)
-      scaleRef.current = newScale
-      if (containerRef.current) {
-        containerRef.current.style.transform = `translate(${positionRef.current.x}px, ${positionRef.current.y}px) scale(${newScale})`
+      const currentTouchCenter = {
+        x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+        y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
       }
-      setScale(newScale)
-      touchDistanceRef.current = dist
+
+      if (dist > 0 && touchDistanceRef.current > 0) {
+        const delta = dist / touchDistanceRef.current
+        const currentScale = scaleRef.current
+        const currentPos = positionRef.current
+        const newScale = Math.min(Math.max(currentScale * delta, 0.01), MAX_MAP_ZOOM)
+        const k = newScale / currentScale
+
+        let newX = currentPos.x
+        let newY = currentPos.y
+
+        if (container) {
+          const cRect = container.getBoundingClientRect()
+          const mapCenterX = cRect.left + cRect.width / 2
+          const mapCenterY = cRect.top + cRect.height / 2
+
+          // Vector from visual map center to the midpoint of the pinch gesture
+          const pinchOffsetX = currentTouchCenter.x - mapCenterX
+          const pinchOffsetY = currentTouchCenter.y - mapCenterY
+
+          // Adjust position so the point under the pinch center stays invariant while scaling
+          newX = currentPos.x + (1 - k) * pinchOffsetX
+          newY = currentPos.y + (1 - k) * pinchOffsetY
+
+          // If the pinch center itself translated (two-finger pan), also apply translation delta
+          if (touchCenterRef.current) {
+            newX += (currentTouchCenter.x - touchCenterRef.current.x)
+            newY += (currentTouchCenter.y - touchCenterRef.current.y)
+          }
+
+          container.style.transform = `translate(${newX}px, ${newY}px) scale(${newScale})`
+        }
+
+        scaleRef.current = newScale
+        positionRef.current = { x: newX, y: newY }
+        setScale(newScale)
+        setPosition({ x: newX, y: newY })
+        touchDistanceRef.current = dist
+        touchCenterRef.current = currentTouchCenter
+      }
     } else if (e.touches.length === 1 && isDragging) {
       if (Math.hypot(e.touches[0].clientX - dragOriginRef.current.x, e.touches[0].clientY - dragOriginRef.current.y) > 5) {
         hasDraggedRef.current = true
@@ -1063,6 +1107,7 @@ export default function MapViewerClient() {
     }
     setIsDragging(false)
     touchDistanceRef.current = null
+    touchCenterRef.current = null
   }
 
   // Zoom controls
@@ -1144,6 +1189,7 @@ export default function MapViewerClient() {
       setSelectedNoteCoords({ x: coords.x, y: coords.y })
       setSelectedNoteData(null)
       setDraftNote('')
+      setDraftWikiLink('')
       setIsNoteDialogOpen(true)
     }
   }
@@ -1492,6 +1538,7 @@ export default function MapViewerClient() {
       const existingNote = noteObjMap[cellKey]
       setSelectedNoteData(existingNote || null)
       setDraftNote(existingNote?.note || notesMap[cellKey] || '')
+      setDraftWikiLink(existingNote?.wikiLink || '')
       if (existingNote?.x !== undefined && existingNote?.y !== undefined) {
         setSelectedNoteCoords({ x: existingNote.x, y: existingNote.y })
       } else {
@@ -1669,6 +1716,7 @@ export default function MapViewerClient() {
     setSelectedCellKey(noteObj.cellKey)
     setSelectedNoteData(noteObj)
     setDraftNote(noteObj.note || '')
+    setDraftWikiLink(noteObj.wikiLink || '')
     if (noteObj.x !== undefined && noteObj.y !== undefined) {
       setSelectedNoteCoords({ x: noteObj.x, y: noteObj.y })
     } else {
@@ -1695,6 +1743,7 @@ export default function MapViewerClient() {
         x: selectedNoteCoords?.x,
         y: selectedNoteCoords?.y,
         note: draftNote,
+        wikiLink: draftWikiLink.trim() || undefined,
         authorName,
       })
       toast.success('Note saved!')
@@ -2792,6 +2841,19 @@ export default function MapViewerClient() {
                           <span>
                             {new Date(note.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                           </span>
+                          {note.wikiLink && (
+                            <a
+                              href={formatWikiUrl(note.wikiLink)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[10px] text-purple-300 hover:text-purple-200 hover:underline"
+                              onClick={(e) => e.stopPropagation()}
+                              title="Open Void Wiki Article"
+                            >
+                              <BookOpen className="h-2.5 w-2.5" />
+                              Wiki
+                            </a>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -3562,13 +3624,19 @@ export default function MapViewerClient() {
                         cx={cell.cx}
                         cy={cell.cy}
                         r={Math.min(6, Math.max(3, gridSize * 0.08))}
-                        fill="#f59e0b"
+                        fill={noteObjMap[cell.key]?.wikiLink ? '#c084fc' : '#f59e0b'}
                         stroke="#0f172a"
                         strokeWidth="1.5"
-                        className="cursor-pointer drop-shadow-[0_0_6px_rgba(245,158,11,0.8)]"
+                        className={`cursor-pointer ${noteObjMap[cell.key]?.wikiLink ? 'drop-shadow-[0_0_6px_rgba(192,132,252,0.9)]' : 'drop-shadow-[0_0_6px_rgba(245,158,11,0.8)]'}`}
                         style={{ pointerEvents: 'auto' }}
                         onClick={(e) => handleCellClick(cell.key, e)}
-                      />
+                      >
+                        <title>
+                          {noteObjMap[cell.key]?.wikiLink
+                            ? `${notesMap[cell.key]} (Wiki: ${noteObjMap[cell.key].wikiLink})`
+                            : notesMap[cell.key]}
+                        </title>
+                      </circle>
                     )}
                   </g>
                 )
@@ -3602,12 +3670,21 @@ export default function MapViewerClient() {
                 }}
               >
                 <div className="flex flex-col items-center relative">
-                  <div className="p-1.5 rounded-full bg-amber-500 text-slate-950 shadow-lg border border-slate-900 drop-shadow-[0_0_8px_rgba(245,158,11,0.7)] group-hover:scale-125 transition-transform">
+                  <div className="p-1.5 rounded-full bg-amber-500 text-slate-950 shadow-lg border border-slate-900 drop-shadow-[0_0_8px_rgba(245,158,11,0.7)] group-hover:scale-125 transition-transform relative">
                     <FileText className="h-3.5 w-3.5" />
+                    {note.wikiLink && (
+                      <span
+                        className="absolute -top-1 -right-1 bg-purple-600 text-white rounded-full p-0.5 border border-slate-900 shadow-md"
+                        title="Linked to Void Wiki"
+                      >
+                        <BookOpen className="h-2 w-2" />
+                      </span>
+                    )}
                   </div>
                   {(scale > 0.8) && (
-                    <span className="mt-1 bg-slate-950/95 backdrop-blur-md px-2 py-0.5 rounded-md text-[10px] font-medium text-amber-200 line-clamp-1 max-w-[120px] whitespace-nowrap shadow-md border border-amber-500/40">
-                      {note.note}
+                    <span className="mt-1 bg-slate-950/95 backdrop-blur-md px-2 py-0.5 rounded-md text-[10px] font-medium text-amber-200 line-clamp-1 max-w-[120px] whitespace-nowrap shadow-md border border-amber-500/40 flex items-center gap-1">
+                      {note.wikiLink && <BookOpen className="h-2.5 w-2.5 text-purple-400 shrink-0" />}
+                      <span className="truncate">{note.note}</span>
                     </span>
                   )}
                 </div>
@@ -3933,6 +4010,61 @@ export default function MapViewerClient() {
                         !canEdit ? 'bg-slate-900/40 border-slate-800 text-slate-300 cursor-default' : ''
                       }`}
                     />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-muted-foreground block mb-1">
+                      Wiki Link (Optional)
+                    </label>
+                    {canEdit ? (
+                      <div className="space-y-1">
+                        <div className="relative">
+                          <Input
+                            value={draftWikiLink}
+                            onChange={(e) => setDraftWikiLink(e.target.value)}
+                            placeholder="https://void.tarragon.be/notes/... or /notes/my-location"
+                            className="text-xs font-mono pr-8"
+                          />
+                          {draftWikiLink && (
+                            <a
+                              href={formatWikiUrl(draftWikiLink)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-purple-400 hover:text-purple-300"
+                              title="Test Wiki Link"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">
+                          Link to campaign lore, articles, or notes on{' '}
+                          <a
+                            href="https://void.tarragon.be"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-purple-400 hover:underline"
+                          >
+                            void.tarragon.be
+                          </a>
+                        </p>
+                      </div>
+                    ) : selectedNoteData?.wikiLink ? (
+                      <div className="pt-0.5">
+                        <a
+                          href={formatWikiUrl(selectedNoteData.wikiLink)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-purple-950/40 border border-purple-800/60 text-purple-200 hover:bg-purple-900/50 hover:text-purple-100 transition-colors text-xs font-medium w-full"
+                        >
+                          <BookOpen className="h-4 w-4 text-purple-400 shrink-0" />
+                          <span className="truncate flex-1 font-mono text-[11px]">{selectedNoteData.wikiLink}</span>
+                          <ExternalLink className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+                        </a>
+                      </div>
+                    ) : (
+                      <p className="text-xs italic text-muted-foreground">No wiki link attached.</p>
+                    )}
                   </div>
                 </div>
 

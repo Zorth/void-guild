@@ -337,6 +337,7 @@ export const bulkRevealCells = mutation({
     await verifyWorldOwner(ctx, map.worldId)
 
     const currentRevealed = new Set(map.revealedCells || [])
+    const initialSize = currentRevealed.size
     for (const key of args.cellKeys) {
       if (args.reveal) {
         currentRevealed.add(key)
@@ -345,9 +346,11 @@ export const bulkRevealCells = mutation({
       }
     }
 
-    await ctx.db.patch(args.mapId, {
-      revealedCells: Array.from(currentRevealed),
-    })
+    if (currentRevealed.size !== initialSize || (map.revealedCells?.length ?? 0) !== currentRevealed.size) {
+      await ctx.db.patch(args.mapId, {
+        revealedCells: Array.from(currentRevealed),
+      })
+    }
   },
 })
 
@@ -467,7 +470,9 @@ export const savePin = mutation({
     await verifyWorldOwner(ctx, map.worldId)
 
     if (args.pinId) {
-      await ctx.db.patch(args.pinId, {
+      const existingPin = await ctx.db.get(args.pinId)
+      if (!existingPin) throw new Error('Pin not found')
+      const patches: any = {
         layerId: args.layerId,
         x: args.x,
         y: args.y,
@@ -479,7 +484,11 @@ export const savePin = mutation({
         targetMapId: args.targetMapId,
         minZoom: args.minZoom,
         gmOnly: args.gmOnly,
-      })
+      }
+      const isDiff = Object.keys(patches).some((k) => patches[k] !== (existingPin as any)[k])
+      if (isDiff) {
+        await ctx.db.patch(args.pinId, patches)
+      }
       return args.pinId
     } else {
       return await ctx.db.insert('mapPins', {
@@ -513,10 +522,12 @@ export const updatePinPosition = mutation({
     if (!map) throw new Error('Map not found')
     await verifyWorldOwner(ctx, map.worldId)
 
-    await ctx.db.patch(args.pinId, {
-      x: args.x,
-      y: args.y,
-    })
+    if (pin.x !== args.x || pin.y !== args.y) {
+      await ctx.db.patch(args.pinId, {
+        x: args.x,
+        y: args.y,
+      })
+    }
   },
 })
 
@@ -552,7 +563,9 @@ export const saveArea = mutation({
     await verifyWorldOwner(ctx, map.worldId)
 
     if (args.areaId) {
-      await ctx.db.patch(args.areaId, {
+      const existingArea = await ctx.db.get(args.areaId)
+      if (!existingArea) throw new Error('Area not found')
+      const patches: any = {
         layerId: args.layerId,
         name: args.name.trim(),
         description: args.description,
@@ -561,7 +574,20 @@ export const saveArea = mutation({
         fillOpacity: args.fillOpacity,
         targetMapId: args.targetMapId,
         gmOnly: args.gmOnly,
-      })
+      }
+      const isDiff =
+        existingArea.layerId !== patches.layerId ||
+        existingArea.name !== patches.name ||
+        existingArea.description !== patches.description ||
+        existingArea.color !== patches.color ||
+        existingArea.fillOpacity !== patches.fillOpacity ||
+        existingArea.targetMapId !== patches.targetMapId ||
+        existingArea.gmOnly !== patches.gmOnly ||
+        JSON.stringify(existingArea.points) !== JSON.stringify(patches.points)
+
+      if (isDiff) {
+        await ctx.db.patch(args.areaId, patches)
+      }
       return args.areaId
     } else {
       return await ctx.db.insert('mapAreas', {
@@ -602,6 +628,7 @@ export const saveGridNote = mutation({
     y: v.optional(v.number()),
     note: v.string(),
     authorName: v.optional(v.string()),
+    wikiLink: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
@@ -625,17 +652,34 @@ export const saveGridNote = mutation({
       return
     }
 
+    const cleanWikiLink = args.wikiLink !== undefined ? args.wikiLink.trim() : (existing?.wikiLink ?? undefined)
+
     if (existing) {
       if (!canManageExisting) {
         throw new Error('Unauthorized to edit this note')
       }
-      await ctx.db.patch(existing._id, {
-        note: args.note.trim(),
-        authorName: args.authorName || user.name || 'Anonymous',
-        x: args.x !== undefined ? args.x : existing.x,
-        y: args.y !== undefined ? args.y : existing.y,
-        updatedAt: Date.now(),
-      })
+      const newAuthor = args.authorName || user.name || 'Anonymous'
+      const newX = args.x !== undefined ? args.x : existing.x
+      const newY = args.y !== undefined ? args.y : existing.y
+      const newWikiLink = cleanWikiLink || undefined
+
+      const isDiff =
+        existing.note !== args.note.trim() ||
+        existing.authorName !== newAuthor ||
+        existing.wikiLink !== newWikiLink ||
+        existing.x !== newX ||
+        existing.y !== newY
+
+      if (isDiff) {
+        await ctx.db.patch(existing._id, {
+          note: args.note.trim(),
+          authorName: newAuthor,
+          wikiLink: newWikiLink,
+          x: newX,
+          y: newY,
+          updatedAt: Date.now(),
+        })
+      }
       return existing._id
     } else {
       return await ctx.db.insert('mapGridNotes', {
@@ -646,6 +690,7 @@ export const saveGridNote = mutation({
         userId: user.subject,
         authorName: args.authorName || user.name || 'Anonymous',
         note: args.note.trim(),
+        wikiLink: cleanWikiLink || undefined,
         updatedAt: Date.now(),
       })
     }
