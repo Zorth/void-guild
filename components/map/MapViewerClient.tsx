@@ -126,6 +126,7 @@ export default function MapViewerClient() {
   // Draggable Pin Repositioning state
   const [draggingPinId, setDraggingPinId] = useState<Id<'mapPins'> | null>(null)
   const [draggedPinOffset, setDraggedPinOffset] = useState<{ x: number; y: number } | null>(null)
+  const [optimisticPinPositions, setOptimisticPinPositions] = useState<Record<string, { x: number; y: number }>>({})
   const pinDragStartRef = useRef<{ clientX: number; clientY: number; origX: number; origY: number; moved: boolean } | null>(null)
   const hasDraggedPinRef = useRef(false)
 
@@ -702,11 +703,22 @@ export default function MapViewerClient() {
         const newX = Number(draggedPinOffset.x.toFixed(2))
         const newY = Number(draggedPinOffset.y.toFixed(2))
         hasDraggedPinRef.current = true
+        setOptimisticPinPositions((prev) => ({
+          ...prev,
+          [pinToUpdate]: { x: newX, y: newY },
+        }))
         updatePinPositionMutation({
           pinId: pinToUpdate,
           x: newX,
           y: newY,
-        }).catch(() => toast.error('Failed to move pin'))
+        }).catch(() => {
+          toast.error('Failed to move pin')
+          setOptimisticPinPositions((prev) => {
+            const next = { ...prev }
+            delete next[pinToUpdate]
+            return next
+          })
+        })
       } else {
         hasDraggedPinRef.current = false
       }
@@ -913,11 +925,22 @@ export default function MapViewerClient() {
         const newX = Number(draggedPinOffset.x.toFixed(2))
         const newY = Number(draggedPinOffset.y.toFixed(2))
         hasDraggedPinRef.current = true
+        setOptimisticPinPositions((prev) => ({
+          ...prev,
+          [pinToUpdate]: { x: newX, y: newY },
+        }))
         updatePinPositionMutation({
           pinId: pinToUpdate,
           x: newX,
           y: newY,
-        }).catch(() => toast.error('Failed to move pin'))
+        }).catch(() => {
+          toast.error('Failed to move pin')
+          setOptimisticPinPositions((prev) => {
+            const next = { ...prev }
+            delete next[pinToUpdate]
+            return next
+          })
+        })
       } else {
         hasDraggedPinRef.current = false
       }
@@ -1438,6 +1461,12 @@ export default function MapViewerClient() {
 
       // Check if this quest is already pinned on this map
       const existingPin = fullData?.pins?.find((p) => p.questId === data.questId)
+      if (existingPin) {
+        setOptimisticPinPositions((prev) => ({
+          ...prev,
+          [existingPin._id]: { x: coords.x, y: coords.y },
+        }))
+      }
 
       await savePinMutation({
         mapId: currentMap._id,
@@ -3074,8 +3103,9 @@ export default function MapViewerClient() {
 
             const showTextOnly = pin.style === 'text_only'
             const isDraggingThisPin = draggingPinId === pin._id
-            const currentPinX = isDraggingThisPin && draggedPinOffset ? draggedPinOffset.x : pin.x
-            const currentPinY = isDraggingThisPin && draggedPinOffset ? draggedPinOffset.y : pin.y
+            const optimisticPos = optimisticPinPositions[pin._id]
+            const currentPinX = isDraggingThisPin && draggedPinOffset ? draggedPinOffset.x : (optimisticPos ? optimisticPos.x : pin.x)
+            const currentPinY = isDraggingThisPin && draggedPinOffset ? draggedPinOffset.y : (optimisticPos ? optimisticPos.y : pin.y)
 
             const canDragThisPin = isOwner && activeTool === 'view'
 
