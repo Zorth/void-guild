@@ -1,4 +1,4 @@
-import { query, mutation, QueryCtx, MutationCtx } from './_generated/server'
+import { query, mutation, internalMutation, QueryCtx, MutationCtx } from './_generated/server'
 import { v } from 'convex/values'
 import { internal } from './_generated/api'
 import { Id } from './_generated/dataModel'
@@ -173,7 +173,30 @@ export const getPartyCharacterDetails = query({
           .first()
 
         if (details) {
-          result[charId] = details
+          // Sanitize hitPoints to guarantee no NaN values reach the client
+          let sanitizedHp = details.hitPoints
+          if (sanitizedHp) {
+            const rawMax = typeof sanitizedHp.max === 'number' && !isNaN(sanitizedHp.max) ? sanitizedHp.max : 20
+            const maxHp = Math.max(1, rawMax)
+            const currentHp = typeof sanitizedHp.current === 'number' && !isNaN(sanitizedHp.current)
+              ? sanitizedHp.current
+              : maxHp
+            const tempHp = typeof sanitizedHp.temporary === 'number' && !isNaN(sanitizedHp.temporary)
+              ? sanitizedHp.temporary
+              : 0
+
+            sanitizedHp = {
+              ...sanitizedHp,
+              max: maxHp,
+              current: currentHp,
+              temporary: tempHp,
+            }
+          }
+
+          result[charId] = {
+            ...details,
+            hitPoints: sanitizedHp,
+          }
         }
       })
     )
@@ -491,9 +514,12 @@ export const importCharacterSheet = mutation({
         ((Number(bAttrs.classhp) || 8) + conMod + (Number(bAttrs.bonushpperlevel) || 0)) * charLvl +
         (Number(bAttrs.bonushp) || 0)
       const maxHp = Number(bAttrs.hp) || Number(rawBuild.hp) || calcMax || 20
+      const parsedCurrentHp = rawBuild.currentHp !== undefined && rawBuild.currentHp !== null && !isNaN(Number(rawBuild.currentHp))
+        ? Number(rawBuild.currentHp)
+        : maxHp
       normalizedHitPoints = {
         max: maxHp,
-        current: Number(rawBuild.currentHp) ?? maxHp,
+        current: parsedCurrentHp,
         temporary: Number(rawBuild.tempHp) || 0,
         dieSize: undefined,
         ancestryHP: bAttrs.ancestryhp !== undefined ? Number(bAttrs.ancestryhp) : undefined,
@@ -1520,6 +1546,30 @@ export const getCharacterProfile = query({
       bestFriend,
       sessions: sessionsWithContext,
     }
+  },
+})
+
+export const repairNaNCharacterHp = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const list = await ctx.db.query('characterDetails').collect()
+    let repairedCount = 0
+    for (const doc of list) {
+      if (doc.hitPoints && (isNaN(doc.hitPoints.current) || doc.hitPoints.current === null)) {
+        const rawMax = typeof doc.hitPoints.max === 'number' && !isNaN(doc.hitPoints.max) ? doc.hitPoints.max : 20
+        const maxHp = Math.max(1, rawMax)
+        await ctx.db.patch(doc._id, {
+          hitPoints: {
+            ...doc.hitPoints,
+            max: maxHp,
+            current: maxHp,
+            temporary: typeof doc.hitPoints.temporary === 'number' && !isNaN(doc.hitPoints.temporary) ? doc.hitPoints.temporary : 0,
+          },
+        })
+        repairedCount++
+      }
+    }
+    return { success: true, repairedCount }
   },
 })
 

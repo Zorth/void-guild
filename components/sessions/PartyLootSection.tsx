@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import PendingObjectiveTracker from './PendingObjectiveTracker'
 
 interface LootItem {
   id: string
@@ -51,6 +52,8 @@ interface PartyLootSectionProps {
     guildmasterCutCharacterData?: Doc<'characters'> | null
   }
   userCharacterIds?: Set<Id<'characters'>>
+  showObjectiveTracker?: boolean
+  className?: string
 }
 
 interface AoNItemResult {
@@ -65,6 +68,8 @@ interface AoNItemResult {
 export default function PartyLootSection({
   session,
   userCharacterIds = new Set(),
+  showObjectiveTracker = false,
+  className,
 }: PartyLootSectionProps) {
   const addLoot = useMutation(api.sessions.addLoot)
   const editLoot = useMutation(api.sessions.editLoot)
@@ -347,7 +352,15 @@ export default function PartyLootSection({
   }
 
   return (
-    <div className="space-y-6 pt-6 border-t border-purple-500/20">
+    <div className={cn("space-y-6 pt-6 border-t border-purple-500/20", className)}>
+      {/* PENDING OBJECTIVE TRACKER (IF ENABLED) */}
+      {showObjectiveTracker && (
+        <PendingObjectiveTracker
+          sessionId={session._id}
+          session={session}
+        />
+      )}
+
       {/* SECTION HEADER & SUMMARY CARDS */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

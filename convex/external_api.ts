@@ -938,9 +938,12 @@ export const updateCharacterSheet = mutation({
             const charLvl = args.level ?? char.lvl ?? 1;
             const calcMax = (bAttrs.ancestryhp || 0) + ((bAttrs.classhp || 8) + conMod + (bAttrs.bonushpperlevel || 0)) * charLvl + (bAttrs.bonushp || 0);
             const maxHp = bAttrs.hp || rawBuild.hp || calcMax || 20;
+            const parsedCurrentHp = rawBuild.currentHp !== undefined && rawBuild.currentHp !== null && !isNaN(Number(rawBuild.currentHp))
+                ? Number(rawBuild.currentHp)
+                : maxHp;
             normalizedHitPoints = {
                 max: maxHp,
-                current: rawBuild.currentHp ?? maxHp,
+                current: parsedCurrentHp,
                 temporary: rawBuild.tempHp ?? 0,
                 dieSize: undefined,
                 ancestryHP: bAttrs.ancestryhp,

@@ -49,13 +49,24 @@ export default function CharacterStatsEditModal({
   const updateStatsMutation = useMutation(api.characters.updatePartyCharacterStats)
 
   // Hit Points
-  const [currentHP, setCurrentHP] = useState<number>(details?.hitPoints?.current ?? 20)
-  const [maxHP, setMaxHP] = useState<number>(details?.hitPoints?.max ?? 20)
-  const [tempHP, setTempHP] = useState<number>(details?.hitPoints?.temporary ?? 0)
+  const rawMax = typeof details?.hitPoints?.max === 'number' && !isNaN(details.hitPoints.max) ? details.hitPoints.max : 20
+  const initialMaxHP = Math.max(1, rawMax)
+  const initialCurrentHP = typeof details?.hitPoints?.current === 'number' && !isNaN(details.hitPoints.current)
+    ? details.hitPoints.current
+    : initialMaxHP
+  const initialTempHP = typeof details?.hitPoints?.temporary === 'number' && !isNaN(details.hitPoints.temporary)
+    ? details.hitPoints.temporary
+    : 0
+
+  const [currentHP, setCurrentHP] = useState<number>(initialCurrentHP)
+  const [maxHP, setMaxHP] = useState<number>(initialMaxHP)
+  const [tempHP, setTempHP] = useState<number>(initialTempHP)
 
   // Armor Class
-  const [acTotal, setAcTotal] = useState<number>(details?.armorClass?.total ?? 15)
-  const [shieldBonus, setShieldBonus] = useState<number>(details?.armorClass?.shieldBonus ?? 0)
+  const initialAcTotal = typeof details?.armorClass?.total === 'number' && !isNaN(details.armorClass.total) ? details.armorClass.total : 15
+  const initialShieldBonus = typeof details?.armorClass?.shieldBonus === 'number' && !isNaN(details.armorClass.shieldBonus) ? details.armorClass.shieldBonus : 0
+  const [acTotal, setAcTotal] = useState<number>(initialAcTotal)
+  const [shieldBonus, setShieldBonus] = useState<number>(initialShieldBonus)
 
   // Ability Scores
   const [abilities, setAbilities] = useState({
