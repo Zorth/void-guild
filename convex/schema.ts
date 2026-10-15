@@ -72,6 +72,8 @@ export default defineSchema({
             valueGP: v.number(),
             isGood: v.boolean(),
             isPerCharacter: v.optional(v.boolean()),
+            isCurrency: v.optional(v.boolean()),
+            fromQuest: v.optional(v.boolean()),
             claimedBy: v.optional(v.id("characters")),
             claimedByCharacters: v.optional(v.array(v.id("characters"))),
         }))),

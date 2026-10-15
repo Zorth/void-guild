@@ -5,7 +5,7 @@ import { internal } from './_generated/api'
 import { isAdmin, isGameMaster, isMember, extractClaim } from './roles'
 import { applyContributionHelper } from './voidObjectives'
 import { formatUserDisplayName } from './users'
-import { adjustCharacterMoney } from './moneyHelpers'
+import { adjustCharacterMoney, parseGpAmount } from './moneyHelpers'
 import { syncActiveSessionsForQuestChange } from './questSyncHelpers'
 import { evaluateAndSyncUserAchievements } from './achievements'
 import { removeUserAvailabilityOnDate } from './planning'
@@ -507,14 +507,26 @@ export const getSession = query({
     const worldDoc = session.world ? await ctx.db.get(session.world as Id<'worlds'>) : null
     const isWorldOwner = worldDoc && user?.subject === worldDoc.owner
     
-    let quest = null
+    let quest: any = null
     if (session.questId && !session.isIntro) {
-        quest = await ctx.db.get(session.questId)
-        if (quest?.isHidden && !isWorldOwner && !isAdminUser) {
-          quest = null
-        }
-        if (!session.locked && quest?.isCompleted) {
-          quest = null
+        const qDoc = await ctx.db.get(session.questId)
+        if (qDoc && (!qDoc.isHidden || isWorldOwner || isAdminUser) && (session.locked || !qDoc.isCompleted)) {
+          let issuerCharacter = null
+          if (qDoc.characterId) {
+            const char = await ctx.db.get(qDoc.characterId)
+            if (char) {
+              issuerCharacter = {
+                _id: char._id,
+                name: char.name,
+                rank: char.rank,
+                lvl: char.lvl,
+              }
+            }
+          }
+          quest = {
+            ...qDoc,
+            issuerCharacter,
+          }
         }
     }
 
@@ -1815,6 +1827,8 @@ export const addLoot = mutation({
     link: v.optional(v.string()),
     valueGP: v.number(),
     isGood: v.boolean(),
+    isCurrency: v.optional(v.boolean()),
+    fromQuest: v.optional(v.boolean()),
     isPerCharacter: v.optional(v.boolean()),
     quantity: v.optional(v.number()),
   },
@@ -1833,6 +1847,8 @@ export const addLoot = mutation({
     const loot = session.loot || []
     const quantity = args.quantity || 1
     const newItems = []
+    const isCurrency = args.isCurrency ?? false
+    const isGood = isCurrency ? true : args.isGood
 
     for (let i = 0; i < quantity; i++) {
         newItems.push({
@@ -1840,7 +1856,9 @@ export const addLoot = mutation({
             name: args.name,
             link: args.link,
             valueGP: args.valueGP,
-            isGood: args.isGood,
+            isGood,
+            isCurrency,
+            fromQuest: args.fromQuest ?? false,
             isPerCharacter: args.isPerCharacter ?? false,
         })
     }
@@ -1862,6 +1880,7 @@ export const editLoot = mutation({
     link: v.optional(v.string()),
     valueGP: v.number(),
     isGood: v.boolean(),
+    isCurrency: v.optional(v.boolean()),
     isPerCharacter: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
@@ -1878,12 +1897,15 @@ export const editLoot = mutation({
 
     const loot = (session.loot || []).map((item) => {
       if (item.id === args.lootId) {
+        const isCurrency = args.isCurrency ?? item.isCurrency ?? false
+        const isGood = isCurrency ? true : args.isGood
         return {
           ...item,
           name: args.name,
           link: args.link,
           valueGP: args.valueGP,
-          isGood: args.isGood,
+          isGood,
+          isCurrency,
           isPerCharacter: args.isPerCharacter ?? false,
         }
       }
@@ -1891,6 +1913,115 @@ export const editLoot = mutation({
     })
 
     await ctx.db.patch(args.sessionId, { loot })
+  },
+})
+
+export const importQuestRewardsToLoot = mutation({
+  args: {
+    sessionId: v.id('sessions'),
+    overwriteExisting: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    const session = await ctx.db.get(args.sessionId)
+    if (!session) throw new Error('Session not found')
+
+    const isAdminUser = await isAdmin(ctx)
+    if (session.owner !== user.subject && !isAdminUser) {
+      throw new Error('Only the session owner or an admin can manage loot.')
+    }
+
+    if (!session.questId) {
+      throw new Error('No quest is linked to this session')
+    }
+
+    const quest = await ctx.db.get(session.questId)
+    if (!quest) {
+      throw new Error('Linked quest not found')
+    }
+
+    let loot = session.loot || []
+    if (args.overwriteExisting) {
+      loot = loot.filter((item: any) => !item.fromQuest)
+    }
+
+    const newItems: Array<{
+      id: string
+      name: string
+      link?: string
+      valueGP: number
+      isGood: boolean
+      isCurrency: boolean
+      fromQuest: boolean
+      isPerCharacter?: boolean
+    }> = []
+
+    // 1. Money reward
+    if (quest.rewardMoneyGP !== undefined && quest.rewardMoneyGP > 0) {
+      const isPerChar = quest.rewardType === 'per_person'
+      newItems.push({
+        id: crypto.randomUUID(),
+        name: `Quest Bounty: ${quest.name}`,
+        valueGP: quest.rewardMoneyGP,
+        isGood: true,
+        isCurrency: true,
+        fromQuest: true,
+        isPerCharacter: isPerChar,
+      })
+    }
+
+    // 2. Other reward (items, relics, potions)
+    if (quest.rewardOther && quest.rewardOther.trim()) {
+      const isPerChar = quest.rewardType === 'per_person'
+      newItems.push({
+        id: crypto.randomUUID(),
+        name: quest.rewardOther.trim(),
+        valueGP: 0,
+        isGood: false,
+        isCurrency: false,
+        fromQuest: true,
+        isPerCharacter: isPerChar,
+      })
+    }
+
+    // 3. Fallback to legacy string reward if neither rewardMoneyGP nor rewardOther were provided
+    if (newItems.length === 0 && quest.reward && quest.reward.trim()) {
+      const parsedGp = parseGpAmount(quest.reward)
+      const isPerChar = quest.rewardType === 'per_person'
+      if (parsedGp > 0) {
+        newItems.push({
+          id: crypto.randomUUID(),
+          name: `Quest Bounty: ${quest.name}`,
+          valueGP: parsedGp,
+          isGood: true,
+          isCurrency: true,
+          fromQuest: true,
+          isPerCharacter: isPerChar,
+        })
+      } else {
+        newItems.push({
+          id: crypto.randomUUID(),
+          name: quest.reward.trim(),
+          valueGP: 0,
+          isGood: false,
+          isCurrency: false,
+          fromQuest: true,
+          isPerCharacter: isPerChar,
+        })
+      }
+    }
+
+    if (newItems.length === 0) {
+      throw new Error('This quest does not specify any rewards to import.')
+    }
+
+    await ctx.db.patch(args.sessionId, {
+      loot: [...loot, ...newItems],
+    })
+
+    return { count: newItems.length }
   },
 })
 
@@ -1914,6 +2045,26 @@ export const deleteLoot = mutation({
     const loot = (session.loot || []).filter((item) => item.id !== args.lootId)
 
     await ctx.db.patch(args.sessionId, { loot })
+  },
+})
+
+export const clearAllLoot = mutation({
+  args: {
+    sessionId: v.id('sessions'),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    const session = await ctx.db.get(args.sessionId)
+    if (!session) throw new Error('Session not found')
+
+    const isAdminUser = await isAdmin(ctx)
+    if (session.owner !== user.subject && !isAdminUser) {
+      throw new Error('Only the session owner or an admin can clear loot.')
+    }
+
+    await ctx.db.patch(args.sessionId, { loot: [] })
   },
 })
 
@@ -1941,6 +2092,9 @@ export const claimLoot = mutation({
 
     const loot = (session.loot || []).map((item) => {
       if (item.id === args.lootId) {
+        if (item.isCurrency) {
+          throw new Error('Currency cannot be claimed as an individual inventory item. It is automatically distributed as cash to all attendees.')
+        }
         if (item.isPerCharacter) {
           const currentClaimed = item.claimedByCharacters || (item.claimedBy ? [item.claimedBy] : [])
           if (currentClaimed.includes(args.characterId)) {

@@ -172,14 +172,14 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
   const { totalPendingIncome, totalPendingExpense, netPendingGold, totalPendingCount } = useMemo(() => {
     let income = 0
     for (const item of pendingSoldItems) income += parseGpAmount(item.winningAmount)
-    for (const q of pendingSponsoredQuests) income += parseGpAmount(q.sponsoredAmount)
+    for (const q of pendingSponsoredQuests) income += q.totalSponsoredAmountGP ?? parseGpAmount(q.sponsoredAmount)
     for (const g of pendingGuildmasterGains) income += parseGpAmount(g.guildmasterCut)
     for (const s of pendingSessionMoneyGains) income += s.pendingMoneyAdjustmentGP
     for (const b of pendingWonBets) income += b.wagerAmount
 
     let expense = 0
     for (const item of pendingWonItems) expense += parseGpAmount(item.winningAmount)
-    for (const q of pendingQuestsToPay) expense += parseGpAmount(q.actualToPay)
+    for (const q of pendingQuestsToPay) expense += q.totalToPayGP ?? parseGpAmount(q.actualToPay)
     for (const s of pendingSessionMoneyDeductions) expense += Math.abs(s.pendingMoneyAdjustmentGP)
     for (const b of pendingLostBets) expense += b.wagerAmount
 
@@ -991,10 +991,20 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
                       <div className="flex items-center gap-3 text-xs pt-0.5 flex-wrap">
                         <span className="text-emerald-300 font-mono font-medium">
                           Payback: <strong>{quest.sponsoredAmount}</strong>
+                          {quest.attendeeCount && quest.attendeeCount > 1 && (
+                            <span className="text-emerald-400/80 font-normal ml-1">
+                              (Total: <strong>+{formatGpAmount(quest.totalSponsoredAmountGP)}</strong> across {quest.attendeeCount} players)
+                            </span>
+                          )}
                         </span>
                         {quest.netCost && (
                           <span className="text-purple-300 font-mono font-medium">
                             Net Out-of-Pocket: <strong>{quest.netCost}</strong>
+                            {quest.attendeeCount && quest.attendeeCount > 1 && (
+                              <span className="text-purple-400/80 font-normal ml-1">
+                                (Total: <strong>{formatGpAmount(quest.totalNetCostGP)}</strong> across {quest.attendeeCount} players)
+                              </span>
+                            )}
                           </span>
                         )}
                       </div>
@@ -1072,6 +1082,11 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
                       <p className="text-xs text-amber-300 font-mono font-medium break-words">
                         Actual Payout Cost:{' '}
                         <strong className="text-white text-sm">{quest.actualToPay}</strong>
+                        {quest.attendeeCount && quest.attendeeCount > 1 && (
+                          <span className="text-amber-400/90 font-normal ml-1">
+                            (Total: <strong>-{formatGpAmount(quest.totalToPayGP)}</strong> across {quest.attendeeCount} players)
+                          </span>
+                        )}
                       </p>
                     </div>
 

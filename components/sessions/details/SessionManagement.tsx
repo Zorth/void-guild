@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { Pencil, CheckCircle2, Shield, Send, Bell, XCircle, Scroll, Calendar, CalendarRange, Clock, Unlock, User, Globe, Target, Sprout, RefreshCw } from 'lucide-react'
+import { Pencil, CheckCircle2, Shield, Send, Bell, XCircle, Scroll, Calendar, CalendarRange, Clock, Unlock, User, Globe, Target, Sprout, RefreshCw, Coins, Sparkles } from 'lucide-react'
 import SessionDialog from '@/components/sessions/SessionDialog'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -239,7 +239,26 @@ export default function SessionManagement({
                                                     <span>PC Quest</span>
                                                 </span>
                                             )}
+                                            {quest.isSponsored && (
+                                                <span 
+                                                    className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0"
+                                                    title="20% Guild Sponsored Journeyman Quest"
+                                                >
+                                                    <Sparkles className="h-2.5 w-2.5 text-amber-400" />
+                                                    <span>20% Sponsored</span>
+                                                </span>
+                                            )}
                                         </div>
+                                        {(quest.rewardMoneyGP || quest.rewardOther || quest.reward) && (
+                                            <div className="flex items-center gap-1 text-[10px] text-amber-300 font-mono">
+                                                <Coins className="h-3 w-3 text-amber-400 shrink-0" />
+                                                <span className="truncate">
+                                                    {quest.rewardMoneyGP 
+                                                        ? `${quest.rewardMoneyGP} GP${quest.rewardType === 'per_person' ? ' / person' : ''}${quest.rewardOther ? ` + ${quest.rewardOther}` : ''}`
+                                                        : quest.reward}
+                                                </span>
+                                            </div>
+                                        )}
                                         {quest.description && (
                                             <div className="text-[10px] text-muted-foreground italic line-clamp-1">
                                                 {quest.description}

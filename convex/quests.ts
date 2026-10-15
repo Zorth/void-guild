@@ -310,7 +310,12 @@ export const toggleQuestReimbursementClaimed = mutation({
       reimbursementClaimed: nextClaimed,
     })
 
-    const amount = parseGpAmount(quest.sponsoredAmount)
+    let amount = parseGpAmount(quest.sponsoredAmount)
+    if (quest.rewardType === 'per_person' && quest.completedSessionId) {
+      const sess = await ctx.db.get(quest.completedSessionId)
+      const attendees = (sess?.characters || []).length || 1
+      amount = Math.round(amount * attendees * 100) / 100
+    }
     if (amount > 0) {
       await adjustCharacterMoney(ctx, args.characterId, nextClaimed ? amount : -amount)
     }
@@ -339,7 +344,12 @@ export const toggleQuestPaymentClaimed = mutation({
       paymentClaimed: nextClaimed,
     })
 
-    const amount = parseGpAmount(quest.netCost || quest.reward || quest.rewardMoneyGP)
+    let amount = parseGpAmount(quest.netCost || quest.reward || quest.rewardMoneyGP)
+    if (quest.rewardType === 'per_person' && quest.completedSessionId) {
+      const sess = await ctx.db.get(quest.completedSessionId)
+      const attendees = (sess?.characters || []).length || 1
+      amount = Math.round(amount * attendees * 100) / 100
+    }
     if (amount > 0) {
       // Payment to adventurers is an expense
       await adjustCharacterMoney(ctx, args.characterId, nextClaimed ? -amount : amount)

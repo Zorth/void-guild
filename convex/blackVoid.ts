@@ -984,13 +984,22 @@ export const markAllCharacterTransactionsClaimed = mutation({
         for (const quest of characterQuests) {
             if (quest.isCompleted) {
                 const patch: { reimbursementClaimed?: boolean; paymentClaimed?: boolean } = {}
+                let attendeeCount = 1
+                if (quest.completedSessionId) {
+                    const sess = await ctx.db.get(quest.completedSessionId)
+                    attendeeCount = (sess?.characters || []).length || 1
+                }
+                const isPerPerson = quest.rewardType === 'per_person'
+
                 if (quest.isSponsored && !quest.reimbursementClaimed) {
                     patch.reimbursementClaimed = true
-                    totalDeltaGp += parseGpAmount(quest.sponsoredAmount)
+                    const baseSponsor = parseGpAmount(quest.sponsoredAmount)
+                    totalDeltaGp += isPerPerson ? Math.round(baseSponsor * attendeeCount * 100) / 100 : baseSponsor
                 }
                 if (!quest.paymentClaimed) {
                     patch.paymentClaimed = true
-                    totalDeltaGp -= parseGpAmount(quest.netCost || quest.reward || quest.rewardMoneyGP)
+                    const baseNet = parseGpAmount(quest.netCost || quest.reward || quest.rewardMoneyGP)
+                    totalDeltaGp -= isPerPerson ? Math.round(baseNet * attendeeCount * 100) / 100 : baseNet
                 }
                 if (Object.keys(patch).length > 0) {
                     await ctx.db.patch(quest._id, patch)
@@ -1203,12 +1212,27 @@ export const getCharacterTransactions = query({
                         const w = await ctx.db.get(q.worldId)
                         if (w) worldName = w.name
                     }
+                    let attendeeCount = 1
+                    if (q.completedSessionId) {
+                        const sess = await ctx.db.get(q.completedSessionId)
+                        attendeeCount = (sess?.characters || []).length || 1
+                    }
+                    const isPerPerson = q.rewardType === 'per_person'
+                    const unitSponsor = parseGpAmount(q.sponsoredAmount)
+                    const totalSponsor = isPerPerson ? Math.round(unitSponsor * attendeeCount * 100) / 100 : unitSponsor
+                    const unitNet = parseGpAmount(q.netCost)
+                    const totalNet = isPerPerson ? Math.round(unitNet * attendeeCount * 100) / 100 : unitNet
+
                     return {
                         _id: q._id,
                         name: q.name,
                         reward: q.reward,
+                        rewardType: q.rewardType,
+                        attendeeCount: isPerPerson ? attendeeCount : undefined,
                         sponsoredAmount: q.sponsoredAmount || '20% of reward',
+                        totalSponsoredAmountGP: totalSponsor,
                         netCost: q.netCost,
+                        totalNetCostGP: totalNet,
                         worldName,
                         completedAt: q.completedAt || q._creationTime,
                         reimbursementClaimed: !!q.reimbursementClaimed,
@@ -1293,13 +1317,25 @@ export const getCharacterTransactions = query({
                         const w = await ctx.db.get(q.worldId)
                         if (w) worldName = w.name
                     }
+                    let attendeeCount = 1
+                    if (q.completedSessionId) {
+                        const sess = await ctx.db.get(q.completedSessionId)
+                        attendeeCount = (sess?.characters || []).length || 1
+                    }
+                    const isPerPerson = q.rewardType === 'per_person'
                     const actualToPay = q.netCost || q.reward || 'Custom reward'
+                    const unitToPay = parseGpAmount(actualToPay)
+                    const totalToPay = isPerPerson ? Math.round(unitToPay * attendeeCount * 100) / 100 : unitToPay
+
                     return {
                         _id: q._id,
                         name: q.name,
                         worldName,
                         reward: q.reward || 'Custom',
+                        rewardType: q.rewardType,
+                        attendeeCount: isPerPerson ? attendeeCount : undefined,
                         actualToPay,
+                        totalToPayGP: totalToPay,
                         isSponsored: !!q.isSponsored,
                         sponsoredAmount: q.sponsoredAmount,
                         netCost: q.netCost,
@@ -1338,10 +1374,12 @@ export const getCharacterTransactions = query({
 
                 const sharePerPlayer = totalLootValue / attendingCount
 
-                // Items claimed by THIS character
+                // Items claimed by THIS character (Currency is auto-distributed and never treated as a claimed physical item)
                 const characterClaimedItems = lootList.filter((item) =>
-                    item.claimedBy === args.characterId ||
-                    (item.claimedByCharacters && item.claimedByCharacters.includes(args.characterId))
+                    !item.isCurrency && (
+                        item.claimedBy === args.characterId ||
+                        (item.claimedByCharacters && item.claimedByCharacters.includes(args.characterId))
+                    )
                 )
 
                 // Total GP value of items claimed by THIS character

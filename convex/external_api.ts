@@ -3,6 +3,7 @@ import { query, mutation } from './_generated/server'
 import { internal } from './_generated/api'
 import { Id } from './_generated/dataModel'
 import { roundToTwoSigFigs, getNextValidBid } from './blackVoid'
+import { parseGpAmount } from './moneyHelpers'
 
 async function validateKey(ctx: any, apiKey?: string) {
     if (!apiKey || apiKey.trim() === "") {
@@ -261,6 +262,8 @@ export const addSessionLoot = mutation({
         link: v.optional(v.string()),
         valueGP: v.number(),
         isGood: v.boolean(),
+        isCurrency: v.optional(v.boolean()),
+        fromQuest: v.optional(v.boolean()),
         isPerCharacter: v.optional(v.boolean()),
         quantity: v.optional(v.number()),
     },
@@ -278,6 +281,8 @@ export const addSessionLoot = mutation({
         const loot = session.loot || []
         const quantity = args.quantity || 1
         const newItems = []
+        const isCurrency = args.isCurrency ?? false
+        const isGood = isCurrency ? true : args.isGood
 
         for (let i = 0; i < quantity; i++) {
             newItems.push({
@@ -285,7 +290,9 @@ export const addSessionLoot = mutation({
                 name: args.name,
                 link: args.link,
                 valueGP: args.valueGP,
-                isGood: args.isGood,
+                isGood,
+                isCurrency,
+                fromQuest: args.fromQuest ?? false,
                 isPerCharacter: args.isPerCharacter ?? false,
             })
         }
@@ -1801,12 +1808,27 @@ export const getBlackVoidCharacterLog = query({
                         const w = await ctx.db.get(q.worldId)
                         if (w) worldName = w.name
                     }
+                    let attendeeCount = 1
+                    if (q.completedSessionId) {
+                        const sess = await ctx.db.get(q.completedSessionId)
+                        attendeeCount = (sess?.characters || []).length || 1
+                    }
+                    const isPerPerson = q.rewardType === 'per_person'
+                    const unitSponsor = parseGpAmount(q.sponsoredAmount)
+                    const totalSponsor = isPerPerson ? Math.round(unitSponsor * attendeeCount * 100) / 100 : unitSponsor
+                    const unitNet = parseGpAmount(q.netCost)
+                    const totalNet = isPerPerson ? Math.round(unitNet * attendeeCount * 100) / 100 : unitNet
+
                     return {
                         _id: q._id,
                         name: q.name,
                         reward: q.reward,
+                        rewardType: q.rewardType,
+                        attendeeCount: isPerPerson ? attendeeCount : undefined,
                         sponsoredAmount: q.sponsoredAmount || '20% of reward',
+                        totalSponsoredAmountGP: totalSponsor,
                         netCost: q.netCost,
+                        totalNetCostGP: totalNet,
                         worldName,
                         completedAt: q.completedAt || q._creationTime,
                         reimbursementClaimed: !!q.reimbursementClaimed,
@@ -1823,13 +1845,25 @@ export const getBlackVoidCharacterLog = query({
                         const w = await ctx.db.get(q.worldId)
                         if (w) worldName = w.name
                     }
+                    let attendeeCount = 1
+                    if (q.completedSessionId) {
+                        const sess = await ctx.db.get(q.completedSessionId)
+                        attendeeCount = (sess?.characters || []).length || 1
+                    }
+                    const isPerPerson = q.rewardType === 'per_person'
                     const actualToPay = q.netCost || q.reward || 'Custom reward'
+                    const unitToPay = parseGpAmount(actualToPay)
+                    const totalToPay = isPerPerson ? Math.round(unitToPay * attendeeCount * 100) / 100 : unitToPay
+
                     return {
                         _id: q._id,
                         name: q.name,
                         worldName,
                         reward: q.reward || 'Custom',
+                        rewardType: q.rewardType,
+                        attendeeCount: isPerPerson ? attendeeCount : undefined,
                         actualToPay,
+                        totalToPayGP: totalToPay,
                         isSponsored: !!q.isSponsored,
                         sponsoredAmount: q.sponsoredAmount,
                         netCost: q.netCost,
