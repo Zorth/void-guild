@@ -1,4 +1,4 @@
-# Guild of The Void - External API Documentation (v1.2)
+# Guild of The Void - External API Documentation (v1.3)
 
 This API allows external tools, integrations, and browser extensions to interact with your "Guild of The Void" data using an API key generated on your account.
 
@@ -31,12 +31,12 @@ https://guild.tarragon.be/api/external/v1
 
 ### Sessions
 * **GET** `/sessions?past=true|false&isIntro=true|false&worldId=...&system=PF|DnD` - List all sessions with filters (private sessions are filtered out unless requester owns them or is an Admin).
-* **GET** `/session/:sessionId` - Get detailed session info including attending characters, GM character, and quest.
+* **GET** `/session/:sessionId` - Get detailed session info including attending characters, GM character, quest, loot roster, and void contributions.
 * **GET** `/session/:sessionId/characters` - List attending characters in a session.
 * **GET** `/session/:sessionId/quotes` - List character quotes logged in a session.
 * **GET** `/session/:sessionId/state` - Get live initiative and clock state.
 * **POST** `/session` - Create a new session (GM/Admin). Body: `{ date?, level?, maxPlayers, system, location?, planning?, isPrivate?, isIntro?, worldId?, inGameDate?: { year, month, day, era?, endYear?, endMonth?, endDay? } }`. *(Note: If `inGameDate` is omitted, it defaults automatically to the campaign world's current calendar date; if `isIntro` is true, level defaults automatically to 1 for Pathfinder or 3 for DnD).*
-* **POST** `/session/:sessionId/loot` - Add loot item to a session (Owner/Admin). Body: `{ name, valueGP, isGood, isPerCharacter?, link?, quantity? }`.
+* **POST** `/session/:sessionId/loot` - Add loot item to a session (Owner/Admin). Body: `{ name, valueGP, isGood, isPerCharacter?: boolean, link?: string, quantity?: number }`. *(Note: If `quantity` is greater than 1, multiple individual item instances are created. If `isPerCharacter` is true, each party character claims their own copy).*
 * **POST** `/session/:sessionId/commendation` - Submit a character commendation. Body: `{ toCharacterId, category }`.
 * **PATCH** `/session/:sessionId` - Update session parameters (Owner/Admin). Body: `{ date?, level?, maxPlayers?, location?, locked?, planning?, isPrivate?, isIntro?, inGameDate?: { year, month, day, era?, endYear?, endMonth?, endDay? } }`.
 * **PATCH** `/session/:sessionId/state` - Update initiative/clock (Owner/Admin). Body: `{ initiative?, currentIndex?, round?, timeSeconds?, isClockRunning?, multiplier? }`.
@@ -103,11 +103,11 @@ The endpoint `POST /character/:characterId/sheet` (and `PATCH`) supports flexibl
 
 1. **Direct Pathbuilder 2e JSON Export (`build` or `rawExport`)**
    * Pass the full exported JSON object from Pathbuilder under `build` or `rawExport`.
-   * **Automatic Server-Side Calculations:**
-     * **Hit Points:** Calculated automatically as `ancestryHP + (classHP + conMod) * level + bonusHP` if not explicitly given.
+   * **Automatic Server-Side Calculations & Safe Fallbacks:**
+     * **Hit Points:** Calculated automatically as `ancestryHP + (classHP + conMod) * level + bonusHP` if not explicitly given. Static Pathbuilder build exports that omit `currentHp` or evaluate to `NaN` automatically default `currentHp` to calculated `maxHp`.
      * **Armor Class:** Extracted and calculated from `build.proficiencies` and equipped armor/dexterity bonus.
      * **Saves:** Fortitude, Reflex, Will, and Perception bonuses are calculated from proficiencies and ability modifiers.
-     * **Skills & Lores:** Extracted and mapped from `build.proficiencies` and `build.lores`.
+     * **Skills & Lores:** Extracted and mapped from `build.proficiencies` and `build.lores` (lores are flagged with `isLore: true`).
      * **Abilities:** Extracted from `build.abilities` (defaults missing stats to 10).
      * **Money & Gear:** Parsed from `build.money` and `build.weapons`/`build.armor`/`build.gear`.
 
@@ -167,7 +167,21 @@ The endpoint `POST /character/:characterId/sheet` (and `PATCH`) supports flexibl
   "isPrivate": false,
   "isIntro": true,
   "characters": ["jh7..."],
-  "locked": false
+  "locked": false,
+  "voidContribution": 15.0,
+  "pendingVoidContribution": 0.0,
+  "loot": [
+    {
+      "id": "item_1740000000000_1",
+      "name": "Healing Potion",
+      "valueGP": 12,
+      "isGood": true,
+      "isPerCharacter": false,
+      "claimedBy": "jh7...",
+      "claimedByCharacters": ["jh7..."],
+      "link": "https://2e.aonprd.com/Equipment.aspx?ID=620"
+    }
+  ]
 }
 ```
 
