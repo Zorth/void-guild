@@ -1,6 +1,7 @@
 import { InteractionResponseType, InteractionType, verifyKey } from 'discord-interactions';
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
+import { DISCORD_GP_EMOJI, DISCORD_SP_EMOJI } from "@/convex/discordHelpers";
 
 let client: ConvexHttpClient | null = null;
 function getConvexClient() {
@@ -455,7 +456,7 @@ export async function POST(req: Request) {
           if (res.myTurnBets.length > 0) {
             lines.push("**🎯 Your Turn:**");
             for (const b of res.myTurnBets) {
-              lines.push(`• **${b.myCharacterName}** vs **${b.opponentCharacterName}** — Wager: **${b.wagerAmount} GP** | Current Max: **${b.deathrollValue}** (Waiting for your roll)`);
+              lines.push(`• **${b.myCharacterName}** vs **${b.opponentCharacterName}** — Wager: **${b.wagerAmount} ${DISCORD_GP_EMOJI}** | Current Max: **${b.deathrollValue}** (Waiting for your roll)`);
             }
           }
 
@@ -463,7 +464,7 @@ export async function POST(req: Request) {
             if (res.myTurnBets.length > 0) lines.push("");
             lines.push("**⏳ Opponent's Turn:**");
             for (const b of res.otherTurnBets) {
-              lines.push(`• **${b.myCharacterName}** vs **${b.opponentCharacterName}** — Wager: **${b.wagerAmount} GP** | Current Max: **${b.deathrollValue}** (Waiting for ${b.opponentCharacterName})`);
+              lines.push(`• **${b.myCharacterName}** vs **${b.opponentCharacterName}** — Wager: **${b.wagerAmount} ${DISCORD_GP_EMOJI}** | Current Max: **${b.deathrollValue}** (Waiting for ${b.opponentCharacterName})`);
             }
           }
 
@@ -521,7 +522,7 @@ export async function POST(req: Request) {
           return new Response(JSON.stringify({
             type: 4,
             data: {
-              content: `🎲 **DEATHROLL CHALLENGE ISSUED!**\n**${res.senderName}** has challenged ${opponentStr} to a **${res.wager} GP** Deathroll starting at **${res.startVal}**!\n\n*Accept or view this challenge on the [Void Guild Market](${baseUrl}/black-void)*`,
+              content: `🎲 **DEATHROLL CHALLENGE ISSUED!**\n**${res.senderName}** has challenged ${opponentStr} to a **${res.wager} ${DISCORD_GP_EMOJI}** Deathroll starting at **${res.startVal}**!\n\n*Accept or view this challenge on the [Void Guild Market](${baseUrl}/black-void)*`,
             },
           }), { headers: { 'Content-Type': 'application/json' } });
         } catch (e: any) {
@@ -548,12 +549,12 @@ export async function POST(req: Request) {
           const fields = listings.map((l) => {
             let priceInfo = "Custom Price";
             if (l.type === 'item') {
-              const start = l.startingBid ? `${l.startingBid} GP Bid` : '';
-              const buyout = l.buyoutPrice ? `${l.buyoutPrice} GP Buyout` : '';
+              const start = l.startingBid ? `${l.startingBid} ${DISCORD_GP_EMOJI} Bid` : '';
+              const buyout = l.buyoutPrice ? `${l.buyoutPrice} ${DISCORD_GP_EMOJI} Buyout` : '';
               priceInfo = [start, buyout].filter(Boolean).join(' | ');
             } else if (l.type === 'service') {
               if (l.priceType === 'percentage') priceInfo = `${l.percentage || 0}% Fee`;
-              else if (l.priceType === 'flat') priceInfo = `+${l.markupGp || 0} GP Markup`;
+              else if (l.priceType === 'flat') priceInfo = `+${l.markupGp || 0} ${DISCORD_GP_EMOJI} Markup`;
               else priceInfo = l.priceDetails || 'Custom Service';
             }
 
@@ -617,7 +618,7 @@ export async function POST(req: Request) {
           if (res.activeListings.length > 0) {
             lines.push("**Active Listings:**");
             for (const l of res.activeListings) {
-              const price = l.buyoutPrice ? `${l.buyoutPrice} GP (Buyout)` : (l.startingBid ? `${l.startingBid} GP (Start)` : 'Service');
+              const price = l.buyoutPrice ? `${l.buyoutPrice} ${DISCORD_GP_EMOJI} (Buyout)` : (l.startingBid ? `${l.startingBid} ${DISCORD_GP_EMOJI} (Start)` : 'Service');
               lines.push(`• **${l.name}** (${l.sellerName}) — ${price}`);
             }
           }
@@ -626,7 +627,7 @@ export async function POST(req: Request) {
             if (res.activeListings.length > 0) lines.push("");
             lines.push("**Won Auctions (Unclaimed):**");
             for (const w of res.wonListings) {
-              lines.push(`• **${w.name}** (${w.buyerName}) — Won for **${w.winningAmount || 0} GP**`);
+              lines.push(`• **${w.name}** (${w.buyerName}) — Won for **${w.winningAmount || 0} ${DISCORD_GP_EMOJI}**`);
             }
           }
 
@@ -715,7 +716,15 @@ export async function POST(req: Request) {
             }), { headers: { 'Content-Type': 'application/json' } });
           }
 
-          const priceStr = result.priceInGP ? `**${result.priceInGP} GP**` : (result.priceRaw ? `**${result.priceRaw}**` : "_Unknown price_");
+          const formattedRawPrice = result.priceRaw
+            ? result.priceRaw
+                .replace(/\bGP\b/gi, DISCORD_GP_EMOJI)
+                .replace(/\bSP\b/gi, DISCORD_SP_EMOJI)
+            : undefined;
+
+          const priceStr = result.priceInGP
+            ? `**${result.priceInGP} ${DISCORD_GP_EMOJI}**`
+            : (formattedRawPrice ? `**${formattedRawPrice}**` : "_Unknown price_");
           const linkStr = result.nethysUrl ? `[View on Archives of Nethys](${result.nethysUrl})` : "_No direct link_";
 
           const embed = {

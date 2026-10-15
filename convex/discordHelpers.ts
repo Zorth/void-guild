@@ -1,4 +1,6 @@
 export const DISCORD_API_BASE = "https://discord.com/api/v10";
+export const DISCORD_GP_EMOJI = "<:GP:1560328903397212190>";
+export const DISCORD_SP_EMOJI = "<:SP:1560338662175019130>";
 
 /**
  * Returns formatted quest level string for Discord display.

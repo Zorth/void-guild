@@ -3,7 +3,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { FunctionReturnType } from "convex/server";
-import { DISCORD_API_BASE } from "./discordHelpers";
+import { DISCORD_API_BASE, DISCORD_GP_EMOJI } from "./discordHelpers";
 import { bustChance } from "./deathroll";
 
 const DEFAULT_BV_CHANNEL_ID = "1547741552649048125";
@@ -209,7 +209,7 @@ function buildBetEmbed(details: BetDetails, betsUrl: string) {
   if (details.status === "cancelled") {
     return {
       ...base,
-      title: `🚫 Deathroll withdrawn · ${details.wagerAmount} GP`,
+      title: `🚫 Deathroll withdrawn · ${details.wagerAmount} ${DISCORD_GP_EMOJI}`,
       description: `**${details.senderName}** cancelled this bet.`,
       color: BET_COLORS.withdrawn,
     };
@@ -221,7 +221,7 @@ function buildBetEmbed(details: BetDetails, betsUrl: string) {
       : `**${details.loserName}** rolled a **0**.`;
     return {
       ...base,
-      title: `🏆 ${details.winnerName} wins ${details.wagerAmount} GP`,
+      title: `🏆 ${details.winnerName} wins ${details.wagerAmount} ${DISCORD_GP_EMOJI}`,
       description: `${outcome}\n\nRolls: ${rollPath(details)}`,
       color: BET_COLORS.won,
     };
@@ -239,7 +239,7 @@ function buildBetEmbed(details: BetDetails, betsUrl: string) {
     lines.push(`Chance to bust: **${bustChance(details.currentRollMax)}%**`, "", "Follow the rolls in the thread.");
     return {
       ...base,
-      title: `🔥 Deathroll · ${details.wagerAmount} GP`,
+      title: `🔥 Deathroll · ${details.wagerAmount} ${DISCORD_GP_EMOJI}`,
       description: lines.join("\n"),
       color: BET_COLORS.live,
     };
@@ -247,7 +247,7 @@ function buildBetEmbed(details: BetDetails, betsUrl: string) {
 
   return {
     ...base,
-    title: `🎲 Deathroll · ${details.wagerAmount} GP`,
+    title: `🎲 Deathroll · ${details.wagerAmount} ${DISCORD_GP_EMOJI}`,
     description: [
       `**${details.senderName}** challenges anyone to a deathroll.`,
       ...(details.message ? [`> ${details.message}`] : []),
@@ -270,7 +270,7 @@ function buildBetThreadUpdate(details: BetDetails, event: "accepted" | "rolled" 
   if (event === "accepted") {
     embeds.push({
       title: `⚔️ ${details.senderName} vs ${details.accepterName}`,
-      description: `**${details.accepterName}** accepted the challenge from **${details.senderName}**! **${details.wagerAmount} GP** is on the line.`,
+      description: `**${details.accepterName}** accepted the challenge from **${details.senderName}**! **${details.wagerAmount} ${DISCORD_GP_EMOJI}** is on the line.`,
       color: BET_COLORS.open,
     });
   }
@@ -295,7 +295,7 @@ function buildBetThreadUpdate(details: BetDetails, event: "accepted" | "rolled" 
   if (details.status === "completed") {
     const outcome = details.lossReason === "timeout" ? `**${details.loserName}** ran out of time.\n` : "";
     embeds.push({
-      title: `🏆 ${details.winnerName} wins ${details.wagerAmount} GP`,
+      title: `🏆 ${details.winnerName} wins ${details.wagerAmount} ${DISCORD_GP_EMOJI}`,
       description: `${outcome}Rolls: ${rollPath(details)}`,
       color: BET_COLORS.won,
     });
@@ -374,10 +374,10 @@ export const notifyNewListing = internalAction({
 
     if (isItem) {
       if (details.startingBid !== undefined) {
-        fields.push({ name: "Starting Bid", value: `${details.startingBid} GP`, inline: true });
+        fields.push({ name: "Starting Bid", value: `${details.startingBid} ${DISCORD_GP_EMOJI}`, inline: true });
       }
       if (details.buyoutPrice !== undefined) {
-        fields.push({ name: "Buyout Price", value: `${details.buyoutPrice} GP`, inline: true });
+        fields.push({ name: "Buyout Price", value: `${details.buyoutPrice} ${DISCORD_GP_EMOJI}`, inline: true });
       }
       if (details.expiresAt) {
         const discordTimestamp = Math.floor(details.expiresAt / 1000);
@@ -390,7 +390,7 @@ export const notifyNewListing = internalAction({
     } else {
       let feeStr = "Custom";
       if (details.priceType === "flat" && details.markupGp !== undefined) {
-        feeStr = `${details.markupGp} GP Flat Fee`;
+        feeStr = `${details.markupGp} ${DISCORD_GP_EMOJI} Flat Fee`;
       } else if (details.priceType === "percentage" && details.percentage !== undefined) {
         feeStr = `${details.percentage}% of item value`;
       } else if (details.priceDetails) {
@@ -559,9 +559,9 @@ export const notifyClosingSoonListing = internalAction({
       {
         name: "Current Bid",
         value: details.winningAmount !== undefined
-          ? `💰 **${details.winningAmount} GP**`
+          ? `💰 **${details.winningAmount} ${DISCORD_GP_EMOJI}**`
           : details.startingBid !== undefined
-          ? `${details.startingBid} GP (Starting)`
+          ? `${details.startingBid} ${DISCORD_GP_EMOJI} (Starting)`
           : "Buyout Only",
         inline: true,
       },
@@ -572,7 +572,7 @@ export const notifyClosingSoonListing = internalAction({
     }
 
     if (details.buyoutPrice !== undefined) {
-      fields.push({ name: "Buyout Price", value: `${details.buyoutPrice} GP`, inline: true });
+      fields.push({ name: "Buyout Price", value: `${details.buyoutPrice} ${DISCORD_GP_EMOJI}`, inline: true });
     }
 
     fields.push({ name: "Auction Closes", value: timeRemainingStr, inline: false });
