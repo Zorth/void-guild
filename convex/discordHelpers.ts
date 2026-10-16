@@ -1,8 +1,8 @@
 export const DISCORD_API_BASE = "https://discord.com/api/v10";
-export const DISCORD_PP_EMOJI = "<:PP:1560443992020353084>";
-export const DISCORD_GP_EMOJI = "<:GP:1560328903397212190>";
-export const DISCORD_SP_EMOJI = "<:SP:1560338662175019130>";
-export const DISCORD_CP_EMOJI = "<:CP:1560444022378594324>";
+export const DISCORD_PP_EMOJI = "<a:PP:1560443992020353084>";
+export const DISCORD_GP_EMOJI = "<a:GP:1560328903397212190>";
+export const DISCORD_SP_EMOJI = "<a:SP:1560338662175019130>";
+export const DISCORD_CP_EMOJI = "<a:CP:1560444022378594324>";
 
 /**
  * Replaces currency abbreviations (PP, GP, SP, CP) in text with Discord custom emotes.
