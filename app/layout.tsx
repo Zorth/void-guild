@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import Link from 'next/link'
-import { Geist, Geist_Mono, MedievalSharp, Cinzel_Decorative, Fredoka, UnifrakturCook, Caveat } from 'next/font/google'
+import { Geist, Geist_Mono, MedievalSharp, Cinzel_Decorative, Fredoka, UnifrakturCook, Caveat, Share_Tech_Mono } from 'next/font/google'
 import localFont from 'next/font/local'
 import './globals.css'
 import { ClerkProvider } from '@clerk/nextjs'
@@ -51,6 +51,12 @@ const fredoka = Fredoka({
 const caveat = Caveat({
   subsets: ['latin'],
   variable: '--font-caveat',
+})
+
+const shareTechMono = Share_Tech_Mono({
+  weight: '400',
+  subsets: ['latin'],
+  variable: '--font-share-tech-mono',
 })
 
 const oxProto = localFont({
@@ -170,7 +176,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className={`${geistSans.variable} ${geistMono.variable} ${oxProto.variable} ${taroca.variable} ${gin.variable} ${sabon.variable} ${medievalSharp.variable} ${unifrakturCook.variable} ${cinzelDec.variable} ${fredoka.variable} ${caveat.variable} antialiased font-sans`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} ${oxProto.variable} ${taroca.variable} ${gin.variable} ${sabon.variable} ${medievalSharp.variable} ${unifrakturCook.variable} ${cinzelDec.variable} ${fredoka.variable} ${caveat.variable} ${shareTechMono.variable} antialiased font-sans`}>
         <ClerkProvider>
           <ConvexClientProvider>
             <TooltipProvider>

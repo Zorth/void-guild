@@ -886,6 +886,12 @@ const COSMETIC_ACHIEVEMENT_REQUIREMENTS: Record<string, string> = {
   'font-rounded': 'link_discord',
   cinzel_decorative: 'system_polymath',
   'font-cinzel-dec': 'system_polymath',
+  handwritten: 'legend_player_25',
+  'font-handwritten': 'legend_player_25',
+  console_futuristic: 'mythic_player_50',
+  'font-console': 'mythic_player_50',
+  robotic_console: 'mythic_player_50',
+  'font-robotic': 'mythic_player_50',
 
   // Colors
   purple_text: 'tutorial_completed',

@@ -47,6 +47,7 @@ export interface UserEvaluationData {
   hasWonBet: boolean
   hasLostBet: boolean
   unlockedAchievementIds?: Set<string>
+  milestoneDates?: Record<string, number>
 }
 
 export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
@@ -88,7 +89,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     reward: 'Sabon Classic Serif Font Cosmetic',
     chainId: 'sessions_played',
     tier: 1,
-    maxTier: 4,
+    maxTier: 5,
     checkEligibility: (data) => data.sessionsPlayedCount >= 1,
   },
   {
@@ -99,7 +100,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     reward: 'Medieval Sharp Font Cosmetic',
     chainId: 'sessions_played',
     tier: 2,
-    maxTier: 4,
+    maxTier: 5,
     checkEligibility: (data) => data.sessionsPlayedCount >= 5,
   },
   {
@@ -110,7 +111,7 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     reward: 'Taroca High-Fantasy Font Cosmetic',
     chainId: 'sessions_played',
     tier: 3,
-    maxTier: 4,
+    maxTier: 5,
     checkEligibility: (data) => data.sessionsPlayedCount >= 10,
   },
   {
@@ -121,8 +122,19 @@ export const ACHIEVEMENTS_REGISTRY: AchievementDefinition[] = [
     reward: 'Handwritten Script Font Cosmetic',
     chainId: 'sessions_played',
     tier: 4,
-    maxTier: 4,
+    maxTier: 5,
     checkEligibility: (data) => data.sessionsPlayedCount >= 25,
+  },
+  {
+    id: 'mythic_player_50',
+    title: 'Eternal Legend',
+    description: 'Played in 50 or more completed sessions.',
+    category: 'hidden',
+    reward: 'Robotic Futuristic Console Font Cosmetic',
+    chainId: 'sessions_played',
+    tier: 5,
+    maxTier: 5,
+    checkEligibility: (data) => data.sessionsPlayedCount >= 50,
   },
   {
     id: 'first_gm_session',
@@ -580,17 +592,41 @@ export async function evaluateAndSyncUserAchievements(
   const allSessions = preloadedSessions || (await ctx.db.query('sessions').collect())
   const allLockedSessions = allSessions.filter((s) => s.locked)
 
+  // Streak calculations & session ordering
+  const sortedLockedSessions = [...allLockedSessions].sort((a, b) => {
+    const dateA = a.date ?? a._creationTime
+    const dateB = b.date ?? b._creationTime
+    if (dateA !== dateB) return dateA - dateB
+    return a._creationTime - b._creationTime
+  })
+
+  const milestoneDates: Record<string, number> = {}
+
   let sessionsPlayedCount = (userDoc?.extraSessionsPlayed || 0)
   let sessionsRanCount = (userDoc?.extraSessionsRan || 0)
 
-  for (const s of allLockedSessions) {
+  const userPlayedSessions: typeof sortedLockedSessions = []
+  const userGMSessions: typeof sortedLockedSessions = []
+
+  for (const s of sortedLockedSessions) {
     if (s.owner === userId) {
       sessionsRanCount += 1
+      userGMSessions.push(s)
     }
     if (s.characters && s.characters.some((id) => charIds.has(String(id)))) {
       sessionsPlayedCount += 1
+      userPlayedSessions.push(s)
     }
   }
+
+  if (userPlayedSessions[0]) milestoneDates['first_session'] = userPlayedSessions[0].date ?? userPlayedSessions[0]._creationTime
+  if (userPlayedSessions[4]) milestoneDates['veteran_player_5'] = userPlayedSessions[4].date ?? userPlayedSessions[4]._creationTime
+  if (userPlayedSessions[9]) milestoneDates['master_player_10'] = userPlayedSessions[9].date ?? userPlayedSessions[9]._creationTime
+  if (userPlayedSessions[24]) milestoneDates['legend_player_25'] = userPlayedSessions[24].date ?? userPlayedSessions[24]._creationTime
+  if (userPlayedSessions[49]) milestoneDates['mythic_player_50'] = userPlayedSessions[49].date ?? userPlayedSessions[49]._creationTime
+
+  if (userGMSessions[0]) milestoneDates['first_gm_session'] = userGMSessions[0].date ?? userGMSessions[0]._creationTime
+  if (userGMSessions[4]) milestoneDates['veteran_gm_5'] = userGMSessions[4].date ?? userGMSessions[4]._creationTime
 
   // Received Commendations calculation
   const commendationCounts = {
@@ -643,14 +679,6 @@ export async function evaluateAndSyncUserAchievements(
 
   const availabilityDaysCount = new Set(userAvailabilityDocs.map((a) => a.date)).size
 
-  // Streak calculations
-  const sortedLockedSessions = [...allLockedSessions].sort((a, b) => {
-    const dateA = a.date ?? a._creationTime
-    const dateB = b.date ?? b._creationTime
-    if (dateA !== dateB) return dateA - dateB
-    return a._creationTime - b._creationTime
-  })
-
   let maxWorldStreak = 0
   let maxCharacterStreak = 0
 
@@ -676,6 +704,24 @@ export async function evaluateAndSyncUserAchievements(
       }
       if (currentWorldStreak > maxWorldStreak) {
         maxWorldStreak = currentWorldStreak
+      }
+      if (currentWorldStreak >= 3) {
+        const sDate = s.date ?? s._creationTime
+        if (!milestoneDates['world_streak_3'] || sDate < milestoneDates['world_streak_3']) {
+          milestoneDates['world_streak_3'] = sDate
+        }
+      }
+      if (currentWorldStreak >= 5) {
+        const sDate = s.date ?? s._creationTime
+        if (!milestoneDates['world_streak_5'] || sDate < milestoneDates['world_streak_5']) {
+          milestoneDates['world_streak_5'] = sDate
+        }
+      }
+      if (currentWorldStreak >= 10) {
+        const sDate = s.date ?? s._creationTime
+        if (!milestoneDates['world_streak_10'] || sDate < milestoneDates['world_streak_10']) {
+          milestoneDates['world_streak_10'] = sDate
+        }
       }
     }
 
@@ -705,6 +751,24 @@ export async function evaluateAndSyncUserAchievements(
           mutualStreak++
           if (mutualStreak > maxCharacterStreak) {
             maxCharacterStreak = mutualStreak
+          }
+          if (mutualStreak >= 3) {
+            const sDate = s.date ?? s._creationTime
+            if (!milestoneDates['character_streak_3'] || sDate < milestoneDates['character_streak_3']) {
+              milestoneDates['character_streak_3'] = sDate
+            }
+          }
+          if (mutualStreak >= 5) {
+            const sDate = s.date ?? s._creationTime
+            if (!milestoneDates['character_streak_5'] || sDate < milestoneDates['character_streak_5']) {
+              milestoneDates['character_streak_5'] = sDate
+            }
+          }
+          if (mutualStreak >= 10) {
+            const sDate = s.date ?? s._creationTime
+            if (!milestoneDates['character_streak_10'] || sDate < milestoneDates['character_streak_10']) {
+              milestoneDates['character_streak_10'] = sDate
+            }
           }
         } else {
           mutualStreak = 0
@@ -843,6 +907,7 @@ export async function evaluateAndSyncUserAchievements(
     hasAcceptedBet,
     hasWonBet,
     hasLostBet,
+    milestoneDates,
   }
 
   // Existing unlocked records in database
@@ -871,6 +936,11 @@ export async function evaluateAndSyncUserAchievements(
         continue
       }
     }
+    const accurateMilestoneDate = evalData.milestoneDates?.[u.achievementId]
+    if (accurateMilestoneDate && accurateMilestoneDate < u.unlockedAt) {
+      await ctx.db.patch(u._id, { unlockedAt: accurateMilestoneDate })
+      u.unlockedAt = accurateMilestoneDate
+    }
     unlockedMap.set(u.achievementId, { unlockedAt: u.unlockedAt, notifiedAt: u.notifiedAt })
     unlockedAchievementIds.add(u.achievementId)
   }
@@ -886,12 +956,13 @@ export async function evaluateAndSyncUserAchievements(
     for (const def of ACHIEVEMENTS_REGISTRY) {
       if (!unlockedMap.has(def.id)) {
         if (def.checkEligibility(evalData)) {
+          const unlockTime = evalData.milestoneDates?.[def.id] ?? now
           await ctx.db.insert('unlockedAchievements', {
             userId,
             achievementId: def.id,
-            unlockedAt: now,
+            unlockedAt: unlockTime,
           })
-          unlockedMap.set(def.id, { unlockedAt: now })
+          unlockedMap.set(def.id, { unlockedAt: unlockTime })
           unlockedAchievementIds.add(def.id)
           newlyUnlocked = true
         }

@@ -22,6 +22,7 @@ export const ACHIEVEMENT_INFO: Record<string, AchievementInfo> = {
   veteran_player_5: { title: 'Seasoned Adventurer', category: 'hidden' },
   master_player_10: { title: 'Guild Champion', category: 'hidden' },
   legend_player_25: { title: 'Living Legend', category: 'hidden' },
+  mythic_player_50: { title: 'Eternal Legend', category: 'hidden' },
   first_gm_session: { title: 'Behind the Screen', category: 'hidden' },
   veteran_gm_5: { title: 'Master Storyteller', category: 'hidden' },
   level_5_char: { title: 'Rising Power', category: 'normal' },
@@ -119,6 +120,13 @@ export const FONT_OPTIONS: CosmeticOption[] = [
     unlockedByDefault: false,
     requiredAchievementId: 'legend_player_25',
     value: 'font-handwritten',
+  },
+  {
+    id: 'console_futuristic',
+    name: 'Robotic Console',
+    unlockedByDefault: false,
+    requiredAchievementId: 'mythic_player_50',
+    value: 'font-console',
   },
 ]
 
@@ -530,15 +538,15 @@ export function resolveCosmeticsStyles(cosmetics?: CharacterCosmetics | null) {
   }
 
   // Name Font
-  const nameFontObj = FONT_OPTIONS.find((f) => f.id === cosmetics.nameFont)
+  const nameFontObj = FONT_OPTIONS.find((f) => f.id === cosmetics.nameFont || f.value === cosmetics.nameFont)
   const nameFontVal = nameFontObj ? nameFontObj.value : ''
 
   // Title Font
-  const titleFontObj = FONT_OPTIONS.find((f) => f.id === cosmetics.titleFont)
+  const titleFontObj = FONT_OPTIONS.find((f) => f.id === cosmetics.titleFont || f.value === cosmetics.titleFont)
   const titleFontVal = titleFontObj ? titleFontObj.value : ''
 
   // Subtitle Font
-  const subFontObj = FONT_OPTIONS.find((f) => f.id === cosmetics.subtitleFont)
+  const subFontObj = FONT_OPTIONS.find((f) => f.id === cosmetics.subtitleFont || f.value === cosmetics.subtitleFont)
   const subFontVal = subFontObj ? subFontObj.value : ''
 
   // Border Shape

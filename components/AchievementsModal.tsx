@@ -11,7 +11,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { Trophy, Lock, CheckCircle2, Gift, EyeOff, Loader2, ChevronDown, ChevronUp, Shield } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, formatDate } from '@/lib/utils'
 
 interface Achievement {
   id: string
@@ -44,11 +44,7 @@ interface AchievementsModalProps {
 
 function formatUnlockedDate(timestamp: number | null): string {
   if (!timestamp) return ''
-  const date = new Date(timestamp)
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const year = date.getFullYear()
-  return `${day}/${month}/${year}`
+  return formatDate(timestamp)
 }
 
 export default function AchievementsModal({ open, onOpenChange }: AchievementsModalProps) {

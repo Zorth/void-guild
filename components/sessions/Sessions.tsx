@@ -941,7 +941,7 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
                 {activeTab === 'upcoming' && sessions.length > 0 && <FiveDayOverview sessions={sessions} userCharacterIds={userCharacterIds} />}
                 <ul className={cn("space-y-4", activeTab === 'upcoming' && sessions.length > 0 && "mt-8")}>
                   {sessions.map((session, i) => {
-                    const hasJoined = activeTab === 'upcoming' && session.characters.some(id => userCharacterIds.has(id))
+                    const hasJoined = session.characters.some(id => userCharacterIds.has(id))
                     const isPlanning = session.planning || !session.date
                     
                     const sessionDateRaw = session.date ? new Date(session.date) : null;
