@@ -1028,8 +1028,26 @@ export default function SessionClient() {
                                         {displayLevel}
                                     </div>
                                 </div>
-                                <div className="p-4 space-y-3">
-                                    <h4 className="font-bold text-lg">{q.name}</h4>
+                                <div className="p-3.5 space-y-2.5">
+                                    <h4 className="font-bold text-base sm:text-lg leading-snug">
+                                        <span className="inline-flex items-center align-middle mr-1.5 gap-0.5 shrink-0">
+                                            {levelPF !== undefined && <img src="/PFVoid.svg" alt="PF" className="h-4 w-4 inline-block" />}
+                                            {levelDnD !== undefined && <img src="/DnDVoid.svg" alt="DnD" className="h-4 w-4 inline-block" />}
+                                        </span>
+                                        <span className="align-middle">{q.name}</span>
+                                    </h4>
+                                    {q.tags && q.tags.length > 0 && (
+                                        <div className="flex flex-wrap items-center gap-1">
+                                            {q.tags.map(tag => (
+                                                <span 
+                                                    key={tag} 
+                                                    className="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider shrink-0"
+                                                >
+                                                    {tag}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
                                     {q.characterId && (
                                         <div className="flex items-center gap-2 text-[11px] text-purple-300 bg-purple-500/10 border border-purple-500/20 rounded-md px-2.5 py-1.5 flex-wrap">
                                             <User className="h-3.5 w-3.5 text-purple-400 shrink-0" />

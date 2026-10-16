@@ -407,121 +407,144 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
               <Card 
                 key={quest._id} 
                 className={cn(
-                    "overflow-hidden transition-all border-border/40 hover:border-border/80",
+                    "overflow-hidden transition-all border-border/40 hover:border-border/80 relative group",
                     isCharacterQuest && "border-purple-500/30 bg-purple-950/10",
                     isExpanded ? "ring-1 ring-primary/20 bg-muted/10" : "bg-card/50"
                 )}
               >
+                {/* Corner action controls: Edit/Delete/Hide & Chevron */}
+                <div 
+                  className="absolute top-1.5 right-1.5 flex items-center gap-0.5 z-10"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {canEdit && (
+                    <div className="flex items-center gap-0.5">
+                      {isWorldOwner && (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className={cn(
+                            "h-6 w-6", 
+                            quest.isHidden ? "text-amber-400 hover:text-amber-300 hover:bg-amber-500/10" : "text-muted-foreground hover:text-foreground"
+                          )} 
+                          onClick={() => handleToggleHidden(quest._id, Boolean(quest.isHidden))}
+                          title={quest.isHidden ? "Unhide quest (make visible to players)" : "Hide quest from players"}
+                        >
+                          {quest.isHidden ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                        </Button>
+                      )}
+                      <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" onClick={() => handleEdit(quest)} title="Edit quest">
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => handleDelete(quest._id)} title="Delete quest">
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                    onClick={() => setExpandedQuestId(isExpanded ? null : quest._id)}
+                    title={isExpanded ? "Collapse quest details" : "Expand quest details"}
+                  >
+                    {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                  </Button>
+                </div>
+
                 <div 
                   className={cn(
-                    "p-3 cursor-pointer flex justify-between gap-3",
-                    isExpanded ? "items-start" : "items-center"
+                    "py-2 px-3 cursor-pointer flex items-start gap-2.5",
+                    canEdit ? "pr-24 sm:pr-26" : "pr-8"
                   )}
                   onClick={() => setExpandedQuestId(isExpanded ? null : quest._id)}
                 >
-                  <div className={cn("flex gap-3 min-w-0 flex-1", isExpanded ? "items-start" : "items-center")}>
-                    <div 
-                        className={cn(
-                            "flex items-center justify-center rounded-full font-bold shrink-0",
-                            isSidebar ? "h-6 w-6 text-[10px]" : "h-8 w-8 text-xs",
-                            isExpanded && "mt-0.5"
-                        )}
-                        style={getDualLevelBadgeStyle(levelPF, levelDnD)}
-                    >
-                      {(levelPF ?? levelDnD ?? 0) > 0 ? (levelPF ?? levelDnD) : '?'}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                        <h4 className={cn("font-bold flex items-center gap-1.5 flex-wrap", isSidebar ? "text-xs" : "text-sm", !isExpanded && "truncate")}>
-                            <div className="flex items-center shrink-0">
-                                {levelPF !== undefined && <img src="/PFVoid.svg" alt="PF" className="h-3 w-3 -mr-0.5" />}
-                                {levelDnD !== undefined && <img src="/DnDVoid.svg" alt="DnD" className="h-3 w-3" />}
-                            </div>
-                            <span 
-                              className={cn(isExpanded ? "whitespace-normal break-words" : "truncate")}
-                              title={quest.name}
-                            >
-                              {quest.name}
-                            </span>
-                            {!quest.worldId && (
-                                <span 
-                                  className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40 shrink-0 shadow-xs"
-                                  title="Global Quest (Shared across all worlds)"
-                                >
-                                    <Globe className="h-2.5 w-2.5 text-blue-400" />
-                                    <span className={cn(isSidebar ? "hidden" : "hidden sm:inline")}>Global Quest</span>
-                                    <span className={cn(isSidebar ? "inline" : "sm:hidden")}>Global</span>
-                                </span>
-                            )}
-                            {quest.isHidden && (
-                                <span 
-                                  className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0 shadow-xs"
-                                  title="Hidden from players (Only visible to world owner & admins)"
-                                >
-                                    <EyeOff className="h-2.5 w-2.5 text-amber-400" />
-                                    <span>Hidden</span>
-                                </span>
-                            )}
-                            {isCharacterQuest && (
-                                <span 
-                                  className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 shrink-0 shadow-xs"
-                                  title={`Given by Character: ${quest.characterName || quest.questgiver?.replace(/^Character:\s*/, '') || 'Player Character'}`}
-                                >
-                                    <User className="h-2.5 w-2.5 text-purple-400" />
-                                    <span className={cn(isSidebar ? "hidden" : "hidden sm:inline")}>Character Quest</span>
-                                    <span className={cn(isSidebar ? "inline" : "sm:hidden")}>PC</span>
-                                </span>
-                            )}
-                        </h4>
-                        {(quest.questgiver || quest.characterName || isCharacterQuest) && (
-                            <p className={cn("text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5", isExpanded ? "whitespace-normal break-words" : "truncate")}>
-                                {isCharacterQuest ? (
-                                    <span className={cn("text-purple-400/90 font-medium flex items-center gap-1", isExpanded ? "whitespace-normal break-words" : "truncate")}>
-                                        <User className="h-2.5 w-2.5 shrink-0" />
-                                        <span>
-                                            {quest.characterName 
-                                                ? `Character: ${quest.characterName}` 
-                                                : (quest.questgiver?.startsWith('Character:') ? quest.questgiver : `Character: ${quest.questgiver || 'Player Character'}`)}
-                                        </span>
-                                        {quest.characterRank && (
-                                            <CharacterRankIcon rank={quest.characterRank} />
-                                        )}
-                                    </span>
-                                ) : (
-                                    <>
-                                        <User className="h-2.5 w-2.5 shrink-0" />
-                                        <span className={cn(isExpanded ? "whitespace-normal break-words" : "truncate")}>{quest.questgiver}</span>
-                                    </>
-                                )}
-                            </p>
-                        )}
-                    </div>
+                  <div 
+                      className={cn(
+                          "flex items-center justify-center rounded-full font-bold shrink-0 mt-0.5",
+                          isSidebar ? "h-6 w-6 text-[10px]" : "h-7 w-7 text-xs"
+                      )}
+                      style={getDualLevelBadgeStyle(levelPF, levelDnD)}
+                  >
+                    {(levelPF ?? levelDnD ?? 0) > 0 ? (levelPF ?? levelDnD) : '?'}
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    {canEdit && (
-                        <div className="flex items-center gap-1 mr-2" onClick={(e) => e.stopPropagation()}>
-                            {isWorldOwner && (
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className={cn(
-                                    "h-7 w-7", 
-                                    quest.isHidden ? "text-amber-400 hover:text-amber-300 hover:bg-amber-500/10" : "text-muted-foreground hover:text-foreground"
-                                  )} 
-                                  onClick={() => handleToggleHidden(quest._id, Boolean(quest.isHidden))}
-                                  title={quest.isHidden ? "Unhide quest (make visible to players)" : "Hide quest from players"}
-                                >
-                                    {quest.isHidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                                </Button>
-                            )}
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(quest)} title="Edit quest">
-                                <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDelete(quest._id)} title="Delete quest">
-                                <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                        </div>
-                    )}
-                    {isExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                  <div className="min-w-0 flex-1">
+                      <h4 className={cn("font-bold text-foreground leading-snug", isSidebar ? "text-xs" : "text-sm")}>
+                          <span className="inline-flex items-center align-middle mr-1 gap-0.5 shrink-0">
+                              {levelPF !== undefined && <img src="/PFVoid.svg" alt="PF" className="h-3.5 w-3.5 inline-block" />}
+                              {levelDnD !== undefined && <img src="/DnDVoid.svg" alt="DnD" className="h-3.5 w-3.5 inline-block" />}
+                          </span>
+                          <span 
+                            className="align-middle"
+                            title={quest.name}
+                          >
+                            {quest.name}
+                          </span>
+                          {!quest.worldId && (
+                              <span 
+                                className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40 ml-1.5 align-middle shadow-xs shrink-0"
+                                title="Global Quest (Shared across all worlds)"
+                              >
+                                  <Globe className="h-2.5 w-2.5 text-blue-400" />
+                                  <span className={cn(isSidebar ? "hidden" : "hidden sm:inline")}>Global Quest</span>
+                                  <span className={cn(isSidebar ? "inline" : "sm:hidden")}>Global</span>
+                              </span>
+                          )}
+                          {quest.isHidden && (
+                              <span 
+                                className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 ml-1.5 align-middle shadow-xs shrink-0"
+                                title="Hidden from players (Only visible to world owner & admins)"
+                              >
+                                  <EyeOff className="h-2.5 w-2.5 text-amber-400" />
+                                  <span>Hidden</span>
+                              </span>
+                          )}
+                          {isCharacterQuest && (
+                              <span 
+                                className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 ml-1.5 align-middle shadow-xs shrink-0"
+                                title={`Given by Character: ${quest.characterName || quest.questgiver?.replace(/^Character:\s*/, '') || 'Player Character'}`}
+                              >
+                                  <User className="h-2.5 w-2.5 text-purple-400" />
+                                  <span className={cn(isSidebar ? "hidden" : "hidden sm:inline")}>Character Quest</span>
+                                  <span className={cn(isSidebar ? "inline" : "sm:hidden")}>PC</span>
+                              </span>
+                          )}
+                      </h4>
+                      {(quest.questgiver || quest.characterName || isCharacterQuest) && (
+                          <p className={cn("text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5", isExpanded ? "whitespace-normal break-words" : "truncate")}>
+                              {isCharacterQuest ? (
+                                  <span className={cn("text-purple-400/90 font-medium flex items-center gap-1", isExpanded ? "whitespace-normal break-words" : "truncate")}>
+                                      <User className="h-2.5 w-2.5 shrink-0" />
+                                      <span>
+                                          {quest.characterName 
+                                              ? `Character: ${quest.characterName}` 
+                                              : (quest.questgiver?.startsWith('Character:') ? quest.questgiver : `Character: ${quest.questgiver || 'Player Character'}`)}
+                                      </span>
+                                      {quest.characterRank && (
+                                          <CharacterRankIcon rank={quest.characterRank} />
+                                      )}
+                                  </span>
+                              ) : (
+                                  <>
+                                      <User className="h-2.5 w-2.5 shrink-0" />
+                                      <span className={cn(isExpanded ? "whitespace-normal break-words" : "truncate")}>{quest.questgiver}</span>
+                                  </>
+                              )}
+                          </p>
+                      )}
+                      {/* Tags on collapsed and expanded versions */}
+                      {quest.tags && quest.tags.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1 mt-1">
+                              {quest.tags.map(tag => (
+                                  <span 
+                                      key={tag} 
+                                      className="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider shrink-0"
+                                  >
+                                      {tag}
+                                  </span>
+                              ))}
+                          </div>
+                      )}
                   </div>
                 </div>
 
@@ -533,9 +556,9 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
                       exit={{ height: 0, opacity: 0 }}
                       transition={{ duration: 0.2 }}
                     >
-                      <div className="px-3 pb-4 pt-0 text-sm border-t border-border/20 space-y-3">
+                      <div className="px-3 pb-3 pt-2 text-sm border-t border-border/20 space-y-2.5">
                         {isCharacterQuest && (
-                            <div className="mt-3 flex items-center gap-2 text-[11px] text-purple-300 bg-purple-500/10 border border-purple-500/20 rounded-md px-2.5 py-1.5 flex-wrap">
+                            <div className="mt-1 flex items-center gap-2 text-[11px] text-purple-300 bg-purple-500/10 border border-purple-500/20 rounded-md px-2.5 py-1.5 flex-wrap">
                                 <User className="h-3.5 w-3.5 text-purple-400 shrink-0" />
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                     <span>Posted by Character:</span>
@@ -567,7 +590,7 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
 
                         {quest.description && (
                             <div className={cn(
-                                "mt-3 text-muted-foreground leading-relaxed [&_>_*:first-child]:mt-0 [&>p]:mt-2 [&>ul]:list-disc [&>ul]:pl-4 [&>ul]:mt-2 [&>ol]:list-decimal [&>ol]:pl-4 [&>ol]:mt-2 [&>blockquote]:border-l-2 [&>blockquote]:pl-3 [&>blockquote]:italic [&>blockquote]:mt-2 [&_a]:text-primary [&_a]:underline",
+                                "mt-1.5 text-muted-foreground leading-relaxed [&_>_*:first-child]:mt-0 [&>p]:mt-1.5 [&>ul]:list-disc [&>ul]:pl-4 [&>ul]:mt-1.5 [&>ol]:list-decimal [&>ol]:pl-4 [&>ol]:mt-1.5 [&>blockquote]:border-l-2 [&>blockquote]:pl-3 [&>blockquote]:italic [&>blockquote]:mt-1.5 [&_a]:text-primary [&_a]:underline",
                                 isSidebar ? "text-[11px]" : "text-xs"
                             )}>
                                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -576,7 +599,7 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
                             </div>
                         )}
                         
-                        <div className="grid grid-cols-1 gap-2 pt-2">
+                        <div className="grid grid-cols-1 gap-1.5 pt-1">
                             {quest.reward && (
                                 <div className="flex items-start gap-2 text-[11px] flex-wrap">
                                     <div className="flex items-center gap-1.5 shrink-0">
@@ -595,18 +618,6 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
                                 <div className="flex items-start gap-2 text-[11px]">
                                     <MapPin className="h-3.5 w-3.5 text-purple-500 shrink-0" />
                                     <span><span className="font-bold text-muted-foreground uppercase mr-1">Location:</span> The Void (Any World)</span>
-                                </div>
-                            )}
-                            {quest.tags && quest.tags.length > 0 && (
-                                <div className="flex items-start gap-2 text-[11px]">
-                                    <Tag className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                                    <div className="flex flex-wrap gap-1">
-                                        {quest.tags.map(tag => (
-                                            <span key={tag} className="bg-blue-500/10 text-blue-500 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase">
-                                                {tag}
-                                            </span>
-                                        ))}
-                                    </div>
                                 </div>
                             )}
                             {isDual && (
