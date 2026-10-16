@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { useState, useEffect, useMemo } from 'react'
 import { Id, Doc } from '@/convex/_generated/dataModel'
 import Link from 'next/link'
-import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, Unlock, Globe, Scroll, Trophy, Menu, User, Target, UserPlus, Coins, Map, Sprout, Loader2, Compass } from 'lucide-react'
+import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, Unlock, Globe, Scroll, Trophy, Menu, User, Target, UserPlus, Coins, Map, Sprout, Loader2 } from 'lucide-react'
 import { useAuth, SignInButton } from '@clerk/nextjs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatDate, formatTime as formatTimeUtil, getLevelBadgeStyle, getDualLevelBadgeStyle, CharacterRankIcon, getSessionWikiUrl, cn } from '@/lib/utils'
@@ -122,7 +122,6 @@ export default function SessionClient() {
   const [optimisticInterestedPlayers, setOptimisticInterestedPlayers] = useState<{ userId: string; username: string }[] | null>(null)
   const [isJoinSuccessDialogOpen, setIsJoinSuccessDialogOpen] = useState(false)
   const [isObjectiveContributeOpen, setIsObjectiveContributeOpen] = useState(false)
-  const [activeSideTab, setActiveSideTab] = useState<'loot' | 'quests' | null>(null)
 
   const userIds = useMemo(() => {
     if (!session) return [];
@@ -669,64 +668,19 @@ export default function SessionClient() {
           />
       )}
 
-      {(() => {
-        const showLootDefault = session.isOwner || session.locked || hasUserCharacterInSession || Boolean(session.questId) || Boolean(session.loot && session.loot.length > 0);
-        const currentTab = activeSideTab ?? (showLootDefault ? 'loot' : 'quests');
-
-        return (
-          <div className="space-y-4">
-            {showLootDefault && (
-              <div className="flex items-center justify-between bg-muted/40 p-1 rounded-lg border border-border/40 text-xs">
-                <button
-                  type="button"
-                  onClick={() => setActiveSideTab('loot')}
-                  className={cn(
-                    "flex-1 py-1.5 px-3 rounded-md font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer",
-                    currentTab === 'loot' 
-                      ? "bg-background text-foreground shadow-xs font-bold" 
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Coins className="h-3.5 w-3.5 text-amber-400" />
-                  <span>Session Loot</span>
-                  {session.loot && session.loot.length > 0 && (
-                    <span className="ml-1 px-1.5 py-0.2 bg-amber-500/15 text-amber-300 rounded-full text-[10px] font-bold border border-amber-500/30">
-                      {session.loot.length}
-                    </span>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveSideTab('quests')}
-                  className={cn(
-                    "flex-1 py-1.5 px-3 rounded-md font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer",
-                    currentTab === 'quests' 
-                      ? "bg-background text-foreground shadow-xs font-bold" 
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Compass className="h-3.5 w-3.5 text-indigo-400" />
-                  <span>World Quests</span>
-                </button>
-              </div>
-            )}
-
-            {currentTab === 'loot' ? (
-              <LootList 
-                session={session as any} 
-                userCharacterIds={userCharacterIds} 
-              />
-            ) : (
-              <QuestList 
-                worldId={session?.world} 
-                worldOwner={world?.owner} 
-                isSidebar={true} 
-                filters={{ pf: session?.system === 'PF', dnd: session?.system === 'DnD' }} 
-              />
-            )}
-          </div>
-        );
-      })()}
+      {session.isOwner || session.locked ? (
+        <LootList 
+          session={session as any} 
+          userCharacterIds={userCharacterIds} 
+        />
+      ) : (
+        <QuestList 
+          worldId={session?.world} 
+          worldOwner={world?.owner} 
+          isSidebar={true} 
+          filters={{ pf: session?.system === 'PF', dnd: session?.system === 'DnD' }} 
+        />
+      )}
     </div>
   );
 

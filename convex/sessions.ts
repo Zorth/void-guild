@@ -1845,27 +1845,26 @@ export const addLoot = mutation({
     }
 
     const loot = session.loot || []
-    const quantity = args.quantity || 1
-    const newItems = []
+    const quantity = Math.max(1, Math.floor(args.quantity || 1))
     const isCurrency = args.isCurrency ?? false
     const isGood = isCurrency ? true : args.isGood
 
-    for (let i = 0; i < quantity; i++) {
-        newItems.push({
-            id: crypto.randomUUID(),
-            name: args.name,
-            link: args.link,
-            valueGP: args.valueGP,
-            isGood,
-            isCurrency,
-            fromQuest: args.fromQuest ?? false,
-            isPerCharacter: args.isPerCharacter ?? false,
-        })
+    const newItem = {
+        id: crypto.randomUUID(),
+        name: args.name,
+        link: args.link,
+        valueGP: args.valueGP,
+        quantity,
+        isGood,
+        isCurrency,
+        fromQuest: args.fromQuest ?? false,
+        isPerCharacter: args.isPerCharacter ?? false,
+        claimedByCharacters: [],
     }
 
     const newLoot = [
       ...loot,
-      ...newItems,
+      newItem,
     ]
 
     await ctx.db.patch(args.sessionId, { loot: newLoot })
@@ -1882,6 +1881,7 @@ export const editLoot = mutation({
     isGood: v.boolean(),
     isCurrency: v.optional(v.boolean()),
     isPerCharacter: v.optional(v.boolean()),
+    quantity: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
@@ -1899,11 +1899,13 @@ export const editLoot = mutation({
       if (item.id === args.lootId) {
         const isCurrency = args.isCurrency ?? item.isCurrency ?? false
         const isGood = isCurrency ? true : args.isGood
+        const quantity = args.quantity !== undefined ? Math.max(1, Math.floor(args.quantity)) : (item.quantity || 1)
         return {
           ...item,
           name: args.name,
           link: args.link,
           valueGP: args.valueGP,
+          quantity,
           isGood,
           isCurrency,
           isPerCharacter: args.isPerCharacter ?? false,
@@ -1947,15 +1949,18 @@ export const importQuestRewardsToLoot = mutation({
       loot = loot.filter((item: any) => !item.fromQuest)
     }
 
+    const attendeeCount = Math.max(1, session.characters?.length || 1)
     const newItems: Array<{
       id: string
       name: string
       link?: string
       valueGP: number
+      quantity: number
       isGood: boolean
       isCurrency: boolean
       fromQuest: boolean
       isPerCharacter?: boolean
+      claimedByCharacters?: Array<Id<'characters'>>
     }> = []
 
     // 1. Money reward
@@ -1965,10 +1970,12 @@ export const importQuestRewardsToLoot = mutation({
         id: crypto.randomUUID(),
         name: `Quest Bounty: ${quest.name}`,
         valueGP: quest.rewardMoneyGP,
+        quantity: isPerChar ? attendeeCount : 1,
         isGood: true,
         isCurrency: true,
         fromQuest: true,
         isPerCharacter: isPerChar,
+        claimedByCharacters: [],
       })
     }
 
@@ -1979,10 +1986,12 @@ export const importQuestRewardsToLoot = mutation({
         id: crypto.randomUUID(),
         name: quest.rewardOther.trim(),
         valueGP: 0,
+        quantity: isPerChar ? attendeeCount : 1,
         isGood: false,
         isCurrency: false,
         fromQuest: true,
         isPerCharacter: isPerChar,
+        claimedByCharacters: [],
       })
     }
 
@@ -1995,20 +2004,24 @@ export const importQuestRewardsToLoot = mutation({
           id: crypto.randomUUID(),
           name: `Quest Bounty: ${quest.name}`,
           valueGP: parsedGp,
+          quantity: isPerChar ? attendeeCount : 1,
           isGood: true,
           isCurrency: true,
           fromQuest: true,
           isPerCharacter: isPerChar,
+          claimedByCharacters: [],
         })
       } else {
         newItems.push({
           id: crypto.randomUUID(),
           name: quest.reward.trim(),
           valueGP: 0,
+          quantity: isPerChar ? attendeeCount : 1,
           isGood: false,
           isCurrency: false,
           fromQuest: true,
           isPerCharacter: isPerChar,
+          claimedByCharacters: [],
         })
       }
     }
@@ -2092,23 +2105,20 @@ export const claimLoot = mutation({
 
     const loot = (session.loot || []).map((item) => {
       if (item.id === args.lootId) {
-        if (item.isCurrency) {
-          throw new Error('Currency cannot be claimed as an individual inventory item. It is automatically distributed as cash to all attendees.')
+        const totalQty = Math.max(1, item.quantity ?? 1)
+        const currentClaimed = item.claimedByCharacters && item.claimedByCharacters.length > 0
+          ? [...item.claimedByCharacters]
+          : (item.claimedBy ? [item.claimedBy] : [])
+
+        if (currentClaimed.length >= totalQty) {
+          throw new Error('All copies of this item have already been claimed')
         }
-        if (item.isPerCharacter) {
-          const currentClaimed = item.claimedByCharacters || (item.claimedBy ? [item.claimedBy] : [])
-          if (currentClaimed.includes(args.characterId)) {
-            throw new Error('Item already claimed by your character')
-          }
-          return {
-            ...item,
-            claimedByCharacters: [...currentClaimed, args.characterId],
-          }
-        } else {
-          if (item.claimedBy) {
-            throw new Error('Item already claimed')
-          }
-          return { ...item, claimedBy: args.characterId }
+
+        const updatedClaimed = [...currentClaimed, args.characterId]
+        return {
+          ...item,
+          claimedBy: updatedClaimed[0],
+          claimedByCharacters: updatedClaimed,
         }
       }
       return item
@@ -2138,25 +2148,26 @@ export const unclaimLoot = mutation({
 
     const loot = (session.loot || []).map((item) => {
       if (item.id === args.lootId) {
-        if (item.isPerCharacter) {
-          const currentClaimed = item.claimedByCharacters || (item.claimedBy ? [item.claimedBy] : [])
-          // If a specific characterId was requested to unclaim
-          const targetCharId = args.characterId || (currentClaimed.length === 1 ? currentClaimed[0] : undefined)
-          if (!targetCharId) {
-            // If user owns session or is admin and no charId specified, or has characters in currentClaimed
-            return {
-              ...item,
-              claimedBy: undefined,
-              claimedByCharacters: [],
-            }
+        const currentClaimed = item.claimedByCharacters && item.claimedByCharacters.length > 0
+          ? [...item.claimedByCharacters]
+          : (item.claimedBy ? [item.claimedBy] : [])
+
+        if (args.characterId) {
+          const idx = currentClaimed.indexOf(args.characterId)
+          const updatedClaimed = idx !== -1
+            ? [...currentClaimed.slice(0, idx), ...currentClaimed.slice(idx + 1)]
+            : currentClaimed
+          return {
+            ...item,
+            claimedBy: updatedClaimed[0] || undefined,
+            claimedByCharacters: updatedClaimed,
           }
+        } else {
           return {
             ...item,
             claimedBy: undefined,
-            claimedByCharacters: currentClaimed.filter((id) => id !== targetCharId),
+            claimedByCharacters: [],
           }
-        } else {
-          return { ...item, claimedBy: undefined }
         }
       }
       return item

@@ -74,6 +74,7 @@ export default defineSchema({
             isPerCharacter: v.optional(v.boolean()),
             isCurrency: v.optional(v.boolean()),
             fromQuest: v.optional(v.boolean()),
+            quantity: v.optional(v.number()),
             claimedBy: v.optional(v.id("characters")),
             claimedByCharacters: v.optional(v.array(v.id("characters"))),
         }))),

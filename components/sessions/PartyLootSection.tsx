@@ -39,6 +39,8 @@ interface LootItem {
   link?: string
   valueGP: number
   isGood: boolean
+  isCurrency?: boolean
+  quantity?: number
   isPerCharacter?: boolean
   claimedBy?: Id<'characters'>
   claimedByCharacters?: Id<'characters'>[]
@@ -275,19 +277,17 @@ export default function PartyLootSection({
 
     const sharePerPlayer = totalValue / attendingCount
 
-    const userClaimedValue = loot
-      .filter((item) => {
-        if (item.isPerCharacter) {
-          return Boolean(
-            userCharacterInSession && item.claimedByCharacters?.includes(userCharacterInSession._id)
-          )
-        }
-        return Boolean(item.claimedBy && userCharacterIds.has(item.claimedBy))
-      })
-      .reduce((sum, item) => {
-        const val = item.isGood ? item.valueGP : item.valueGP / 2
-        return sum + val
-      }, 0)
+    const userClaimedValue = loot.reduce((sum, item) => {
+      if (item.isCurrency) return sum
+      const baseVal = item.isGood ? item.valueGP : item.valueGP / 2
+      const claimedList = item.claimedByCharacters && item.claimedByCharacters.length > 0
+        ? item.claimedByCharacters
+        : (item.claimedBy ? [item.claimedBy] : [])
+      const count = userCharacterInSession
+        ? claimedList.filter((id) => id === userCharacterInSession._id).length
+        : 0
+      return sum + baseVal * count
+    }, 0)
 
     const userFinalShare = sharePerPlayer - userClaimedValue
     const guildmasterCutValue = Math.round(totalValue * 0.2 * 100) / 100
@@ -299,7 +299,29 @@ export default function PartyLootSection({
       userClaimedValue,
       guildmasterCutValue,
     }
-  }, [loot, session.attendingCharacters.length, userCharacterIds, userCharacterInSession])
+  }, [loot, session.attendingCharacters.length, userCharacterInSession])
+
+  const userClaimedItems = useMemo(() => {
+    if (!userCharacterInSession) return []
+    return loot
+      .map((item) => {
+        if (item.isCurrency) return null
+        const isGoodOrCurrency = item.isGood || item.isCurrency
+        const unitVal = isGoodOrCurrency ? item.valueGP : item.valueGP / 2
+        const claimedList = item.claimedByCharacters && item.claimedByCharacters.length > 0
+          ? item.claimedByCharacters
+          : (item.claimedBy ? [item.claimedBy] : [])
+        const count = claimedList.filter((id) => id === userCharacterInSession._id).length
+        if (count === 0) return null
+        return {
+          id: item.id,
+          name: item.name,
+          count,
+          totalVal: unitVal * count,
+        }
+      })
+      .filter((item): item is { id: string; name: string; count: number; totalVal: number } => item !== null)
+  }, [loot, userCharacterInSession])
 
   const currentNetMoneyGP = calculations ? Math.round(calculations.userFinalShare * 100) / 100 : 0
   const isClaimed = Boolean(claimStatus?.isClaimed)
@@ -602,25 +624,21 @@ export default function PartyLootSection({
         >
           <CardContent className="p-4 text-center">
             <div className="flex items-center justify-between gap-2 mb-1">
-              <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider truncate text-left">
-                Your Share ({userCharacterInSession.name})
+              <span className="text-xs text-muted-foreground font-bold tracking-wider truncate text-left">
+                {userCharacterInSession.name}&apos;s loot:
               </span>
-              {session.locked && (
+              {session.locked && isClaimed && (
                 <span
                   className={cn(
                     'text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0',
-                    isClaimed && pendingMoneyAdjustmentGP === 0
+                    pendingMoneyAdjustmentGP === 0
                       ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                      : isClaimed && pendingMoneyAdjustmentGP !== 0
-                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/30 animate-pulse'
-                      : 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+                      : 'bg-amber-500/20 text-amber-300 border-amber-500/30 animate-pulse'
                   )}
                 >
-                  {isClaimed
-                    ? pendingMoneyAdjustmentGP !== 0
-                      ? 'Adjustment Needed'
-                      : 'On Sheet ✓'
-                    : 'Not on Sheet'}
+                  {pendingMoneyAdjustmentGP !== 0
+                    ? 'Adjustment Needed'
+                    : 'On Sheet ✓'}
                 </span>
               )}
             </div>
@@ -638,36 +656,24 @@ export default function PartyLootSection({
               {formatGP(calculations.userFinalShare)}
             </div>
 
-            {loot.filter(item => {
-              if (item.isPerCharacter) {
-                return Boolean(userCharacterInSession && item.claimedByCharacters?.includes(userCharacterInSession._id))
-              }
-              return Boolean(item.claimedBy && userCharacterIds.has(item.claimedBy))
-            }).length > 0 && (
+            {userClaimedItems.length > 0 && (
               <div className="my-2.5 text-xs text-muted-foreground space-y-1 bg-background/40 p-2.5 rounded border border-border/30 text-left">
-                <div className="font-semibold text-[11px] text-foreground/80 mb-1">Claimed Items (Deducted):</div>
-                {loot
-                  .filter(item => {
-                    if (item.isPerCharacter) {
-                      return Boolean(userCharacterInSession && item.claimedByCharacters?.includes(userCharacterInSession._id))
-                    }
-                    return Boolean(item.claimedBy && userCharacterIds.has(item.claimedBy))
-                  })
-                  .map((item) => {
-                    const val = item.isGood ? item.valueGP : item.valueGP / 2
-                    return (
-                      <div key={item.id} className="flex justify-between items-center gap-2 text-muted-foreground">
-                        <span className="truncate">- {item.name}</span>
-                        <span className="font-mono text-rose-300 shrink-0">-{formatGP(val)}</span>
-                      </div>
-                    )
-                  })}
+                <div className="flex justify-between items-center gap-2 text-foreground/90 font-medium pb-1 border-b border-border/20">
+                  <span>Base amount:</span>
+                  <span className="font-mono text-foreground font-semibold">{formatGP(calculations.sharePerPlayer)}</span>
+                </div>
+                <div className="space-y-1 pt-0.5">
+                  {userClaimedItems.map((claimed) => (
+                    <div key={claimed.id} className="flex justify-between items-center gap-2 text-muted-foreground">
+                      <span className="truncate">
+                        - {claimed.count > 1 ? `${claimed.count}x ` : ''}{claimed.name}
+                      </span>
+                      <span className="font-mono text-rose-300 shrink-0">- {formatGP(claimed.totalVal)}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
-
-            <div className="text-[10px] text-muted-foreground mt-2 italic leading-normal">
-              Based on {formatGP(calculations.sharePerPlayer)} base share minus {formatGP(calculations.userClaimedValue)} in claimed items.
-            </div>
 
             {session.locked && (
               <div className="pt-2 mt-2 border-t border-border/30 flex flex-col gap-2">
@@ -968,16 +974,14 @@ export default function PartyLootSection({
                 className="h-8 gap-1.5 border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
               >
                 <Crown className="h-3.5 w-3.5 text-amber-400" />
-                <span>
-                  {session.guildmasterCutCharacterData ? 'Edit Guildmaster' : 'Assign Guildmaster'}
-                </span>
+                <span>Guildmaster</span>
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px] bg-zinc-950 border-amber-500/30">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2 text-amber-300">
                   <Crown className="h-5 w-5 text-amber-400" />
-                  <span>Assign Regional Guildmaster</span>
+                  <span>Guildmaster</span>
                 </DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-3 text-xs">

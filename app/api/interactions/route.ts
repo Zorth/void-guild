@@ -1,7 +1,13 @@
 import { InteractionResponseType, InteractionType, verifyKey } from 'discord-interactions';
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
-import { DISCORD_GP_EMOJI, DISCORD_SP_EMOJI } from "@/convex/discordHelpers";
+import { 
+  DISCORD_GP_EMOJI, 
+  DISCORD_SP_EMOJI, 
+  DISCORD_CP_EMOJI, 
+  DISCORD_PP_EMOJI, 
+  formatDiscordCurrency 
+} from "@/convex/discordHelpers";
 
 let client: ConvexHttpClient | null = null;
 function getConvexClient() {
@@ -717,9 +723,7 @@ export async function POST(req: Request) {
           }
 
           const formattedRawPrice = result.priceRaw
-            ? result.priceRaw
-                .replace(/\bGP\b/gi, DISCORD_GP_EMOJI)
-                .replace(/\bSP\b/gi, DISCORD_SP_EMOJI)
+            ? formatDiscordCurrency(result.priceRaw)
             : undefined;
 
           const priceStr = result.priceInGP

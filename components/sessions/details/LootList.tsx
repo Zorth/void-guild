@@ -23,10 +23,22 @@ import {
     Loader2, 
     Scroll, 
     Sparkles, 
-    Package 
+    Package,
+    Shield,
+    Search 
 } from 'lucide-react'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+
+interface AoNItemResult {
+    id: string;
+    name: string;
+    url?: string;
+    priceInGP?: number;
+    priceRaw?: string;
+    category?: string;
+}
 
 interface LootItem {
     id: string;
@@ -37,6 +49,7 @@ interface LootItem {
     isCurrency?: boolean;
     fromQuest?: boolean;
     isPerCharacter?: boolean;
+    quantity?: number;
     claimedBy?: Id<'characters'>;
     claimedByCharacters?: Id<'characters'>[];
 }
@@ -85,9 +98,14 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
     const [name, setName] = useState('')
     const [link, setLink] = useState('')
     const [valueGP, setValueGP] = useState<string>('0')
-    const [itemType, setItemType] = useState<'currency' | 'trade_good' | 'equipment'>('equipment')
+    const [isGood, setIsGood] = useState(false)
     const [isPerCharacter, setIsPerCharacter] = useState(false)
     const [quantity, setQuantity] = useState<string>('1')
+
+    // AoN Search states
+    const [aonQuery, setAonQuery] = useState('')
+    const [aonSearchResults, setAonSearchResults] = useState<AoNItemResult[]>([])
+    const [isSearchingAon, setIsSearchingAon] = useState(false)
 
     const loot = (session as any).loot as LootItem[] || []
 
@@ -143,36 +161,52 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
         setName('')
         setLink('')
         setValueGP('0')
-        setItemType('equipment')
+        setIsGood(false)
         setIsPerCharacter(false)
         setQuantity('1')
         setEditingItem(null)
+        setAonQuery('')
+        setAonSearchResults([])
     }
 
-    const handleQuickCurrencyPreset = (amount: number) => {
-        setName(amount >= 1 ? `${amount} Gold Pieces` : `${Math.round(amount * 10)} Silver Pieces`)
-        setValueGP(amount.toString())
-        setItemType('currency')
-        setIsPerCharacter(false)
-    }
-
-    const handleNameChange = (val: string) => {
-        setName(val)
-        // If user types currency-like names, suggest switching to currency type so value isn't halved
-        if (itemType === 'equipment') {
-            const lower = val.toLowerCase()
-            if (
-                lower.includes('gold') || 
-                lower.includes('coin') || 
-                lower.includes('gp') || 
-                lower.includes('silver') || 
-                lower.includes('sp') || 
-                lower.includes('copper') || 
-                lower.includes('bounty')
-            ) {
-                setItemType('currency')
-            }
+    const handleSearchAon = async (searchVal: string) => {
+        const q = searchVal.trim()
+        if (!q) {
+            setAonSearchResults([])
+            return
         }
+        setIsSearchingAon(true)
+        try {
+            const res = await fetch(`/api/nethys/item?q=${encodeURIComponent(q)}`)
+            if (res.ok) {
+                const data = await res.json()
+                const results = data.results || []
+                setAonSearchResults(results)
+                if (results.length === 0) {
+                    toast.info(`No items found matching "${q}" on Archives of Nethys`)
+                }
+            } else {
+                setAonSearchResults([])
+                toast.error('Archives of Nethys search failed')
+            }
+        } catch (e) {
+            console.error('Failed to search AoN:', e)
+            toast.error('Failed to connect to Archives of Nethys')
+        } finally {
+            setIsSearchingAon(false)
+        }
+    }
+
+    const handleSelectAonItem = (hit: AoNItemResult) => {
+        setName(hit.name)
+        if (hit.url) setLink(hit.url)
+        if (hit.priceInGP !== undefined && hit.priceInGP > 0) {
+            setValueGP(hit.priceInGP.toString())
+        }
+        setIsGood(false)
+        setAonSearchResults([])
+        setAonQuery('')
+        toast.success(`Loaded "${hit.name}" from Archives of Nethys!`)
     }
 
     const handleImportQuest = async (overwrite: boolean = false) => {
@@ -197,23 +231,21 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
 
     const handleAdd = async () => {
         try {
-            const parsedQty = parseInt(quantity) || 1
-            const isCurrencyItem = itemType === 'currency'
-            const isGoodItem = isCurrencyItem || itemType === 'trade_good'
+            const parsedQty = Math.max(1, parseInt(quantity) || 1)
 
             await addLoot({
                 sessionId: session._id,
-                name: name.trim() || (isCurrencyItem ? 'Coin Bounty' : 'Item'),
+                name: name.trim() || (isGood ? 'Trade Good / Currency' : 'Item'),
                 link: link.trim() || undefined,
                 valueGP: parseFloat(valueGP) || 0,
-                isGood: isGoodItem,
-                isCurrency: isCurrencyItem,
+                isGood,
+                isCurrency: false,
                 isPerCharacter,
                 quantity: parsedQty,
             })
             setIsAddDialogOpen(false)
             resetForm()
-            toast.success(parsedQty > 1 ? `Added ${parsedQty} loot entries` : 'Loot added')
+            toast.success(parsedQty > 1 ? `Added ${parsedQty}x ${name.trim() || 'loot'}` : 'Loot added')
         } catch (e) {
             toast.error('Failed to add loot')
         }
@@ -222,18 +254,17 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
     const handleEdit = async () => {
         if (!editingItem) return
         try {
-            const isCurrencyItem = itemType === 'currency'
-            const isGoodItem = isCurrencyItem || itemType === 'trade_good'
-
+            const parsedQty = Math.max(1, parseInt(quantity) || 1)
             await editLoot({
                 sessionId: session._id,
                 lootId: editingItem.id,
                 name: name.trim() || editingItem.name,
                 link: link.trim() || undefined,
                 valueGP: parseFloat(valueGP) || 0,
-                isGood: isGoodItem,
-                isCurrency: isCurrencyItem,
+                isGood,
+                isCurrency: false,
                 isPerCharacter,
+                quantity: parsedQty,
             })
             setEditingItem(null)
             resetForm()
@@ -309,8 +340,10 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
         let totalItemsResale = 0
 
         for (const item of loot) {
-            const baseVal = item.isGood || item.isCurrency ? item.valueGP : item.valueGP / 2
-            const itemTotal = item.isPerCharacter ? baseVal * attendingCount : baseVal
+            const isGoodOrCurrency = item.isGood || item.isCurrency
+            const baseVal = isGoodOrCurrency ? item.valueGP : item.valueGP / 2
+            const qty = item.quantity ?? 1
+            const itemTotal = baseVal * qty
             if (item.isCurrency) {
                 totalCash += itemTotal
             } else {
@@ -321,19 +354,19 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
         const totalValue = totalCash + totalItemsResale
         const sharePerPlayer = totalValue / attendingCount
 
-        // Only physical items (not auto-distributed currency) claimed by THIS character deduct from cash payout
-        const userClaimedValue = loot
-            .filter(item => {
-                if (item.isCurrency) return false
-                if (item.isPerCharacter) {
-                    return Boolean(userCharacterInSession && item.claimedByCharacters?.includes(userCharacterInSession._id))
-                }
-                return Boolean(item.claimedBy && userCharacterIds.has(item.claimedBy))
-            })
-            .reduce((sum, item) => {
-                const val = item.isGood ? item.valueGP : item.valueGP / 2
-                return sum + val
-            }, 0)
+        // Claimed items (trade goods at 100%, gear at 50% resale) claimed by THIS character deduct from their cash payout
+        let userClaimedValue = 0
+        if (userCharacterInSession) {
+            for (const item of loot) {
+                const isGoodOrCurrency = item.isGood || item.isCurrency
+                const unitVal = isGoodOrCurrency ? item.valueGP : item.valueGP / 2
+                const claimedList = item.claimedByCharacters && item.claimedByCharacters.length > 0
+                    ? item.claimedByCharacters
+                    : (item.claimedBy ? [item.claimedBy] : [])
+                const myClaimCount = claimedList.filter(id => id === userCharacterInSession._id).length
+                userClaimedValue += myClaimCount * unitVal
+            }
+        }
 
         const userFinalShare = sharePerPlayer - userClaimedValue
         const guildmasterCutValue = Math.round(totalValue * 0.2 * 100) / 100
@@ -347,7 +380,29 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
             userClaimedValue,
             guildmasterCutValue,
         }
-    }, [loot, session.attendingCharacters.length, userCharacterIds, userCharacterInSession])
+    }, [loot, session.attendingCharacters.length, userCharacterInSession])
+
+    const userClaimedItems = useMemo(() => {
+        if (!userCharacterInSession) return []
+        return loot
+            .map((item) => {
+                if (item.isCurrency) return null
+                const isGoodOrCurrency = item.isGood || item.isCurrency
+                const unitVal = isGoodOrCurrency ? item.valueGP : item.valueGP / 2
+                const claimedList = item.claimedByCharacters && item.claimedByCharacters.length > 0
+                    ? item.claimedByCharacters
+                    : (item.claimedBy ? [item.claimedBy] : [])
+                const count = claimedList.filter((id) => id === userCharacterInSession._id).length
+                if (count === 0) return null
+                return {
+                    id: item.id,
+                    name: item.name,
+                    count,
+                    totalVal: unitVal * count,
+                }
+            })
+            .filter((item): item is { id: string; name: string; count: number; totalVal: number } => item !== null)
+    }, [loot, userCharacterInSession])
 
     const currentNetMoneyGP = calculations ? Math.round(calculations.userFinalShare * 100) / 100 : 0
     const isClaimed = Boolean(claimStatus?.isClaimed)
@@ -406,36 +461,17 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                 <div className="flex items-center gap-2">
                     <h3 className="font-bold flex items-center gap-2 text-lg">
                         <Coins className="text-primary h-5 w-5" />
-                        Loot & Quest Rewards
+                        Session Loot
                     </h3>
-                    {!session.locked && (
-                        <span className="text-[10px] bg-blue-500/15 text-blue-400 border border-blue-500/30 px-1.5 py-0.5 rounded-full font-semibold">
-                            Pre-Session
-                        </span>
-                    )}
                 </div>
                 {session.canManage && (
-                    <div className="flex items-center gap-1.5">
-                        {loot.length > 0 && (
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                disabled={isClearingLoot}
-                                onClick={handleClearAll}
-                                className="h-8 text-xs text-muted-foreground hover:text-destructive gap-1 px-2 cursor-pointer"
-                                title="Clear all loot entries"
-                            >
-                                <Trash2 className="h-3.5 w-3.5" />
-                                <span className="hidden sm:inline">Clear All</span>
+                    <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                        <DialogTrigger asChild>
+                            <Button size="sm" onClick={resetForm} className="h-8 gap-1.5 cursor-pointer">
+                                <Plus className="h-3.5 w-3.5" />
+                                Add Loot
                             </Button>
-                        )}
-                        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                            <DialogTrigger asChild>
-                                <Button size="sm" onClick={resetForm} className="h-8 gap-1.5 cursor-pointer">
-                                    <Plus className="h-3.5 w-3.5" />
-                                    Add Loot
-                                </Button>
-                            </DialogTrigger>
+                        </DialogTrigger>
                         <DialogContent className="sm:max-w-[480px]">
                             <DialogHeader>
                                 <DialogTitle className="flex items-center gap-2">
@@ -444,106 +480,110 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                                 </DialogTitle>
                             </DialogHeader>
                             <div className="space-y-4 py-3">
+                                {/* Archives of Nethys Search */}
+                                <div className="p-3 rounded-xl border border-purple-500/30 bg-purple-950/20 space-y-2">
+                                    <label className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+                                        <Search className="h-3.5 w-3.5" />
+                                        <span>Search Archives of Nethys (AoN)</span>
+                                    </label>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            placeholder="e.g. Bag of Holding, Striking Rune, Elixir of Life..."
+                                            value={aonQuery}
+                                            onChange={(e) => setAonQuery(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault()
+                                                    handleSearchAon(aonQuery)
+                                                }
+                                            }}
+                                            className="h-8 text-xs bg-background/60"
+                                        />
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => handleSearchAon(aonQuery)}
+                                            disabled={isSearchingAon}
+                                            className="h-8 text-xs shrink-0 border-purple-500/40 text-purple-300 hover:bg-purple-900/40 cursor-pointer"
+                                        >
+                                            {isSearchingAon ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Search'}
+                                        </Button>
+                                    </div>
+
+                                    {/* Search Results Dropdown / List */}
+                                    {aonSearchResults.length > 0 && (
+                                        <div className="max-h-40 overflow-y-auto rounded-lg border border-border/50 bg-background/95 divide-y divide-border/30 mt-2">
+                                            {aonSearchResults.map((hit) => (
+                                                <div
+                                                    key={hit.id}
+                                                    onClick={() => handleSelectAonItem(hit)}
+                                                    className="p-2 hover:bg-purple-900/30 cursor-pointer text-xs flex items-center justify-between gap-2 transition-colors"
+                                                >
+                                                    <div className="truncate">
+                                                        <span className="font-bold text-foreground">{hit.name}</span>
+                                                        {hit.category && (
+                                                            <span className="text-[10px] text-muted-foreground ml-2 capitalize">
+                                                                ({hit.category})
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center gap-2 shrink-0 font-mono text-[11px] text-amber-300 font-bold">
+                                                        {hit.priceInGP ? `${hit.priceInGP} GP` : hit.priceRaw || '0 GP'}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
                                 {/* Type Selector */}
                                 <div className="space-y-1.5">
                                     <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                                         Loot Classification
                                     </label>
-                                    <div className="grid grid-cols-3 gap-2">
+                                    <div className="grid grid-cols-2 gap-2">
                                         <button
                                             type="button"
-                                            onClick={() => setItemType('currency')}
+                                            onClick={() => setIsGood(true)}
                                             className={cn(
-                                                "flex flex-col items-center justify-center p-2 rounded-md border text-xs font-medium transition-all text-center cursor-pointer",
-                                                itemType === 'currency' 
-                                                    ? "border-amber-500 bg-amber-500/20 text-amber-300 font-bold shadow-sm" 
-                                                    : "border-border/40 bg-muted/30 text-muted-foreground hover:bg-muted/50"
-                                            )}
-                                        >
-                                            <Coins className="h-4 w-4 mb-1 text-amber-400" />
-                                            <span>Coin / Currency</span>
-                                            <span className="text-[9px] opacity-75 font-normal">Auto-split cash</span>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setItemType('trade_good')}
-                                            className={cn(
-                                                "flex flex-col items-center justify-center p-2 rounded-md border text-xs font-medium transition-all text-center cursor-pointer",
-                                                itemType === 'trade_good' 
+                                                "flex flex-col items-center justify-center p-2.5 rounded-md border text-xs font-medium transition-all text-center cursor-pointer",
+                                                isGood 
                                                     ? "border-emerald-500 bg-emerald-500/20 text-emerald-300 font-bold shadow-sm" 
                                                     : "border-border/40 bg-muted/30 text-muted-foreground hover:bg-muted/50"
                                             )}
                                         >
                                             <Sparkles className="h-4 w-4 mb-1 text-emerald-400" />
-                                            <span>Trade Good</span>
-                                            <span className="text-[9px] opacity-75 font-normal">100% full value</span>
+                                            <span>Trade Good / Currency</span>
+                                            <span className="text-[9px] opacity-75 font-normal">100% Value • Claimable</span>
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={() => setItemType('equipment')}
+                                            onClick={() => setIsGood(false)}
                                             className={cn(
-                                                "flex flex-col items-center justify-center p-2 rounded-md border text-xs font-medium transition-all text-center cursor-pointer",
-                                                itemType === 'equipment' 
+                                                "flex flex-col items-center justify-center p-2.5 rounded-md border text-xs font-medium transition-all text-center cursor-pointer",
+                                                !isGood 
                                                     ? "border-purple-500 bg-purple-500/20 text-purple-300 font-bold shadow-sm" 
                                                     : "border-border/40 bg-muted/30 text-muted-foreground hover:bg-muted/50"
                                             )}
                                         >
                                             <Package className="h-4 w-4 mb-1 text-purple-400" />
                                             <span>Gear / Equipment</span>
-                                            <span className="text-[9px] opacity-75 font-normal">50% resale</span>
+                                            <span className="text-[9px] opacity-75 font-normal">50% Resale • Claimable</span>
                                         </button>
                                     </div>
                                 </div>
-
-                                {/* Quick Presets for Currency */}
-                                {itemType === 'currency' && (
-                                    <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                                        <span className="text-[11px] text-muted-foreground mr-1">Quick presets:</span>
-                                        <Button 
-                                            type="button" 
-                                            size="sm" 
-                                            variant="outline" 
-                                            className="h-6 px-2 text-[10px] border-amber-500/30 text-amber-300 bg-amber-500/10 hover:bg-amber-500/20"
-                                            onClick={() => handleQuickCurrencyPreset(10)}
-                                        >
-                                            +10 GP
-                                        </Button>
-                                        <Button 
-                                            type="button" 
-                                            size="sm" 
-                                            variant="outline" 
-                                            className="h-6 px-2 text-[10px] border-amber-500/30 text-amber-300 bg-amber-500/10 hover:bg-amber-500/20"
-                                            onClick={() => handleQuickCurrencyPreset(50)}
-                                        >
-                                            +50 GP
-                                        </Button>
-                                        <Button 
-                                            type="button" 
-                                            size="sm" 
-                                            variant="outline" 
-                                            className="h-6 px-2 text-[10px] border-amber-500/30 text-amber-300 bg-amber-500/10 hover:bg-amber-500/20"
-                                            onClick={() => handleQuickCurrencyPreset(100)}
-                                        >
-                                            +100 GP
-                                        </Button>
-                                        <Button 
-                                            type="button" 
-                                            size="sm" 
-                                            variant="outline" 
-                                            className="h-6 px-2 text-[10px] border-amber-500/30 text-amber-300 bg-amber-500/10 hover:bg-amber-500/20"
-                                            onClick={() => handleQuickCurrencyPreset(500)}
-                                        >
-                                            +500 GP
-                                        </Button>
-                                    </div>
-                                )}
 
                                 <div className="space-y-1.5">
                                     <label className="text-xs font-medium">Item or Bounty Name</label>
                                     <Input 
                                         value={name} 
-                                        onChange={(e) => handleNameChange(e.target.value)} 
-                                        placeholder={itemType === 'currency' ? "e.g. Gold Coins or Quest Bounty" : "e.g. +1 Striking Shortsword"} 
+                                        onChange={(e) => setName(e.target.value)} 
+                                        placeholder={
+                                            isGood 
+                                                ? "e.g. Silver Bars, Flawless Ruby, or Gold Bounty" 
+                                                : "e.g. +1 Striking Shortsword or Cloak of Elvenkind"
+                                        } 
                                     />
                                 </div>
 
@@ -558,9 +598,7 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
 
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-1.5">
-                                        <label className="text-xs font-medium">
-                                            {itemType === 'currency' ? 'Amount in GP' : 'Value in GP'}
-                                        </label>
+                                        <label className="text-xs font-medium">Value in GP</label>
                                         <Input 
                                             type="number" 
                                             step="0.01" 
@@ -584,15 +622,23 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                                         <Checkbox 
                                             id="isPerCharacter" 
                                             checked={isPerCharacter} 
-                                            onCheckedChange={(val) => setIsPerCharacter(!!val)} 
+                                            onCheckedChange={(val) => {
+                                                const checked = !!val
+                                                setIsPerCharacter(checked)
+                                                const attendeeCount = Math.max(1, session.attendingCharacters.length)
+                                                const currentQty = Math.max(1, parseInt(quantity) || 1)
+                                                if (checked) {
+                                                    setQuantity(String(currentQty * attendeeCount))
+                                                } else {
+                                                    setQuantity(String(Math.max(1, Math.floor(currentQty / attendeeCount))))
+                                                }
+                                            }} 
                                             className="mt-0.5"
                                         />
                                         <label htmlFor="isPerCharacter" className="text-xs font-medium cursor-pointer leading-tight">
-                                            <span>Award for <span className="font-bold underline text-primary">EACH</span> attending adventurer</span>
+                                            <span>Award for <span className="font-bold underline text-primary">EACH</span> attending adventurer ({session.attendingCharacters.length} {session.attendingCharacters.length === 1 ? 'player' : 'players'})</span>
                                             <p className="text-[11px] text-muted-foreground font-normal mt-0.5">
-                                                {itemType === 'currency' 
-                                                    ? "Multiplies the gold bounty so every party member receives this full amount in cash."
-                                                    : "Creates a shared entry allowing every character to claim their own copy of the item."}
+                                                Multiplies the quantity by {session.attendingCharacters.length} (the number of adventurers in this session).
                                             </p>
                                         </label>
                                     </div>
@@ -603,7 +649,6 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                             </DialogFooter>
                         </DialogContent>
                     </Dialog>
-                    </div>
                 )}
             </div>
 
@@ -686,7 +731,7 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                     <div className="flex items-center gap-2">
                         <Crown className="h-4 w-4 text-amber-400 shrink-0" />
                         <div>
-                            <span className="text-muted-foreground">Regional Guildmaster: </span>
+                            <span className="text-muted-foreground">Guildmaster: </span>
                             <strong className="text-amber-300 font-semibold">{session.guildmasterCutCharacterData.name}</strong>
                             <span className="text-muted-foreground text-[11px] ml-1.5">(Lvl {session.guildmasterCutCharacterData.lvl})</span>
                         </div>
@@ -728,32 +773,12 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
 
             {/* Party Loot Pool Summary Card */}
             {calculations && (
-                <div className="rounded-lg border border-border/40 bg-muted/20 p-3.5 space-y-2.5 text-xs">
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <span className="font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 text-[11px]">
-                            <Coins className="h-3.5 w-3.5 text-amber-400" />
-                            Party Loot Pool
-                        </span>
-                        <div className="flex items-baseline gap-1.5 font-mono">
-                            <span className="text-muted-foreground text-[11px]">Total Pool:</span>
-                            <strong className="text-foreground text-sm font-black">{formatGP(calculations.totalValue)}</strong>
-                        </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t border-border/30 text-[11px]">
-                        <div>
-                            <span className="text-muted-foreground block text-[10px]">Cash Bounty (100%)</span>
-                            <span className="font-mono font-semibold text-amber-300">+{formatGP(calculations.totalCash)}</span>
-                        </div>
-                        <div>
-                            <span className="text-muted-foreground block text-[10px]">Gear & Items (50% Resale)</span>
-                            <span className="font-mono font-semibold text-purple-300">+{formatGP(calculations.totalItemsResale)}</span>
-                        </div>
-                        <div className="col-span-2 sm:col-span-1">
-                            <span className="text-muted-foreground block text-[10px]">Base Split ({session.attendingCharacters.length} {session.attendingCharacters.length === 1 ? 'adventurer' : 'adventurers'})</span>
-                            <span className="font-mono font-bold text-primary">{formatGP(calculations.sharePerPlayer)} / player</span>
-                        </div>
-                    </div>
+                <div className="rounded-lg border border-border/40 bg-muted/20 px-3.5 py-2.5 flex items-center justify-between text-xs">
+                    <span className="font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 text-[11px]">
+                        <Coins className="h-3.5 w-3.5 text-amber-400" />
+                        Party Loot Pool
+                    </span>
+                    <strong className="text-foreground font-mono font-black text-sm">{formatGP(calculations.totalValue)}</strong>
                 </div>
             )}
 
@@ -771,23 +796,19 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                 )}>
                     <CardContent className="p-4 text-center">
                         <div className="flex items-center justify-between gap-2 mb-1">
-                            <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider truncate text-left">
-                                Your Net Payout ({userCharacterInSession.name})
+                            <span className="text-xs text-muted-foreground font-bold tracking-wider truncate text-left">
+                                {userCharacterInSession.name}&apos;s loot:
                             </span>
-                            {session.locked && (
+                            {session.locked && isClaimed && (
                                 <span className={cn(
                                     "text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0",
-                                    isClaimed && pendingMoneyAdjustmentGP === 0
+                                    pendingMoneyAdjustmentGP === 0
                                         ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
-                                        : isClaimed && pendingMoneyAdjustmentGP !== 0
-                                        ? "bg-amber-500/20 text-amber-300 border-amber-500/30 animate-pulse"
-                                        : "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                                        : "bg-amber-500/20 text-amber-300 border-amber-500/30 animate-pulse"
                                 )}>
-                                    {isClaimed 
-                                        ? pendingMoneyAdjustmentGP !== 0 
-                                            ? "Adjustment Needed" 
-                                            : "On Sheet ✓" 
-                                        : "Not on Sheet"}
+                                    {pendingMoneyAdjustmentGP !== 0 
+                                        ? "Adjustment Needed" 
+                                        : "On Sheet ✓"}
                                 </span>
                             )}
                         </div>
@@ -804,38 +825,24 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                         </div>
 
                         {/* Deducted Claimed Physical Items */}
-                        {loot.filter(item => {
-                            if (item.isCurrency) return false
-                            if (item.isPerCharacter) {
-                                return Boolean(userCharacterInSession && item.claimedByCharacters?.includes(userCharacterInSession._id))
-                            }
-                            return Boolean(item.claimedBy && userCharacterIds.has(item.claimedBy))
-                        }).length > 0 && (
+                        {userClaimedItems.length > 0 && (
                             <div className="my-2.5 text-xs text-muted-foreground space-y-1 bg-background/40 p-2.5 rounded border border-border/30 text-left">
-                                <div className="font-semibold text-[11px] text-foreground/80 mb-1">Claimed Gear (Deducted from Cash):</div>
-                                {loot
-                                    .filter(item => {
-                                        if (item.isCurrency) return false
-                                        if (item.isPerCharacter) {
-                                            return Boolean(userCharacterInSession && item.claimedByCharacters?.includes(userCharacterInSession._id))
-                                        }
-                                        return Boolean(item.claimedBy && userCharacterIds.has(item.claimedBy))
-                                    })
-                                    .map((item) => {
-                                        const val = item.isGood ? item.valueGP : item.valueGP / 2
-                                        return (
-                                            <div key={item.id} className="flex justify-between items-center gap-2 text-muted-foreground">
-                                                <span className="truncate">- {item.name}</span>
-                                                <span className="font-mono text-rose-300 shrink-0">-{formatGP(val)}</span>
-                                            </div>
-                                        )
-                                    })}
+                                <div className="flex justify-between items-center gap-2 text-foreground/90 font-medium pb-1 border-b border-border/20">
+                                    <span>Base amount:</span>
+                                    <span className="font-mono text-foreground font-semibold">{formatGP(calculations.sharePerPlayer)}</span>
+                                </div>
+                                <div className="space-y-1 pt-0.5">
+                                    {userClaimedItems.map((claimed) => (
+                                        <div key={claimed.id} className="flex justify-between items-center gap-2 text-muted-foreground">
+                                            <span className="truncate">
+                                                - {claimed.count > 1 ? `${claimed.count}x ` : ''}{claimed.name}
+                                            </span>
+                                            <span className="font-mono text-rose-300 shrink-0">- {formatGP(claimed.totalVal)}</span>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         )}
-
-                        <div className="text-[10px] text-muted-foreground mt-2 italic leading-normal">
-                            Based on {formatGP(calculations.sharePerPlayer)} base share{calculations.userClaimedValue > 0 ? ` minus ${formatGP(calculations.userClaimedValue)} in claimed gear.` : '.'}
-                        </div>
 
                         {session.locked && (
                             <div className="pt-3 mt-3 border-t border-border/30 flex flex-col gap-2">
@@ -916,208 +923,181 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
             ) : (
                 <div className="grid gap-3">
                     {loot.map((item) => {
-                        const isCurrency = item.isCurrency
-                        const claimedCharacter = session.attendingCharacters.find(c => c._id === item.claimedBy)
-                        const isClaimedByMe = item.claimedBy && userCharacterIds.has(item.claimedBy)
-                        const resaleValue = item.isGood || isCurrency ? item.valueGP : item.valueGP / 2
-                        const totalItemValue = item.isPerCharacter 
-                            ? resaleValue * (session.attendingCharacters.length || 1) 
-                            : resaleValue
+                        const isGoodOrCurrency = item.isGood || item.isCurrency
+                        const itemQty = Math.max(1, item.quantity ?? 1)
+                        const resaleValue = isGoodOrCurrency ? item.valueGP : item.valueGP / 2
+                        const totalItemValue = resaleValue * itemQty
+
+                        const claimedList = item.claimedByCharacters && item.claimedByCharacters.length > 0
+                            ? item.claimedByCharacters
+                            : (item.claimedBy ? [item.claimedBy] : [])
+                        const remainingSlots = Math.max(0, itemQty - claimedList.length)
 
                         return (
                             <Card 
                                 key={item.id} 
                                 className={cn(
                                     "overflow-hidden transition-all",
-                                    isCurrency 
-                                        ? "bg-amber-950/10 border-amber-500/30" 
+                                    isGoodOrCurrency 
+                                        ? "bg-emerald-950/10 border-emerald-500/30" 
                                         : "bg-card/50 border-border/40"
                                 )}
                             >
-                                <div className="p-3 flex items-center justify-between gap-3">
-                                    <div className="min-w-0 flex-1">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            <h4 className="font-bold text-sm truncate flex items-center gap-1.5">
-                                                {isCurrency && <Coins className="h-4 w-4 text-amber-400 shrink-0" />}
-                                                {item.link ? (
-                                                    <a 
-                                                        href={item.link} 
-                                                        target="_blank" 
-                                                        rel="noopener noreferrer" 
-                                                        className="hover:underline flex items-center gap-1 text-primary truncate"
-                                                    >
-                                                        <span>{item.name}</span>
-                                                        <LinkIcon className="h-3 w-3 shrink-0" />
-                                                    </a>
-                                                ) : (
-                                                    <span className="truncate">{item.name}</span>
-                                                )}
-                                            </h4>
-                                            {isCurrency ? (
-                                                <span className="text-[10px] bg-amber-500/15 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded uppercase font-bold">
-                                                    Coin / Currency
-                                                </span>
-                                            ) : item.isGood ? (
-                                                <span className="text-[10px] bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded uppercase font-bold">
-                                                    Trade Good (100%)
-                                                </span>
+                                <div className="px-3 py-2 flex flex-col gap-1.5">
+                                    {/* Row 1: Header (Icon + Qty + Name + Quest Badge + Management actions) */}
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="min-w-0 flex-1 flex items-center gap-1.5 flex-wrap">
+                                            {isGoodOrCurrency ? (
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <button 
+                                                            type="button" 
+                                                            className="inline-flex items-center cursor-help p-0 m-0 bg-transparent border-0 text-inherit focus:outline-none" 
+                                                            title="sells for full price"
+                                                            aria-label="sells for full price"
+                                                        >
+                                                            <Coins className="h-4 w-4 text-emerald-400 shrink-0" />
+                                                        </button>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent side="top" className="text-xs">
+                                                        sells for full price
+                                                    </TooltipContent>
+                                                </Tooltip>
                                             ) : (
-                                                <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded uppercase font-bold text-muted-foreground">
-                                                    Gear (50% Resale)
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <button 
+                                                            type="button" 
+                                                            className="inline-flex items-center cursor-help p-0 m-0 bg-transparent border-0 text-inherit focus:outline-none" 
+                                                            title="sells for half price"
+                                                            aria-label="sells for half price"
+                                                        >
+                                                            <Shield className="h-4 w-4 text-muted-foreground/70 hover:text-foreground shrink-0" />
+                                                        </button>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent side="top" className="text-xs">
+                                                        sells for half price
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            )}
+                                            {itemQty > 1 && (
+                                                <span className="font-mono text-[10px] font-black bg-primary/15 text-primary border border-primary/30 px-1.5 py-0.2 rounded shrink-0">
+                                                    {itemQty}x
                                                 </span>
+                                            )}
+                                            {item.link ? (
+                                                <a 
+                                                    href={item.link} 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer" 
+                                                    className="font-bold text-sm hover:underline inline-flex items-center gap-1 text-primary break-words"
+                                                >
+                                                    <span>{item.name}</span>
+                                                    <LinkIcon className="h-3 w-3 shrink-0" />
+                                                </a>
+                                            ) : (
+                                                <span className="font-bold text-sm text-foreground break-words">{item.name}</span>
                                             )}
                                             {item.fromQuest && (
-                                                <span className="text-[10px] bg-purple-500/15 text-purple-300 border border-purple-500/30 px-1.5 py-0.5 rounded uppercase font-bold">
-                                                    Quest Reward
-                                                </span>
-                                            )}
-                                            {item.isPerCharacter && (
-                                                <span className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded uppercase font-bold">
-                                                    For EACH Player
+                                                <span className="text-[9px] bg-purple-500/15 text-purple-300 border border-purple-500/30 px-1.5 py-0.5 rounded uppercase font-bold tracking-wider shrink-0">
+                                                    Quest
                                                 </span>
                                             )}
                                         </div>
-                                        <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
-                                            {isCurrency ? (
-                                                item.isPerCharacter ? (
-                                                    <>
-                                                        <span className="text-amber-300 font-mono font-medium">+{formatGP(item.valueGP)} / player</span>
-                                                        <span className="opacity-50">|</span>
-                                                        <span>Total Cash: {formatGP(totalItemValue)}</span>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <span className="text-amber-300 font-mono font-medium">{formatGP(item.valueGP)} Total</span>
-                                                        <span className="opacity-50">|</span>
-                                                        <span>Split: {formatGP(item.valueGP / (session.attendingCharacters.length || 1))} / player</span>
-                                                    </>
-                                                )
-                                            ) : item.isPerCharacter ? (
-                                                <>
-                                                    <span>Value: {formatGP(item.valueGP)} / player</span>
-                                                    <span className="opacity-50">|</span>
-                                                    <span>Total Resale: {formatGP(totalItemValue)}</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <span>Value: {formatGP(item.valueGP)}</span>
-                                                    <span className="opacity-50">|</span>
-                                                    <span>Resale: {formatGP(resaleValue)}</span>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                                        {/* If Currency: it is automatically distributed in cash payout */}
-                                        {isCurrency ? (
-                                            <span className="text-[11px] text-muted-foreground italic bg-muted/40 px-2 py-1 rounded border border-border/30">
-                                                Auto-split in Cash
-                                            </span>
-                                        ) : item.isPerCharacter ? (
-                                            <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                                                {/* If user's character has claimed this per-character item */}
-                                                {userCharacterInSession && item.claimedByCharacters?.includes(userCharacterInSession._id) ? (
-                                                    <div className="flex items-center gap-1.5 bg-primary/10 text-primary px-2 py-1 rounded-md border border-primary/20">
-                                                        <User className="h-3 w-3 text-primary" />
-                                                        <span className="text-[10px] font-bold">You Claimed</span>
-                                                        <button 
-                                                            onClick={() => handleUnclaim(item.id, userCharacterInSession._id)}
-                                                            className="hover:text-destructive transition-colors ml-0.5 cursor-pointer"
-                                                            title="Unclaim for yourself"
-                                                        >
-                                                            <X className="h-3 w-3" />
-                                                        </button>
-                                                    </div>
-                                                ) : userCharacterInSession ? (
-                                                    <Button 
-                                                        size="sm" 
-                                                        variant="outline" 
-                                                        className="h-7 text-[10px] font-bold px-2 gap-1 border-primary/30 text-primary hover:bg-primary/10 cursor-pointer"
-                                                        onClick={() => handleClaim(item.id, userCharacterInSession._id)}
-                                                    >
-                                                        Claim
-                                                    </Button>
-                                                ) : null}
-
-                                                {/* Other characters claimed it */}
-                                                {(item.claimedByCharacters?.length || 0) > 0 && (
-                                                    <div className="flex items-center gap-1 flex-wrap">
-                                                        {item.claimedByCharacters?.map((cId) => {
-                                                            if (userCharacterInSession && cId === userCharacterInSession._id) return null
-                                                            const otherChar = session.attendingCharacters.find(c => c._id === cId)
-                                                            return (
-                                                                <div key={cId} className="flex items-center gap-1 bg-muted/50 px-1.5 py-0.5 rounded text-[10px] text-muted-foreground border border-border/40">
-                                                                    <span>{otherChar?.name || 'Claimed'}</span>
-                                                                    {session.canManage && (
-                                                                        <button 
-                                                                            onClick={() => handleUnclaim(item.id, cId)}
-                                                                            className="hover:text-destructive transition-colors ml-0.5 cursor-pointer"
-                                                                            title={`Unclaim for ${otherChar?.name || 'character'}`}
-                                                                        >
-                                                                            <X className="h-2.5 w-2.5" />
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            )
-                                                        })}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ) : item.claimedBy ? (
-                                            <div className="flex items-center gap-1.5 bg-muted/50 px-2 py-1 rounded-md border border-border/40">
-                                                <User className={cn("h-3 w-3", isClaimedByMe ? "text-primary" : "text-muted-foreground")} />
-                                                <span className={cn("text-[10px] font-bold truncate max-w-[80px]", isClaimedByMe ? "text-primary" : "text-muted-foreground")}>
-                                                    {isClaimedByMe ? 'You' : (claimedCharacter?.name || 'Claimed')}
-                                                </span>
-                                                {(isClaimedByMe || session.canManage) && (
-                                                    <button 
-                                                        onClick={() => handleUnclaim(item.id)}
-                                                        className="hover:text-destructive transition-colors ml-0.5 cursor-pointer"
-                                                        title="Unclaim"
-                                                    >
-                                                        <X className="h-3 w-3" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        ) : userCharacterInSession ? (
-                                            <Button 
-                                                size="sm" 
-                                                variant="outline" 
-                                                className="h-7 text-[10px] font-bold px-2 gap-1 cursor-pointer"
-                                                onClick={() => handleClaim(item.id, userCharacterInSession._id)}
-                                            >
-                                                Claim
-                                            </Button>
-                                        ) : null}
 
                                         {session.canManage && (
-                                            <div className="flex items-center gap-1 border-l pl-2 border-border/40">
+                                            <div className="flex items-center gap-0.5 shrink-0 -mr-1 -mt-0.5">
                                                 <Button 
                                                     variant="ghost" 
                                                     size="icon" 
-                                                    className="h-7 w-7 cursor-pointer" 
+                                                    className="h-6 w-6 text-muted-foreground hover:text-foreground cursor-pointer" 
+                                                    title="Edit Item"
                                                     onClick={() => {
                                                         setEditingItem(item)
                                                         setName(item.name)
                                                         setLink(item.link || '')
                                                         setValueGP(item.valueGP.toString())
-                                                        setItemType(item.isCurrency ? 'currency' : item.isGood ? 'trade_good' : 'equipment')
+                                                        setQuantity((item.quantity || 1).toString())
+                                                        setIsGood(Boolean(item.isGood || item.isCurrency))
                                                         setIsPerCharacter(!!item.isPerCharacter)
                                                     }}
                                                 >
-                                                    <Edit2 className="h-3.5 w-3.5" />
+                                                    <Edit2 className="h-3 w-3" />
                                                 </Button>
                                                 <Button 
                                                     variant="ghost" 
                                                     size="icon" 
-                                                    className="h-7 w-7 text-destructive hover:text-destructive cursor-pointer" 
+                                                    className="h-6 w-6 text-muted-foreground hover:text-destructive cursor-pointer" 
+                                                    title="Delete Item"
                                                     onClick={() => handleDelete(item.id)}
                                                 >
-                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                    <Trash2 className="h-3 w-3" />
                                                 </Button>
                                             </div>
                                         )}
+                                    </div>
+
+                                    {/* Row 2: Price */}
+                                    <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                                        <span>
+                                            worth {itemQty > 1 ? `${formatGP(item.valueGP * itemQty)} (${formatGP(item.valueGP)} each)` : formatGP(item.valueGP)}
+                                        </span>
+                                    </div>
+
+                                    {/* Row 3: Claiming & slots section */}
+                                    <div className="pt-1.5 border-t border-border/30 flex items-center justify-between gap-1.5 flex-wrap">
+                                        <div className="flex items-center gap-1.5 flex-wrap flex-1 min-w-0">
+                                            {claimedList.length === 0 ? (
+                                                <span className="text-[11px] text-muted-foreground/75 italic">
+                                                    Unclaimed {itemQty > 1 ? `(${itemQty} available)` : ''}
+                                                </span>
+                                            ) : (
+                                                claimedList.map((charId, idx) => {
+                                                    const isMyChar = Boolean(userCharacterInSession && charId === userCharacterInSession._id)
+                                                    const charName = session.attendingCharacters.find(c => c._id === charId)?.name || 'Claimed'
+                                                    return (
+                                                        <div 
+                                                            key={`${charId}-${idx}`} 
+                                                            className={cn(
+                                                                "inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-medium",
+                                                                isMyChar
+                                                                    ? "bg-primary/15 text-primary border-primary/30"
+                                                                    : "bg-muted/50 text-muted-foreground border-border/40"
+                                                            )}
+                                                        >
+                                                            <User className={cn("h-2.5 w-2.5 shrink-0", isMyChar ? "text-primary" : "text-muted-foreground")} />
+                                                            <span className="truncate max-w-[100px]">{isMyChar ? `${charName} (You)` : charName}</span>
+                                                            {(isMyChar || session.canManage) && (
+                                                                <button 
+                                                                    onClick={() => handleUnclaim(item.id, charId)}
+                                                                    className="hover:text-destructive transition-colors ml-0.5 cursor-pointer"
+                                                                    title={`Unclaim for ${charName}`}
+                                                                >
+                                                                    <X className="h-2.5 w-2.5" />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    )
+                                                })
+                                            )}
+                                        </div>
+
+                                        <div className="shrink-0 ml-auto">
+                                            {remainingSlots > 0 && userCharacterInSession ? (
+                                                <Button 
+                                                    size="sm" 
+                                                    variant="outline" 
+                                                    className="h-6 text-[10px] font-bold px-2 gap-1 border-primary/40 text-primary hover:bg-primary/10 cursor-pointer"
+                                                    onClick={() => handleClaim(item.id, userCharacterInSession._id)}
+                                                >
+                                                    Claim {remainingSlots > 1 ? `(${remainingSlots})` : ''}
+                                                </Button>
+                                            ) : remainingSlots === 0 ? (
+                                                <span className="text-[10px] text-muted-foreground font-medium flex items-center gap-1">
+                                                    All Claimed ✓
+                                                </span>
+                                            ) : null}
+                                        </div>
                                     </div>
                                 </div>
                             </Card>
@@ -1142,48 +1122,34 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                                 <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                                     Loot Classification
                                 </label>
-                                <div className="grid grid-cols-3 gap-2">
+                                <div className="grid grid-cols-2 gap-2">
                                     <button
                                         type="button"
-                                        onClick={() => setItemType('currency')}
+                                        onClick={() => setIsGood(true)}
                                         className={cn(
-                                            "flex flex-col items-center justify-center p-2 rounded-md border text-xs font-medium transition-all text-center cursor-pointer",
-                                            itemType === 'currency' 
-                                                ? "border-amber-500 bg-amber-500/20 text-amber-300 font-bold shadow-sm" 
-                                                : "border-border/40 bg-muted/30 text-muted-foreground hover:bg-muted/50"
-                                        )}
-                                    >
-                                        <Coins className="h-4 w-4 mb-1 text-amber-400" />
-                                        <span>Coin / Currency</span>
-                                        <span className="text-[9px] opacity-75 font-normal">Auto-split cash</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setItemType('trade_good')}
-                                        className={cn(
-                                            "flex flex-col items-center justify-center p-2 rounded-md border text-xs font-medium transition-all text-center cursor-pointer",
-                                            itemType === 'trade_good' 
+                                            "flex flex-col items-center justify-center p-2.5 rounded-md border text-xs font-medium transition-all text-center cursor-pointer",
+                                            isGood 
                                                 ? "border-emerald-500 bg-emerald-500/20 text-emerald-300 font-bold shadow-sm" 
                                                 : "border-border/40 bg-muted/30 text-muted-foreground hover:bg-muted/50"
                                         )}
                                     >
                                         <Sparkles className="h-4 w-4 mb-1 text-emerald-400" />
-                                        <span>Trade Good</span>
-                                        <span className="text-[9px] opacity-75 font-normal">100% full value</span>
+                                        <span>Trade Good / Currency</span>
+                                        <span className="text-[9px] opacity-75 font-normal">100% Value • Claimable</span>
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => setItemType('equipment')}
+                                        onClick={() => setIsGood(false)}
                                         className={cn(
-                                            "flex flex-col items-center justify-center p-2 rounded-md border text-xs font-medium transition-all text-center cursor-pointer",
-                                            itemType === 'equipment' 
+                                            "flex flex-col items-center justify-center p-2.5 rounded-md border text-xs font-medium transition-all text-center cursor-pointer",
+                                            !isGood 
                                                 ? "border-purple-500 bg-purple-500/20 text-purple-300 font-bold shadow-sm" 
                                                 : "border-border/40 bg-muted/30 text-muted-foreground hover:bg-muted/50"
                                         )}
                                     >
                                         <Package className="h-4 w-4 mb-1 text-purple-400" />
                                         <span>Gear / Equipment</span>
-                                        <span className="text-[9px] opacity-75 font-normal">50% resale</span>
+                                        <span className="text-[9px] opacity-75 font-normal">50% Resale • Claimable</span>
                                     </button>
                                 </div>
                             </div>
@@ -1198,14 +1164,25 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                                 <Input value={link} onChange={(e) => setLink(e.target.value)} />
                             </div>
 
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-medium">Value in GP</label>
-                                <Input 
-                                    type="number" 
-                                    step="0.01" 
-                                    value={valueGP} 
-                                    onChange={(e) => setValueGP(e.target.value)} 
-                                />
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-medium">Value in GP</label>
+                                    <Input 
+                                        type="number" 
+                                        step="0.01" 
+                                        value={valueGP} 
+                                        onChange={(e) => setValueGP(e.target.value)} 
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-medium">Quantity</label>
+                                    <Input 
+                                        type="number" 
+                                        min="1" 
+                                        value={quantity} 
+                                        onChange={(e) => setQuantity(e.target.value)} 
+                                    />
+                                </div>
                             </div>
 
                             <div className="pt-1">
@@ -1213,15 +1190,23 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                                     <Checkbox 
                                         id="isPerCharacterEdit" 
                                         checked={isPerCharacter} 
-                                        onCheckedChange={(val) => setIsPerCharacter(!!val)} 
+                                        onCheckedChange={(val) => {
+                                            const checked = !!val
+                                            setIsPerCharacter(checked)
+                                            const attendeeCount = Math.max(1, session.attendingCharacters.length)
+                                            const currentQty = Math.max(1, parseInt(quantity) || 1)
+                                            if (checked) {
+                                                setQuantity(String(currentQty * attendeeCount))
+                                            } else {
+                                                setQuantity(String(Math.max(1, Math.floor(currentQty / attendeeCount))))
+                                            }
+                                        }} 
                                         className="mt-0.5"
                                     />
                                     <label htmlFor="isPerCharacterEdit" className="text-xs font-medium cursor-pointer leading-tight">
-                                        <span>Award for <span className="font-bold underline text-primary">EACH</span> attending adventurer</span>
+                                        <span>Award for <span className="font-bold underline text-primary">EACH</span> attending adventurer ({session.attendingCharacters.length} {session.attendingCharacters.length === 1 ? 'player' : 'players'})</span>
                                         <p className="text-[11px] text-muted-foreground font-normal mt-0.5">
-                                            {itemType === 'currency' 
-                                                ? "Multiplies the gold bounty so every party member receives this full amount in cash."
-                                                : "Creates a shared entry allowing every character to claim their own copy of the item."}
+                                            Multiplies the quantity by {session.attendingCharacters.length} (the number of adventurers in this session).
                                         </p>
                                     </label>
                                 </div>
@@ -1234,9 +1219,22 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                 </Dialog>
             )}
 
-            {/* Guildmaster Assignment at the bottom of the loot section */}
+            {/* Guildmaster Assignment & Loot Management at the bottom of the loot section */}
             {session.canManage && (
-                <div className="flex items-center justify-end pt-2 border-t border-border/40">
+                <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/40">
+                    {loot.length > 0 ? (
+                        <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            disabled={isClearingLoot}
+                            onClick={handleClearAll}
+                            className="h-8 text-xs text-muted-foreground hover:text-destructive gap-1 px-2 cursor-pointer"
+                            title="Clear all loot entries from session"
+                        >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            <span>Clear All Loot</span>
+                        </Button>
+                    ) : <div />}
                     <Dialog open={isGuildmasterDialogOpen} onOpenChange={setIsGuildmasterDialogOpen}>
                         <DialogTrigger asChild>
                             <Button 
@@ -1245,14 +1243,14 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                                 className="h-8 gap-1.5 border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 hover:text-amber-200 cursor-pointer"
                             >
                                 <Crown className="h-3.5 w-3.5 text-amber-400" />
-                                {session.guildmasterCutCharacterData ? 'Edit Regional Guildmaster' : 'Assign Regional Guildmaster'}
+                                Guildmaster
                             </Button>
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-[425px]">
                             <DialogHeader>
                                 <DialogTitle className="flex items-center gap-2 text-amber-300">
                                     <Crown className="h-5 w-5 text-amber-400" />
-                                    Assign Regional Guildmaster
+                                    Guildmaster
                                 </DialogTitle>
                             </DialogHeader>
                             <div className="space-y-4 py-3 text-sm">

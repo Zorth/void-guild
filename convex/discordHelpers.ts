@@ -1,6 +1,20 @@
 export const DISCORD_API_BASE = "https://discord.com/api/v10";
+export const DISCORD_PP_EMOJI = "<:PP:1560443992020353084>";
 export const DISCORD_GP_EMOJI = "<:GP:1560328903397212190>";
 export const DISCORD_SP_EMOJI = "<:SP:1560338662175019130>";
+export const DISCORD_CP_EMOJI = "<:CP:1560444022378594324>";
+
+/**
+ * Replaces currency abbreviations (PP, GP, SP, CP) in text with Discord custom emotes.
+ */
+export const formatDiscordCurrency = (text: string): string => {
+  if (!text) return "";
+  return text
+    .replace(/\bPP\b/g, DISCORD_PP_EMOJI)
+    .replace(/\bGP\b/g, DISCORD_GP_EMOJI)
+    .replace(/\bSP\b/g, DISCORD_SP_EMOJI)
+    .replace(/\bCP\b/g, DISCORD_CP_EMOJI);
+};
 
 /**
  * Returns formatted quest level string for Discord display.
