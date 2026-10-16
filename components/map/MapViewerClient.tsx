@@ -3168,12 +3168,14 @@ export default function MapViewerClient() {
               <div
                 key={pin._id}
                 className={`absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-auto group ${
+                  isOwner && isEditMode ? 'z-20' : 'z-[5]'
+                } hover:z-30 ${
                   canDragThisPin ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
                 }`}
                 style={{
                   left: `${currentPinX}%`,
                   top: `${currentPinY}%`,
-                  zIndex: isDraggingThisPin ? 40 : (isOwner && isEditMode ? 25 : 5),
+                  zIndex: isDraggingThisPin ? 40 : undefined,
                 }}
                 onMouseDown={(e) => {
                   if (canDragThisPin) {
