@@ -3274,8 +3274,7 @@ export default function MapViewerClient() {
                     {isQuestPin ? (
                       /* Quest pins: quest name ONLY displays on hover */
                       <div className="absolute top-full mt-1.5 z-30 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none">
-                        <span className="bg-slate-950/95 backdrop-blur-md px-2 py-0.5 rounded-md text-[10px] font-bold whitespace-nowrap shadow-xl border border-amber-500/50 text-amber-300 flex items-center gap-1">
-                          <img src="/quest.svg" alt="" className="h-2.5 w-2.5 shrink-0" />
+                        <span className="bg-slate-950/95 backdrop-blur-md px-2.5 py-0.5 rounded-md text-[10px] font-bold whitespace-nowrap shadow-xl border border-amber-500/50 text-amber-300 block text-center">
                           {pin.title}
                         </span>
                       </div>
