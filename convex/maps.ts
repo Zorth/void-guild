@@ -1,5 +1,6 @@
-import { query, mutation } from './_generated/server'
+import { query, mutation, MutationCtx } from './_generated/server'
 import { v } from 'convex/values'
+import { Id } from './_generated/dataModel'
 import { isAdmin } from './roles'
 
 // Helper to verify world ownership / admin
@@ -91,7 +92,28 @@ export const getMapFullData = query({
       .withIndex('by_mapId', (q) => q.eq('mapId', args.mapId))
       .collect()
 
-    const pins = isOwnerOrAdmin ? rawPins : rawPins.filter((p) => !p.gmOnly)
+    // Omit pins whose associated quest is completed or deleted
+    const questPins = rawPins.filter((p) => p.questId)
+    let completedOrMissingQuestPinIds: Set<string> | null = null
+
+    if (questPins.length > 0) {
+      await Promise.all(
+        questPins.map(async (pin) => {
+          if (!pin.questId) return
+          const quest = await ctx.db.get(pin.questId)
+          if (!quest || quest.isCompleted) {
+            if (!completedOrMissingQuestPinIds) completedOrMissingQuestPinIds = new Set()
+            completedOrMissingQuestPinIds.add(pin._id)
+          }
+        })
+      )
+    }
+
+    const validRawPins = completedOrMissingQuestPinIds
+      ? rawPins.filter((p) => !completedOrMissingQuestPinIds!.has(p._id))
+      : rawPins
+
+    const pins = isOwnerOrAdmin ? validRawPins : validRawPins.filter((p) => !p.gmOnly)
     const areas = isOwnerOrAdmin ? rawAreas : rawAreas.filter((a) => !a.gmOnly)
 
     return {
@@ -448,6 +470,17 @@ export const deleteLayer = mutation({
   },
 })
 
+// Delete all pins referencing a quest across all maps
+export async function deletePinsForQuest(ctx: MutationCtx, questId: Id<'quests'>) {
+  const pins = await ctx.db
+    .query('mapPins')
+    .withIndex('by_questId', (q) => q.eq('questId', questId))
+    .collect()
+  for (const pin of pins) {
+    await ctx.db.delete(pin._id)
+  }
+}
+
 export const savePin = mutation({
   args: {
     mapId: v.id('worldMaps'),
@@ -470,8 +503,21 @@ export const savePin = mutation({
     if (!map) throw new Error('Map not found')
     await verifyWorldOwner(ctx, map.worldId)
 
-    if (args.pinId) {
-      const existingPin = await ctx.db.get(args.pinId)
+    let targetPinId = args.pinId
+    // If no pinId is explicitly given, but this is a quest pin, check if a pin for this quest already exists on this map
+    if (!targetPinId && args.questId) {
+      const existingPins = await ctx.db
+        .query('mapPins')
+        .withIndex('by_questId', (q) => q.eq('questId', args.questId))
+        .collect()
+      const existingPinOnMap = existingPins.find((p) => p.mapId === args.mapId)
+      if (existingPinOnMap) {
+        targetPinId = existingPinOnMap._id
+      }
+    }
+
+    if (targetPinId) {
+      const existingPin = await ctx.db.get(targetPinId)
       if (!existingPin) throw new Error('Pin not found')
       const patches: any = {
         layerId: args.layerId,
@@ -489,9 +535,9 @@ export const savePin = mutation({
       }
       const isDiff = Object.keys(patches).some((k) => patches[k] !== (existingPin as any)[k])
       if (isDiff) {
-        await ctx.db.patch(args.pinId, patches)
+        await ctx.db.patch(targetPinId, patches)
       }
-      return args.pinId
+      return targetPinId
     } else {
       return await ctx.db.insert('mapPins', {
         mapId: args.mapId,

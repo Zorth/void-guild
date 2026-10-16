@@ -123,6 +123,7 @@ export default function MapViewerClient() {
   const hasDraggedRef = useRef(false)
   const [naturalDimensions, setNaturalDimensions] = useState<{ width: number; height: number } | null>(null)
   const hasAutoFittedRef = useRef(false)
+  const isDroppingQuestRef = useRef(false)
 
   // Distance Measurement Ruler state
   const [rulerPoints, setRulerPoints] = useState<{ start: { x: number; y: number }; current: { x: number; y: number } } | null>(null)
@@ -1478,17 +1479,21 @@ export default function MapViewerClient() {
   const handleDragOverCanvas = (e: React.DragEvent<HTMLDivElement>) => {
     if (!isOwner) return
     e.preventDefault()
+    e.stopPropagation()
     e.dataTransfer.dropEffect = 'copy'
   }
 
   const handleDropQuest = async (e: React.DragEvent<HTMLDivElement>) => {
-    if (!isOwner || !currentMap) return
     e.preventDefault()
+    e.stopPropagation()
+    if (isDroppingQuestRef.current) return
+    if (!isOwner || !currentMap) return
 
     const rawData = e.dataTransfer.getData('application/json')
     if (!rawData) return
 
     try {
+      isDroppingQuestRef.current = true
       const data = JSON.parse(rawData)
       if (data.type !== 'quest' || !data.questId) return
 
@@ -1531,6 +1536,8 @@ export default function MapViewerClient() {
     } catch (err) {
       console.error('Failed to drop quest on map:', err)
       toast.error('Failed to place quest on map')
+    } finally {
+      isDroppingQuestRef.current = false
     }
   }
 
@@ -2852,8 +2859,6 @@ export default function MapViewerClient() {
             willChange: isDragging ? 'transform' : 'auto',
           }}
           onClick={handleCanvasClick}
-          onDragOver={handleDragOverCanvas}
-          onDrop={handleDropQuest}
         >
           {/* BASE MAP BACKGROUND IMAGE OR TILE PYRAMID */}
           {currentMap?.imageUrl ? (

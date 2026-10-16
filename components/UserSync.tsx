@@ -92,7 +92,10 @@ export default function UserSync() {
         String(user.publicMetadata?.admin).toLowerCase() === 'true' ||
         user.publicMetadata?.role === 'admin'
       )
-      const isGM = Boolean(
+      const isGMExplicitlyFalse =
+        user.publicMetadata?.gamemaster === false ||
+        String(user.publicMetadata?.gamemaster).toLowerCase() === 'false'
+      const isGM = !isGMExplicitlyFalse && Boolean(
         user.publicMetadata?.gamemaster === true ||
         String(user.publicMetadata?.gamemaster).toLowerCase() === 'true' ||
         user.publicMetadata?.role === 'gamemaster' ||

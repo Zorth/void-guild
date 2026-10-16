@@ -453,6 +453,192 @@ export const syncSessionToDiscord = internalAction({
 });
 
 /**
+ * Pings all signed-up players in the Discord forum thread when a session's date or location changes.
+ */
+export const notifySessionDetailsChanged = internalAction({
+  args: {
+    sessionId: v.id("sessions"),
+    dateChanged: v.boolean(),
+    prevDate: v.optional(v.number()),
+    newDate: v.optional(v.number()),
+    locationChanged: v.boolean(),
+    prevLocation: v.optional(v.string()),
+    newLocation: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const botToken = process.env.DISCORD_BOT_TOKEN;
+    if (!botToken) {
+      console.warn("Discord bot token not configured.");
+      return;
+    }
+
+    let session = await ctx.runQuery(internal.discord.getInternalSessionDetails, {
+      sessionId: args.sessionId,
+    });
+    if (!session) return;
+
+    const attendingCharacters = session.attendingCharacters || [];
+    if (attendingCharacters.length === 0) {
+      console.log(`No players signed up for session ${args.sessionId}; skipping Discord thread update ping.`);
+      return;
+    }
+
+    // Ensure thread exists
+    if (!session.discordThreadId) {
+      await ctx.runAction(internal.discord.syncSessionToDiscord, { sessionId: args.sessionId });
+      const refreshedSession = await ctx.runQuery(internal.discord.getInternalSessionDetails, {
+        sessionId: args.sessionId,
+      });
+      if (refreshedSession) {
+        session = refreshedSession;
+      }
+    }
+
+    if (!session.discordThreadId) {
+      console.warn(`Cannot post update notification: No Discord thread ID for session ${args.sessionId}`);
+      return;
+    }
+
+    // Collect unique player Discord IDs (excluding GM if present)
+    const playerDiscordIds = Array.from(
+      new Set(
+        attendingCharacters
+          .map((c: any) => c?.discordId)
+          .filter((id): id is string => Boolean(id) && id !== session.gmDiscordId)
+      )
+    );
+
+    // Ensure all players are added to the forum thread
+    if (playerDiscordIds.length > 0) {
+      await Promise.all(
+        playerDiscordIds.map(async (discordUserId) => {
+          try {
+            await fetch(`${DISCORD_API_BASE}/channels/${session.discordThreadId}/thread-members/${discordUserId}`, {
+              method: "PUT",
+              headers: { Authorization: `Bot ${botToken}` },
+            });
+          } catch (_) {}
+        })
+      );
+    }
+
+    // Build changes summary
+    const changeLines: string[] = [];
+
+    if (args.dateChanged) {
+      const newDateDisplay = args.newDate
+        ? `<t:${Math.floor(args.newDate / 1000)}:F> (<t:${Math.floor(args.newDate / 1000)}:R>)`
+        : "TBD (Planning Phase)";
+      const prevDateDisplay = args.prevDate
+        ? `<t:${Math.floor(args.prevDate / 1000)}:f>`
+        : "TBD";
+      changeLines.push(`• 📅 **Date & Time:** ${newDateDisplay} *(was ${prevDateDisplay})*`);
+    }
+
+    if (args.locationChanged) {
+      const formatLoc = (loc?: string) => {
+        if (!loc || !loc.trim()) return "TBD";
+        const trimmed = loc.trim();
+        if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+          return `[Google Maps](${trimmed})`;
+        }
+        return trimmed;
+      };
+      const newLocDisplay = formatLoc(args.newLocation);
+      const prevLocDisplay = formatLoc(args.prevLocation);
+      changeLines.push(`• 📍 **Location:** ${newLocDisplay} *(was ${prevLocDisplay})*`);
+    }
+
+    if (changeLines.length === 0) return;
+
+    let title = "⚠️ **Session Details Updated**";
+    if (args.dateChanged && !args.locationChanged) {
+      title = "⚠️ **Session Date Changed**";
+    } else if (!args.dateChanged && args.locationChanged) {
+      title = "⚠️ **Session Location Changed**";
+    }
+
+    const unlinkedNames = attendingCharacters
+      .filter((c: any) => c && !c.discordId)
+      .map((c: any) => c.name);
+
+    let pingStr = "";
+    if (playerDiscordIds.length > 0) {
+      pingStr = playerDiscordIds.map((id) => `<@${id}>`).join(" ");
+    }
+
+    let mentionHeader = "";
+    if (pingStr && unlinkedNames.length > 0) {
+      mentionHeader = `🔔 ${pingStr} *(and ${unlinkedNames.join(", ")})*\n\n`;
+    } else if (pingStr) {
+      mentionHeader = `🔔 ${pingStr}\n\n`;
+    } else if (unlinkedNames.length > 0) {
+      mentionHeader = `🔔 *(Attention: ${unlinkedNames.join(", ")})*\n\n`;
+    }
+
+    const sessionLink = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'}/sessions/${session._id}`;
+
+    const messageContent = `${mentionHeader}${title}\n` +
+      `The details for **The Void: ${session.worldName}** have been updated:\n\n` +
+      changeLines.join("\n") + "\n\n" +
+      `Please check your availability and update your attendance on the Guild if needed:\n` +
+      `🌐 [View Session on Guild](${sessionLink})`;
+
+    try {
+      let postRes = await fetch(`${DISCORD_API_BASE}/channels/${session.discordThreadId}/messages`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bot ${botToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          content: messageContent,
+          flags: 4, // SUPPRESS_EMBEDS so link previews don't clutter the forum thread
+          allowed_mentions: {
+            parse: ["users"],
+          },
+        }),
+      });
+
+      if (!postRes.ok && postRes.status === 400) {
+        // Thread might be archived; attempt unarchiving and retry
+        await fetch(`${DISCORD_API_BASE}/channels/${session.discordThreadId}`, {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bot ${botToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ archived: false }),
+        });
+        postRes = await fetch(`${DISCORD_API_BASE}/channels/${session.discordThreadId}/messages`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bot ${botToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            content: messageContent,
+            flags: 4,
+            allowed_mentions: {
+              parse: ["users"],
+            },
+          }),
+        });
+      }
+
+      if (!postRes.ok) {
+        const errText = await postRes.text();
+        console.error(`Failed to post session update notification to Discord thread (${postRes.status}):`, errText);
+      } else {
+        console.log(`Successfully sent session change notification to thread ${session.discordThreadId}`);
+      }
+    } catch (e) {
+      console.error("Failed to post session change notification to Discord thread:", e);
+    }
+  },
+});
+
+/**
  * Sends a message to a Discord channel via the bot.
  */
 export const sendActivityToDiscord = internalAction({
@@ -714,20 +900,22 @@ export const getInternalSessionDetails = internalQuery({
     if (!session) return null;
 
     const world = await ctx.db.get(session.world);
-    const attendingCharacters = await Promise.all(
-      session.characters.map(async (id) => {
-        const c = await ctx.db.get(id);
-        if (!c) return null;
-        const ownerUser = await ctx.db
-          .query("users")
-          .withIndex("by_userId", (q) => q.eq("userId", c.userId))
-          .first();
-        return {
-          ...c,
-          discordId: ownerUser?.discordId || null,
-        };
-      })
-    );
+    const attendingCharacters = (
+      await Promise.all(
+        session.characters.map(async (id) => {
+          const c = await ctx.db.get(id);
+          if (!c) return null;
+          const ownerUser = await ctx.db
+            .query("users")
+            .withIndex("by_userId", (q) => q.eq("userId", c.userId))
+            .first();
+          return {
+            ...c,
+            discordId: ownerUser?.discordId || null,
+          };
+        })
+      )
+    ).filter((c): c is NonNullable<typeof c> => c !== null);
 
     const interestedPlayers = session.interestedPlayers
       ? await Promise.all(

@@ -8,12 +8,38 @@ export const getAvailabilityForMonth = query({
     endOfMonth: v.number()
   },
   handler: async (ctx, args) => {
-    return await ctx.db
+    const rawAvailability = await ctx.db
       .query('availability')
       .withIndex('by_date', (q) => 
         q.gte('date', args.startOfMonth).lte('date', args.endOfMonth)
       )
       .collect()
+
+    const uniqueUserIds = Array.from(new Set(rawAvailability.map((a) => a.userId)))
+    const users = await Promise.all(
+      uniqueUserIds.map((userId) =>
+        ctx.db
+          .query('users')
+          .withIndex('by_userId', (q) => q.eq('userId', userId))
+          .first()
+      )
+    )
+
+    const userMap = new Map<string, boolean>()
+    uniqueUserIds.forEach((uid, i) => {
+      const u = users[i]
+      if (u && u.isGM !== undefined) {
+        userMap.set(uid, u.isGM)
+      }
+    })
+
+    return rawAvailability.map((a) => {
+      const dynamicIsGM = userMap.has(a.userId) ? userMap.get(a.userId)! : Boolean(a.isGM)
+      return {
+        ...a,
+        isGM: dynamicIsGM,
+      }
+    })
   }
 })
 
@@ -129,12 +155,30 @@ export const getPlanningSummary = query({
             .withIndex('by_date', (q) => q.gte('date', startTime).lte('date', twoWeeksLater))
             .collect();
 
+        const uniqueUserIds = Array.from(new Set(availability.map((a) => a.userId)))
+        const users = await Promise.all(
+          uniqueUserIds.map((userId) =>
+            ctx.db
+              .query('users')
+              .withIndex('by_userId', (q) => q.eq('userId', userId))
+              .first()
+          )
+        )
+        const userMap = new Map<string, boolean>()
+        uniqueUserIds.forEach((uid, i) => {
+          const u = users[i]
+          if (u && u.isGM !== undefined) {
+            userMap.set(uid, u.isGM)
+          }
+        })
+
         // Group by date
         const byDate = new Map<number, { date: number, users: string[], gms: string[] }>();
         for (const record of availability) {
             const entry = byDate.get(record.date) || { date: record.date, users: [], gms: [] };
             entry.users.push(record.username);
-            if (record.isGM) entry.gms.push(record.username);
+            const dynamicIsGM = userMap.has(record.userId) ? userMap.get(record.userId)! : Boolean(record.isGM);
+            if (dynamicIsGM) entry.gms.push(record.username);
             byDate.set(record.date, entry);
         }
 
@@ -181,4 +225,44 @@ export const getUserAvailability = query({
       .withIndex('by_user_date', (q) => q.eq('userId', identity.subject))
       .collect()
   }
+})
+
+/**
+ * Repairs availability records where isGM does not match the user's actual isGM flag.
+ */
+export const repairAvailabilityGMStatus = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const allAvailability = await ctx.db.query('availability').collect()
+    let updatedCount = 0
+
+    const uniqueUserIds = Array.from(new Set(allAvailability.map((a) => a.userId)))
+    const userDocs = await Promise.all(
+      uniqueUserIds.map((uid) =>
+        ctx.db
+          .query('users')
+          .withIndex('by_userId', (q) => q.eq('userId', uid))
+          .first()
+      )
+    )
+    const userMap = new Map<string, boolean>()
+    uniqueUserIds.forEach((uid, i) => {
+      const u = userDocs[i]
+      if (u && u.isGM !== undefined) {
+        userMap.set(uid, u.isGM)
+      }
+    })
+
+    for (const rec of allAvailability) {
+      if (userMap.has(rec.userId)) {
+        const actualGM = userMap.get(rec.userId)!
+        if (rec.isGM !== actualGM) {
+          await ctx.db.patch(rec._id, { isGM: actualGM })
+          updatedCount++
+        }
+      }
+    }
+
+    return { updatedCount }
+  },
 })

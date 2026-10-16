@@ -3,6 +3,7 @@ import { v } from 'convex/values'
 import { isAdmin } from './roles'
 import { adjustCharacterMoney, parseGpAmount } from './moneyHelpers'
 import { syncActiveSessionsForQuestChange } from './questSyncHelpers'
+import { deletePinsForQuest } from './maps'
 export const createQuest = mutation({
   args: {
     name: v.string(),
@@ -644,6 +645,8 @@ export const deleteQuest = mutation({
       affectedQuestId: args.questId,
       isRemovedOrCompleted: true,
     })
+
+    await deletePinsForQuest(ctx, args.questId)
 
     await ctx.db.delete(args.questId)
   },

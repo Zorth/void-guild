@@ -4,6 +4,7 @@ import { internal } from './_generated/api'
 import { Id } from './_generated/dataModel'
 import { roundToTwoSigFigs, getNextValidBid } from './blackVoid'
 import { parseGpAmount } from './moneyHelpers'
+import { deletePinsForQuest } from './maps'
 
 async function validateKey(ctx: any, apiKey?: string) {
     if (!apiKey || apiKey.trim() === "") {
@@ -17,23 +18,9 @@ async function validateKey(ctx: any, apiKey?: string) {
     
     if (!user) return null
 
-    // Determine admin and GM status, honoring user document plus character guildmaster rank or owned world
+    // Determine admin and GM status, honoring user document plus owned world
     let isAdmin = Boolean(user.isAdmin)
     let isGM = Boolean(user.isGM) || isAdmin
-
-    if (!isAdmin) {
-        const userCharacters = await ctx.db
-            .query('characters')
-            .withIndex('by_userId', (q: any) => q.eq('userId', user.userId))
-            .collect()
-        
-        if (userCharacters.some((c: any) => c.rank === 'guildmaster')) {
-            isAdmin = true
-            isGM = true
-        } else if (!isGM && userCharacters.some((c: any) => c.rank === 'journeyman')) {
-            isGM = true
-        }
-    }
 
     if (!isGM) {
         const ownedWorld = await ctx.db
@@ -336,6 +323,20 @@ export const updateSession = mutation({
         }
 
         const { apiKey, sessionId, ...patch } = args
+        const prevDate = session.date
+        const newDate = patch.date !== undefined ? patch.date : prevDate
+        const prevLocation = session.location
+        const newLocation = patch.location !== undefined ? patch.location : prevLocation
+
+        const dateChanged = patch.date !== undefined && (
+          (prevDate === undefined && newDate !== undefined) ||
+          (prevDate !== undefined && newDate === undefined) ||
+          (prevDate !== undefined && newDate !== undefined && Math.floor(prevDate / 60000) !== Math.floor(newDate / 60000))
+        )
+
+        const locationChanged = patch.location !== undefined &&
+          (prevLocation || '').trim() !== (newLocation || '').trim()
+
         if (patch.isIntro !== undefined) {
             const system = (patch as any).system ?? session.system
             if (patch.isIntro) {
@@ -347,6 +348,18 @@ export const updateSession = mutation({
         await ctx.scheduler.runAfter(0, internal.discord.syncSessionToDiscord, {
             sessionId: sId,
         })
+
+        if (dateChanged || locationChanged) {
+          await ctx.scheduler.runAfter(1000, internal.discord.notifySessionDetailsChanged, {
+            sessionId: sId,
+            dateChanged,
+            prevDate: prevDate ?? undefined,
+            newDate: newDate ?? undefined,
+            locationChanged,
+            prevLocation: prevLocation?.trim() || undefined,
+            newLocation: newLocation?.trim() || undefined,
+          })
+        }
 
         return { success: true }
     },
@@ -530,6 +543,9 @@ export const updateQuest = mutation({
 
         const { apiKey, questId, ...patch } = args
         await ctx.db.patch(qId, patch)
+        if (patch.isCompleted === true) {
+            await deletePinsForQuest(ctx, qId)
+        }
         return { success: true }
     }
 })

@@ -53,6 +53,9 @@ export async function isAdmin(ctx: QueryCtx, targetUserId?: string) {
   // A. Check JWT claims (configured in Clerk JWT templates) if checking current authenticated user
   if (identity && identity.subject === effectiveUserId) {
     const adminClaim = extractClaim(identity, 'admin');
+    if (adminClaim === false || String(adminClaim).toLowerCase() === 'false') {
+      return false;
+    }
     if (adminClaim === true || String(adminClaim).toLowerCase() === 'true') {
       return true;
     }
@@ -67,14 +70,7 @@ export async function isAdmin(ctx: QueryCtx, targetUserId?: string) {
     .query('users')
     .withIndex('by_userId', (q) => q.eq('userId', effectiveUserId))
     .first();
-  if (userRecord?.isAdmin) return true;
-
-  // C. Check characters for rank 'guildmaster'
-  const characters = await ctx.db
-    .query('characters')
-    .withIndex('by_userId', (q) => q.eq('userId', effectiveUserId))
-    .collect();
-  if (characters.some(c => c.rank === 'guildmaster')) return true;
+  if (userRecord?.isAdmin !== undefined) return userRecord.isAdmin;
 
   return false;
 }
@@ -94,6 +90,9 @@ export async function isGameMaster(ctx: QueryCtx, targetUserId?: string) {
   // A. Check JWT claims if checking current authenticated user
   if (identity && identity.subject === effectiveUserId) {
     const gmClaim = extractClaim(identity, 'gamemaster');
+    if (gmClaim === false || String(gmClaim).toLowerCase() === 'false') {
+      return false;
+    }
     if (gmClaim === true || String(gmClaim).toLowerCase() === 'true') {
       return true;
     }
@@ -108,7 +107,7 @@ export async function isGameMaster(ctx: QueryCtx, targetUserId?: string) {
     .query('users')
     .withIndex('by_userId', (q) => q.eq('userId', effectiveUserId))
     .first();
-  if (userRecord?.isGM) return true;
+  if (userRecord?.isGM !== undefined) return userRecord.isGM;
 
   // C. Check if user owns a world (World owners are GMs)
   const world = await ctx.db
@@ -116,13 +115,6 @@ export async function isGameMaster(ctx: QueryCtx, targetUserId?: string) {
     .withIndex('by_owner', (q) => q.eq('owner', effectiveUserId))
     .first();
   if (world) return true;
-
-  // D. Check characters for rank 'journeyman' or 'guildmaster'
-  const characters = await ctx.db
-    .query('characters')
-    .withIndex('by_userId', (q) => q.eq('userId', effectiveUserId))
-    .collect();
-  if (characters.some(c => c.rank === 'journeyman' || c.rank === 'guildmaster')) return true;
 
   return false;
 }

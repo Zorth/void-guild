@@ -126,7 +126,7 @@ export default function SessionDialog({ session, trigger, hasWorld, initialDate 
     return ''
   })
   // const [world, setWorld] = useState('') // Removed: world is now derived
-  const [level, setLevel] = useState(session?.level?.toString() || '1')
+  const [level, setLevel] = useState(session ? (session.level !== undefined ? session.level.toString() : '0') : '0')
   const [maxPlayers, setMaxPlayers] = useState(session?.maxPlayers?.toString() || '6')
   const [gmCharacter, setGmCharacter] = useState<Id<'characters'> | ''>(session?.gmCharacter || '')
   const [location, setLocation] = useState(session?.location || '')
@@ -156,7 +156,7 @@ export default function SessionDialog({ session, trigger, hasWorld, initialDate 
         // setWorld(session.world) // Removed: world is now derived
         const sessIntro = session.isIntro || false
         setIsIntro(sessIntro)
-        setLevel(sessIntro ? (session.system === 'PF' ? '1' : '3') : (session.level?.toString() || ''))
+        setLevel(sessIntro ? (session.system === 'PF' ? '1' : '3') : (session.level !== undefined ? session.level.toString() : '0'))
         setMaxPlayers(session.maxPlayers.toString())
         setGmCharacter(session.gmCharacter || '')
         setLocation(session.location || '')
@@ -182,7 +182,7 @@ export default function SessionDialog({ session, trigger, hasWorld, initialDate 
         }
         // setWorld('') // Removed: world is now derived
         setIsIntro(false)
-        setLevel('1')
+        setLevel('0')
         setMaxPlayers('6')
         setGmCharacter('')
         setLocation('')
@@ -393,6 +393,8 @@ export default function SessionDialog({ session, trigger, hasWorld, initialDate 
                 if (checked) {
                   setLevel(system === 'PF' ? '1' : '3')
                   if (errors.level) setErrors({ ...errors, level: '' })
+                } else {
+                  setLevel(session ? (session.level !== undefined ? session.level.toString() : '0') : '0')
                 }
               }}
             />

@@ -9,6 +9,7 @@ import { adjustCharacterMoney, parseGpAmount } from './moneyHelpers'
 import { syncActiveSessionsForQuestChange } from './questSyncHelpers'
 import { evaluateAndSyncUserAchievements } from './achievements'
 import { removeUserAvailabilityOnDate } from './planning'
+import { deletePinsForQuest } from './maps'
 
 /**
  * XP gain based on session level and character level.
@@ -783,6 +784,17 @@ export const updateSession = mutation({
         throw new Error('This session is locked and cannot be edited.')
     }
 
+    const prevDate = session.date
+    const newDate = args.date
+    const prevLocation = session.location
+    const newLocation = args.location
+
+    const dateChanged = (prevDate === undefined && newDate !== undefined) ||
+      (prevDate !== undefined && newDate === undefined) ||
+      (prevDate !== undefined && newDate !== undefined && Math.floor(prevDate / 60000) !== Math.floor(newDate / 60000))
+
+    const locationChanged = (prevLocation || '').trim() !== (newLocation || '').trim()
+
     const level = args.isIntro ? (args.system === 'PF' ? 1 : 3) : args.level
 
     await ctx.db.patch(args.sessionId, {
@@ -813,6 +825,18 @@ export const updateSession = mutation({
     await ctx.scheduler.runAfter(0, internal.discord.syncSessionToDiscord, {
         sessionId: args.sessionId
     })
+
+    if (dateChanged || locationChanged) {
+      await ctx.scheduler.runAfter(1000, internal.discord.notifySessionDetailsChanged, {
+        sessionId: args.sessionId,
+        dateChanged,
+        prevDate: prevDate ?? undefined,
+        newDate: newDate ?? undefined,
+        locationChanged,
+        prevLocation: prevLocation?.trim() || undefined,
+        newLocation: newLocation?.trim() || undefined,
+      })
+    }
   },
 })
 
@@ -1645,6 +1669,7 @@ export const lockSession = mutation({
           completedSessionId: session._id,
           completedAt: Date.now(),
         })
+        await deletePinsForQuest(ctx, session.questId)
         await syncActiveSessionsForQuestChange(ctx, session.world as Id<'worlds'> | undefined, {
           affectedQuestId: session.questId,
           isRemovedOrCompleted: true,
@@ -1745,6 +1770,7 @@ export const forceLockSession = mutation({
           completedSessionId: session._id,
           completedAt: Date.now(),
         })
+        await deletePinsForQuest(ctx, session.questId)
         await syncActiveSessionsForQuestChange(ctx, session.world as Id<'worlds'> | undefined, {
           affectedQuestId: session.questId,
           isRemovedOrCompleted: true,

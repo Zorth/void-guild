@@ -44,18 +44,30 @@ export const syncUser = mutation({
     const extraSessionsPlayed = Number(extractClaim(identity, 'extraSessionsPlayed') || 0)
     const extraSessionsRan = Number(extractClaim(identity, 'extraSessionsRan') || 0)
     
-    const isAdminUser =
+    const isAdminExplicitlyFalse =
+      args.isAdmin === false ||
+      adminClaim === false ||
+      String(adminClaim).toLowerCase() === 'false'
+
+    const isGMExplicitlyFalse =
+      args.isGM === false ||
+      gmClaim === false ||
+      String(gmClaim).toLowerCase() === 'false'
+
+    const isAdminUser = !isAdminExplicitlyFalse && (
       args.isAdmin === true ||
       adminClaim === true ||
       String(adminClaim).toLowerCase() === 'true' ||
       roleClaim === 'admin'
-    const isGMUser =
+    )
+    const isGMUser = !isGMExplicitlyFalse && (
       args.isGM === true ||
       gmClaim === true ||
       String(gmClaim).toLowerCase() === 'true' ||
       roleClaim === 'gamemaster' ||
       roleClaim === 'voidmaster' ||
       isAdminUser
+    )
     const isMemberUser =
       args.isMember === true ||
       memberClaim === true ||
@@ -131,6 +143,17 @@ export const syncUser = mutation({
       }
     } else {
       userIdDocId = await ctx.db.insert('users', userData)
+    }
+
+    // Keep user's availability records in sync with their current isGM status
+    const userAvails = await ctx.db
+      .query('availability')
+      .withIndex('by_user_date', (q) => q.eq('userId', identity.subject))
+      .collect()
+    for (const rec of userAvails) {
+      if (rec.isGM !== isGMUser) {
+        await ctx.db.patch(rec._id, { isGM: isGMUser })
+      }
     }
 
     // If user has a Discord ID (synced now or previously), auto-grant link_discord achievement
@@ -615,5 +638,47 @@ export const getUserByDiscordId = query({
       .query('users')
       .withIndex('by_discordId', (q) => q.eq('discordId', args.discordId))
       .first()
+  },
+})
+
+/**
+ * Fixes a user's isGM status in the database and synchronizes their availability records.
+ */
+export const fixUserGMStatus = mutation({
+  args: {
+    emailOrUsername: v.string(),
+    isGM: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const isAdminUser = await isAdmin(ctx)
+    if (!isAdminUser) throw new Error('Unauthorized')
+
+    const allUsers = await ctx.db.query('users').collect()
+    const target = allUsers.find(
+      (u) =>
+        u.email?.toLowerCase() === args.emailOrUsername.toLowerCase() ||
+        u.username?.toLowerCase() === args.emailOrUsername.toLowerCase()
+    )
+    if (!target) throw new Error(`User ${args.emailOrUsername} not found`)
+
+    await ctx.db.patch(target._id, { isGM: args.isGM })
+
+    const userAvails = await ctx.db
+      .query('availability')
+      .withIndex('by_user_date', (q) => q.eq('userId', target.userId))
+      .collect()
+
+    for (const rec of userAvails) {
+      if (rec.isGM !== args.isGM) {
+        await ctx.db.patch(rec._id, { isGM: args.isGM })
+      }
+    }
+
+    return {
+      success: true,
+      userId: target.userId,
+      isGM: args.isGM,
+      availabilityRecordsUpdated: userAvails.length,
+    }
   },
 })
