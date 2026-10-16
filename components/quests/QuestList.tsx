@@ -41,6 +41,7 @@ const LEVEL_TIERS = [
 
 export default function QuestList({ worldId, worldOwner, isSidebar = false, filters }: QuestListProps) {
   const { userId } = useAuth()
+  const worldDoc = useQuery(api.worlds.getWorld, worldId ? { worldId } : 'skip')
   const questsRaw = useQuery(api.quests.getQuestsByWorld, { worldId })
   const suggestedQuests = useQuery(
     api.quests.getSuggestedQuestsByWorld,
@@ -52,7 +53,8 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
   const rejectSuggestedQuest = useMutation(api.quests.rejectSuggestedQuest)
   const toggleQuestHidden = useMutation(api.quests.toggleQuestHidden)
 
-  const isWorldOwner = userId === worldOwner || !!isAdmin
+  const effectiveWorldOwner = worldOwner ?? worldDoc?.owner
+  const isWorldOwner = Boolean((userId && userId === effectiveWorldOwner) || isAdmin)
 
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingQuest, setEditingQuest] = useState<any>(null)
@@ -393,7 +395,7 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
         <div className="grid gap-3">
           {quests.map((quest) => {
             const isOwner = quest.owner === userId
-            const canEdit = isOwner || userId === worldOwner || isAdmin
+            const canEdit = isOwner || isWorldOwner
             const isExpanded = expandedQuestId === quest._id
             const isCharacterQuest = Boolean(quest.characterId)
 
@@ -541,9 +543,24 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
                                     {quest.characterRank && <CharacterRankIcon rank={quest.characterRank} />}
                                 </div>
                                 {quest.isSponsored && (
-                                    <span className="ml-auto text-[9px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded">
+                                    <span className="text-[9px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded">
                                         Guild Sponsored
                                     </span>
+                                )}
+                                {isWorldOwner && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-6 text-[10px] px-2 py-0 border-purple-500/40 text-purple-300 hover:bg-purple-500/20 hover:text-purple-200 ml-auto"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleEdit(quest)
+                                      }}
+                                      title="Set or edit quest level"
+                                    >
+                                      <Pencil className="h-2.5 w-2.5 mr-1" />
+                                      Edit Level
+                                    </Button>
                                 )}
                             </div>
                         )}

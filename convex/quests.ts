@@ -172,15 +172,18 @@ export const updateQuest = mutation({
 
     const isAdminUser = await isAdmin(ctx)
     let isWorldOwner = false
-    if (quest.worldId) {
-        const world = await ctx.db.get(quest.worldId)
-        isWorldOwner = world?.owner === user.subject
+    const targetWorldId = quest.worldId || args.worldId
+    if (targetWorldId) {
+      const world = await ctx.db.get(targetWorldId)
+      isWorldOwner = Boolean(world && (world.owner === user.subject || world.owner === user.tokenIdentifier))
     }
 
-    if (quest.owner !== user.subject && !isWorldOwner && !isAdminUser) {
+    const isQuestOwner = quest.owner === user.subject || quest.owner === user.tokenIdentifier
+    if (!isQuestOwner && !isWorldOwner && !isAdminUser) {
       throw new Error('You do not have permission to update this quest.')
     }
 
+    const targetCharacterId = args.characterId !== undefined ? args.characterId : quest.characterId
     let characterRank = quest.characterRank
     let isSponsored = quest.isSponsored ?? false
     let sponsoredAmount = quest.sponsoredAmount
@@ -189,32 +192,41 @@ export const updateQuest = mutation({
     // Round rewardMoneyGP to 2 decimals if provided
     const roundedMoneyGP = args.rewardMoneyGP !== undefined && args.rewardMoneyGP !== null
       ? Math.round(args.rewardMoneyGP * 100) / 100
-      : undefined
+      : quest.rewardMoneyGP
 
     // Determine final reward string
-    let finalReward = args.reward
-    if (roundedMoneyGP !== undefined || args.rewardOther) {
-      const parts: string[] = []
-      if (roundedMoneyGP !== undefined && roundedMoneyGP > 0) {
-        const moneyFormatted = roundedMoneyGP % 1 === 0
-          ? `${roundedMoneyGP.toLocaleString()} GP`
-          : `${roundedMoneyGP.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} GP`
-        const typeSuffix = args.rewardType === 'per_person' ? ' / person' : ''
-        parts.push(`${moneyFormatted}${typeSuffix}`)
-      }
-      if (args.rewardOther && args.rewardOther.trim()) {
-        parts.push(args.rewardOther.trim())
-      }
-      if (parts.length > 0) {
-        finalReward = parts.join(' + ')
+    let finalReward = args.reward !== undefined ? args.reward : quest.reward
+    const rewardOther = args.rewardOther !== undefined ? args.rewardOther.trim() : quest.rewardOther
+    const rewardType = args.rewardType || quest.rewardType || 'party'
+
+    if (args.rewardMoneyGP !== undefined || args.rewardOther !== undefined) {
+      if (roundedMoneyGP !== undefined || rewardOther) {
+        const parts: string[] = []
+        if (roundedMoneyGP !== undefined && roundedMoneyGP > 0) {
+          const moneyFormatted = roundedMoneyGP % 1 === 0
+            ? `${roundedMoneyGP.toLocaleString()} GP`
+            : `${roundedMoneyGP.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} GP`
+          const typeSuffix = rewardType === 'per_person' ? ' / person' : ''
+          parts.push(`${moneyFormatted}${typeSuffix}`)
+        }
+        if (rewardOther && rewardOther.trim()) {
+          parts.push(rewardOther.trim())
+        }
+        if (parts.length > 0) {
+          finalReward = parts.join(' + ')
+        } else {
+          finalReward = undefined
+        }
       }
     }
 
-    if (args.characterId) {
-      const character = await ctx.db.get(args.characterId)
+    if (targetCharacterId) {
+      const character = await ctx.db.get(targetCharacterId)
       if (character) {
         characterRank = character.rank || 'none'
-        const questLevel = (args.levelPF !== null ? args.levelPF : undefined) ?? (args.levelDnD !== null ? args.levelDnD : undefined) ?? 0
+        const effectiveLevelPF = args.levelPF !== undefined ? (args.levelPF === null ? undefined : args.levelPF) : quest.levelPF
+        const effectiveLevelDnD = args.levelDnD !== undefined ? (args.levelDnD === null ? undefined : args.levelDnD) : quest.levelDnD
+        const questLevel = effectiveLevelPF ?? effectiveLevelDnD ?? 0
         const maxSponsoredLevel = Math.max(0, (character.lvl || 1) - 4)
 
         if ((characterRank === 'journeyman' || characterRank === 'guildmaster') && questLevel <= maxSponsoredLevel) {
@@ -223,8 +235,8 @@ export const updateQuest = mutation({
             const sponsorVal = Math.round((roundedMoneyGP / 5) * 100) / 100
             const netVal = Math.round((roundedMoneyGP - sponsorVal) * 100) / 100
             const formatGP = (n: number) => n % 1 === 0 ? `${n.toLocaleString()} GP` : `${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} GP`
-            const typeSuffix = args.rewardType === 'per_person' ? ' / person' : ''
-            const otherSuffix = args.rewardOther && args.rewardOther.trim() ? ` + ${args.rewardOther.trim()}` : ''
+            const typeSuffix = rewardType === 'per_person' ? ' / person' : ''
+            const otherSuffix = rewardOther && rewardOther.trim() ? ` + ${rewardOther.trim()}` : ''
             sponsoredAmount = `${formatGP(sponsorVal)}${typeSuffix}`
             netCost = `${formatGP(netVal)}${typeSuffix}${otherSuffix}`
           } else if (finalReward) {
@@ -235,7 +247,7 @@ export const updateQuest = mutation({
               const unit = match[2] ? match[2].toUpperCase() : 'GP'
               const sponsorVal = Math.round((num / 5) * 100) / 100
               const netVal = Math.round((num - sponsorVal) * 100) / 100
-              const typeSuffix = args.rewardType === 'per_person' ? ' / person' : ''
+              const typeSuffix = rewardType === 'per_person' ? ' / person' : ''
               sponsoredAmount = `${sponsorVal.toLocaleString()} ${unit}${typeSuffix}`
               netCost = `${netVal.toLocaleString()} ${unit}${typeSuffix}`
             } else {
@@ -254,34 +266,139 @@ export const updateQuest = mutation({
       }
     }
 
-    const { questId, levelPF, levelDnD, rewardMoneyGP: _rm, ...otherFields } = args
-    
-    await ctx.db.replace(questId, {
-        ...quest,
-        ...otherFields,
-        worldId: args.worldId,
-        reward: finalReward,
-        rewardType: args.rewardType || quest.rewardType || 'party',
-        rewardMoneyGP: roundedMoneyGP !== undefined ? roundedMoneyGP : quest.rewardMoneyGP,
-        rewardOther: args.rewardOther !== undefined ? args.rewardOther.trim() : quest.rewardOther,
-        levelPF: levelPF === null ? undefined : levelPF,
-        levelDnD: levelDnD === null ? undefined : levelDnD,
-        // Clear deprecated level if PF level is explicitly unset
-        level: levelPF === null ? undefined : quest.level,
-        characterRank,
-        isSponsored,
-        sponsoredAmount,
-        netCost,
+    const effectiveWorldId = args.worldId !== undefined ? args.worldId : quest.worldId
+    const effectiveIsHidden = args.isHidden !== undefined ? args.isHidden : quest.isHidden
+
+    await ctx.db.patch(args.questId, {
+      name: args.name,
+      worldId: effectiveWorldId,
+      description: args.description,
+      questgiver: args.questgiver,
+      reward: finalReward,
+      rewardType,
+      rewardMoneyGP: roundedMoneyGP,
+      rewardOther,
+      tags: args.tags,
+      characterId: targetCharacterId,
+      levelPF: args.levelPF === null ? undefined : (args.levelPF !== undefined ? args.levelPF : quest.levelPF),
+      levelDnD: args.levelDnD === null ? undefined : (args.levelDnD !== undefined ? args.levelDnD : quest.levelDnD),
+      level: args.levelPF === null ? undefined : (args.levelPF !== undefined ? args.levelPF : quest.level),
+      characterRank,
+      isSponsored,
+      sponsoredAmount,
+      netCost,
+      isHidden: effectiveIsHidden,
     })
 
-    await syncActiveSessionsForQuestChange(ctx, args.worldId, {
+    await syncActiveSessionsForQuestChange(ctx, effectiveWorldId, {
       affectedQuestId: args.questId,
-      isRemovedOrCompleted: args.isHidden,
+      isRemovedOrCompleted: effectiveIsHidden,
     })
-    if (quest.worldId && quest.worldId !== args.worldId) {
+    if (quest.worldId && quest.worldId !== effectiveWorldId) {
       await syncActiveSessionsForQuestChange(ctx, quest.worldId, {
         affectedQuestId: args.questId,
         isRemovedOrCompleted: true,
+      })
+    }
+  },
+})
+
+export const updateQuestLevel = mutation({
+  args: {
+    questId: v.id('quests'),
+    levelPF: v.union(v.number(), v.null()),
+    levelDnD: v.union(v.number(), v.null()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) {
+      throw new Error('Not authenticated')
+    }
+
+    const quest = await ctx.db.get(args.questId)
+    if (!quest) {
+      throw new Error('Quest not found')
+    }
+
+    const isAdminUser = await isAdmin(ctx)
+    let isWorldOwner = false
+    if (quest.worldId) {
+      const world = await ctx.db.get(quest.worldId)
+      isWorldOwner = Boolean(
+        world && (world.owner === user.subject || world.owner === user.tokenIdentifier)
+      )
+    }
+
+    const isQuestOwner = quest.owner === user.subject || quest.owner === user.tokenIdentifier
+    if (!isQuestOwner && !isWorldOwner && !isAdminUser) {
+      throw new Error('You do not have permission to update this quest.')
+    }
+
+    let isSponsored = quest.isSponsored ?? false
+    let sponsoredAmount = quest.sponsoredAmount
+    let netCost = quest.netCost
+    let characterRank = quest.characterRank
+
+    if (quest.characterId) {
+      const character = await ctx.db.get(quest.characterId)
+      if (character) {
+        characterRank = character.rank || 'none'
+        const effectivePF = args.levelPF !== null ? args.levelPF : undefined
+        const effectiveDnD = args.levelDnD !== null ? args.levelDnD : undefined
+        const questLevel = effectivePF ?? effectiveDnD ?? 0
+        const maxSponsoredLevel = Math.max(0, (character.lvl || 1) - 4)
+
+        if ((characterRank === 'journeyman' || characterRank === 'guildmaster') && questLevel <= maxSponsoredLevel) {
+          isSponsored = true
+          const roundedMoneyGP = quest.rewardMoneyGP
+          if (roundedMoneyGP !== undefined && roundedMoneyGP > 0) {
+            const sponsorVal = Math.round((roundedMoneyGP / 5) * 100) / 100
+            const netVal = Math.round((roundedMoneyGP - sponsorVal) * 100) / 100
+            const formatGP = (n: number) => n % 1 === 0 ? `${n.toLocaleString()} GP` : `${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} GP`
+            const typeSuffix = quest.rewardType === 'per_person' ? ' / person' : ''
+            const otherSuffix = quest.rewardOther && quest.rewardOther.trim() ? ` + ${quest.rewardOther.trim()}` : ''
+            sponsoredAmount = `${formatGP(sponsorVal)}${typeSuffix}`
+            netCost = `${formatGP(netVal)}${typeSuffix}${otherSuffix}`
+          } else if (quest.reward) {
+            const rewardClean = quest.reward.replace(/,/g, '')
+            const match = rewardClean.match(/(\d+(?:\.\d+)?)\s*(sp|gp|cp|pp|gold|silver|copper|platinum)?/i)
+            if (match) {
+              const num = parseFloat(match[1])
+              const unit = match[2] ? match[2].toUpperCase() : 'GP'
+              const sponsorVal = Math.round((num / 5) * 100) / 100
+              const netVal = Math.round((num - sponsorVal) * 100) / 100
+              const typeSuffix = quest.rewardType === 'per_person' ? ' / person' : ''
+              sponsoredAmount = `${sponsorVal.toLocaleString()} ${unit}${typeSuffix}`
+              netCost = `${netVal.toLocaleString()} ${unit}${typeSuffix}`
+            } else {
+              sponsoredAmount = '20% (1/5th) reimbursed by Guild'
+              netCost = '80% (4/5ths) net cost'
+            }
+          } else {
+            sponsoredAmount = '20% (1/5th) reimbursed by Guild'
+            netCost = '80% (4/5ths) net cost'
+          }
+        } else {
+          isSponsored = false
+          sponsoredAmount = undefined
+          netCost = undefined
+        }
+      }
+    }
+
+    await ctx.db.patch(args.questId, {
+      levelPF: args.levelPF === null ? undefined : args.levelPF,
+      levelDnD: args.levelDnD === null ? undefined : args.levelDnD,
+      level: args.levelPF === null ? undefined : quest.level,
+      characterRank,
+      isSponsored,
+      sponsoredAmount,
+      netCost,
+    })
+
+    if (quest.worldId) {
+      await syncActiveSessionsForQuestChange(ctx, quest.worldId, {
+        affectedQuestId: args.questId,
       })
     }
   },
@@ -402,7 +519,8 @@ export const rejectSuggestedQuest = mutation({
 
     const world = await ctx.db.get(quest.worldId)
     const isAdminUser = await isAdmin(ctx)
-    if (!world || (world.owner !== user.subject && !isAdminUser)) {
+    const isWorldOwner = Boolean(world && (world.owner === user.subject || world.owner === user.tokenIdentifier))
+    if (!world || (!isWorldOwner && !isAdminUser)) {
       throw new Error('Only the world owner or an admin can reject suggested quests.')
     }
 
@@ -427,7 +545,7 @@ export const toggleQuestHidden = mutation({
     let isWorldOwner = false
     if (quest.worldId) {
       const world = await ctx.db.get(quest.worldId)
-      isWorldOwner = world?.owner === user.subject
+      isWorldOwner = Boolean(world && (world.owner === user.subject || world.owner === user.tokenIdentifier))
     } else {
       // For worldless quests, only admin can toggle hidden
       isWorldOwner = isAdminUser
@@ -459,7 +577,7 @@ export const getSuggestedQuestsByWorld = query({
 
     const world = await ctx.db.get(args.worldId)
     const isAdminUser = await isAdmin(ctx)
-    const isWorldOwner = world?.owner === user.subject
+    const isWorldOwner = Boolean(world && (world.owner === user.subject || world.owner === user.tokenIdentifier))
 
     // Only world owner or admin can view pending suggestions
     if (!isWorldOwner && !isAdminUser) return []
@@ -513,11 +631,12 @@ export const deleteQuest = mutation({
     const isAdminUser = await isAdmin(ctx)
     let isWorldOwner = false
     if (quest.worldId) {
-        const world = await ctx.db.get(quest.worldId)
-        isWorldOwner = world?.owner === user.subject
+      const world = await ctx.db.get(quest.worldId)
+      isWorldOwner = Boolean(world && (world.owner === user.subject || world.owner === user.tokenIdentifier))
     }
 
-    if (quest.owner !== user.subject && !isWorldOwner && !isAdminUser) {
+    const isQuestOwner = quest.owner === user.subject || quest.owner === user.tokenIdentifier
+    if (!isQuestOwner && !isWorldOwner && !isAdminUser) {
       throw new Error('You do not have permission to delete this quest.')
     }
 
@@ -559,7 +678,7 @@ export const getQuestsByWorld = query({
     let isWorldOwner = false
     if (args.worldId && user) {
       const world = await ctx.db.get(args.worldId)
-      isWorldOwner = world?.owner === user.subject
+      isWorldOwner = Boolean(world && (world.owner === user.subject || world.owner === user.tokenIdentifier))
     }
 
     // Exclude completed quests and pending suggestions (pending suggestions are reviewed by world owner first)

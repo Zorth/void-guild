@@ -38,6 +38,12 @@ interface QuestDialogProps {
     tags?: string[]
     worldId?: Id<'worlds'>
     isHidden?: boolean
+    characterId?: Id<'characters'>
+    characterName?: string
+    characterRank?: string
+    isSponsored?: boolean
+    sponsoredAmount?: string
+    netCost?: string
   }
 }
 
@@ -117,6 +123,7 @@ export default function QuestDialog({ isOpen, onClose, worldId, isWorldOwner = f
           tags,
           worldId: targetWorldId,
           isHidden,
+          characterId: quest.characterId,
         })
         toast.success('Quest updated successfully!')
       } else {
@@ -154,6 +161,25 @@ export default function QuestDialog({ isOpen, onClose, worldId, isWorldOwner = f
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
+          {quest?.characterId && (
+            <div className="flex items-center gap-2.5 p-3 rounded-lg bg-purple-500/10 border border-purple-500/25 text-xs text-purple-200">
+              <User className="h-4 w-4 text-purple-400 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap font-semibold">
+                  <span>Player Character Quest</span>
+                  {(quest.characterName || quest.questgiver) && (
+                    <span className="text-purple-300 font-normal">
+                      posted by <strong>{quest.characterName || quest.questgiver?.replace(/^Character:\s*/, '')}</strong>
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-purple-300/80 mt-0.5">
+                  World Owners and GMs can set or update the level (Pathfinder / D&D) for this quest.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <label className="text-sm font-semibold flex items-center gap-2">
               <Sword className="h-4 w-4 text-muted-foreground" />
