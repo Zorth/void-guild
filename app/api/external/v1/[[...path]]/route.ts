@@ -23,10 +23,27 @@ async function handleResponse(promise: Promise<any>) {
     }
 }
 
+function extractApiKey(req: NextRequest, body?: any): string | undefined {
+    const authHeader = req.headers.get('Authorization');
+    if (authHeader) {
+        const cleaned = authHeader.replace(/^Bearer\s+/i, '').trim();
+        if (cleaned) return cleaned;
+    }
+    const queryKey = req.nextUrl.searchParams.get('apiKey')?.trim();
+    if (queryKey) return queryKey;
+
+    if (body && typeof body === 'object' && typeof body.apiKey === 'string') {
+        const bKey = body.apiKey.trim();
+        if (bKey) return bKey;
+    }
+
+    return undefined;
+}
+
 function getApiDocsResponse() {
     return NextResponse.json({
         name: "Guild of The Void External API",
-        version: "v1.2",
+        version: "v1.3",
         documentationUrl: "https://github.com/Zorth/void-guild/blob/main/API.md",
         baseUrl: "https://guild.tarragon.be/api/external/v1",
         authentication: {
@@ -75,7 +92,13 @@ function getApiDocsResponse() {
             { method: "POST", path: "/black-void/item", description: "Post an item listing" },
             { method: "POST", path: "/black-void/service", description: "Post a crafting/service listing" },
             { method: "POST", path: "/black-void/bid", description: "Place bid, 2-sig-fig auto-bid cap, or buyout on item" },
-            { method: "PATCH", path: "/black-void/claim/:type", description: "Toggle claim state or claim all log entries (seller, buyer, quest, guildmaster, bet/winner, bet/loser, all)" },
+            { method: "PATCH", path: "/black-void/claim/seller", description: "Toggle claim state for a sold listing" },
+            { method: "PATCH", path: "/black-void/claim/buyer", description: "Toggle claim state for a won auction listing" },
+            { method: "PATCH", path: "/black-void/claim/quest", description: "Toggle claim state for quest reimbursement or payment" },
+            { method: "PATCH", path: "/black-void/claim/guildmaster", description: "Toggle claim state for Guildmaster regional loot compensation" },
+            { method: "PATCH", path: "/black-void/claim/bet/winner", description: "Toggle claim state for a won bet" },
+            { method: "PATCH", path: "/black-void/claim/bet/loser", description: "Toggle claim state for a lost bet" },
+            { method: "PATCH", path: "/black-void/claim/all", description: "Mark all log entries for a character as claimed" },
 
             { method: "GET", path: "/world/:id/reputation", description: "Get character faction reputation scores" },
             { method: "PATCH", path: "/reputation", description: "Update character faction reputation" },
@@ -99,7 +122,7 @@ export async function GET(
     if (!path || path.length === 0 || ['docs', 'help', 'spec', 'openapi.json'].includes(path[0])) {
         return getApiDocsResponse();
     }
-    const apiKey = req.headers.get('Authorization')?.replace('Bearer ', '') || undefined;
+    const apiKey = extractApiKey(req);
 
     const convex = getConvexClient();
     const [resource, id, subresource] = path;
@@ -198,11 +221,18 @@ export async function POST(
 ) {
     const { path } = await params;
     if (!path || path.length === 0) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    const apiKey = req.headers.get('Authorization')?.replace('Bearer ', '');
+
+    let body: any = {};
+    try {
+        body = await req.json();
+    } catch {
+        body = {};
+    }
+
+    const apiKey = extractApiKey(req, body);
     if (!apiKey) return NextResponse.json({ error: 'Missing API key' }, { status: 401 });
 
     const convex = getConvexClient();
-    const body = await req.json();
     const [resource, id, subresource] = path;
 
     switch (resource) {
@@ -245,11 +275,18 @@ export async function PATCH(
 ) {
     const { path } = await params;
     if (!path || path.length === 0) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    const apiKey = req.headers.get('Authorization')?.replace('Bearer ', '');
+
+    let body: any = {};
+    try {
+        body = await req.json();
+    } catch {
+        body = {};
+    }
+
+    const apiKey = extractApiKey(req, body);
     if (!apiKey) return NextResponse.json({ error: 'Missing API key' }, { status: 401 });
 
     const convex = getConvexClient();
-    const body = await req.json();
     const [resource, id, subresource] = path;
 
     switch (resource) {

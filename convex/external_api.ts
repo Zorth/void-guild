@@ -479,6 +479,9 @@ export const createQuest = mutation({
         description: v.optional(v.string()),
         questgiver: v.optional(v.string()),
         reward: v.optional(v.string()),
+        rewardType: v.optional(v.union(v.literal('party'), v.literal('per_person'))),
+        rewardMoneyGP: v.optional(v.number()),
+        rewardOther: v.optional(v.string()),
         tags: v.optional(v.array(v.string())),
         characterId: v.optional(v.string()),
     },
@@ -504,10 +507,36 @@ export const createQuest = mutation({
             }
         }
 
+        // Round rewardMoneyGP to 2 decimals if provided
+        const roundedMoneyGP = args.rewardMoneyGP !== undefined && args.rewardMoneyGP !== null
+            ? Math.round(args.rewardMoneyGP * 100) / 100
+            : undefined
+
+        // Determine final reward string
+        let finalReward = args.reward
+        if (roundedMoneyGP !== undefined || args.rewardOther) {
+            const parts: string[] = []
+            if (roundedMoneyGP !== undefined && roundedMoneyGP > 0) {
+                const moneyFormatted = roundedMoneyGP % 1 === 0
+                    ? `${roundedMoneyGP.toLocaleString()} GP`
+                    : `${roundedMoneyGP.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} GP`
+                const typeSuffix = args.rewardType === 'per_person' ? ' / person' : ''
+                parts.push(`${moneyFormatted}${typeSuffix}`)
+            }
+            if (args.rewardOther && args.rewardOther.trim()) {
+                parts.push(args.rewardOther.trim())
+            }
+            if (parts.length > 0) {
+                finalReward = parts.join(' + ')
+            }
+        }
+
         const { apiKey, worldId, characterId, ...questData } = args
 
         return await ctx.db.insert('quests', {
             ...questData,
+            reward: finalReward,
+            rewardMoneyGP: roundedMoneyGP,
             worldId: wId,
             characterId: cId,
             owner: user.userId,
@@ -524,6 +553,9 @@ export const updateQuest = mutation({
         name: v.optional(v.string()),
         description: v.optional(v.string()),
         reward: v.optional(v.string()),
+        rewardType: v.optional(v.union(v.literal('party'), v.literal('per_person'))),
+        rewardMoneyGP: v.optional(v.number()),
+        rewardOther: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
         const user = await requireUser(ctx, args.apiKey)
@@ -541,8 +573,43 @@ export const updateQuest = mutation({
 
         if (!canUpdate) throw new Error('Unauthorized to update quest')
 
+        // Round rewardMoneyGP to 2 decimals if provided
+        const roundedMoneyGP = args.rewardMoneyGP !== undefined && args.rewardMoneyGP !== null
+            ? Math.round(args.rewardMoneyGP * 100) / 100
+            : quest.rewardMoneyGP
+
+        // Determine final reward string if rewardMoneyGP or rewardOther or reward is provided
+        let finalReward = args.reward !== undefined ? args.reward : quest.reward
+        const rewardOther = args.rewardOther !== undefined ? args.rewardOther.trim() : quest.rewardOther
+        const rewardType = args.rewardType || quest.rewardType || 'party'
+
+        if (args.rewardMoneyGP !== undefined || args.rewardOther !== undefined) {
+            if (roundedMoneyGP !== undefined || rewardOther) {
+                const parts: string[] = []
+                if (roundedMoneyGP !== undefined && roundedMoneyGP > 0) {
+                    const moneyFormatted = roundedMoneyGP % 1 === 0
+                        ? `${roundedMoneyGP.toLocaleString()} GP`
+                        : `${roundedMoneyGP.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} GP`
+                    const typeSuffix = rewardType === 'per_person' ? ' / person' : ''
+                    parts.push(`${moneyFormatted}${typeSuffix}`)
+                }
+                if (rewardOther && rewardOther.trim()) {
+                    parts.push(rewardOther.trim())
+                }
+                if (parts.length > 0) {
+                    finalReward = parts.join(' + ')
+                } else {
+                    finalReward = undefined
+                }
+            }
+        }
+
         const { apiKey, questId, ...patch } = args
-        await ctx.db.patch(qId, patch)
+        await ctx.db.patch(qId, {
+            ...patch,
+            ...(args.rewardMoneyGP !== undefined ? { rewardMoneyGP: roundedMoneyGP } : {}),
+            ...(args.rewardMoneyGP !== undefined || args.rewardOther !== undefined ? { reward: finalReward } : {}),
+        })
         if (patch.isCompleted === true) {
             await deletePinsForQuest(ctx, qId)
         }
