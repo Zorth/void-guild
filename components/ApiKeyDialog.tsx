@@ -233,7 +233,7 @@ export function ApiKeyDialog({ open, onOpenChange }: { open?: boolean, onOpenCha
                             </a>
 
                             <a
-                                href="/downloads/void_guild_extenstion-0.0.3.xpi"
+                                href="/downloads/void_guild_extenstion-0.0.4.xpi"
                                 download
                                 className="flex items-center justify-between p-2.5 rounded-md border border-border bg-muted/20 hover:bg-muted/50 hover:border-purple-500/40 transition-colors group"
                             >
@@ -241,7 +241,7 @@ export function ApiKeyDialog({ open, onOpenChange }: { open?: boolean, onOpenCha
                                     <FirefoxIcon className="h-4 w-4 text-purple-400 shrink-0" />
                                     <div className="min-w-0">
                                         <div className="text-xs font-semibold group-hover:text-purple-300 transition-colors truncate">Firefox Extension (.xpi)</div>
-                                        <div className="text-[10px] text-muted-foreground truncate">v0.0.3 • Lookups & tools</div>
+                                        <div className="text-[10px] text-muted-foreground truncate">v0.0.4 • Lookups & tools</div>
                                     </div>
                                 </div>
                                 <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-purple-300 shrink-0" />

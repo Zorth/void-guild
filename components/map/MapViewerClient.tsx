@@ -176,6 +176,8 @@ export default function MapViewerClient() {
   const [isQuestsMenuOpen, setIsQuestsMenuOpen] = useState(false)
   const [questSearch, setQuestSearch] = useState('')
   const [isTilePyramidEnabled, setIsTilePyramidEnabled] = useState(true)
+  const [tappedQuestPinId, setTappedQuestPinId] = useState<string | null>(null)
+  const isTouchInteractionRef = useRef(false)
   const [isNotesMenuOpen, setIsNotesMenuOpen] = useState(false)
   const [selectedNoteCoords, setSelectedNoteCoords] = useState<{ x: number; y: number } | null>(null)
   const [selectedNoteData, setSelectedNoteData] = useState<any>(null)
@@ -629,6 +631,7 @@ export default function MapViewerClient() {
     setIsDragging(true)
     isDraggingRef.current = true
     hasDraggedRef.current = false
+    isTouchInteractionRef.current = false
     dragOriginRef.current = { x: e.clientX, y: e.clientY }
 
     if (activeTool === 'align_grid') {
@@ -767,6 +770,7 @@ export default function MapViewerClient() {
 
   // Touch Pinch Zoom & Pan Handlers
   const handleTouchStart = (e: React.TouchEvent) => {
+    isTouchInteractionRef.current = true
     if (activeTool === 'ruler' && e.touches.length === 1) {
       const touch = e.touches[0]
       if (containerRef.current) {
@@ -919,6 +923,7 @@ export default function MapViewerClient() {
     } else if (e.touches.length === 1 && isDragging) {
       if (Math.hypot(e.touches[0].clientX - dragOriginRef.current.x, e.touches[0].clientY - dragOriginRef.current.y) > 5) {
         hasDraggedRef.current = true
+        if (tappedQuestPinId) setTappedQuestPinId(null)
       }
 
       if (activeTool === 'align_grid') {
@@ -1038,6 +1043,7 @@ export default function MapViewerClient() {
 
   // Canvas Click Handler based on Active Tool
   const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    setTappedQuestPinId(null)
     if (isDragging || hasDraggedRef.current || activeTool === 'ruler') return
     const coords = getCanvasCoordinates(e)
 
@@ -1151,6 +1157,10 @@ export default function MapViewerClient() {
       setIsMeasuring(false)
     }
   }, [gridType, activeTool])
+
+  useEffect(() => {
+    setTappedQuestPinId(null)
+  }, [activeTool, currentMap?._id])
 
   const revealedSet = useMemo(() => {
     return new Set(currentMap?.revealedCells || [])
@@ -3163,19 +3173,21 @@ export default function MapViewerClient() {
             const currentPinY = isDraggingThisPin && draggedPinOffset ? draggedPinOffset.y : (optimisticPos ? optimisticPos.y : pin.y)
 
             const canDragThisPin = isOwner && activeTool === 'view'
+            const isTapped = tappedQuestPinId === pin._id
 
             return (
               <div
                 key={pin._id}
-                className={`absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-auto group ${
-                  isOwner && isEditMode ? 'z-20' : 'z-[5]'
-                } hover:z-30 ${
+                tabIndex={0}
+                className={`absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-auto group outline-none ${
+                  isTapped ? 'z-50' : (isOwner && isEditMode ? 'z-20' : 'z-[5]')
+                } hover:z-50 focus-within:z-50 active:z-50 ${
                   canDragThisPin ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
                 }`}
                 style={{
                   left: `${currentPinX}%`,
                   top: `${currentPinY}%`,
-                  zIndex: isDraggingThisPin ? 40 : undefined,
+                  zIndex: isDraggingThisPin ? 60 : (isTapped ? 50 : undefined),
                 }}
                 onMouseDown={(e) => {
                   if (canDragThisPin) {
@@ -3192,6 +3204,7 @@ export default function MapViewerClient() {
                   }
                 }}
                 onTouchStart={(e) => {
+                  isTouchInteractionRef.current = true
                   if (canDragThisPin && e.touches.length === 1) {
                     e.stopPropagation()
                     hasDraggedPinRef.current = false
@@ -3208,6 +3221,15 @@ export default function MapViewerClient() {
                 onClick={(e) => {
                   e.stopPropagation()
                   if (hasDraggedPinRef.current || pinDragStartRef.current?.moved) return
+
+                  // For quest pins on touch devices: first tap reveals the label over fog, grid, and notes
+                  if (isQuestPin && isTouchInteractionRef.current) {
+                    if (tappedQuestPinId !== pin._id) {
+                      setTappedQuestPinId(pin._id)
+                      return
+                    }
+                  }
+
                   if (isOwner && isEditMode) {
                     setSelectedPin(pin)
                     return
@@ -3215,9 +3237,11 @@ export default function MapViewerClient() {
                   if (pin.targetMapId) {
                     const target = worldMaps?.find((m) => m._id === pin.targetMapId)
                     if (target) router.push(`/world/${encodeURIComponent(world.name)}/map/${target.slug}`)
-                  } else {
-                    setSelectedPin(pin)
+                    return
                   }
+
+                  setTappedQuestPinId(null)
+                  setSelectedPin(pin)
                 }}
                 onContextMenu={(e) => {
                   if (isOwner) {
@@ -3246,7 +3270,9 @@ export default function MapViewerClient() {
                         className={`transition-all ${
                           isDraggingThisPin
                             ? 'scale-125 drop-shadow-[0_0_12px_rgba(245,158,11,1)]'
-                            : 'group-hover:scale-125 drop-shadow-[0_0_8px_rgba(245,158,11,0.85)]'
+                            : isTapped
+                            ? 'scale-125 drop-shadow-[0_0_8px_rgba(245,158,11,0.85)]'
+                            : 'group-hover:scale-125 group-focus-within:scale-125 group-active:scale-125 drop-shadow-[0_0_8px_rgba(245,158,11,0.85)]'
                         }`}
                       >
                         <img
@@ -3274,9 +3300,15 @@ export default function MapViewerClient() {
                       </div>
                     )}
                     {isQuestPin ? (
-                      /* Quest pins: quest name ONLY displays on hover */
-                      <div className="absolute top-full mt-1.5 z-30 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none">
-                        <span className="bg-slate-950/95 backdrop-blur-md px-2.5 py-0.5 rounded-md text-[10px] font-bold whitespace-nowrap shadow-xl border border-amber-500/50 text-amber-300 block text-center">
+                      /* Quest pins: quest name ONLY displays on hover or tap on mobile, rendered cleanly over fog of war, hex grid, and map notes */
+                      <div
+                        className={`absolute top-full mt-1.5 z-50 transition-opacity duration-150 pointer-events-none ${
+                          isTapped
+                            ? 'opacity-100'
+                            : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 group-active:opacity-100'
+                        }`}
+                      >
+                        <span className="bg-slate-950/95 backdrop-blur-md px-2.5 py-0.5 rounded-md text-[10px] font-bold whitespace-nowrap shadow-xl border border-amber-500/50 text-amber-300 block text-center select-none">
                           {pin.title}
                         </span>
                       </div>
@@ -3408,7 +3440,7 @@ export default function MapViewerClient() {
             return (
               <div
                 key={`freeform_note_${note._id}`}
-                className="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-auto cursor-pointer group z-20"
+                className="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-auto cursor-pointer group z-20 hover:z-30"
                 style={stylePos}
                 onClick={(e) => {
                   e.stopPropagation()
@@ -3416,11 +3448,11 @@ export default function MapViewerClient() {
                 }}
               >
                 <div className="flex flex-col items-center relative">
-                  <div className="p-1.5 rounded-full bg-amber-500 text-slate-950 shadow-lg border border-slate-900 drop-shadow-[0_0_8px_rgba(245,158,11,0.7)] group-hover:scale-125 transition-transform relative">
-                    <FileText className="h-3.5 w-3.5" />
+                  <div className="p-1.5 rounded-full bg-amber-500 text-slate-950 shadow-[0_0_10px_rgba(245,158,11,0.7)] border border-slate-900 group-hover:scale-115 transition-transform duration-200 ease-out origin-center transform-gpu relative select-none">
+                    <FileText className="h-3.5 w-3.5 pointer-events-none" />
                     {note.wikiLink && (
                       <span
-                        className="absolute -top-1 -right-1 bg-purple-600 text-white rounded-full p-0.5 border border-slate-900 shadow-md"
+                        className="absolute -top-1 -right-1 bg-purple-600 text-white rounded-full p-0.5 border border-slate-900 shadow-md pointer-events-none"
                         title="Linked to Void Wiki"
                       >
                         <BookOpen className="h-2 w-2" />
@@ -3428,7 +3460,7 @@ export default function MapViewerClient() {
                     )}
                   </div>
                   {(scale > 0.8) && (
-                    <span className="mt-1 bg-slate-950/95 backdrop-blur-md px-2 py-0.5 rounded-md text-[10px] font-medium text-amber-200 line-clamp-1 max-w-[120px] whitespace-nowrap shadow-md border border-amber-500/40 flex items-center gap-1">
+                    <span className="mt-1 bg-slate-950/95 backdrop-blur-md px-2 py-0.5 rounded-md text-[10px] font-medium text-amber-200 line-clamp-1 max-w-[120px] whitespace-nowrap shadow-md border border-amber-500/40 flex items-center gap-1 pointer-events-none select-none">
                       {note.wikiLink && <BookOpen className="h-2.5 w-2.5 text-purple-400 shrink-0" />}
                       <span className="truncate">{note.note}</span>
                     </span>
