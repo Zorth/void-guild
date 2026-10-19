@@ -9,7 +9,7 @@ import { Id, Doc } from '@/convex/_generated/dataModel'
 import { 
   ChevronLeft, Pencil, Check, Plus, Trash2, Eye, Shield, Heart,
   ExternalLink, Search, RefreshCw, AlertCircle, Sparkles, User, Sword,
-  Copy, GripVertical, PlusCircle, Minus, X, ShieldAlert, Skull,
+  Copy, GripVertical, PlusCircle, Minus, X, ShieldAlert,
   CalendarDays, Users as UsersIcon, Swords
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -27,6 +27,13 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import CharacterPartyTab from '@/components/sessions/CharacterPartyTab'
 import TacticalCalendarTab from '@/components/sessions/TacticalCalendarTab'
+import EditMonsterModal from '@/components/sessions/EditMonsterModal'
+import {
+  MonsterAdjustment,
+  calculateAdjustedStats,
+  getMonsterBaseName,
+  getNextNumberedMonsterName,
+} from '@/components/sessions/tacticalMonsterUtils'
 
 // Monster interface
 export interface MonsterInstance {
@@ -35,6 +42,11 @@ export interface MonsterInstance {
   currentHp: number
   maxHp: number
   ac: number
+  level?: number
+  adjustment?: MonsterAdjustment
+  baseHp?: number
+  baseAc?: number
+  baseLevel?: number
   nethysUrl?: string
   immunities?: string
   resistances?: string
@@ -176,6 +188,12 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
   const [newGroupName, setNewGroupName] = useState('')
   const [newGroupInit, setNewGroupInit] = useState(10)
 
+  // Edit Monster Dialog state
+  const [editingMonsterData, setEditingMonsterData] = useState<{
+    groupId: string
+    monster: MonsterInstance
+  } | null>(null)
+
   // Add Monster Dialog state
   const [activeGroupIdForMonster, setActiveGroupIdForMonster] = useState<string | null>(null)
   const [monsterSearchQuery, setMonsterSearchQuery] = useState('')
@@ -183,11 +201,29 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
   const [isSearchingMonster, setIsSearchingMonster] = useState(false)
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [manualMonsterName, setManualMonsterName] = useState('')
+  const [manualMonsterLevel, setManualMonsterLevel] = useState(1)
+  const [manualMonsterAdjustment, setManualMonsterAdjustment] = useState<MonsterAdjustment>('normal')
   const [manualMonsterHp, setManualMonsterHp] = useState(20)
   const [manualMonsterAc, setManualMonsterAc] = useState(15)
+  const [manualMonsterBaseHp, setManualMonsterBaseHp] = useState(20)
+  const [manualMonsterBaseAc, setManualMonsterBaseAc] = useState(15)
+  const [manualMonsterBaseLevel, setManualMonsterBaseLevel] = useState(1)
   const [manualMonsterImmune, setManualMonsterImmune] = useState('')
   const [manualMonsterResist, setManualMonsterResist] = useState('')
   const [manualMonsterWeak, setManualMonsterWeak] = useState('')
+
+  const handleChangeManualAdjustment = (newAdj: MonsterAdjustment) => {
+    setManualMonsterAdjustment(newAdj)
+    const adjusted = calculateAdjustedStats(
+      manualMonsterBaseHp,
+      manualMonsterBaseAc,
+      manualMonsterBaseLevel,
+      newAdj
+    )
+    setManualMonsterHp(adjusted.hp)
+    setManualMonsterAc(adjusted.ac)
+    setManualMonsterLevel(adjusted.level)
+  }
 
   // Editing perception score modal
   const [editingPerceptionCharId, setEditingPerceptionCharId] = useState<Id<'characters'> | null>(null)
@@ -223,6 +259,41 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
         if (!parsed.activeCombatId && parsed.combats?.[0]) {
           parsed.activeCombatId = parsed.combats[0].id
         }
+
+        // Migration: Ensure all monsters in encounters are cleanly numbered and remove any "(Copy)"
+        if (parsed.combats) {
+          parsed.combats = parsed.combats.map((combat: CombatEncounter) => {
+            const nameCounters: Record<string, number> = {}
+            return {
+              ...combat,
+              monsterGroups: (combat.monsterGroups || []).map((group: MonsterGroup) => ({
+                ...group,
+                monsters: (group.monsters || []).map((m: MonsterInstance) => {
+                  const cleanName = m.name.replace(/\s*\(\s*copy(?:\s*\d+)?\s*\)/gi, '').trim()
+                  const baseName = getMonsterBaseName(cleanName)
+                  const numMatch = cleanName.match(/^(.*?)\s+(\d+)$/)
+
+                  let finalNum: number
+                  if (numMatch && numMatch[1]?.trim() === baseName) {
+                    const parsedNum = parseInt(numMatch[2], 10)
+                    finalNum = parsedNum
+                    nameCounters[baseName] = Math.max(nameCounters[baseName] || 0, parsedNum)
+                  } else {
+                    const nextNum = (nameCounters[baseName] || 0) + 1
+                    nameCounters[baseName] = nextNum
+                    finalNum = nextNum
+                  }
+
+                  return {
+                    ...m,
+                    name: `${baseName} ${finalNum}`,
+                  }
+                }),
+              })),
+            }
+          })
+        }
+
         setTacticalState(parsed)
       }
     } catch (e) {
@@ -607,9 +678,33 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
   }
 
   // Monster Handlers
+  const handleOpenEditMonster = (groupId: string, monster: MonsterInstance) => {
+    setEditingMonsterData({ groupId, monster })
+  }
+
+  const handleSaveEditMonster = (groupId: string, updatedMonster: MonsterInstance) => {
+    updateActiveMonsterGroups((groups) =>
+      groups.map((g) =>
+        g.id === groupId
+          ? {
+              ...g,
+              monsters: g.monsters.map((m) =>
+                m.id === updatedMonster.id ? updatedMonster : m
+              ),
+            }
+          : g
+      )
+    )
+    toast.success(`Updated ${updatedMonster.name}`)
+  }
+
   const handleAddMonsterToGroup = (groupId: string, monster: Omit<MonsterInstance, 'id'>) => {
+    const allCurrentMonsters = activeMonsterGroups.flatMap((g) => g.monsters)
+    const finalName = getNextNumberedMonsterName(monster.name, allCurrentMonsters)
+
     const newMonster: MonsterInstance = {
       ...monster,
+      name: finalName,
       id: `monster-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     }
     updateActiveMonsterGroups((groups) =>
@@ -622,6 +717,13 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
     setMonsterUrlInput('')
     setSearchResults([])
     setManualMonsterName('')
+    setManualMonsterLevel(1)
+    setManualMonsterAdjustment('normal')
+    setManualMonsterHp(20)
+    setManualMonsterAc(15)
+    setManualMonsterBaseHp(20)
+    setManualMonsterBaseAc(15)
+    setManualMonsterBaseLevel(1)
     setManualMonsterImmune('')
     setManualMonsterResist('')
     setManualMonsterWeak('')
@@ -630,19 +732,38 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
 
   // Monster Duplication
   const handleDuplicateMonster = (groupId: string, monster: MonsterInstance) => {
-    // Generate copy name, e.g. "Goblin Warrior 2" or "Goblin Warrior (Copy)"
+    const allCurrentMonsters = activeMonsterGroups.flatMap((g) => g.monsters)
+    const baseName = getMonsterBaseName(monster.name)
+    const isOriginalNumbered = /^(.*?)\s+\d+$/.test(
+      monster.name.replace(/\s*\(\s*copy(?:\s*\d+)?\s*\)/gi, '').trim()
+    )
+
+    const nextName = getNextNumberedMonsterName(monster.name, allCurrentMonsters)
+    const shouldRenumberOriginal = !isOriginalNumbered
+
     const clonedMonster: MonsterInstance = {
       ...monster,
       id: `monster-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      name: `${monster.name} (Copy)`,
+      name: shouldRenumberOriginal ? `${baseName} 2` : nextName,
       currentHp: monster.maxHp, // fresh full HP for the clone
     }
+
     updateActiveMonsterGroups((groups) =>
-      groups.map((g) =>
-        g.id === groupId ? { ...g, monsters: [...g.monsters, clonedMonster] } : g
-      )
+      groups.map((g) => {
+        if (g.id !== groupId) return g
+        const updatedMonsters = g.monsters.map((m) => {
+          if (shouldRenumberOriginal && m.id === monster.id) {
+            return { ...m, name: `${baseName} 1` }
+          }
+          return m
+        })
+        return {
+          ...g,
+          monsters: [...updatedMonsters, clonedMonster],
+        }
+      })
     )
-    toast.success(`Duplicated ${monster.name}`)
+    toast.success(`Duplicated ${clonedMonster.name}`)
   }
 
   // Move monster from one group to another (via drag and drop)
@@ -1452,6 +1573,21 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
                                   <span className="font-bold text-xs sm:text-sm truncate text-foreground">
                                     {monster.name}
                                   </span>
+                                  {monster.adjustment === 'elite' && (
+                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
+                                      Elite
+                                    </span>
+                                  )}
+                                  {monster.adjustment === 'weak' && (
+                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-sky-500/20 text-sky-300 border border-sky-500/30 shrink-0">
+                                      Weak
+                                    </span>
+                                  )}
+                                  {monster.level !== undefined && (
+                                    <span className="text-[10px] text-muted-foreground font-mono shrink-0">
+                                      (Lvl {monster.level})
+                                    </span>
+                                  )}
                                   {monster.nethysUrl && (
                                     <a
                                       href={monster.nethysUrl}
@@ -1467,6 +1603,15 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
                                 </div>
 
                                 <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                  {/* Edit Monster Button */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditMonster(group.id, monster)}
+                                    className="text-muted-foreground/60 hover:text-purple-400 p-1 rounded transition-colors"
+                                    title="Edit monster"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </button>
                                   {/* Duplicate Monster Button */}
                                   <button
                                     type="button"
@@ -1854,26 +1999,99 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
                           <span>AC {res.ac}</span>
                         </div>
                       </div>
-                      <Button
-                        size="sm"
-                        className="h-7 text-xs bg-purple-600 hover:bg-purple-700 text-white"
-                        onClick={() => {
-                          if (activeGroupIdForMonster) {
-                            handleAddMonsterToGroup(activeGroupIdForMonster, {
-                              name: res.name,
-                              currentHp: res.hp,
-                              maxHp: res.hp,
-                              ac: res.ac,
-                              nethysUrl: res.url,
-                              immunities: res.immunities,
-                              resistances: res.resistances,
-                              weaknesses: res.weaknesses,
-                            })
-                          }
-                        }}
-                      >
-                        Add
-                      </Button>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-xs font-bold text-sky-400 border-sky-500/30 hover:bg-sky-950/40 hover:text-sky-300"
+                          title={`Add Weak (-2 AC, HP reduction, Level ${(res.level ?? 0) - 1})`}
+                          onClick={() => {
+                            if (activeGroupIdForMonster) {
+                              const originalLevel = res.level ?? 0
+                              const originalHp = res.hp || 1
+                              const originalAc = res.ac || 10
+                              const adjusted = calculateAdjustedStats(originalHp, originalAc, originalLevel, 'weak')
+                              handleAddMonsterToGroup(activeGroupIdForMonster, {
+                                name: res.name,
+                                currentHp: adjusted.hp,
+                                maxHp: adjusted.hp,
+                                ac: adjusted.ac,
+                                level: adjusted.level,
+                                adjustment: 'weak',
+                                baseHp: originalHp,
+                                baseAc: originalAc,
+                                baseLevel: originalLevel,
+                                nethysUrl: res.url,
+                                immunities: res.immunities,
+                                resistances: res.resistances,
+                                weaknesses: res.weaknesses,
+                              })
+                            }
+                          }}
+                        >
+                          Weak
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="h-7 px-2.5 text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white"
+                          title={`Add Normal (${res.hp} HP, ${res.ac} AC)`}
+                          onClick={() => {
+                            if (activeGroupIdForMonster) {
+                              const originalLevel = res.level ?? 0
+                              const originalHp = res.hp || 1
+                              const originalAc = res.ac || 10
+                              handleAddMonsterToGroup(activeGroupIdForMonster, {
+                                name: res.name,
+                                currentHp: originalHp,
+                                maxHp: originalHp,
+                                ac: originalAc,
+                                level: originalLevel,
+                                adjustment: 'normal',
+                                baseHp: originalHp,
+                                baseAc: originalAc,
+                                baseLevel: originalLevel,
+                                nethysUrl: res.url,
+                                immunities: res.immunities,
+                                resistances: res.resistances,
+                                weaknesses: res.weaknesses,
+                              })
+                            }
+                          }}
+                        >
+                          Add
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-xs font-bold text-amber-400 border-amber-500/30 hover:bg-amber-950/40 hover:text-amber-300"
+                          title={`Add Elite (+2 AC, HP boost, Level ${(res.level ?? 0) + 1})`}
+                          onClick={() => {
+                            if (activeGroupIdForMonster) {
+                              const originalLevel = res.level ?? 0
+                              const originalHp = res.hp || 1
+                              const originalAc = res.ac || 10
+                              const adjusted = calculateAdjustedStats(originalHp, originalAc, originalLevel, 'elite')
+                              handleAddMonsterToGroup(activeGroupIdForMonster, {
+                                name: res.name,
+                                currentHp: adjusted.hp,
+                                maxHp: adjusted.hp,
+                                ac: adjusted.ac,
+                                level: adjusted.level,
+                                adjustment: 'elite',
+                                baseHp: originalHp,
+                                baseAc: originalAc,
+                                baseLevel: originalLevel,
+                                nethysUrl: res.url,
+                                immunities: res.immunities,
+                                resistances: res.resistances,
+                                weaknesses: res.weaknesses,
+                              })
+                            }
+                          }}
+                        >
+                          Elite
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1887,7 +2105,67 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
                 Manual Monster Entry
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {/* Weak / Elite Template buttons for manual entry */}
+              <div className="p-2.5 bg-background/50 rounded-lg border border-border/40 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                    Template Adjustment
+                  </label>
+                  <span className="text-[10px] font-mono text-purple-400 font-semibold">
+                    {manualMonsterAdjustment === 'elite'
+                      ? 'Elite (+2 AC, HP boost, +1 Lvl)'
+                      : manualMonsterAdjustment === 'weak'
+                      ? 'Weak (-2 AC, HP reduction, -1 Lvl)'
+                      : 'Normal'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={manualMonsterAdjustment === 'weak' ? 'default' : 'outline'}
+                    className={cn(
+                      'h-7 text-xs font-bold transition-all',
+                      manualMonsterAdjustment === 'weak'
+                        ? 'bg-sky-600 hover:bg-sky-700 text-white border-sky-500 shadow-sm'
+                        : 'text-sky-400 border-sky-500/30 hover:bg-sky-950/30 hover:text-sky-300'
+                    )}
+                    onClick={() => handleChangeManualAdjustment('weak')}
+                  >
+                    Weak
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={manualMonsterAdjustment === 'normal' ? 'default' : 'outline'}
+                    className={cn(
+                      'h-7 text-xs font-bold transition-all',
+                      manualMonsterAdjustment === 'normal'
+                        ? 'bg-purple-600 hover:bg-purple-700 text-white border-purple-500 shadow-sm'
+                        : 'text-muted-foreground border-border/60 hover:bg-muted'
+                    )}
+                    onClick={() => handleChangeManualAdjustment('normal')}
+                  >
+                    Normal
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={manualMonsterAdjustment === 'elite' ? 'default' : 'outline'}
+                    className={cn(
+                      'h-7 text-xs font-bold transition-all',
+                      manualMonsterAdjustment === 'elite'
+                        ? 'bg-amber-600 hover:bg-amber-700 text-white border-amber-500 shadow-sm'
+                        : 'text-amber-400 border-amber-500/30 hover:bg-amber-950/30 hover:text-amber-300'
+                    )}
+                    onClick={() => handleChangeManualAdjustment('elite')}
+                  >
+                    Elite
+                  </Button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
                 <div className="sm:col-span-3 space-y-1">
                   <label className="text-[10px] font-bold text-muted-foreground">Monster Name</label>
                   <Input
@@ -1898,25 +2176,55 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
                   />
                 </div>
                 <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-muted-foreground">Level</label>
+                  <Input
+                    type="number"
+                    value={manualMonsterLevel}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10)
+                      const lvl = isNaN(val) ? 0 : val
+                      setManualMonsterLevel(lvl)
+                      if (manualMonsterAdjustment === 'normal') {
+                        setManualMonsterBaseLevel(lvl)
+                      }
+                    }}
+                    className="text-xs font-mono"
+                  />
+                </div>
+                <div className="sm:col-span-2 space-y-1">
                   <label className="text-[10px] font-bold text-muted-foreground">HP</label>
                   <Input
                     type="number"
                     value={manualMonsterHp}
-                    onChange={(e) => setManualMonsterHp(parseInt(e.target.value, 10) || 1)}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10)
+                      const hp = isNaN(val) ? 1 : Math.max(1, val)
+                      setManualMonsterHp(hp)
+                      if (manualMonsterAdjustment === 'normal') {
+                        setManualMonsterBaseHp(hp)
+                      }
+                    }}
                     className="text-xs font-mono"
                   />
                 </div>
-                <div className="space-y-1">
+                <div className="sm:col-span-2 space-y-1">
                   <label className="text-[10px] font-bold text-muted-foreground">AC</label>
                   <Input
                     type="number"
                     value={manualMonsterAc}
-                    onChange={(e) => setManualMonsterAc(parseInt(e.target.value, 10) || 10)}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10)
+                      const ac = isNaN(val) ? 10 : val
+                      setManualMonsterAc(ac)
+                      if (manualMonsterAdjustment === 'normal') {
+                        setManualMonsterBaseAc(ac)
+                      }
+                    }}
                     className="text-xs font-mono"
                   />
                 </div>
 
-                <div className="sm:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-border/30">
+                <div className="sm:col-span-4 grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-border/30">
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-emerald-400">Immunities</label>
                     <Input
@@ -1946,7 +2254,7 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
                   </div>
                 </div>
 
-                <div className="sm:col-span-3 flex justify-end pt-2">
+                <div className="sm:col-span-4 flex justify-end pt-2">
                   <Button
                     onClick={() => {
                       if (!manualMonsterName.trim()) {
@@ -1959,6 +2267,11 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
                           currentHp: manualMonsterHp,
                           maxHp: manualMonsterHp,
                           ac: manualMonsterAc,
+                          level: manualMonsterLevel,
+                          adjustment: manualMonsterAdjustment,
+                          baseHp: manualMonsterBaseHp,
+                          baseAc: manualMonsterBaseAc,
+                          baseLevel: manualMonsterBaseLevel,
                           immunities: manualMonsterImmune.trim() || undefined,
                           resistances: manualMonsterResist.trim() || undefined,
                           weaknesses: manualMonsterWeak.trim() || undefined,
@@ -1981,6 +2294,15 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* EDIT MONSTER MODAL */}
+      <EditMonsterModal
+        isOpen={Boolean(editingMonsterData)}
+        onClose={() => setEditingMonsterData(null)}
+        groupId={editingMonsterData?.groupId || null}
+        monster={editingMonsterData?.monster || null}
+        onSave={handleSaveEditMonster}
+      />
 
       {/* NEW COMBAT ENCOUNTER DIALOG */}
       <Dialog open={isNewCombatDialogOpen} onOpenChange={setIsNewCombatDialogOpen}>

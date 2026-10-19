@@ -101,6 +101,8 @@ export default function AttendingCharactersList({
   const giveCommendation = useMutation(api.commendations.giveCommendation)
   const recordWikiVisit = useMutation(api.users.recordWikiVisit)
   const syncAndGetAchievements = useMutation(api.achievements.syncAndGetAchievements)
+  const isAdmin = useQuery(api.sessions.isAdminQuery)
+  const canMarkDied = Boolean((isSessionOwner || isAdmin) && sessionId)
 
   const handleCommend = async (
     toCharacterId: Id<'characters'>,
@@ -254,7 +256,7 @@ export default function AttendingCharactersList({
                 <Skull className="h-3 w-3" />
                 <span>{char.diedAtSessionId === sessionId ? 'Died Here' : 'Deceased'}</span>
               </span>
-            ) : isSessionOwner && sessionId ? (
+            ) : canMarkDied ? (
               <button
                 type="button"
                 className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full border border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 hover:text-rose-300 transition-all shrink-0 focus:outline-none"
@@ -1076,7 +1078,7 @@ export default function AttendingCharactersList({
                 Are you sure you want to mark <strong>{characterToMarkDead?.name}</strong> as having died in this session?
               </p>
               <p className="text-xs text-muted-foreground">
-                This will record that they died in this session, announce their death in Discord (#ourobouros-inn), and move them to their player&apos;s fallen heroes list.
+                This will record that they died in this session, announce their death in Discord (#ouroubouros-inn), and move them to their player&apos;s fallen heroes list.
               </p>
               <p className="text-xs text-amber-500/90 font-medium">
                 Note: Only an admin can resurrect them later in the admin characters view.
