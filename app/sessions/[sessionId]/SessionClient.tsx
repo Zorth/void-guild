@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { useState, useEffect, useMemo } from 'react'
 import { Id, Doc } from '@/convex/_generated/dataModel'
 import Link from 'next/link'
-import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, Unlock, Globe, Scroll, Trophy, Menu, User, Target, UserPlus, Coins, Map, Sprout, Loader2 } from 'lucide-react'
+import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, Unlock, Globe, Scroll, Trophy, Menu, User, Target, UserPlus, Coins, Map, Sprout, Loader2, Sparkles } from 'lucide-react'
 import { useAuth, SignInButton } from '@clerk/nextjs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatDate, formatTime as formatTimeUtil, getLevelBadgeStyle, getDualLevelBadgeStyle, CharacterRankIcon, getSessionWikiUrl, cn } from '@/lib/utils'
@@ -122,6 +122,27 @@ export default function SessionClient() {
   const [optimisticInterestedPlayers, setOptimisticInterestedPlayers] = useState<{ userId: string; username: string }[] | null>(null)
   const [isJoinSuccessDialogOpen, setIsJoinSuccessDialogOpen] = useState(false)
   const [isObjectiveContributeOpen, setIsObjectiveContributeOpen] = useState(false)
+  const [isSyncingQuestRewards, setIsSyncingQuestRewards] = useState(false)
+
+  const handleSyncQuestRewards = async () => {
+    if (!session?._id || isSyncingQuestRewards) return
+    setIsSyncingQuestRewards(true)
+    try {
+      const res = await importQuestRewards({
+        sessionId: session._id,
+        overwriteExisting: true,
+      })
+      toast.success(
+        res?.count && res.count > 0
+          ? `Re-synced ${res.count} quest reward item(s) to loot!`
+          : 'Re-synced quest rewards to loot!'
+      )
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to re-sync quest rewards')
+    } finally {
+      setIsSyncingQuestRewards(false)
+    }
+  }
 
   const userIds = useMemo(() => {
     if (!session) return [];
@@ -1007,8 +1028,8 @@ export default function SessionClient() {
                     return (
                         <div className="px-6 pb-6">
                             <div className="bg-primary/5 border border-primary/20 rounded-lg overflow-hidden">
-                                <div className="bg-primary/10 px-4 py-2 border-b border-primary/20 flex items-center justify-between">
-                                    <div className="flex items-center gap-2 font-bold text-sm">
+                                <div className="bg-primary/10 px-4 py-2 border-b border-primary/20 flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
+                                    <div className="flex items-center gap-2 font-bold text-sm flex-wrap">
                                         <Scroll className="h-4 w-4 text-primary" />
                                         Active Quest
                                         {q.characterId && (
@@ -1021,11 +1042,29 @@ export default function SessionClient() {
                                             </span>
                                         )}
                                     </div>
-                                    <div 
-                                        className="flex items-center justify-center rounded-full font-bold h-6 w-6 text-[10px]"
-                                        style={badgeStyle}
-                                    >
-                                        {displayLevel}
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        {isOwnerOrAdmin && (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                disabled={isSyncingQuestRewards}
+                                                onClick={handleSyncQuestRewards}
+                                                className="h-7 px-2.5 text-xs border-purple-500/40 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 hover:text-purple-200 gap-1.5 cursor-pointer font-medium"
+                                            >
+                                                {isSyncingQuestRewards ? (
+                                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                                ) : (
+                                                    <Sparkles className="h-3 w-3 text-purple-400" />
+                                                )}
+                                                <span>Re-sync Quest Reward</span>
+                                            </Button>
+                                        )}
+                                        <div 
+                                            className="flex items-center justify-center rounded-full font-bold h-6 w-6 text-[10px]"
+                                            style={badgeStyle}
+                                        >
+                                            {displayLevel}
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="p-3.5 space-y-2.5">

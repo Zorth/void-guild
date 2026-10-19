@@ -21,7 +21,6 @@ import {
     CheckCheck, 
     CheckCircle2, 
     Loader2, 
-    Scroll, 
     Sparkles, 
     Package,
     Shield,
@@ -119,10 +118,6 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
             ? { sessionId: session._id, characterId: userCharacterInSession._id }
             : "skip"
     )
-
-    const hasImportedQuestLoot = useMemo(() => {
-        return loot.some(item => item.fromQuest)
-    }, [loot])
 
     const questRewardSummary = useMemo(() => {
         if (!session.quest) return null
@@ -652,78 +647,6 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                 )}
             </div>
 
-            {/* Active Quest Rewards Banner */}
-            {session.quest && (
-                <div className="rounded-lg border border-purple-500/30 bg-purple-950/20 p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                    <div className="space-y-1 min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <Scroll className="h-4 w-4 text-purple-400 shrink-0" />
-                            <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider">
-                                Active Quest Rewards
-                            </span>
-                            {session.quest.isSponsored && (
-                                <span className="text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded font-bold">
-                                    ★ 20% Guild Sponsored
-                                </span>
-                            )}
-                            {session.quest.issuerCharacter && (
-                                <span className="text-[10px] bg-muted/60 text-muted-foreground border border-border/40 px-1.5 py-0.5 rounded">
-                                    Issuer: <strong className="text-purple-300">{session.quest.issuerCharacter.name}</strong> ({session.quest.issuerCharacter.rank || 'Adventurer'})
-                                </span>
-                            )}
-                        </div>
-                        <div className="flex items-baseline gap-2 flex-wrap">
-                            <span className="font-bold text-sm text-foreground">{session.quest.name}:</span>
-                            <span className="font-mono text-amber-300 font-semibold text-xs sm:text-sm">
-                                {questRewardSummary || 'Custom reward'}
-                            </span>
-                        </div>
-                        {session.quest.sponsoredAmount && (
-                            <div className="text-[11px] text-muted-foreground">
-                                Guild Reimbursement to Issuer: <span className="text-emerald-300 font-mono font-medium">{session.quest.sponsoredAmount}</span>
-                                {session.quest.netCost && (
-                                    <span> (Net out-of-pocket: <span className="text-purple-300 font-mono">{session.quest.netCost}</span>)</span>
-                                )}
-                            </div>
-                        )}
-                    </div>
-
-                    {session.canManage && (
-                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                            {hasImportedQuestLoot ? (
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    disabled={isImportingQuest}
-                                    onClick={() => handleImportQuest(true)}
-                                    className="h-8 text-xs border-purple-500/40 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 hover:text-purple-200 gap-1.5 cursor-pointer"
-                                >
-                                    {isImportingQuest ? (
-                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                    ) : (
-                                        <Sparkles className="h-3.5 w-3.5 text-purple-400" />
-                                    )}
-                                    <span>Re-sync Quest Reward</span>
-                                </Button>
-                            ) : (
-                                <Button
-                                    size="sm"
-                                    disabled={isImportingQuest}
-                                    onClick={() => handleImportQuest(false)}
-                                    className="h-8 text-xs bg-purple-600 hover:bg-purple-500 text-white border border-purple-400/30 gap-1.5 shadow-sm cursor-pointer"
-                                >
-                                    {isImportingQuest ? (
-                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                    ) : (
-                                        <Sparkles className="h-3.5 w-3.5" />
-                                    )}
-                                    <span>Import Quest Reward to Loot</span>
-                                </Button>
-                            )}
-                        </div>
-                    )}
-                </div>
-            )}
 
             {/* Guildmaster Cut Banner if assigned */}
             {session.guildmasterCutCharacterData && calculations && (

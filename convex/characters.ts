@@ -1286,12 +1286,15 @@ export const markCharacterDiedInSession = mutation({
     const quest = session.questId ? await ctx.db.get(session.questId) : null
 
     let diedText = ''
+    let discordDiedText = ''
     if (quest) {
       const questLevel = computeEffectiveLevel(session, quest) ?? quest.levelPF ?? quest.levelDnD ?? quest.level ?? session.level ?? 1
       diedText = `${character.name} died at level ${character.lvl} in ${worldName} during ${quest.name} (${questLevel})`
+      discordDiedText = `**${character.name}** died at level **${character.lvl}** in **${worldName}** during ${quest.name} (${questLevel})`
     } else {
       const sessionLevel = computeEffectiveLevel(session, null) ?? session.level ?? 1
       diedText = `${character.name} died at level ${character.lvl} in ${worldName} in a level ${sessionLevel} session`
+      discordDiedText = `**${character.name}** died at level **${character.lvl}** in **${worldName}** in a level ${sessionLevel} session`
     }
 
     // 4. Log to activity
@@ -1308,13 +1311,7 @@ export const markCharacterDiedInSession = mutation({
 
     // 5. Send sad discord message in ourobouros inn channel
     await ctx.scheduler.runAfter(0, internal.discord.sendActivityToDiscord, {
-      message: `🕯️ ${diedText} 🪦`,
-      embeds: [{
-        title: "🪦 Fallen Adventurer",
-        description: diedText,
-        color: 0x374151,
-        timestamp: new Date().toISOString(),
-      }],
+      message: `🕯️ ${discordDiedText} 🪦`,
     })
   },
 })
