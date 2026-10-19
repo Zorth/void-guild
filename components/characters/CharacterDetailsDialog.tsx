@@ -42,6 +42,7 @@ import {
   Shield,
   Users,
   Heart,
+  Skull,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { track } from '@vercel/analytics'
@@ -320,6 +321,22 @@ export default function CharacterDetailsDialog({
             </div>
           ) : activeTab === 'general' ? (
             <div className="space-y-6">
+              {char.isDead && (
+                <div className="p-3.5 rounded-lg bg-rose-500/10 border border-rose-500/30 flex items-center gap-3 text-rose-400">
+                  <Skull className="h-5 w-5 shrink-0" />
+                  <div className="text-xs">
+                    <div className="font-bold uppercase tracking-wider">Fallen Hero (Deceased)</div>
+                    <div className="text-rose-300/80 mt-0.5">
+                      This character fell in battle{char.diedAtLevel ? ` at Level ${char.diedAtLevel}` : ''}.
+                      {char.diedAtSessionId && (
+                        <Link href={`/sessions/${char.diedAtSessionId}`} className="underline ml-1.5 hover:text-rose-200">
+                          View Session of Death
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
               {/* 1. Full Calling Card with Cosmetics */}
               <div>
                 <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">

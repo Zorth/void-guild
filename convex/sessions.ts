@@ -1015,6 +1015,10 @@ export const joinSession = mutation({
       throw new Error('Character not found or you do not own it')
     }
 
+    if (character.isDead) {
+      throw new Error('This character has died and cannot join sessions.')
+    }
+
     if (character.system !== session.system) {
         throw new Error(`This is a ${session.system} session, but your character is ${character.system}.`)
     }
@@ -1310,6 +1314,10 @@ export const adminAddCharacterToSession = mutation({
       const character = await ctx.db.get(args.characterId)
       if (!character) throw new Error('Character not found')
 
+      if (character.isDead) {
+        throw new Error('This character has died and cannot join sessions.')
+      }
+
       if (character.system !== session.system) {
           throw new Error(`This is a ${session.system} session, but this character is ${character.system}.`)
       }
@@ -1377,6 +1385,10 @@ export const inviteCharacterToSession = mutation({
     const character = await ctx.db.get(args.characterId)
     if (!character) throw new Error('Character not found')
 
+    if (character.isDead) {
+      throw new Error('This character has died and cannot join sessions.')
+    }
+
     if (character.system !== session.system) {
       throw new Error(`This is a ${session.system} session, but this character is ${character.system}.`)
     }
@@ -1443,8 +1455,8 @@ export const getAvailableCharactersToInvite = query({
       .collect()
     const sessionCharSet = new Set(session.characters)
 
-    // Filter characters not already in this session
-    const matching = matchingChars.filter((c) => !sessionCharSet.has(c._id))
+    // Filter characters not already in this session and not dead
+    const matching = matchingChars.filter((c) => !c.isDead && !sessionCharSet.has(c._id))
 
     // Resolve owner usernames/names for easier identification
     const userIds = Array.from(new Set(matching.map((c) => c.userId)))
@@ -1628,6 +1640,9 @@ export const lockSession = mutation({
       for (const characterId of characterIds) {
         const character = await ctx.db.get(characterId)
         if (character) {
+          if (character.isDead) {
+            continue
+          }
           const xpGain = calculateXPGain(effectiveLevel, character.lvl, character._id === session.gmCharacter)
           const { lvl: newLvl, xp: newXp } = calculateNewStats(character.lvl, character.xp, xpGain)
           
@@ -2415,3 +2430,6 @@ export const updateSessionState = mutation({
         }
     }
 })
+
+export { markCharacterDiedInSession } from './characters'
+

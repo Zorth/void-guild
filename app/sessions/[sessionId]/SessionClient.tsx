@@ -461,7 +461,7 @@ export default function SessionClient() {
   }
 
   const availableCharacters = (userCharacters ?? []).filter(char => {
-    if (session.characters.includes(char._id) || char.system !== session.system) {
+    if (char.isDead || session.characters.includes(char._id) || char.system !== session.system) {
       return false
     }
     if (typeof session.level === 'number' && session.level > 0) {
@@ -470,14 +470,14 @@ export default function SessionClient() {
     return true
   })
   const hasCharactersOutOfLevelRange = (userCharacters ?? []).some(
-    c => c.system === session.system &&
+    c => !c.isDead && c.system === session.system &&
       !session.characters.includes(c._id) &&
       typeof session.level === 'number' &&
       session.level > 0 &&
       Math.abs(c.lvl - session.level) >= 5
   )
   const adminAvailableCharacters = allCharacters?.filter(char => 
-    !session.characters.includes(char._id) && char.system === session.system
+    !char.isDead && !session.characters.includes(char._id) && char.system === session.system
   ) ?? []
   const isFull = session.characters.length >= session.maxPlayers
 

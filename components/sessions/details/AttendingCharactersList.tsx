@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useMemo } from 'react'
-import { Book, Trash2, Loader2, Sparkles, Flame, Trophy, Star, Users, ExternalLink, Globe, Medal, Crown, Quote } from 'lucide-react'
+import { Book, Trash2, Loader2, Sparkles, Flame, Trophy, Star, Users, ExternalLink, Globe, Medal, Crown, Quote, Skull } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
@@ -13,6 +13,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { Doc, Id } from '@/convex/_generated/dataModel'
 import { cn, getLevelBadgeStyle, CharacterRankIcon, getCharacterWikiUrl } from '@/lib/utils'
@@ -137,6 +147,27 @@ export default function AttendingCharactersList({
   const [isSubmittingQuote, setIsSubmittingQuote] = useState(false)
   const [isDeletingQuoteId, setIsDeletingQuoteId] = useState<Id<'quotes'> | null>(null)
 
+  const markCharacterDiedInSession = useMutation(api.characters.markCharacterDiedInSession)
+  const [characterToMarkDead, setCharacterToMarkDead] = useState<Doc<'characters'> | null>(null)
+  const [isMarkingDead, setIsMarkingDead] = useState(false)
+
+  const handleConfirmMarkDead = async () => {
+    if (!characterToMarkDead || !sessionId) return
+    setIsMarkingDead(true)
+    try {
+      await markCharacterDiedInSession({
+        sessionId,
+        characterId: characterToMarkDead._id,
+      })
+      toast.success(`${characterToMarkDead.name} has fallen in battle. Discord announcement sent.`)
+      setCharacterToMarkDead(null)
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to mark character as dead')
+    } finally {
+      setIsMarkingDead(false)
+    }
+  }
+
   const handleOpenQuoteDialog = (char: Doc<'characters'>) => {
     setSelectedCharForQuote(char)
     setQuoteText('')
@@ -218,6 +249,22 @@ export default function AttendingCharactersList({
         
         const actionButtons = (
           <>
+            {char.isDead ? (
+              <span className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30 shrink-0">
+                <Skull className="h-3 w-3" />
+                <span>{char.diedAtSessionId === sessionId ? 'Died Here' : 'Deceased'}</span>
+              </span>
+            ) : isSessionOwner && sessionId ? (
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full border border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 hover:text-rose-300 transition-all shrink-0 focus:outline-none"
+                onClick={() => setCharacterToMarkDead(char)}
+                title={`Mark ${char.name} as died in this session`}
+              >
+                <Skull className="h-3 w-3" />
+                <span>Mark Died</span>
+              </button>
+            ) : null}
             {sessionId && (
               <button
                 type="button"
@@ -584,6 +631,11 @@ export default function AttendingCharactersList({
                         </button>
                         {Boolean((char as any).isMember || metadata?.isMember) && <MembershipBadge />}
                         {isUserCharacter && <span className="text-[10px] bg-purple-200 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded-full uppercase tracking-wider font-bold shrink-0">You</span>}
+                        {char.isDead && (
+                          <span className="text-[10px] bg-rose-500/20 text-rose-400 border border-rose-500/30 px-1.5 py-0.5 rounded-full uppercase tracking-wider font-bold shrink-0 flex items-center gap-1">
+                            <Skull className="h-3 w-3" /> Deceased
+                          </span>
+                        )}
                         {/* Book Icon */}
                         <a
                             href={getCharacterWikiUrl(char.name)}
@@ -1011,6 +1063,39 @@ export default function AttendingCharactersList({
         onClose={() => setCharacterDetailsId(null)}
         readOnly={true}
       />
+
+      {/* Mark as Died Confirmation Dialog */}
+      <AlertDialog open={!!characterToMarkDead} onOpenChange={(open) => !open && setCharacterToMarkDead(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-rose-500">
+              <Skull className="h-5 w-5" /> Mark {characterToMarkDead?.name} as Died?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2 text-left">
+              <p>
+                Are you sure you want to mark <strong>{characterToMarkDead?.name}</strong> as having died in this session?
+              </p>
+              <p className="text-xs text-muted-foreground">
+                This will record that they died in this session, announce their death in Discord (#ourobouros-inn), and move them to their player&apos;s fallen heroes list.
+              </p>
+              <p className="text-xs text-amber-500/90 font-medium">
+                Note: Only an admin can resurrect them later in the admin characters view.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isMarkingDead}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-rose-600 hover:bg-rose-700 text-white"
+              disabled={isMarkingDead}
+              onClick={handleConfirmMarkDead}
+            >
+              {isMarkingDead ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Skull className="h-4 w-4 mr-1" />}
+              Confirm Death
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }

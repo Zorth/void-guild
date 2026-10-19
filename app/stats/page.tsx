@@ -5,7 +5,7 @@ import { api } from '@/convex/_generated/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import { ChevronLeft, Crown, Shield, Swords, Book } from 'lucide-react'
+import { ChevronLeft, Crown, Shield, Swords, Book, Skull } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@clerk/nextjs'
@@ -91,6 +91,11 @@ export default function StatsPage() {
                             </button>
                             {isUser && (
                               <span className="text-[8px] bg-purple-200 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-1 py-0.5 rounded-full uppercase tracking-wider font-bold shrink-0">You</span>
+                            )}
+                            {char.isDead && (
+                              <span className="text-[9px] bg-rose-500/20 text-rose-400 border border-rose-500/30 px-1.5 py-0.2 rounded-full uppercase tracking-wider font-bold shrink-0 flex items-center gap-0.5" title="Fallen in battle">
+                                <Skull className="h-2.5 w-2.5" /> Deceased
+                              </span>
                             )}
                             <a 
                                 href={getCharacterWikiUrl(char.name)} 

@@ -15,6 +15,7 @@ import {
   Medal,
   Sparkles,
   Coins,
+  Skull,
 } from 'lucide-react'
 import {
   Dialog,
@@ -88,8 +89,24 @@ export default function Characters({ filters }: { filters?: { pf: boolean; dnd: 
     })
   }, [charactersRaw, filters])
 
+  const livingCharacters = useMemo(() => {
+    if (!characters) return characters
+    return characters.filter((char) => !char.isDead)
+  }, [characters])
+
+  const deadCharacters = useMemo(() => {
+    if (!characters) return []
+    return characters.filter((char) => Boolean(char.isDead))
+  }, [characters])
+
+  const totalDeadCharacters = useMemo(() => {
+    if (!charactersRaw) return []
+    return charactersRaw.filter((char) => Boolean(char.isDead))
+  }, [charactersRaw])
+
   const [selectedCharacterId, setSelectedCharacterId] = useState<Id<'characters'> | null>(null)
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false)
+  const [isDeadModalOpen, setIsDeadModalOpen] = useState(false)
 
   const [showCreateWorldDialog, setShowCreateWorldDialog] = useState(false)
   const [newWorldName, setNewWorldName] = useState('')
@@ -141,20 +158,33 @@ export default function Characters({ filters }: { filters?: { pf: boolean; dnd: 
       <div className="flex flex-col">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle>Your Characters</CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle>Your Characters</CardTitle>
+              {totalDeadCharacters.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs gap-1.5 border-rose-500/30 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                  onClick={() => setIsDeadModalOpen(true)}
+                >
+                  <Skull className="h-3.5 w-3.5" />
+                  <span>Dead Characters ({totalDeadCharacters.length})</span>
+                </Button>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               <AdminUserList />
               <AdminCharacterList />
             </div>
           </CardHeader>
           <CardContent>
-            {characters === undefined ? (
+            {livingCharacters === undefined ? (
               <div className="space-y-3">
                 <Skeleton className="h-14 w-full" />
                 <Skeleton className="h-14 w-full" />
                 <Skeleton className="h-14 w-full" />
               </div>
-            ) : !characters || characters.length === 0 ? (
+            ) : !livingCharacters || livingCharacters.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center bg-muted/20 rounded-lg border border-dashed border-border/50">
                 <Shield className="h-12 w-12 text-muted-foreground/30 mb-3" />
                 <p className="text-muted-foreground font-medium">No heroes yet.</p>
@@ -164,7 +194,7 @@ export default function Characters({ filters }: { filters?: { pf: boolean; dnd: 
               </div>
             ) : (
               <ul className="space-y-2 w-full">
-                {characters.map((character) => {
+                {livingCharacters.map((character) => {
                   const cosmetics = resolveCosmeticsStyles(character.cosmetics)
                   const isSpecialBorder =
                     cosmetics.cardClassName.includes('-card-border') ||
@@ -474,6 +504,105 @@ export default function Characters({ filters }: { filters?: { pf: boolean; dnd: 
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Dead Characters Dialog */}
+      <Dialog open={isDeadModalOpen} onOpenChange={setIsDeadModalOpen}>
+        <DialogContent className="max-w-xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-400">
+              <Skull className="h-5 w-5" /> Dead Characters
+            </DialogTitle>
+            <DialogDescription>
+              Fallen heroes who met their end in the Void. They remain honored in memory and on the leaderboards.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="overflow-y-auto flex-grow py-2 space-y-2 pr-1">
+            {totalDeadCharacters.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic text-center py-6">
+                You have no fallen heroes.
+              </p>
+            ) : (
+              totalDeadCharacters.map((character) => {
+                const cosmetics = resolveCosmeticsStyles(character.cosmetics)
+                const isCharMember = Boolean((character as any).isMember || isCurrentUserMember)
+
+                return (
+                  <div
+                    key={character._id}
+                    className={cn(
+                      'w-full flex items-center justify-between p-3 rounded-md transition-all cursor-pointer border border-border/50 hover:bg-muted/40 relative overflow-hidden',
+                      cosmetics.cardClassName
+                    )}
+                    style={cosmetics.cardStyle}
+                    onClick={() => {
+                      setIsDeadModalOpen(false)
+                      openDetailsDialog(character)
+                    }}
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
+                      {isCharMember && character.cosmetics?.avatarUrl && (
+                        <ProfileAvatarWithBadge
+                          imageUrl={character.cosmetics.avatarUrl}
+                          name={character.name}
+                          cosmetics={character.cosmetics}
+                          profileRingClassName={cosmetics.profileRingClassName}
+                          rankNumber={characterRanks?.[character._id]}
+                          size="md"
+                        />
+                      )}
+                      <div className="flex flex-col min-w-0 flex-1">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span
+                            className={cn('font-medium relative truncate', cosmetics.nameClassName)}
+                            style={cosmetics.nameStyle}
+                          >
+                            {character.name}
+                          </span>
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30 shrink-0">
+                            <Skull className="h-2.5 w-2.5" /> Deceased
+                          </span>
+                        </div>
+                        {character.title && (
+                          <span className="text-xs text-muted-foreground truncate italic">
+                            {character.title}
+                          </span>
+                        )}
+                        <span className="text-xs text-muted-foreground truncate">
+                          {character.ancestry} {character.class}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <CharacterRankIcon rank={character.rank} />
+                      {character.system && (
+                        <img
+                          src={character.system === 'PF' ? '/PFVoid.svg' : '/DnDVoid.svg'}
+                          alt={character.system}
+                          className="h-4 w-4 mx-0.5"
+                        />
+                      )}
+                      <span
+                        className="inline-flex align-middle justify-center w-14 rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap"
+                        style={getLevelBadgeStyle(character.lvl)}
+                      >
+                        Lvl {character.lvl}
+                      </span>
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsDeadModalOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -7,6 +7,7 @@ import {
   User,
   Edit2,
   BookOpen,
+  Skull,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -128,6 +129,11 @@ export default function CharacterPartyTab({
                       <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-950/60 text-purple-300 border border-purple-800/80 shrink-0">
                         Lvl {char.lvl} {char.class}
                       </span>
+                      {char.isDead && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 shrink-0 flex items-center gap-1">
+                          <Skull className="h-2.5 w-2.5" /> Deceased
+                        </span>
+                      )}
                       <span className="text-[11px] text-muted-foreground flex items-center gap-1 shrink-0">
                         <User className="h-3 w-3 text-purple-400 shrink-0" />
                         <span className="truncate max-w-[120px] font-medium">{playerName}</span>

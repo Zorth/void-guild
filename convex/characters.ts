@@ -5,6 +5,7 @@ import { Id } from './_generated/dataModel'
 import { isAdmin, isMember } from './roles'
 import { formatUserDisplayName } from './users'
 import { getUserWorldStreaksMap } from './worlds'
+import { computeEffectiveLevel } from './sessions'
 
 export const listCharacters = query({
   args: {},
@@ -18,7 +19,7 @@ export const listCharacters = query({
 
     const characters = await ctx.db
       .query('characters')
-      .filter((q) => q.eq(q.field('userId'), user.subject))
+      .withIndex('by_userId', (q) => q.eq('userId', user.subject))
       .collect()
     
     return characters
@@ -1139,6 +1140,7 @@ export const adminUpdateCharacter = mutation({
     rank: v.optional(v.string()),
     system: v.union(v.literal('PF'), v.literal('DnD')),
     title: v.optional(v.string()),
+    isDead: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const isAdminUser = await isAdmin(ctx)
@@ -1152,7 +1154,7 @@ export const adminUpdateCharacter = mutation({
       await assertUniqueCharacterName(ctx, trimmedName, args.characterId)
     }
 
-    await ctx.db.patch(args.characterId, {
+    const patchData: any = {
       name: trimmedName,
       lvl: args.lvl,
       xp: args.xp,
@@ -1162,7 +1164,38 @@ export const adminUpdateCharacter = mutation({
       rank: args.rank,
       system: args.system,
       title: args.title,
-    })
+    }
+
+    if (args.isDead !== undefined) {
+      patchData.isDead = args.isDead
+      if (!args.isDead) {
+        // Resurrected! Clear death information
+        patchData.diedAtSessionId = undefined
+        patchData.diedAtLevel = undefined
+        if (oldCharacter?.diedAtSessionId) {
+          const session = await ctx.db.get(oldCharacter.diedAtSessionId)
+          if (session && session.deadCharacters) {
+            await ctx.db.patch(oldCharacter.diedAtSessionId, {
+              deadCharacters: session.deadCharacters.filter((id) => id !== args.characterId),
+            })
+          }
+        }
+      }
+    }
+
+    await ctx.db.patch(args.characterId, patchData)
+
+    if (oldCharacter?.isDead && args.isDead === false) {
+      await ctx.scheduler.runAfter(0, internal.activity.logActivity, {
+        type: 'character_resurrection',
+        message: `${trimmedName} was resurrected from the grave!`,
+        userId: oldCharacter.userId,
+        metadata: { characterId: args.characterId },
+      })
+      await ctx.scheduler.runAfter(0, internal.discord.sendActivityToDiscord, {
+        message: `✨ **${trimmedName}** was resurrected by an admin! Welcome back to the realm of the living. ✨`,
+      })
+    }
 
     if (args.rank && args.rank !== 'none' && args.rank !== oldCharacter?.rank) {
         const rankName = args.rank.charAt(0).toUpperCase() + args.rank.slice(1);
@@ -1193,6 +1226,96 @@ export const adminUpdateCharacter = mutation({
             message: `**${args.name}** just reached level **${args.lvl}**!`
         })
     }
+  },
+})
+
+export const markCharacterDiedInSession = mutation({
+  args: {
+    sessionId: v.id('sessions'),
+    characterId: v.id('characters'),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) {
+      throw new Error('Not authenticated')
+    }
+
+    const session = await ctx.db.get(args.sessionId)
+    if (!session) {
+      throw new Error('Session not found')
+    }
+
+    const isAdminUser = await isAdmin(ctx)
+    const isSessionOwner = session.owner === user.subject
+    if (!isSessionOwner && !isAdminUser) {
+      throw new Error('Only the voidmaster (session owner) or an admin can mark a character as dead.')
+    }
+
+    const isAttending = (session.characters || []).includes(args.characterId) || session.gmCharacter === args.characterId
+    if (!isAttending) {
+      throw new Error('Character is not part of this session.')
+    }
+
+    const character = await ctx.db.get(args.characterId)
+    if (!character) {
+      throw new Error('Character not found')
+    }
+
+    if (character.isDead) {
+      throw new Error('Character is already marked as deceased.')
+    }
+
+    // 1. Mark character as dead and record the session and level
+    await ctx.db.patch(args.characterId, {
+      isDead: true,
+      diedAtSessionId: args.sessionId,
+      diedAtLevel: character.lvl,
+    })
+
+    // 2. Track on session
+    const deadCharacters = session.deadCharacters || []
+    if (!deadCharacters.includes(args.characterId)) {
+      await ctx.db.patch(args.sessionId, {
+        deadCharacters: [...deadCharacters, args.characterId],
+      })
+    }
+
+    // 3. Construct sad discord message
+    const world = await ctx.db.get(session.world)
+    const worldName = world ? world.name : 'Unknown World'
+    const quest = session.questId ? await ctx.db.get(session.questId) : null
+
+    let diedText = ''
+    if (quest) {
+      const questLevel = computeEffectiveLevel(session, quest) ?? quest.levelPF ?? quest.levelDnD ?? quest.level ?? session.level ?? 1
+      diedText = `${character.name} died at level ${character.lvl} in ${worldName} during ${quest.name} (${questLevel})`
+    } else {
+      const sessionLevel = computeEffectiveLevel(session, null) ?? session.level ?? 1
+      diedText = `${character.name} died at level ${character.lvl} in ${worldName} in a level ${sessionLevel} session`
+    }
+
+    // 4. Log to activity
+    await ctx.scheduler.runAfter(0, internal.activity.logActivity, {
+      type: 'character_death',
+      message: diedText,
+      userId: character.userId,
+      metadata: {
+        characterId: args.characterId,
+        sessionId: args.sessionId,
+        level: character.lvl,
+      },
+    })
+
+    // 5. Send sad discord message in ourobouros inn channel
+    await ctx.scheduler.runAfter(0, internal.discord.sendActivityToDiscord, {
+      message: `🕯️ ${diedText} 🪦`,
+      embeds: [{
+        title: "🪦 Fallen Adventurer",
+        description: diedText,
+        color: 0x374151,
+        timestamp: new Date().toISOString(),
+      }],
+    })
   },
 })
 

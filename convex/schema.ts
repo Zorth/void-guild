@@ -13,6 +13,9 @@ export default defineSchema({
         websiteLink: v.optional(v.string()),
         rank: v.optional(v.string()), // none, journeyman, guildmaster
         system: v.union(v.literal('PF'), v.literal('DnD')),
+        isDead: v.optional(v.boolean()),
+        diedAtSessionId: v.optional(v.id("sessions")),
+        diedAtLevel: v.optional(v.number()),
         cosmetics: v.optional(v.object({
             nameFont: v.optional(v.string()),
             titleFont: v.optional(v.string()),
@@ -40,6 +43,7 @@ export default defineSchema({
         isPrivate: v.optional(v.boolean()),
         isIntro: v.optional(v.boolean()),
         characters: v.array(v.id("characters")),
+        deadCharacters: v.optional(v.array(v.id("characters"))),
         gmCharacter: v.optional(v.id("characters")),
         location: v.optional(v.string()), // Google Maps link
         xpGains: v.optional(v.array(v.object({
