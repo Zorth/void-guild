@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, Flag, CheckCircle2, CalendarDays, ExternalLink, Target } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Flag, CheckCircle2, CalendarDays, ExternalLink, Target, Sunrise, Sunset, CloudRain, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -12,35 +12,12 @@ import { useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Id, Doc } from '@/convex/_generated/dataModel'
 import { toast } from 'sonner'
-
-interface FantasyCalendarJSON {
-  name?: string
-  description?: string
-  dynamic_data: {
-    year: number
-    month: number
-    day: number
-    epoch?: number
-  }
-  static_data: {
-    year: number
-    timespans?: { name: string; type: string; length: number }[]
-    months: { name: string; length: number; type: string }[]
-    n_months: number
-    eras?: {
-      name: string
-      formatting?: string
-      settings?: {
-        starting_day?: number
-        starting_month?: number
-        starting_year?: number
-      }
-    }[]
-    settings?: {
-      year_zero_exists?: boolean
-    }
-  }
-}
+import {
+  FantasyCalendarJSON,
+  normalizeCalendarJSON,
+  formatClockTime,
+} from '@/lib/fantasy-calendar/types'
+import { evaluateSingleDay } from '@/lib/fantasy-calendar/astronomy'
 
 interface VoidmasterLeftSidebarProps {
   sessionId: Id<'sessions'>
@@ -67,26 +44,29 @@ export default function VoidmasterLeftSidebar({
   const [isSavingContribution, setIsSavingContribution] = useState(false)
   const [objectiveContributionInput, setObjectiveContributionInput] = useState<number | null>(null)
 
-  const calendarConfig = useMemo(() => {
+  const calendarConfig = useMemo<FantasyCalendarJSON | null>(() => {
     if (!world?.calendar) return null
     try {
       const parsed = JSON.parse(world.calendar)
-      const dynamicData = parsed.dynamic_data || parsed.dynamic || parsed.dynamicData
-      const staticData = parsed.static_data || parsed.static || parsed.staticData
-
-      if (!staticData || !dynamicData) return null
-
-      return {
-        ...parsed,
-        dynamic_data: dynamicData,
-        static_data: staticData,
-      } as FantasyCalendarJSON
+      return normalizeCalendarJSON(parsed)
     } catch (e) {
       return null
     }
   }, [world?.calendar])
 
   const currentDate = calendarConfig?.dynamic_data
+  const canEditCalendar = Boolean(isAdmin || (world && session && world.owner === session.owner))
+
+  const dayEvaluation = useMemo(() => {
+    if (!calendarConfig || !currentDate) return null
+    return evaluateSingleDay(
+      calendarConfig,
+      currentDate.year,
+      currentDate.month,
+      currentDate.day,
+      canEditCalendar
+    )
+  }, [calendarConfig, currentDate, canEditCalendar])
 
   const saveDateToWorld = useCallback(
     async (year: number, month: number, day: number) => {
@@ -261,8 +241,6 @@ export default function VoidmasterLeftSidebar({
     )
   }, [currentDate, session?.inGameDate])
 
-  const canEditCalendar = Boolean(isAdmin || (world && session && world.owner === session.owner))
-
   return (
     <div className="flex flex-col gap-4 w-full">
       {/* Tactical View button */}
@@ -309,6 +287,11 @@ export default function VoidmasterLeftSidebar({
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
                 <div className="flex-grow text-center py-2 bg-card rounded border border-border/50 shadow-sm">
+                  {dayEvaluation?.weekdayName && (
+                    <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                      {dayEvaluation.weekdayName}
+                    </div>
+                  )}
                   <div className="text-sm font-black text-foreground">
                     {currentDate.day}{' '}
                     {calendarConfig.static_data.months[currentDate.month]?.name || 'Unknown Month'}
@@ -332,6 +315,81 @@ export default function VoidmasterLeftSidebar({
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
+
+              {/* Compact Almanac Summary: Season, Sunrise/Sunset, Weather & Moons */}
+              {dayEvaluation && (dayEvaluation.season || dayEvaluation.weather || dayEvaluation.moons.length > 0) && (
+                <div className="p-2 rounded bg-card/70 border border-border/50 space-y-1.5 text-[10px]">
+                  {dayEvaluation.season && (
+                    <div className="flex items-center justify-between gap-1">
+                      <span
+                        className="font-bold truncate"
+                        style={{ color: dayEvaluation.season.color || '#a855f7' }}
+                      >
+                        {dayEvaluation.season.season_name} (Day {dayEvaluation.season.season_day})
+                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="flex items-center gap-0.5 text-amber-300 font-semibold" title="Sunrise">
+                          <Sunrise className="h-3 w-3" />
+                          {formatClockTime(dayEvaluation.season.sunrise)}
+                        </span>
+                        <span className="flex items-center gap-0.5 text-orange-400 font-semibold" title="Sunset">
+                          <Sunset className="h-3 w-3" />
+                          {formatClockTime(dayEvaluation.season.sunset)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {dayEvaluation.weather && !calendarConfig.static_data.settings?.hide_all_weather && (
+                    <div className="flex items-center justify-between gap-1 text-muted-foreground pt-1 border-t border-border/30">
+                      <span className="font-semibold text-foreground/90">
+                        {dayEvaluation.weather.temp_actual}
+                        {dayEvaluation.weather.temp_unit} • {dayEvaluation.weather.clouds}
+                      </span>
+                      {dayEvaluation.weather.precipitation && (
+                        <span className="text-cyan-300 font-medium flex items-center gap-0.5 truncate">
+                          <CloudRain className="h-2.5 w-2.5 shrink-0" />
+                          {dayEvaluation.weather.precipitation}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {dayEvaluation.moons.length > 0 && (
+                    <div className="flex items-center justify-between gap-1 pt-1 border-t border-border/30">
+                      <span className="text-muted-foreground font-semibold">Moons:</span>
+                      <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                        {dayEvaluation.moons.map((m, idx) => (
+                          <span key={idx} className="inline-flex items-center gap-1" title={`${m.name}: ${m.phaseName}`}>
+                            <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 32 32">
+                              <circle cx="16" cy="16" r="10" fill={m.shadow_color || '#1e1b2e'} />
+                              <path fill={m.color || '#ffffff'} d={m.path} />
+                            </svg>
+                            <span className="text-[9px] text-foreground/80 font-medium">{m.name}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Today's Calendar Events */}
+              {dayEvaluation && dayEvaluation.events.length > 0 && (
+                <div className="space-y-1">
+                  {dayEvaluation.events.map((ev, idx) => (
+                    <div
+                      key={idx}
+                      className="px-2 py-1 rounded text-[10px] font-bold text-white flex items-center justify-between gap-1 shadow-xs"
+                      style={{ backgroundColor: ev.color || '#7c3aed' }}
+                      title={ev.description ? `${ev.name}: ${ev.description}` : ev.name}
+                    >
+                      <span className="truncate">{ev.name}</span>
+                      {ev.hidden && <Lock className="h-2.5 w-2.5 shrink-0 opacity-80" />}
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Session Range Controls */}
               <div className="grid grid-cols-2 gap-2">

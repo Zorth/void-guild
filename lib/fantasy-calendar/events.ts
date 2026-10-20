@@ -33,23 +33,37 @@ export class EventEvaluator {
             this.event_data.ends[event_index] = [];
         }
 
-        // Simplified: iterate through all epochs in range
+        // Check if event has explicit fixed date fallback in event.data.date = [year, month, day]
+        const fixedDate = event?.data?.date;
+        const hasConditions = Array.isArray(event?.data?.conditions) && event.data.conditions.length > 0;
+
         for (let epoch = start_epoch; epoch <= end_epoch; epoch++) {
             const data = this.epoch_data[epoch];
             if (!data) continue;
 
-            if (event.data && this.evaluate_event_group(data, event.data.conditions || [])) {
+            let matched = false;
+            if (hasConditions) {
+                matched = this.evaluate_event_group(data, event.data.conditions);
+            } else if (Array.isArray(fixedDate) && fixedDate.length >= 3) {
+                matched =
+                    Number(data.year) === Number(fixedDate[0]) &&
+                    Number(data.timespan_index) === Number(fixedDate[1]) &&
+                    Number(data.day) === Number(fixedDate[2]);
+            }
+
+            if (matched) {
                 this.add_to_epoch(event, event_index, epoch, start_epoch, end_epoch);
             }
         }
     }
 
     evaluate_event_group(epoch_data: any, conditions: any[]): boolean {
-        if (conditions.length === 0) return false;
+        if (!Array.isArray(conditions) || conditions.length === 0) return false;
 
         let result = false;
         for (let i = conditions.length - 1; i >= 0; i -= 2) {
             const condition = conditions[i];
+            if (!Array.isArray(condition)) continue;
             const is_array = Array.isArray(condition[1]);
 
             let new_result = false;
@@ -73,8 +87,8 @@ export class EventEvaluator {
 
     evaluate_condition(epoch_data: any, array: any[]): boolean {
         const category = array[0];
-        const type = array[1];
-        const values = array[2];
+        const type = Number(array[1]);
+        const values = array[2] || [];
 
         const mapping = condition_mapping[category]?.[type];
         if (!mapping) return false;
@@ -91,40 +105,57 @@ export class EventEvaluator {
             let cond_1: any;
             let cond_2: any;
 
-            if (category === "Epoch") {
-                selected = epoch_data[selector];
-                cond_1 = Number(values[subcon[2]]);
-                cond_2 = values[subcon[3]] !== undefined ? Number(values[subcon[3]]) : undefined;
-            } else if (category === "Date") {
-                const year = epoch_data.year;
-                const month = epoch_data.timespan_index;
-                const day = epoch_data.day;
-                
+            if (category === "Date") {
+                const year = Number(epoch_data.year);
+                const month = Number(epoch_data.timespan_index);
+                const day = Number(epoch_data.day);
+
                 const v_year = Number(values[0]);
                 const v_month = Number(values[1]);
                 const v_day = Number(values[2]);
-                
+
                 const current_total = (year * 100000) + (month * 1000) + day;
                 const target_total = (v_year * 100000) + (v_month * 1000) + v_day;
-                
+
                 return this.evaluate_operator(operator, current_total, target_total);
             } else if (category === "Moons") {
-                selected = epoch_data.moon_phase?.[values[0]];
+                const moonIdx = Number(values[0]) || 0;
+                selected = epoch_data.moon_phase?.[moonIdx];
                 cond_1 = Number(values[subcon[2]]);
+                cond_2 = subcon[3] !== undefined && values[subcon[3]] !== undefined ? Number(values[subcon[3]]) : undefined;
             } else if (category === "Season") {
                 if (!epoch_data.season) return false;
                 selected = epoch_data.season[selector];
                 cond_1 = values[subcon[2]];
+                cond_2 = subcon[3] !== undefined && values[subcon[3]] !== undefined ? Number(values[subcon[3]]) : undefined;
             } else if (category === "Random") {
                 cond_1 = Number(values[subcon[2]]);
-                cond_2 = values[subcon[3]] !== undefined ? Number(values[subcon[3]]) : 0;
+                cond_2 = subcon[3] !== undefined && values[subcon[3]] !== undefined ? Number(values[subcon[3]]) : 0;
                 selected = fract(43758.5453 * Math.sin(cond_2 + (78.233 * epoch_data.epoch))) * 100;
             } else if (category === "Weekday") {
-                selected = epoch_data.week_day_name;
-                cond_1 = values[subcon[2]];
+                if (selector === "week_day_name") {
+                    selected = epoch_data.week_day_name;
+                    cond_1 = values[subcon[2]];
+                    // Also allow matching by 0-based weekday index if values[0] is a numeric index string
+                    const asNum = Number(cond_1);
+                    if (!Number.isNaN(asNum) && String(asNum) === String(cond_1).trim()) {
+                        const wkName = this.static_data?.weekdays?.[asNum];
+                        if (wkName) cond_1 = wkName;
+                    }
+                } else {
+                    selected = epoch_data[selector];
+                    cond_1 = Number(values[subcon[2]]);
+                    cond_2 = subcon[3] !== undefined && values[subcon[3]] !== undefined ? Number(values[subcon[3]]) : undefined;
+                }
             } else {
                 selected = epoch_data[selector];
                 cond_1 = values[subcon[2]];
+                if (typeof selected === 'number' && cond_1 !== undefined) {
+                    cond_1 = Number(cond_1);
+                }
+                if (subcon[3] !== undefined && values[subcon[3]] !== undefined) {
+                    cond_2 = Number(values[subcon[3]]);
+                }
             }
 
             if (subcon.length === 4) {
@@ -146,8 +177,8 @@ export class EventEvaluator {
             case '>': return !!(a > b);
             case '<': return !!(a < b);
             case '%':
-                if (c === undefined) return !!(a % b === 0);
-                return !!((a - c) % b === 0);
+                if (c === undefined || Number.isNaN(Number(c))) return !!(Number(a) % Number(b) === 0);
+                return !!((Number(a) - Number(c)) % Number(b) === 0);
             case '&&': return !!(a && b);
             case '||': return !!(a || b);
             case 'NAND': return !(a && b);
@@ -157,8 +188,8 @@ export class EventEvaluator {
     }
 
     add_to_epoch(event: any, event_index: number, epoch: number, start_epoch: number, end_epoch: number) {
-        if (event.data.has_duration) {
-            const duration = event.data.duration || 1;
+        if (event.data?.has_duration) {
+            const duration = Math.max(1, Number(event.data.duration) || 1);
             for (let d = 0; d < duration; d++) {
                 const current_epoch = epoch + d;
                 if (current_epoch >= start_epoch && current_epoch <= end_epoch) {

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, FormEvent } from 'react'
+import React, { useState, useEffect, useMemo, FormEvent } from 'react'
 import { useQuery, useMutation } from 'convex/react'
 import { useUser } from '@clerk/nextjs'
 import { api } from '@/convex/_generated/api'
@@ -43,6 +43,7 @@ import {
   Users,
   Heart,
   Skull,
+  Compass,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { track } from '@vercel/analytics'
@@ -74,6 +75,12 @@ export default function CharacterDetailsDialog({
   const unlockedAchievementIds = useQuery(api.achievements.getUserUnlockedAchievementIds) || []
   const userWorldStreaks = useQuery(api.worlds.getUserWorldStreaks) || []
   const characterRanks = useQuery(api.characters.getCharacterLeaderboardRanks)
+  const allWorlds = useQuery(api.worlds.getAllWorlds)
+
+  const sortedWorlds = useMemo(() => {
+    if (!allWorlds) return []
+    return [...allWorlds].sort((a, b) => a.name.localeCompare(b.name))
+  }, [allWorlds])
 
   const updateCharacter = useMutation(api.characters.updateCharacter)
   const deleteCharacter = useMutation(api.characters.deleteCharacter)
@@ -90,6 +97,7 @@ export default function CharacterDetailsDialog({
     ancestry: '',
     class: '',
     websiteLink: '',
+    originWorld: '',
     system: 'PF' as 'PF' | 'DnD',
   })
 
@@ -116,6 +124,7 @@ export default function CharacterDetailsDialog({
         ancestry: char.ancestry ?? '',
         class: char.class ?? '',
         websiteLink: char.websiteLink ?? '',
+        originWorld: char.originWorld ?? '',
         system: (char.system as 'PF' | 'DnD') ?? 'PF',
       })
       setEditedCosmetics({
@@ -255,6 +264,12 @@ export default function CharacterDetailsDialog({
                     Lvl {char.lvl}
                   </span>
                   <span>{char.xp} XP</span>
+                  {char.originWorld && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-purple-500/15 border border-purple-500/30 px-2 py-0.5 text-[10px] font-semibold text-purple-300">
+                      <Compass className="h-3 w-3 text-purple-400" />
+                      {char.originWorld}
+                    </span>
+                  )}
                 </>
               ) : (
                 <Skeleton className="h-4 w-48" />
@@ -511,8 +526,55 @@ export default function CharacterDetailsDialog({
                 )}
               </div>
 
-              {/* 4. Streaks Summary */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* 4. Streaks & Origin Summary */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-3.5 rounded-lg bg-card/60 border border-border/70 flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-purple-500/15 border border-purple-500/30 flex items-center justify-center shrink-0 overflow-hidden">
+                    {(() => {
+                      const matchedWorld = char.originWorld
+                        ? sortedWorlds.find((w) => w.name === char.originWorld)
+                        : undefined
+                      if (matchedWorld?.emblemUrl) {
+                        return (
+                          <img
+                            src={matchedWorld.emblemUrl}
+                            alt={matchedWorld.name}
+                            className="h-full w-full object-cover"
+                          />
+                        )
+                      }
+                      return <Compass className="h-5 w-5 text-purple-400" />
+                    })()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                      Home World
+                    </div>
+                    {char.originWorld ? (
+                      char.originWorld !== 'Other' && sortedWorlds.some((w) => w.name === char.originWorld) ? (
+                        <Link
+                          href={`/world/${encodeURIComponent(char.originWorld)}`}
+                          onClick={onClose}
+                          className="text-sm font-bold text-purple-300 hover:text-purple-200 hover:underline truncate block"
+                        >
+                          {char.originWorld}
+                        </Link>
+                      ) : (
+                        <div className="text-sm font-bold text-foreground truncate">
+                          {char.originWorld}
+                        </div>
+                      )
+                    ) : (
+                      <div className="text-sm font-bold text-muted-foreground">
+                        Not specified
+                      </div>
+                    )}
+                    <div className="text-[10px] text-muted-foreground">
+                      Character Origin
+                    </div>
+                  </div>
+                </div>
+
                 <div className="p-3.5 rounded-lg bg-card/60 border border-border/70 flex items-center gap-3">
                   <div className="h-10 w-10 rounded-full bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0">
                     <Globe className="h-5 w-5 text-amber-500" />
@@ -746,6 +808,28 @@ export default function CharacterDetailsDialog({
                   onChange={(e) => setEditedData({ ...editedData, class: e.target.value })}
                   placeholder="Class"
                 />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium">Home World (Optional)</label>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  value={editedData.originWorld}
+                  onChange={(e) =>
+                    setEditedData({
+                      ...editedData,
+                      originWorld: e.target.value,
+                    })
+                  }
+                >
+                  <option value="">Not specified</option>
+                  {sortedWorlds.map((w) => (
+                    <option key={w._id} value={w.name}>
+                      {w.name}
+                    </option>
+                  ))}
+                  <option value="Other">Other</option>
+                </select>
               </div>
 
               <div className="flex flex-col gap-2">

@@ -24,7 +24,13 @@ export default function AdminCharacterList() {
   // All hooks must be called unconditionally at the top level
   const isAdmin = useQuery(api.sessions.isAdminQuery)
   const allCharacters = useQuery(api.characters.listAllCharacters, !!isAdmin ? undefined : "skip")
+  const allWorlds = useQuery(api.worlds.getAllWorlds, !!isAdmin ? undefined : "skip")
   const adminUpdateCharacter = useMutation(api.characters.adminUpdateCharacter)
+
+  const sortedWorlds = useMemo(() => {
+    if (!allWorlds) return []
+    return [...allWorlds].sort((a, b) => a.name.localeCompare(b.name))
+  }, [allWorlds])
 
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCharacter, setSelectedCharacter] = useState<Doc<'characters'> | null>(null)
@@ -38,6 +44,7 @@ export default function AdminCharacterList() {
     ancestry: '',
     class: '',
     websiteLink: '',
+    originWorld: '',
     rank: 'none' as 'none' | 'journeyman' | 'guildmaster',
     system: 'PF' as 'PF' | 'DnD',
     isDead: false,
@@ -179,6 +186,7 @@ export default function AdminCharacterList() {
       ancestry: character.ancestry ?? '',
       class: character.class ?? '',
       websiteLink: character.websiteLink ?? '',
+      originWorld: character.originWorld ?? '',
       rank: (character.rank as any) ?? 'none',
       system: (character.system as 'PF' | 'DnD') ?? 'PF',
       isDead: Boolean(character.isDead),
@@ -435,6 +443,22 @@ export default function AdminCharacterList() {
                     value={editData.class}
                     onChange={(e) => setEditData({ ...editData, class: e.target.value })}
                   />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <label className="text-right text-sm">Home World</label>
+                  <select
+                    className="col-span-3 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    value={editData.originWorld}
+                    onChange={(e) => setEditData({ ...editData, originWorld: e.target.value })}
+                  >
+                    <option value="">Not specified</option>
+                    {sortedWorlds.map((w) => (
+                      <option key={w._id} value={w.name}>
+                        {w.name}
+                      </option>
+                    ))}
+                    <option value="Other">Other</option>
+                  </select>
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <label className="text-right text-sm">Website</label>

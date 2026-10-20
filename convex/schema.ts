@@ -10,6 +10,7 @@ export default defineSchema({
         xp: v.number(),
         ancestry: v.optional(v.string()),
         class: v.optional(v.string()),
+        originWorld: v.optional(v.string()),
         websiteLink: v.optional(v.string()),
         rank: v.optional(v.string()), // none, journeyman, guildmaster
         system: v.union(v.literal('PF'), v.literal('DnD')),

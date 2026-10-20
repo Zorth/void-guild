@@ -1,6 +1,6 @@
 'use client'
 
-import { useMutation } from 'convex/react'
+import { useMutation, useQuery } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,23 +12,30 @@ import {
   DialogTrigger,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { FormEvent, useState } from 'react'
+import { FormEvent, useMemo, useState } from 'react'
 import { fireVoidParticles } from '@/lib/particles'
 import { track } from '@vercel/analytics'
 import { toast } from 'sonner'
 
 export default function CreateCharacter() {
   const createCharacter = useMutation(api.characters.createCharacter)
+  const allWorlds = useQuery(api.worlds.getAllWorlds)
   const [newCharacterData, setNewCharacterData] = useState({ 
     name: '', 
     ancestry: '', 
     class: '', 
     websiteLink: '',
+    originWorld: '',
     system: 'PF' as 'PF' | 'DnD'
   })
   const [isOpen, setIsOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<{ name?: string }>({})
+
+  const sortedWorlds = useMemo(() => {
+    if (!allWorlds) return []
+    return [...allWorlds].sort((a, b) => a.name.localeCompare(b.name))
+  }, [allWorlds])
 
   async function handleCreateCharacter(event: FormEvent) {
     event.preventDefault()
@@ -55,9 +62,12 @@ export default function CreateCharacter() {
           fireVoidParticles(e.clientX, e.clientY);
       }
 
-      await createCharacter(newCharacterData)
+      await createCharacter({
+        ...newCharacterData,
+        originWorld: newCharacterData.originWorld || undefined,
+      })
       track('character_created', { name: newCharacterData.name, system: newCharacterData.system })
-      setNewCharacterData({ name: '', ancestry: '', class: '', websiteLink: '', system: 'PF' })
+      setNewCharacterData({ name: '', ancestry: '', class: '', websiteLink: '', originWorld: '', system: 'PF' })
       setIsOpen(false)
       toast.success('Character created successfully!')
     } catch (err: any) {
@@ -73,7 +83,7 @@ export default function CreateCharacter() {
     setIsOpen(open)
     if (!open) {
       setErrors({})
-      setNewCharacterData({ name: '', ancestry: '', class: '', websiteLink: '', system: 'PF' })
+      setNewCharacterData({ name: '', ancestry: '', class: '', websiteLink: '', originWorld: '', system: 'PF' })
     }
   }
 
@@ -120,6 +130,22 @@ export default function CreateCharacter() {
             onChange={(e) => setNewCharacterData({ ...newCharacterData, class: e.target.value })}
             placeholder="Class"
           />
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-muted-foreground">Home World (Optional)</label>
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              value={newCharacterData.originWorld}
+              onChange={(e) => setNewCharacterData({ ...newCharacterData, originWorld: e.target.value })}
+            >
+              <option value="">Not specified</option>
+              {sortedWorlds.map((w) => (
+                <option key={w._id} value={w.name}>
+                  {w.name}
+                </option>
+              ))}
+              <option value="Other">Other</option>
+            </select>
+          </div>
           <Input
             value={newCharacterData.websiteLink}
             onChange={(e) => setNewCharacterData({ ...newCharacterData, websiteLink: e.target.value })}
