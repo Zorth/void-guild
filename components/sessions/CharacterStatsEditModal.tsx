@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import { useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Doc } from '@/convex/_generated/dataModel'
@@ -90,6 +91,9 @@ export default function CharacterStatsEditModal({
 
   const [percBonus, setPercBonus] = useState<number>(details?.saves?.perception?.bonus ?? 0)
   const [percProf, setPercProf] = useState<ProficiencyCode>(details?.saves?.perception?.proficiency ?? 'T')
+  const [visionType, setVisionType] = useState<'normal' | 'low-light' | 'darkvision'>(
+    details?.saves?.perception?.vision || details?.vision || 'normal'
+  )
 
   // Skills
   const [skills, setSkills] = useState<
@@ -160,7 +164,7 @@ export default function CharacterStatsEditModal({
           fortitude: { bonus: fortBonus, proficiency: fortProf },
           reflex: { bonus: refBonus, proficiency: refProf },
           will: { bonus: willBonus, proficiency: willProf },
-          perception: { bonus: percBonus, proficiency: percProf },
+          perception: { bonus: percBonus, proficiency: percProf, vision: visionType },
         },
         skills,
       })
@@ -371,25 +375,42 @@ export default function CharacterStatsEditModal({
 
               {/* Perception */}
               <div className="space-y-1.5 bg-background/40 p-2.5 rounded-lg border border-border/40">
-                <span className="text-[11px] font-bold text-amber-300">Perception</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-amber-300">Perception</span>
+                  <span className={cn(
+                    "text-[10px] font-bold uppercase",
+                    visionType === 'darkvision' ? "text-purple-400" : visionType === 'low-light' ? "text-cyan-400" : "text-amber-400/80"
+                  )}>
+                    {visionType === 'darkvision' ? 'Darkvision' : visionType === 'low-light' ? 'Low-Light' : 'Normal'}
+                  </span>
+                </div>
                 <div className="flex gap-2">
                   <Input
                     type="number"
                     value={percBonus}
                     onChange={(e) => setPercBonus(parseInt(e.target.value) || 0)}
-                    className="h-7 text-xs font-mono"
+                    className="h-7 text-xs font-mono w-16 text-center"
                     placeholder="Bonus"
                   />
                   <select
                     value={percProf}
                     onChange={(e) => setPercProf(e.target.value as ProficiencyCode)}
-                    className="h-7 px-1.5 text-xs rounded bg-muted border border-border/40"
+                    className="h-7 px-1.5 text-xs rounded bg-muted border border-border/40 font-semibold"
                   >
                     {PROFICIENCY_OPTIONS.map((p) => (
                       <option key={p} value={p}>
                         {p}
                       </option>
                     ))}
+                  </select>
+                  <select
+                    value={visionType}
+                    onChange={(e) => setVisionType(e.target.value as 'normal' | 'low-light' | 'darkvision')}
+                    className="h-7 px-1.5 text-xs rounded bg-muted border border-border/40 font-semibold flex-1"
+                  >
+                    <option value="normal">Normal</option>
+                    <option value="low-light">Low-Light</option>
+                    <option value="darkvision">Darkvision</option>
                   </select>
                 </div>
               </div>

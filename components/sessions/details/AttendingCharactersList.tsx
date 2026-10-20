@@ -735,7 +735,7 @@ export default function AttendingCharactersList({
                               </PopoverContent>
                             </Popover>
                           ) : null
-                        ) : (
+                        ) : (rel.count > 0 || rel.isNew) ? (
                           <Popover>
                             <PopoverTrigger asChild>
                               <button
@@ -820,7 +820,7 @@ export default function AttendingCharactersList({
                               )}
                             </PopoverContent>
                           </Popover>
-                        )
+                        ) : null
                       )}
                     </div>
                     {char.websiteLink && (

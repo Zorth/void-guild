@@ -682,16 +682,15 @@ export async function evaluateAndSyncUserAchievements(
   let maxWorldStreak = 0
   let maxCharacterStreak = 0
 
-  const isAttendingSession = (charId: Id<'characters'> | string, s: typeof sortedLockedSessions[0]) => {
-    const inChars = Boolean(s.characters && s.characters.some((c) => String(c) === String(charId)))
-    const isGM = Boolean(s.gmCharacter && String(s.gmCharacter) === String(charId))
-    return inChars || isGM
+  const isAttendingSessionAsPlayer = (charId: Id<'characters'> | string, s: typeof sortedLockedSessions[0]) => {
+    if (s.gmCharacter && String(s.gmCharacter) === String(charId)) return false
+    return Boolean(s.characters && s.characters.some((c) => String(c) === String(charId)))
   }
 
   for (const char of characters) {
-    const charSessions = sortedLockedSessions.filter((s) => isAttendingSession(char._id, s))
+    const charSessions = sortedLockedSessions.filter((s) => isAttendingSessionAsPlayer(char._id, s))
 
-    // World Streak per character
+    // World Streak per character (only player sessions)
     let currentWorld: string | null = null
     let currentWorldStreak = 0
     for (const s of charSessions) {
@@ -725,13 +724,12 @@ export async function evaluateAndSyncUserAchievements(
       }
     }
 
-    // Mutual character streak with companion characters
+    // Mutual character streak with companion characters (player companions only, excluding GM)
     const companionIds = new Set<string>()
     for (const s of charSessions) {
-      const sessionChars = [
-        ...(s.characters || []),
-        ...(s.gmCharacter ? [s.gmCharacter as Id<'characters'>] : [])
-      ]
+      const sessionChars = (s.characters || []).filter(
+        (cId) => !s.gmCharacter || String(cId) !== String(s.gmCharacter)
+      )
       for (const cId of sessionChars) {
         if (String(cId) !== String(char._id)) {
           companionIds.add(String(cId))
@@ -741,12 +739,12 @@ export async function evaluateAndSyncUserAchievements(
 
     for (const compId of companionIds) {
       const relevantSessions = sortedLockedSessions.filter(
-        (s) => isAttendingSession(char._id, s) || isAttendingSession(compId, s)
+        (s) => isAttendingSessionAsPlayer(char._id, s) || isAttendingSessionAsPlayer(compId, s)
       )
       let mutualStreak = 0
       for (const s of relevantSessions) {
-        const hasChar = isAttendingSession(char._id, s)
-        const hasComp = isAttendingSession(compId, s)
+        const hasChar = isAttendingSessionAsPlayer(char._id, s)
+        const hasComp = isAttendingSessionAsPlayer(compId, s)
         if (hasChar && hasComp) {
           mutualStreak++
           if (mutualStreak > maxCharacterStreak) {

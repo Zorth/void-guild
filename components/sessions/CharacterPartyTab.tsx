@@ -108,6 +108,7 @@ export default function CharacterPartyTab({
               const ref = saves.reflex || { bonus: 0, proficiency: 'T' }
               const will = saves.will || { bonus: 0, proficiency: 'T' }
               const perc = saves.perception || { bonus: 0, proficiency: 'T' }
+              const charVision = perc.vision || details.vision || 'normal'
 
               // Skills
               const skillsList = Object.entries(details.skills || {}).map(([key, sk]: [string, any]) => ({
@@ -228,8 +229,23 @@ export default function CharacterPartyTab({
                         {will.bonus >= 0 ? `+${will.bonus}` : will.bonus}
                       </span>
                       <span className="text-border/60 text-[10px]">|</span>
-                      <span className="text-[9px] font-mono font-bold text-amber-300" title="Perception">
-                        <span className="text-[8px] font-bold text-amber-500 mr-0.5">P</span>
+                      <span
+                        className={cn(
+                          "text-[9px] font-mono font-bold",
+                          charVision === 'darkvision'
+                            ? "text-purple-300"
+                            : charVision === 'low-light'
+                            ? "text-cyan-300"
+                            : "text-amber-300"
+                        )}
+                        title={`Perception: ${perc.bonus >= 0 ? `+${perc.bonus}` : perc.bonus} (${
+                          charVision === 'darkvision' ? 'Darkvision' : charVision === 'low-light' ? 'Low-Light Vision' : 'Normal Vision'
+                        })`}
+                      >
+                        <span className={cn(
+                          "text-[8px] font-bold mr-0.5",
+                          charVision === 'darkvision' ? "text-purple-400" : charVision === 'low-light' ? "text-cyan-400" : "text-amber-500"
+                        )}>P</span>
                         {perc.bonus >= 0 ? `+${perc.bonus}` : perc.bonus}
                       </span>
                     </div>

@@ -6,8 +6,8 @@ import Link from 'next/link'
 export default function Footer() {
   const pathname = usePathname()
 
-  // Remove footer from all map pages so scrolling only zooms the map without scrolling the webpage
-  if (pathname?.includes('/map')) {
+  // Remove footer from all map pages and tactical GM view so it's always full screen
+  if (pathname?.includes('/map') || pathname?.includes('/gm')) {
     return null
   }
 

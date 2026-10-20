@@ -271,7 +271,8 @@ export default function PartyLootSection({
 
     const totalValue = loot.reduce((sum, item) => {
       const baseVal = item.isGood ? item.valueGP : item.valueGP / 2
-      const itemTotal = item.isPerCharacter ? baseVal * attendingCount : baseVal
+      const qty = (item.quantity ?? 1) * (item.isPerCharacter ? attendingCount : 1)
+      const itemTotal = baseVal * qty
       return sum + itemTotal
     }, 0)
 
@@ -305,7 +306,6 @@ export default function PartyLootSection({
     if (!userCharacterInSession) return []
     return loot
       .map((item) => {
-        if (item.isCurrency) return null
         const isGoodOrCurrency = item.isGood || item.isCurrency
         const unitVal = isGoodOrCurrency ? item.valueGP : item.valueGP / 2
         const claimedList = item.claimedByCharacters && item.claimedByCharacters.length > 0
@@ -721,8 +721,8 @@ export default function PartyLootSection({
             const isClaimedByMe = Boolean(item.claimedBy && userCharacterIds.has(item.claimedBy))
             const resaleValue = item.isGood ? item.valueGP : item.valueGP / 2
             const totalItemValue = item.isPerCharacter
-              ? resaleValue * (session.attendingCharacters.length || 1)
-              : resaleValue
+              ? resaleValue * (session.attendingCharacters.length || 1) * (item.quantity ?? 1)
+              : resaleValue * (item.quantity ?? 1)
 
             return (
               <Card key={item.id} className="bg-card/40 overflow-hidden border-border/40">

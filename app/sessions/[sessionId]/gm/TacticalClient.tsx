@@ -228,6 +228,7 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
   // Editing perception score modal
   const [editingPerceptionCharId, setEditingPerceptionCharId] = useState<Id<'characters'> | null>(null)
   const [perceptionScoreInput, setPerceptionScoreInput] = useState<number>(0)
+  const [visionTypeInput, setVisionTypeInput] = useState<'normal' | 'low-light' | 'darkvision'>('normal')
   const [isUpdatingPerception, setIsUpdatingPerception] = useState(false)
 
   // Load from LocalStorage
@@ -466,7 +467,7 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
     }))
   }
 
-  // Update perception score in database
+  // Update perception score and vision in database
   const handleSavePerception = async () => {
     if (!editingPerceptionCharId) return
     setIsUpdatingPerception(true)
@@ -474,8 +475,9 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
       await updatePerceptionMutation({
         characterId: editingPerceptionCharId,
         bonus: perceptionScoreInput,
+        vision: visionTypeInput,
       })
-      toast.success('Perception modifier updated in database!')
+      toast.success('Perception modifier & vision updated in database!')
       setEditingPerceptionCharId(null)
     } catch (err: any) {
       toast.error(err.message || 'Failed to update perception modifier')
@@ -511,65 +513,130 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
     }
   }
 
-  // Handle reordering in BG3 initiative tracker row
-  const handleReorderTrackerCombatant = (sourceId: string, targetId: string) => {
-    if (sourceId === targetId) return
+  // Handle dynamic reordering in BG3 initiative tracker row while dragging
+  const handleDynamicReorder = (sourceId: string, targetId: string) => {
+    if (!sourceId || !targetId || sourceId === targetId) return
 
-    const currentIndex = combatants.findIndex((c) => c.id === sourceId)
-    const targetIndex = combatants.findIndex((c) => c.id === targetId)
-    if (currentIndex === -1 || targetIndex === -1) return
+    setTacticalState((prev) => {
+      // Reconstruct combatants list from current state
+      const list: TurnCombatant[] = []
 
-    const sourceCombatant = combatants[currentIndex]
-    const targetCombatant = combatants[targetIndex]
+      attendingCharacters.forEach((c) => {
+        const percBonus = perceptions?.[c._id]?.bonus ?? 0
+        const init = prev.characterInitiatives[c._id] ?? (10 + percBonus)
+        list.push({
+          id: c._id,
+          name: c.name,
+          initiative: init,
+          type: 'character',
+          characterId: c._id,
+        })
+      })
 
-    // Determine the new initiative value based on destination position in the sorted list
-    // List is sorted descending by initiative (combatants[0] is highest).
-    let newInitiative = targetCombatant.initiative
+      const activeEncounter =
+        prev.combats.find((c) => c.id === prev.activeCombatId) || prev.combats[0]
+      if (activeEncounter) {
+        activeEncounter.monsterGroups.forEach((g) => {
+          list.push({
+            id: g.id,
+            name: g.name,
+            initiative: g.initiative,
+            type: 'monsterGroup',
+            groupId: g.id,
+          })
+        })
+      }
 
-    if (currentIndex < targetIndex) {
-      // Moving down (to a lower initiative position)
-      // Place it right after targetCombatant
-      const nextBelow = combatants[targetIndex + 1]
-      if (nextBelow) {
-        if (targetCombatant.initiative - nextBelow.initiative > 1) {
-          newInitiative = Math.floor((targetCombatant.initiative + nextBelow.initiative) / 2)
+      list.sort((a, b) => b.initiative - a.initiative)
+
+      const sourceIndex = list.findIndex((c) => c.id === sourceId)
+      const targetIndex = list.findIndex((c) => c.id === targetId)
+      if (sourceIndex === -1 || targetIndex === -1 || sourceIndex === targetIndex) return prev
+
+      const sourceItem = list[sourceIndex]
+      const targetItem = list[targetIndex]
+
+      // Map of id -> updated initiative
+      const updates: Record<string, number> = {}
+
+      if (sourceIndex > targetIndex) {
+        // Moving UP (to higher initiative position)
+        const targetInit = targetItem.initiative
+        if (targetIndex > 0) {
+          const prevAbove = list[targetIndex - 1]
+          if (prevAbove.initiative - targetInit > 1) {
+            updates[sourceItem.id] = Math.floor((prevAbove.initiative + targetInit) / 2)
+          } else {
+            const newInit = targetInit + 1
+            updates[sourceItem.id] = newInit
+            let shiftVal = newInit + 1
+            for (let i = targetIndex - 1; i >= 0; i--) {
+              if (list[i].initiative < shiftVal) {
+                updates[list[i].id] = shiftVal
+                shiftVal++
+              } else {
+                break
+              }
+            }
+          }
         } else {
-          newInitiative = targetCombatant.initiative - 1
+          updates[sourceItem.id] = targetInit + 1
         }
       } else {
-        newInitiative = targetCombatant.initiative - 1
-      }
-      // Ensure strictly lower than targetCombatant
-      if (newInitiative >= targetCombatant.initiative) {
-        newInitiative = targetCombatant.initiative - 1
-      }
-    } else {
-      // Moving up (to a higher initiative position)
-      // Place it right before targetCombatant
-      const prevAbove = combatants[targetIndex - 1]
-      if (prevAbove) {
-        if (prevAbove.initiative - targetCombatant.initiative > 1) {
-          newInitiative = Math.floor((prevAbove.initiative + targetCombatant.initiative) / 2)
+        // Moving DOWN (to lower initiative position)
+        const targetInit = targetItem.initiative
+        if (targetIndex < list.length - 1) {
+          const nextBelow = list[targetIndex + 1]
+          if (targetInit - nextBelow.initiative > 1) {
+            updates[sourceItem.id] = Math.floor((targetInit + nextBelow.initiative) / 2)
+          } else {
+            const newInit = targetInit - 1
+            updates[sourceItem.id] = newInit
+            let shiftVal = newInit - 1
+            for (let i = targetIndex + 1; i < list.length; i++) {
+              if (list[i].initiative > shiftVal) {
+                updates[list[i].id] = shiftVal
+                shiftVal--
+              } else {
+                break
+              }
+            }
+          }
         } else {
-          newInitiative = targetCombatant.initiative + 1
+          updates[sourceItem.id] = targetInit - 1
         }
-      } else {
-        newInitiative = targetCombatant.initiative + 1
       }
-      // Ensure strictly higher than targetCombatant
-      if (newInitiative <= targetCombatant.initiative) {
-        newInitiative = targetCombatant.initiative + 1
-      }
-    }
 
-    // Apply the new initiative to character or monster group
-    if (sourceCombatant.type === 'character' && sourceCombatant.characterId) {
-      setCharInitiative(sourceCombatant.characterId, newInitiative)
-      toast.info(`Updated ${sourceCombatant.name}'s initiative to ${newInitiative}`)
-    } else if (sourceCombatant.type === 'monsterGroup' && sourceCombatant.groupId) {
-      handleUpdateGroupInit(sourceCombatant.groupId, newInitiative)
-      toast.info(`Updated ${sourceCombatant.name}'s initiative to ${newInitiative}`)
-    }
+      // Apply updates to characterInitiatives
+      const newCharInits = { ...prev.characterInitiatives }
+      attendingCharacters.forEach((c) => {
+        if (updates[c._id] !== undefined) {
+          newCharInits[c._id] = updates[c._id]
+        }
+      })
+
+      // Apply updates to active encounter monsterGroups
+      const newCombats = prev.combats.map((combat) => {
+        if (combat.id === prev.activeCombatId) {
+          return {
+            ...combat,
+            monsterGroups: combat.monsterGroups.map((g) => {
+              if (updates[g.id] !== undefined) {
+                return { ...g, initiative: updates[g.id] }
+              }
+              return g
+            }),
+          }
+        }
+        return combat
+      })
+
+      return {
+        ...prev,
+        characterInitiatives: newCharInits,
+        combats: newCombats,
+      }
+    })
   }
 
   // --- Combat Encounter Tab Handlers ---
@@ -918,6 +985,7 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
     const character = charId ? characterMap.get(charId) : null
     const playerName = character ? usersMap[character.userId] || 'Player' : ''
     const percBonus = character ? perceptions?.[character._id]?.bonus ?? 0 : 0
+    const charVision = character ? perceptions?.[character._id]?.vision || 'normal' : 'normal'
     const charInit = character ? tacticalState.characterInitiatives[character._id] ?? (10 + percBonus) : 10
 
     const isCurrentTurn = Boolean(charId && currentActiveTurnId === charId)
@@ -938,7 +1006,7 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
           }
         }}
         className={cn(
-          'relative flex flex-col justify-between p-3 rounded-xl border transition-all min-h-[105px] select-none',
+          'relative flex flex-col justify-between p-3 rounded-xl border transition-all h-[112px] select-none',
           charId
             ? isCurrentTurn
               ? 'bg-amber-950/30 border-amber-400 ring-2 ring-amber-400/80 shadow-[0_0_18px_rgba(251,191,36,0.35)]'
@@ -969,7 +1037,7 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
 
         {charId && character ? (
           <>
-            <div className="flex items-start justify-between gap-1.5">
+            <div className="flex items-start justify-between gap-1.5 min-w-0">
               <div className="min-w-0 flex-grow">
                 <div
                   className={cn(
@@ -995,7 +1063,7 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
                       return { ...prev, tableSlots: slots }
                     })
                   }}
-                  className="p-1 text-muted-foreground hover:text-destructive rounded transition-colors"
+                  className="p-1 text-muted-foreground hover:text-destructive rounded transition-colors shrink-0"
                   title="Remove from slot"
                 >
                   <Trash2 className="h-3 w-3" />
@@ -1004,7 +1072,7 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
             </div>
 
             <div
-              className="flex flex-wrap items-center justify-between gap-1.5 mt-2 pt-2 border-t border-border/40"
+              className="flex items-center justify-between gap-1.5 mt-auto pt-1.5 border-t border-border/40"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Initiative score */}
@@ -1033,9 +1101,19 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
                 onClick={() => {
                   setEditingPerceptionCharId(character._id)
                   setPerceptionScoreInput(percBonus)
+                  setVisionTypeInput(charVision)
                 }}
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition-colors shrink-0"
-                title="Click to view and edit Perception score"
+                className={cn(
+                  "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border transition-colors shrink-0",
+                  charVision === 'darkvision'
+                    ? "bg-purple-950/60 text-purple-300 border-purple-500/50 hover:bg-purple-900/60"
+                    : charVision === 'low-light'
+                    ? "bg-cyan-950/60 text-cyan-300 border-cyan-500/50 hover:bg-cyan-900/60"
+                    : "bg-amber-500/15 text-amber-400 border-amber-500/30 hover:bg-amber-500/25"
+                )}
+                title={`Perception: ${percBonus >= 0 ? `+${percBonus}` : percBonus} (${
+                  charVision === 'darkvision' ? 'Darkvision' : charVision === 'low-light' ? 'Low-Light Vision' : 'Normal Vision'
+                }) - Click to edit`}
               >
                 <Eye className="h-3 w-3 shrink-0" />
                 <span>{percBonus >= 0 ? `+${percBonus}` : percBonus}</span>
@@ -1043,8 +1121,8 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
             </div>
           </>
         ) : (
-          <div className="text-[11px] text-muted-foreground/60 italic font-medium">
-            Slot {slotIndex + 1}
+          <div className="h-full flex items-center justify-center text-[11px] text-muted-foreground/60 italic font-medium">
+            {sideLabel || `Slot ${slotIndex + 1}`}
           </div>
         )}
       </div>
@@ -1057,6 +1135,13 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
   const topSlotIndices = [0, 1, 2]
   const leftSlotIndices = [3, 4, 5, 6]
   const rightSlotIndices = [7, 8, 9, 10]
+
+  // Filter occupied slots for neat non-edit mode display
+  const topOccupiedSlots = topSlotIndices.filter((idx) => tacticalState.tableSlots[idx] !== null)
+  const leftCornerOccupied = tacticalState.tableSlots[3] !== null
+  const leftFlankOccupied = [4, 5, 6].filter((idx) => tacticalState.tableSlots[idx] !== null)
+  const rightCornerOccupied = tacticalState.tableSlots[7] !== null
+  const rightFlankOccupied = [8, 9, 10].filter((idx) => tacticalState.tableSlots[idx] !== null)
 
   if (session === undefined || isAdmin === undefined) {
     return (
@@ -1173,7 +1258,7 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
       </header>
 
       {/* Main Full-Width Content */}
-      <main className="flex-1 w-full p-3 sm:p-5 lg:p-6 max-w-[2400px] mx-auto flex flex-col gap-6">
+      <main className="flex-1 w-full p-3 sm:p-5 lg:p-6 max-w-[2400px] mx-auto flex flex-col gap-6 pb-28">
         {activeMainTab === 'party' ? (
           <CharacterPartyTab
             session={session}
@@ -1227,15 +1312,44 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
             <div className="grid grid-cols-1 md:grid-cols-[1fr_1.8fr_1fr] xl:grid-cols-[210px_1fr_210px] 2xl:grid-cols-[240px_1fr_240px] gap-3 items-start">
               {/* LEFT SIDE SLOTS (4 SLOTS: 1 CORNER + 3 FLANK) */}
               <div className="flex flex-col gap-3">
-                {leftSlotIndices.map((idx, i) => renderSlot(idx, i === 0 ? 'Left Corner' : 'Left Flank'))}
+                {isEditMode ? (
+                  leftSlotIndices.map((idx, i) => renderSlot(idx, i === 0 ? 'Left Corner' : `Left Flank ${i}`))
+                ) : (
+                  <>
+                    {leftCornerOccupied ? (
+                      renderSlot(3, 'Left Corner')
+                    ) : leftFlankOccupied.length > 0 ? (
+                      <div className="h-[112px] w-full" />
+                    ) : null}
+                    {leftFlankOccupied.map((idx, i) => renderSlot(idx, `Left Flank ${i + 1}`))}
+                  </>
+                )}
               </div>
 
               {/* CENTER U-SHAPED TABLE WITH TOP SLOTS AND MONSTER INITIATIVES */}
               <div className="flex flex-col gap-3">
-                {/* TOP SLOTS (3 SLOTS) */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {topSlotIndices.map((idx) => renderSlot(idx, 'Head'))}
-                </div>
+                {/* TOP SLOTS */}
+                {isEditMode ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {topSlotIndices.map((idx, i) => renderSlot(idx, `Head ${i + 1}`))}
+                  </div>
+                ) : topOccupiedSlots.length === 0 ? (
+                  (leftCornerOccupied || rightCornerOccupied) ? (
+                    <div className="h-[112px] w-full" />
+                  ) : null
+                ) : topOccupiedSlots.length === 1 ? (
+                  <div className="grid grid-cols-1 max-w-sm sm:max-w-md mx-auto w-full">
+                    {renderSlot(topOccupiedSlots[0], 'Head')}
+                  </div>
+                ) : topOccupiedSlots.length === 2 ? (
+                  <div className="grid grid-cols-2 gap-3 w-full">
+                    {topOccupiedSlots.map((idx, i) => renderSlot(idx, `Head ${i + 1}`))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {topOccupiedSlots.map((idx, i) => renderSlot(idx, `Head ${i + 1}`))}
+                  </div>
+                )}
 
                 {/* SQUARE WITH BOTTOM LINE REMOVED (Horseshoe / U-Shape) */}
                 <div className="relative p-5 rounded-t-3xl border-t-4 border-l-4 border-r-4 border-b-0 border-purple-500/40 bg-gradient-to-b from-purple-950/20 via-background/40 to-transparent min-h-[420px] flex flex-col items-center justify-between shadow-2xl">
@@ -1335,7 +1449,18 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
 
               {/* RIGHT SIDE SLOTS (4 SLOTS: 1 CORNER + 3 FLANK) */}
               <div className="flex flex-col gap-3">
-                {rightSlotIndices.map((idx, i) => renderSlot(idx, i === 0 ? 'Right Corner' : 'Right Flank'))}
+                {isEditMode ? (
+                  rightSlotIndices.map((idx, i) => renderSlot(idx, i === 0 ? 'Right Corner' : `Right Flank ${i}`))
+                ) : (
+                  <>
+                    {rightCornerOccupied ? (
+                      renderSlot(7, 'Right Corner')
+                    ) : rightFlankOccupied.length > 0 ? (
+                      <div className="h-[112px] w-full" />
+                    ) : null}
+                    {rightFlankOccupied.map((idx, i) => renderSlot(idx, `Right Flank ${i + 1}`))}
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -1758,26 +1883,11 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
           </section>
         </div>
 
-        {/* BALDUR'S GATE 3 STYLE INITIATIVE ORDER ROW */}
+        {/* BALDUR'S GATE 3 STYLE INITIATIVE ORDER ROW (Fixed on bottom) */}
         {combatants.length > 0 && (
-          <div className="w-full mt-4 pt-4 border-t border-purple-500/20 bg-card/60 backdrop-blur-md rounded-2xl p-4 border border-border/50 shadow-lg">
-            <div className="flex items-center justify-between gap-3 mb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-sm">⚔️</span>
-                <span className="text-xs font-black tracking-wider uppercase text-foreground">
-                  Initiative Order
-                </span>
-                <span className="text-[10px] text-muted-foreground font-medium hidden sm:inline">
-                  (Drag portraits to reorder turn priority & auto-update initiative)
-                </span>
-              </div>
-              <div className="text-[10px] font-bold text-purple-400 bg-purple-950/40 border border-purple-500/30 px-2 py-0.5 rounded-full">
-                {combatants.length} Combatant{combatants.length !== 1 ? 's' : ''}
-              </div>
-            </div>
-
+          <div className="fixed bottom-0 left-0 right-0 z-40 bg-card/90 backdrop-blur-md border-t border-purple-500/30 px-4 py-2.5 shadow-[0_-8px_25px_rgba(0,0,0,0.5)]">
             {/* Horizontal Scrollable BG3 Ribbon */}
-            <div className="flex items-center gap-2.5 overflow-x-auto pb-2 pt-1 px-1 scrollbar-thin">
+            <div className="max-w-[2400px] mx-auto flex items-center gap-2.5 overflow-x-auto scrollbar-thin py-0.5 px-1">
               {combatants.map((c, index) => {
                 const isCurrentTurn = currentActiveTurnId === c.id
                 const isNextUp = nextUpCombatant?.id === c.id
@@ -1789,22 +1899,28 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
                   <div
                     key={c.id}
                     draggable
-                    onDragStart={() => setDraggedTrackerId(c.id)}
+                    onDragStart={(e) => {
+                      setDraggedTrackerId(c.id)
+                      e.dataTransfer.effectAllowed = 'move'
+                    }}
                     onDragEnd={() => setDraggedTrackerId(null)}
                     onDragOver={(e) => {
+                      e.preventDefault()
+                      e.dataTransfer.dropEffect = 'move'
+                    }}
+                    onDragEnter={(e) => {
+                      e.preventDefault()
                       if (draggedTrackerId && draggedTrackerId !== c.id) {
-                        e.preventDefault()
+                        handleDynamicReorder(draggedTrackerId, c.id)
                       }
                     }}
-                    onDrop={() => {
-                      if (draggedTrackerId) {
-                        handleReorderTrackerCombatant(draggedTrackerId, c.id)
-                        setDraggedTrackerId(null)
-                      }
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      setDraggedTrackerId(null)
                     }}
                     onClick={() => handleSelectTurn(c.id)}
                     className={cn(
-                      'group relative flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-bold transition-all cursor-grab active:cursor-grabbing select-none shrink-0 shadow-sm hover:scale-[1.03]',
+                      'group relative flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-grab active:cursor-grabbing select-none shrink-0 shadow-sm hover:scale-[1.03]',
                       isDragging
                         ? 'opacity-40 scale-95 border-dashed border-purple-400'
                         : isCurrentTurn
@@ -1844,6 +1960,38 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
                     <span className="truncate max-w-[120px] font-black tracking-tight">
                       {c.name}
                     </span>
+
+                    {/* Perception badge colored by vision */}
+                    {c.type === 'character' && c.characterId && (
+                      <span
+                        className={cn(
+                          'px-1.5 py-0.5 rounded font-mono text-[9px] font-bold shrink-0 border flex items-center gap-0.5',
+                          perceptions?.[c.characterId]?.vision === 'darkvision'
+                            ? 'bg-purple-950/70 text-purple-300 border-purple-500/50'
+                            : perceptions?.[c.characterId]?.vision === 'low-light'
+                            ? 'bg-cyan-950/70 text-cyan-300 border-cyan-500/50'
+                            : 'bg-amber-950/40 text-amber-300 border-amber-500/40'
+                        )}
+                        title={`Perception: ${
+                          (perceptions?.[c.characterId]?.bonus ?? 0) >= 0
+                            ? `+${perceptions?.[c.characterId]?.bonus ?? 0}`
+                            : perceptions?.[c.characterId]?.bonus ?? 0
+                        } (${
+                          perceptions?.[c.characterId]?.vision === 'darkvision'
+                            ? 'Darkvision'
+                            : perceptions?.[c.characterId]?.vision === 'low-light'
+                            ? 'Low-Light Vision'
+                            : 'Normal Vision'
+                        })`}
+                      >
+                        <Eye className="h-2.5 w-2.5 shrink-0 opacity-80" />
+                        <span>
+                          {(perceptions?.[c.characterId]?.bonus ?? 0) >= 0
+                            ? `+${perceptions?.[c.characterId]?.bonus ?? 0}`
+                            : perceptions?.[c.characterId]?.bonus ?? 0}
+                        </span>
+                      </span>
+                    )}
 
                     {/* Initiative badge */}
                     <span
@@ -2399,6 +2547,22 @@ export default function TacticalClient({ sessionId }: { sessionId: string }) {
               </div>
               <p className="text-[10px] text-muted-foreground">
                 Base initiative defaults to 10 + Perception Modifier.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-muted-foreground">Vision Type</label>
+              <select
+                value={visionTypeInput}
+                onChange={(e) => setVisionTypeInput(e.target.value as 'normal' | 'low-light' | 'darkvision')}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-medium"
+              >
+                <option value="normal">Normal Vision (Amber)</option>
+                <option value="low-light">Low-Light Vision (Cyan)</option>
+                <option value="darkvision">Darkvision (Purple)</option>
+              </select>
+              <p className="text-[10px] text-muted-foreground">
+                Colors the perception badge across the initiative tracker and tactical views.
               </p>
             </div>
           </div>

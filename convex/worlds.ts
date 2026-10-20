@@ -741,7 +741,10 @@ export async function getUserWorldStreaksMap(
 
   for (const char of characters) {
     const charSessions = sortedLockedSessions.filter(
-      (s: any) => (s.characters && s.characters.includes(char._id)) || s.gmCharacter === char._id
+      (s: any) =>
+        s.characters &&
+        s.characters.includes(char._id) &&
+        (!s.gmCharacter || s.gmCharacter !== char._id)
     )
 
     let currentWorld: string | null = null

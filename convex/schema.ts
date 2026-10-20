@@ -383,8 +383,10 @@ export default defineSchema({
                 proficiency: v.optional(v.union(v.literal('U'), v.literal('T'), v.literal('E'), v.literal('M'), v.literal('L'))),
                 profValue: v.optional(v.number()),
                 itemBonus: v.optional(v.number()),
+                vision: v.optional(v.union(v.literal('normal'), v.literal('low-light'), v.literal('darkvision'))),
             })),
         })),
+        vision: v.optional(v.union(v.literal('normal'), v.literal('low-light'), v.literal('darkvision'))),
         abilities: v.optional(v.object({
             str: v.number(),
             dex: v.number(),

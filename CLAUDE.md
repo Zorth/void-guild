@@ -68,3 +68,15 @@ All backend code in `convex/` must strictly adhere to the following platform res
 * **Production Build**: Run `npm run build` to ensure static page generation and Next.js bundle succeed cleanly.
 * **Single-Source Docstrings**: Preserve existing comments and docstrings.
 * **Error Handling**: Log and address root causes—never wrap failing logic in empty `catch` blocks or dummy fallbacks.
+
+---
+
+## 6. Domain Rules: GM Characters vs. Player Characters
+
+* **GM Character Separation**: In any session `s`, `s.gmCharacter` represents the Voidmaster running the session and receiving GM XP. The GM character is **never** an active party member / player character in that session.
+* **Strict "Played Together" Exclusion**: GM characters must **never** be counted as "playing together" with players in sessions they ran. Mutual session counts, mutual streaks, and "Played Together" relationships only apply to sessions where **both** characters participated as active player characters (`s.characters` excluding `s.gmCharacter`).
+* **Companion & "Best Friend" Calculations**: A GM character must never be listed or tallied as a companion or "Best Friend" for any player character, nor can a GM character accumulate player companions from sessions they GMed.
+* **Attendance & World Streaks**:
+  * Running a session as a GM (`s.gmCharacter === character._id`) must **never** increment a character's player attendance streak or world streak, nor can it count as a world session played by that character.
+  * Running a session as a GM does **not** break a character's ongoing player attendance streak (it is skipped neutrally).
+* **Achievements & Milestones**: Companion milestones (e.g. `character_streak_3/5/10`) and world streak achievements must strictly evaluate only active player attendee records (`s.characters` where `s.gmCharacter !== charId`).

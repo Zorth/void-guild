@@ -337,7 +337,7 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
         for (const item of loot) {
             const isGoodOrCurrency = item.isGood || item.isCurrency
             const baseVal = isGoodOrCurrency ? item.valueGP : item.valueGP / 2
-            const qty = item.quantity ?? 1
+            const qty = (item.quantity ?? 1) * (item.isPerCharacter ? attendingCount : 1)
             const itemTotal = baseVal * qty
             if (item.isCurrency) {
                 totalCash += itemTotal
@@ -381,7 +381,6 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
         if (!userCharacterInSession) return []
         return loot
             .map((item) => {
-                if (item.isCurrency) return null
                 const isGoodOrCurrency = item.isGood || item.isCurrency
                 const unitVal = isGoodOrCurrency ? item.valueGP : item.valueGP / 2
                 const claimedList = item.claimedByCharacters && item.claimedByCharacters.length > 0
@@ -847,7 +846,7 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                 <div className="grid gap-3">
                     {loot.map((item) => {
                         const isGoodOrCurrency = item.isGood || item.isCurrency
-                        const itemQty = Math.max(1, item.quantity ?? 1)
+                        const itemQty = Math.max(1, (item.quantity ?? 1) * (item.isPerCharacter ? session.attendingCharacters.length : 1))
                         const resaleValue = isGoodOrCurrency ? item.valueGP : item.valueGP / 2
                         const totalItemValue = resaleValue * itemQty
 

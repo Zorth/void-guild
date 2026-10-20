@@ -139,7 +139,7 @@ export const getCharactersByIds = query({
 export const getCharacterPerceptions = query({
   args: { characterIds: v.array(v.id('characters')) },
   handler: async (ctx, args) => {
-    const result: Record<string, { bonus: number; proficiency?: string }> = {}
+    const result: Record<string, { bonus: number; proficiency?: string; vision?: 'normal' | 'low-light' | 'darkvision' }> = {}
 
     await Promise.all(
       args.characterIds.map(async (charId) => {
@@ -152,6 +152,7 @@ export const getCharacterPerceptions = query({
           result[charId] = {
             bonus: details.saves.perception.bonus,
             proficiency: details.saves.perception.proficiency,
+            vision: details.saves.perception.vision || details.vision || 'normal',
           }
         }
       })
@@ -210,6 +211,7 @@ export const updateCharacterPerception = mutation({
   args: {
     characterId: v.id('characters'),
     bonus: v.number(),
+    vision: v.optional(v.union(v.literal('normal'), v.literal('low-light'), v.literal('darkvision'))),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity()
@@ -248,29 +250,35 @@ export const updateCharacterPerception = mutation({
     if (existingDetails) {
       const currentSaves = existingDetails.saves || {}
       const currentPerception = currentSaves.perception || { bonus: 0 }
+      const newVision = args.vision ?? currentPerception.vision ?? existingDetails.vision ?? 'normal'
 
-      if (currentPerception.bonus === args.bonus) {
+      if (currentPerception.bonus === args.bonus && currentPerception.vision === newVision) {
         return { success: true }
       }
 
       await ctx.db.patch(existingDetails._id, {
+        vision: newVision,
         saves: {
           ...currentSaves,
           perception: {
             ...currentPerception,
             bonus: args.bonus,
+            vision: newVision,
           },
         },
       })
     } else {
+      const newVision = args.vision || 'normal'
       await ctx.db.insert('characterDetails', {
         characterId: args.characterId,
         system: character.system === 'DnD' ? 'DnD' : 'PF2e',
         name: character.name,
         level: character.lvl,
+        vision: newVision,
         saves: {
           perception: {
             bonus: args.bonus,
+            vision: newVision,
           },
         },
         lastSyncedAt: Date.now(),
@@ -380,6 +388,13 @@ export const updatePartyCharacterStats = mutation({
             ),
             profValue: v.optional(v.number()),
             itemBonus: v.optional(v.number()),
+            vision: v.optional(
+              v.union(
+                v.literal('normal'),
+                v.literal('low-light'),
+                v.literal('darkvision')
+              )
+            ),
           })
         ),
       })
@@ -445,7 +460,12 @@ export const updatePartyCharacterStats = mutation({
     if (args.hitPoints !== undefined) patchPayload.hitPoints = args.hitPoints
     if (args.armorClass !== undefined) patchPayload.armorClass = args.armorClass
     if (args.abilities !== undefined) patchPayload.abilities = args.abilities
-    if (args.saves !== undefined) patchPayload.saves = args.saves
+    if (args.saves !== undefined) {
+      patchPayload.saves = args.saves
+      if (args.saves.perception?.vision) {
+        patchPayload.vision = args.saves.perception.vision
+      }
+    }
     if (args.skills !== undefined) patchPayload.skills = args.skills
 
     if (existingDetails) {
@@ -750,6 +770,13 @@ export const importCharacterSheet = mutation({
       languages: languagesList,
     }
 
+    const hasDarkvision = specialsList.some((s: string) => /darkvision/i.test(s)) || featsList.some((f: string) => /darkvision/i.test(f))
+    const hasLowLight = specialsList.some((s: string) => /low-light/i.test(s)) || featsList.some((f: string) => /low-light/i.test(f))
+    const detectedVision: 'normal' | 'low-light' | 'darkvision' = hasDarkvision ? 'darkvision' : hasLowLight ? 'low-light' : 'normal'
+    if (normalizedSaves?.perception) {
+      normalizedSaves.perception.vision = detectedVision
+    }
+
     // Existing characterDetails
     const existing = await ctx.db
       .query('characterDetails')
@@ -778,6 +805,7 @@ export const importCharacterSheet = mutation({
       armorClass: normalizedArmorClass ?? existing?.armorClass,
       saves: normalizedSaves ?? existing?.saves,
       abilities: normalizedAbilities ?? existing?.abilities,
+      vision: detectedVision || existing?.vision || 'normal',
       skills: normalizedSkills ?? existing?.skills,
       money: normalizedMoney ?? existing?.money,
       gear: normalizedGear ?? existing?.gear,
@@ -1434,13 +1462,12 @@ export const getCharacterProfile = query({
       return a._creationTime - b._creationTime
     })
 
-    const isAttending = (s: typeof allSessions[0]) => {
-      const inChars = Array.isArray(s.characters) && s.characters.includes(args.characterId)
-      const isGM = s.gmCharacter === args.characterId
-      return inChars || isGM
+    const isAttendingAsPlayer = (s: typeof allSessions[0]) => {
+      if (s.gmCharacter && String(s.gmCharacter) === String(args.characterId)) return false
+      return Array.isArray(s.characters) && s.characters.some((c) => String(c) === String(args.characterId))
     }
 
-    const attendingSessions = allSessions.filter(isAttending)
+    const attendingSessions = allSessions.filter(isAttendingAsPlayer)
 
     // Calculate streaks:
     // 1. Current world streak (for the most recent session played)
@@ -1496,11 +1523,11 @@ export const getCharacterProfile = query({
     let attendanceStreak = 0
     for (let i = sortedLocked.length - 1; i >= 0; i--) {
       const s = sortedLocked[i]
-      if (s.gmCharacter === args.characterId) {
+      if (s.gmCharacter && String(s.gmCharacter) === String(args.characterId)) {
         // Ignored: GM session doesn't count for player streak, but also doesn't break it
         continue
       }
-      if (isAttending(s)) {
+      if (isAttendingAsPlayer(s)) {
         attendanceStreak += 1
       } else {
         break

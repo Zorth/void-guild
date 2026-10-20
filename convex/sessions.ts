@@ -381,11 +381,15 @@ export const getAttendingCharacterRelationships = query({
       ...(currentSession.gmCharacter ? [currentSession.gmCharacter] : [])
     ]))
 
-    const isAttending = (charId: string, s: Doc<'sessions'>) => {
-      const inChars = Array.isArray(s.characters) && s.characters.includes(charId as Id<'characters'>)
-      const isGM = s.gmCharacter === charId
-      return inChars || isGM
+    // A character attends as a player ONLY if they are in s.characters AND NOT the GM character
+    const isPlayerAttending = (charId: string, s: Doc<'sessions'>) => {
+      if (s.gmCharacter && String(s.gmCharacter) === String(charId)) return false
+      return Array.isArray(s.characters) && s.characters.some(id => String(id) === String(charId))
     }
+
+    const isUserGMInCurrentSession = Boolean(
+      currentSession.gmCharacter && String(currentSession.gmCharacter) === String(args.userCharacterId)
+    )
 
     for (const charId of allAttendingIds) {
       let count = 0
@@ -393,12 +397,21 @@ export const getAttendingCharacterRelationships = query({
       let lastSessionInfo = null
       let streak = 0
 
-      if (charId !== args.userCharacterId) {
-        const coPastSessions = pastSessions.filter(s => isAttending(args.userCharacterId, s) && isAttending(charId, s))
-        const bothInCurrent = isAttending(args.userCharacterId, currentSession) && isAttending(charId, currentSession)
+      const isTargetGMInCurrentSession = Boolean(
+        currentSession.gmCharacter && String(currentSession.gmCharacter) === String(charId)
+      )
+
+      // Mutual player relationships: only between two different player characters (neither can be the GM)
+      if (charId !== args.userCharacterId && !isUserGMInCurrentSession && !isTargetGMInCurrentSession) {
+        const coPastSessions = pastSessions.filter(s =>
+          isPlayerAttending(args.userCharacterId, s) && isPlayerAttending(charId, s)
+        )
+        const bothInCurrent =
+          isPlayerAttending(args.userCharacterId, currentSession) &&
+          isPlayerAttending(charId, currentSession)
 
         count = coPastSessions.length + (bothInCurrent ? 1 : 0)
-        isNew = coPastSessions.length === 0
+        isNew = bothInCurrent && coPastSessions.length === 0
 
         if (coPastSessions.length > 0) {
           const last = coPastSessions[coPastSessions.length - 1]
@@ -414,14 +427,16 @@ export const getAttendingCharacterRelationships = query({
           streak += 1
         }
 
-        // Filter past sessions to those where EITHER user character OR target character physically attended
-        const relevantPastSessions = pastSessions.filter(s => isAttending(args.userCharacterId, s) || isAttending(charId, s))
+        // Filter past sessions to those where EITHER user character OR target character attended as a player
+        const relevantPastSessions = pastSessions.filter(s =>
+          isPlayerAttending(args.userCharacterId, s) || isPlayerAttending(charId, s)
+        )
 
         // Mutual streak calculation: break if EITHER character played a past session without the other
         for (let i = relevantPastSessions.length - 1; i >= 0; i--) {
           const pastS = relevantPastSessions[i]
-          const hasUser = isAttending(args.userCharacterId, pastS)
-          const hasTarget = isAttending(charId, pastS)
+          const hasUser = isPlayerAttending(args.userCharacterId, pastS)
+          const hasTarget = isPlayerAttending(charId, pastS)
           
           if (hasUser && hasTarget) {
             streak += 1
@@ -431,19 +446,19 @@ export const getAttendingCharacterRelationships = query({
         }
       }
 
-      // World Stats for this character
-      const charPastSessions = pastSessions.filter(s => isAttending(charId, s))
-      const charWorldPastSessions = charPastSessions.filter(s => Boolean(currentSession.world) && String(s.world) === String(currentSession.world))
+      // World Stats for this character as a player
+      const charPastSessions = pastSessions.filter(s => isPlayerAttending(charId, s))
+      const charWorldPastSessions = charPastSessions.filter(s =>
+        Boolean(currentSession.world) && String(s.world) === String(currentSession.world)
+      )
       
-      const charInCurrent = isAttending(charId, currentSession)
+      const charInCurrent = isPlayerAttending(charId, currentSession)
       const worldCount = charWorldPastSessions.length + (charInCurrent && currentSession.world ? 1 : 0)
-      const isNewToWorld = Boolean(currentSession.world) && charWorldPastSessions.length === 0
+      const isNewToWorld = Boolean(currentSession.world) && charInCurrent && charWorldPastSessions.length === 0
 
       let worldStreak = 0
-      if (currentSession.world) {
-        if (charInCurrent) {
-          worldStreak += 1
-        }
+      if (currentSession.world && charInCurrent) {
+        worldStreak += 1
         for (let i = charPastSessions.length - 1; i >= 0; i--) {
           const s = charPastSessions[i]
           if (String(s.world) === String(currentSession.world)) {
@@ -2146,7 +2161,7 @@ export const claimLoot = mutation({
 
     const loot = (session.loot || []).map((item) => {
       if (item.id === args.lootId) {
-        const totalQty = Math.max(1, item.quantity ?? 1)
+        const totalQty = Math.max(1, (item.quantity ?? 1) * (item.isPerCharacter ? (session.characters?.length || 1) : 1))
         const currentClaimed = item.claimedByCharacters && item.claimedByCharacters.length > 0
           ? [...item.claimedByCharacters]
           : (item.claimedBy ? [item.claimedBy] : [])
