@@ -50,14 +50,17 @@ export default function AchievementListener() {
     if (isLoading || !isAuthenticated) return
 
     const storageKey = 'void_last_achievement_check'
-    const lastCheck = typeof window !== 'undefined' ? sessionStorage.getItem(storageKey) : null
-    const now = Date.now()
-    if (lastCheck && now - Number(lastCheck) < ACHIEVEMENT_CHECK_INTERVAL_MS) {
-      return // Skip check: already checked within cooldown window
-    }
 
-    const checkAndNotify = async () => {
+    const checkAndNotify = async (force: boolean = false) => {
       if (isCheckingRef.current) return
+      if (!force) {
+        const lastCheck = typeof window !== 'undefined' ? sessionStorage.getItem(storageKey) : null
+        const now = Date.now()
+        if (lastCheck && now - Number(lastCheck) < ACHIEVEMENT_CHECK_INTERVAL_MS) {
+          return // Skip check: already checked within cooldown window
+        }
+      }
+
       isCheckingRef.current = true
       try {
         if (typeof window !== 'undefined') {
@@ -114,7 +117,15 @@ export default function AchievementListener() {
       }
     }
 
-    checkAndNotify()
+    checkAndNotify(false)
+
+    const handleTrigger = () => {
+      checkAndNotify(true)
+    }
+    window.addEventListener('void-achievement-action', handleTrigger)
+    return () => {
+      window.removeEventListener('void-achievement-action', handleTrigger)
+    }
   }, [isAuthenticated, isLoading, syncAndGetAchievements, markAchievementsNotified])
 
   return null

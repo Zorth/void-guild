@@ -236,6 +236,9 @@ export default function PartyLootSection({
     try {
       await claimLoot({ sessionId: session._id, lootId, characterId })
       toast.success('Loot claimed')
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('void-achievement-action'))
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to claim loot')
     }

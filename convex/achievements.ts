@@ -1,4 +1,4 @@
-import { mutation, query, MutationCtx } from './_generated/server'
+import { mutation, query, internalMutation, MutationCtx } from './_generated/server'
 import { Doc, Id } from './_generated/dataModel'
 import { v } from 'convex/values'
 
@@ -775,15 +775,34 @@ export async function evaluateAndSyncUserAchievements(
     }
   }
 
-  // Loot calculation
+  // Loot calculation (count each claimed copy across all items & record milestone dates)
   let claimedLootCount = 0
-  for (const s of allSessions) {
+  const sortedAllSessions = [...allSessions].sort((a, b) => {
+    const dateA = a.date ?? a._creationTime
+    const dateB = b.date ?? b._creationTime
+    if (dateA !== dateB) return dateA - dateB
+    return a._creationTime - b._creationTime
+  })
+  for (const s of sortedAllSessions) {
     if (s.loot) {
       for (const item of s.loot) {
-        if (item.claimedBy && charIds.has(String(item.claimedBy))) {
-          claimedLootCount += 1
-        } else if (item.claimedByCharacters && item.claimedByCharacters.some((cId: any) => charIds.has(String(cId)))) {
-          claimedLootCount += 1
+        const claimedList =
+          item.claimedByCharacters && item.claimedByCharacters.length > 0
+            ? item.claimedByCharacters
+            : item.claimedBy
+            ? [item.claimedBy]
+            : []
+        const userClaimedCopies = claimedList.filter((cId: any) => charIds.has(String(cId))).length
+        if (userClaimedCopies > 0) {
+          const prevCount = claimedLootCount
+          claimedLootCount += userClaimedCopies
+          const sDate = s.date ?? s._creationTime
+          if (prevCount < 1 && claimedLootCount >= 1 && !milestoneDates['loot_first']) {
+            milestoneDates['loot_first'] = sDate
+          }
+          if (prevCount < 5 && claimedLootCount >= 5 && !milestoneDates['loot_hoarder_5']) {
+            milestoneDates['loot_hoarder_5'] = sDate
+          }
         }
       }
     }
@@ -1137,5 +1156,19 @@ export const adminRecalculateAllUserStreakAchievements = mutation({
     }
 
     return { success: true, processedUsersCount }
+  },
+})
+
+export const syncAllUsersAchievementsInternal = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const allSessions = await ctx.db.query('sessions').take(500)
+    const allUsers = await ctx.db.query('users').take(500)
+    let processedUsersCount = 0
+    for (const u of allUsers) {
+      await evaluateAndSyncUserAchievements(ctx, u.userId, allSessions)
+      processedUsersCount++
+    }
+    return { processedUsersCount }
   },
 })

@@ -2180,6 +2180,7 @@ export const claimLoot = mutation({
     })
 
     await ctx.db.patch(args.sessionId, { loot })
+    await evaluateAndSyncUserAchievements(ctx, user.subject)
   },
 })
 

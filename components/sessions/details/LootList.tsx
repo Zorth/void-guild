@@ -297,6 +297,9 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
         try {
             await claimLoot({ sessionId: session._id, lootId, characterId })
             toast.success('Item claimed for your character')
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new Event('void-achievement-action'))
+            }
         } catch (e) {
             toast.error(e instanceof Error ? e.message : 'Failed to claim loot')
         }
