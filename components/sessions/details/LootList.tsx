@@ -227,6 +227,7 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
     const handleAdd = async () => {
         try {
             const parsedQty = Math.max(1, parseInt(quantity) || 1)
+            const totalQty = parsedQty * (isPerCharacter ? Math.max(1, session.attendingCharacters.length) : 1)
 
             await addLoot({
                 sessionId: session._id,
@@ -240,7 +241,7 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
             })
             setIsAddDialogOpen(false)
             resetForm()
-            toast.success(parsedQty > 1 ? `Added ${parsedQty}x ${name.trim() || 'loot'}` : 'Loot added')
+            toast.success(totalQty > 1 ? `Added ${totalQty}x ${name.trim() || 'loot'}` : 'Loot added')
         } catch (e) {
             toast.error('Failed to add loot')
         }
@@ -616,23 +617,13 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                                         <Checkbox 
                                             id="isPerCharacter" 
                                             checked={isPerCharacter} 
-                                            onCheckedChange={(val) => {
-                                                const checked = !!val
-                                                setIsPerCharacter(checked)
-                                                const attendeeCount = Math.max(1, session.attendingCharacters.length)
-                                                const currentQty = Math.max(1, parseInt(quantity) || 1)
-                                                if (checked) {
-                                                    setQuantity(String(currentQty * attendeeCount))
-                                                } else {
-                                                    setQuantity(String(Math.max(1, Math.floor(currentQty / attendeeCount))))
-                                                }
-                                            }} 
+                                            onCheckedChange={(val) => setIsPerCharacter(!!val)} 
                                             className="mt-0.5"
                                         />
                                         <label htmlFor="isPerCharacter" className="text-xs font-medium cursor-pointer leading-tight">
                                             <span>Award for <span className="font-bold underline text-primary">EACH</span> attending adventurer ({session.attendingCharacters.length} {session.attendingCharacters.length === 1 ? 'player' : 'players'})</span>
                                             <p className="text-[11px] text-muted-foreground font-normal mt-0.5">
-                                                Multiplies the quantity by {session.attendingCharacters.length} (the number of adventurers in this session).
+                                                Multiplies the quantity by {session.attendingCharacters.length} (Total: {Math.max(1, parseInt(quantity) || 1) * Math.max(1, session.attendingCharacters.length)}x).
                                             </p>
                                         </label>
                                     </div>
@@ -1112,23 +1103,13 @@ export default function LootList({ session, userCharacterIds }: LootListProps) {
                                     <Checkbox 
                                         id="isPerCharacterEdit" 
                                         checked={isPerCharacter} 
-                                        onCheckedChange={(val) => {
-                                            const checked = !!val
-                                            setIsPerCharacter(checked)
-                                            const attendeeCount = Math.max(1, session.attendingCharacters.length)
-                                            const currentQty = Math.max(1, parseInt(quantity) || 1)
-                                            if (checked) {
-                                                setQuantity(String(currentQty * attendeeCount))
-                                            } else {
-                                                setQuantity(String(Math.max(1, Math.floor(currentQty / attendeeCount))))
-                                            }
-                                        }} 
+                                        onCheckedChange={(val) => setIsPerCharacter(!!val)} 
                                         className="mt-0.5"
                                     />
                                     <label htmlFor="isPerCharacterEdit" className="text-xs font-medium cursor-pointer leading-tight">
                                         <span>Award for <span className="font-bold underline text-primary">EACH</span> attending adventurer ({session.attendingCharacters.length} {session.attendingCharacters.length === 1 ? 'player' : 'players'})</span>
                                         <p className="text-[11px] text-muted-foreground font-normal mt-0.5">
-                                            Multiplies the quantity by {session.attendingCharacters.length} (the number of adventurers in this session).
+                                            Multiplies the quantity by {session.attendingCharacters.length} (Total: {Math.max(1, parseInt(quantity) || 1) * Math.max(1, session.attendingCharacters.length)}x).
                                         </p>
                                     </label>
                                 </div>

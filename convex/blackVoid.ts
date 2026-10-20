@@ -266,18 +266,19 @@ export const getUserBlackVoidNotifications = query({
                     const lootList = sess.loot || []
                     const attendingCount = (sess.characters || []).length || 1
                     const totalLootValue = lootList.reduce((sum, item) => {
-                        const baseVal = item.isGood ? item.valueGP : item.valueGP / 2
-                        const itemTotal = item.isPerCharacter ? baseVal * attendingCount : baseVal
-                        return sum + itemTotal
+                        const baseVal = (item.isGood || item.isCurrency) ? item.valueGP : item.valueGP / 2
+                        const qty = (item.quantity ?? 1) * (item.isPerCharacter ? attendingCount : 1)
+                        return sum + baseVal * qty
                     }, 0)
                     const sharePerPlayer = totalLootValue / attendingCount
-                    const characterClaimedItems = lootList.filter((item) =>
-                        item.claimedBy === char._id ||
-                        (item.claimedByCharacters && item.claimedByCharacters.includes(char._id))
-                    )
-                    const userClaimedValue = characterClaimedItems.reduce((sum, item) => {
+                    const userClaimedValue = lootList.reduce((sum, item) => {
+                        if (item.isCurrency) return sum
                         const val = item.isGood ? item.valueGP : item.valueGP / 2
-                        return sum + val
+                        const claimedList = item.claimedByCharacters && item.claimedByCharacters.length > 0
+                            ? item.claimedByCharacters
+                            : (item.claimedBy ? [item.claimedBy] : [])
+                        const count = claimedList.filter((id) => id === char._id).length
+                        return sum + val * count
                     }, 0)
                     const currentNetMoneyGP = Math.round((sharePerPlayer - userClaimedValue) * 100) / 100
 
@@ -1027,9 +1028,9 @@ export const markAllCharacterTransactionsClaimed = mutation({
                     const lootList = sess.loot || []
                     const attendingCount = (sess.characters || []).length || 1
                     const totalLootValue = lootList.reduce((sum, item) => {
-                        const baseVal = item.isGood ? item.valueGP : item.valueGP / 2
-                        const itemTotal = item.isPerCharacter ? baseVal * attendingCount : baseVal
-                        return sum + itemTotal
+                        const baseVal = (item.isGood || item.isCurrency) ? item.valueGP : item.valueGP / 2
+                        const qty = (item.quantity ?? 1) * (item.isPerCharacter ? attendingCount : 1)
+                        return sum + baseVal * qty
                     }, 0)
                     const cutVal = Math.round(totalLootValue * 0.2 * 100) / 100
                     totalDeltaGp += cutVal
@@ -1086,19 +1087,20 @@ export const markAllCharacterTransactionsClaimed = mutation({
             const lootList = sess.loot || []
             const attendingCount = characters.length
             const totalLootValue = lootList.reduce((sum, item) => {
-                const baseVal = item.isGood ? item.valueGP : item.valueGP / 2
-                const itemTotal = item.isPerCharacter ? baseVal * attendingCount : baseVal
-                return sum + itemTotal
+                const baseVal = (item.isGood || item.isCurrency) ? item.valueGP : item.valueGP / 2
+                const qty = (item.quantity ?? 1) * (item.isPerCharacter ? attendingCount : 1)
+                return sum + baseVal * qty
             }, 0)
 
             const sharePerPlayer = totalLootValue / attendingCount
-            const characterClaimedItems = lootList.filter((item) =>
-                item.claimedBy === args.characterId ||
-                (item.claimedByCharacters && item.claimedByCharacters.includes(args.characterId))
-            )
-            const userClaimedValue = characterClaimedItems.reduce((sum, item) => {
+            const userClaimedValue = lootList.reduce((sum, item) => {
+                if (item.isCurrency) return sum
                 const val = item.isGood ? item.valueGP : item.valueGP / 2
-                return sum + val
+                const claimedList = item.claimedByCharacters && item.claimedByCharacters.length > 0
+                    ? item.claimedByCharacters
+                    : (item.claimedBy ? [item.claimedBy] : [])
+                const count = claimedList.filter((id) => id === args.characterId).length
+                return sum + val * count
             }, 0)
             const currentNetMoneyGP = Math.round((sharePerPlayer - userClaimedValue) * 100) / 100
 
@@ -1274,9 +1276,9 @@ export const getCharacterTransactions = query({
                 const lootList = sess.loot || []
                 const attendingCount = (sess.characters || []).length
                 const totalLootValue = lootList.reduce((sum, item) => {
-                    const baseVal = item.isGood ? item.valueGP : item.valueGP / 2
-                    const itemTotal = item.isPerCharacter ? baseVal * attendingCount : baseVal
-                    return sum + itemTotal
+                    const baseVal = (item.isGood || item.isCurrency) ? item.valueGP : item.valueGP / 2
+                    const qty = (item.quantity ?? 1) * (item.isPerCharacter ? attendingCount : 1)
+                    return sum + baseVal * qty
                 }, 0)
 
                 // 20% extra compensated loot worth
@@ -1367,9 +1369,9 @@ export const getCharacterTransactions = query({
 
                 // Total session loot value
                 const totalLootValue = lootList.reduce((sum, item) => {
-                    const baseVal = item.isGood ? item.valueGP : item.valueGP / 2
-                    const itemTotal = item.isPerCharacter ? baseVal * attendingCount : baseVal
-                    return sum + itemTotal
+                    const baseVal = (item.isGood || item.isCurrency) ? item.valueGP : item.valueGP / 2
+                    const qty = (item.quantity ?? 1) * (item.isPerCharacter ? attendingCount : 1)
+                    return sum + baseVal * qty
                 }, 0)
 
                 const sharePerPlayer = totalLootValue / attendingCount
@@ -1385,7 +1387,11 @@ export const getCharacterTransactions = query({
                 // Total GP value of items claimed by THIS character
                 const userClaimedValue = characterClaimedItems.reduce((sum, item) => {
                     const val = item.isGood ? item.valueGP : item.valueGP / 2
-                    return sum + val
+                    const claimedList = item.claimedByCharacters && item.claimedByCharacters.length > 0
+                        ? item.claimedByCharacters
+                        : (item.claimedBy ? [item.claimedBy] : [])
+                    const count = claimedList.filter((id) => id === args.characterId).length
+                    return sum + val * count
                 }, 0)
 
                 // Net GP cut (Share minus value of claimed items)

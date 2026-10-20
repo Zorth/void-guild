@@ -1,4 +1,4 @@
-import { query, mutation, QueryCtx, MutationCtx } from './_generated/server'
+import { query, mutation, internalMutation, QueryCtx, MutationCtx } from './_generated/server'
 import { v } from 'convex/values'
 import { Doc, Id } from './_generated/dataModel'
 import { internal } from './_generated/api'
@@ -2005,7 +2005,6 @@ export const importQuestRewardsToLoot = mutation({
       loot = loot.filter((item: any) => !item.fromQuest)
     }
 
-    const attendeeCount = Math.max(1, session.characters?.length || 1)
     const newItems: Array<{
       id: string
       name: string
@@ -2026,7 +2025,7 @@ export const importQuestRewardsToLoot = mutation({
         id: crypto.randomUUID(),
         name: `Quest Bounty: ${quest.name}`,
         valueGP: quest.rewardMoneyGP,
-        quantity: isPerChar ? attendeeCount : 1,
+        quantity: 1,
         isGood: true,
         isCurrency: true,
         fromQuest: true,
@@ -2042,7 +2041,7 @@ export const importQuestRewardsToLoot = mutation({
         id: crypto.randomUUID(),
         name: quest.rewardOther.trim(),
         valueGP: 0,
-        quantity: isPerChar ? attendeeCount : 1,
+        quantity: 1,
         isGood: false,
         isCurrency: false,
         fromQuest: true,
@@ -2060,7 +2059,7 @@ export const importQuestRewardsToLoot = mutation({
           id: crypto.randomUUID(),
           name: `Quest Bounty: ${quest.name}`,
           valueGP: parsedGp,
-          quantity: isPerChar ? attendeeCount : 1,
+          quantity: 1,
           isGood: true,
           isCurrency: true,
           fromQuest: true,
@@ -2072,7 +2071,7 @@ export const importQuestRewardsToLoot = mutation({
           id: crypto.randomUUID(),
           name: quest.reward.trim(),
           valueGP: 0,
-          quantity: isPerChar ? attendeeCount : 1,
+          quantity: 1,
           isGood: false,
           isCurrency: false,
           fromQuest: true,
@@ -2300,9 +2299,9 @@ export const toggleGuildmasterCutClaimed = mutation({
     const lootList = session.loot || []
     const attendingCount = (session.characters || []).length || 1
     const totalLootValue = lootList.reduce((sum, item) => {
-      const baseVal = item.isGood ? item.valueGP : item.valueGP / 2
-      const itemTotal = item.isPerCharacter ? baseVal * attendingCount : baseVal
-      return sum + itemTotal
+      const baseVal = (item.isGood || item.isCurrency) ? item.valueGP : item.valueGP / 2
+      const qty = (item.quantity ?? 1) * (item.isPerCharacter ? attendingCount : 1)
+      return sum + baseVal * qty
     }, 0)
     const cutVal = Math.round(totalLootValue * 0.2 * 100) / 100
     if (cutVal > 0) {
@@ -2444,6 +2443,82 @@ export const updateSessionState = mutation({
             await ctx.db.insert('sessionStates', { sessionId, ...state })
         }
     }
+})
+
+export const retroactivelyNormalizeLoot = internalMutation({
+    args: {},
+    handler: async (ctx) => {
+        const sessions = await ctx.db.query('sessions').take(500)
+        let updatedSessionsCount = 0
+
+        for (const s of sessions) {
+            if (!s.loot || s.loot.length === 0) continue
+
+            const n = Math.max(1, (s.characters || []).length)
+            const groups = new Map<string, typeof s.loot>()
+
+            for (const item of s.loot) {
+                const key = `${item.name}|${item.valueGP}|${Boolean(item.isGood)}|${Boolean(item.isCurrency)}|${Boolean(item.isPerCharacter)}|${item.link || ''}|${Boolean(item.fromQuest)}`
+                if (!groups.has(key)) {
+                    groups.set(key, [])
+                }
+                groups.get(key)!.push(item)
+            }
+
+            let changed = false
+            const newLoot: typeof s.loot = []
+
+            for (const list of groups.values()) {
+                const first = list[0]
+                let totalBaseQty = 0
+                const claimedChars: Array<Id<'characters'>> = []
+
+                for (const item of list) {
+                    totalBaseQty += item.quantity ?? 1
+                    if (item.claimedByCharacters && item.claimedByCharacters.length > 0) {
+                        claimedChars.push(...item.claimedByCharacters)
+                    } else if (item.claimedBy) {
+                        claimedChars.push(item.claimedBy)
+                    }
+                }
+
+                let isPerChar = Boolean(first.isPerCharacter)
+                let finalQty = totalBaseQty
+
+                if (!isPerChar && n > 1 && totalBaseQty === n) {
+                    isPerChar = true
+                    finalQty = 1
+                } else if (isPerChar && n > 1 && totalBaseQty === n && list.length === 1) {
+                    finalQty = 1
+                }
+
+                const normalized = {
+                    ...first,
+                    quantity: finalQty,
+                    isPerCharacter: isPerChar,
+                    claimedBy: claimedChars[0] || undefined,
+                    claimedByCharacters: claimedChars,
+                }
+
+                if (
+                    list.length > 1 ||
+                    first.quantity !== normalized.quantity ||
+                    Boolean(first.isPerCharacter) !== normalized.isPerCharacter ||
+                    JSON.stringify(first.claimedByCharacters || []) !== JSON.stringify(normalized.claimedByCharacters)
+                ) {
+                    changed = true
+                }
+                newLoot.push(normalized)
+            }
+
+            if (changed) {
+                await ctx.db.patch(s._id, { loot: newLoot })
+                updatedSessionsCount++
+            }
+        }
+
+        return { updatedSessionsCount }
+    },
 })
 
 export { markCharacterDiedInSession } from './characters'

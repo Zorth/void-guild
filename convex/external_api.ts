@@ -266,25 +266,24 @@ export const addSessionLoot = mutation({
         }
 
         const loot = session.loot || []
-        const quantity = args.quantity || 1
-        const newItems = []
+        const quantity = Math.max(1, Math.floor(args.quantity || 1))
         const isCurrency = args.isCurrency ?? false
         const isGood = isCurrency ? true : args.isGood
 
-        for (let i = 0; i < quantity; i++) {
-            newItems.push({
-                id: crypto.randomUUID(),
-                name: args.name,
-                link: args.link,
-                valueGP: args.valueGP,
-                isGood,
-                isCurrency,
-                fromQuest: args.fromQuest ?? false,
-                isPerCharacter: args.isPerCharacter ?? false,
-            })
+        const newItem = {
+            id: crypto.randomUUID(),
+            name: args.name,
+            link: args.link,
+            valueGP: args.valueGP,
+            quantity,
+            isGood,
+            isCurrency,
+            fromQuest: args.fromQuest ?? false,
+            isPerCharacter: args.isPerCharacter ?? false,
+            claimedByCharacters: [],
         }
 
-        await ctx.db.patch(sId, { loot: [...loot, ...newItems] })
+        await ctx.db.patch(sId, { loot: [...loot, newItem] })
         return { success: true, count: quantity }
     },
 })
@@ -1986,9 +1985,9 @@ export const getBlackVoidCharacterLog = query({
                 const lootList = sess.loot || []
                 const attendingCount = (sess.characters || []).length
                 const totalLootValue = lootList.reduce((sum, item) => {
-                    const baseVal = item.isGood ? item.valueGP : item.valueGP / 2
-                    const itemTotal = item.isPerCharacter ? baseVal * attendingCount : baseVal
-                    return sum + itemTotal
+                    const baseVal = (item.isGood || item.isCurrency) ? item.valueGP : item.valueGP / 2
+                    const qty = (item.quantity ?? 1) * (item.isPerCharacter ? attendingCount : 1)
+                    return sum + baseVal * qty
                 }, 0)
 
                 const cutVal = Math.round(totalLootValue * 0.2 * 100) / 100

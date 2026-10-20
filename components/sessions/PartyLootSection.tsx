@@ -203,6 +203,7 @@ export default function PartyLootSection({
   const handleEdit = async () => {
     if (!editingItem) return
     try {
+      const parsedQty = Math.max(1, parseInt(quantity) || 1)
       await editLoot({
         sessionId: session._id,
         lootId: editingItem.id,
@@ -211,6 +212,7 @@ export default function PartyLootSection({
         valueGP: parseFloat(valueGP) || 0,
         isGood,
         isPerCharacter,
+        quantity: parsedQty,
       })
       setEditingItem(null)
       resetForm()
@@ -715,20 +717,26 @@ export default function PartyLootSection({
       ) : (
         <div className="grid gap-2.5">
           {loot.map((item) => {
-            const claimedCharacter = session.attendingCharacters.find(
-              (c) => c._id === item.claimedBy
-            )
-            const isClaimedByMe = Boolean(item.claimedBy && userCharacterIds.has(item.claimedBy))
-            const resaleValue = item.isGood ? item.valueGP : item.valueGP / 2
-            const totalItemValue = item.isPerCharacter
-              ? resaleValue * (session.attendingCharacters.length || 1) * (item.quantity ?? 1)
-              : resaleValue * (item.quantity ?? 1)
+            const isGoodOrCurrency = item.isGood || item.isCurrency
+            const itemQty = Math.max(1, (item.quantity ?? 1) * (item.isPerCharacter ? session.attendingCharacters.length : 1))
+            const resaleValue = isGoodOrCurrency ? item.valueGP : item.valueGP / 2
+            const totalItemValue = resaleValue * itemQty
+
+            const claimedList = item.claimedByCharacters && item.claimedByCharacters.length > 0
+              ? item.claimedByCharacters
+              : (item.claimedBy ? [item.claimedBy] : [])
+            const remainingSlots = Math.max(0, itemQty - claimedList.length)
 
             return (
               <Card key={item.id} className="bg-card/40 overflow-hidden border-border/40">
                 <div className="p-3 flex items-center justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
+                      {itemQty > 1 && (
+                        <span className="font-mono text-[10px] font-black bg-primary/15 text-primary border border-primary/30 px-1.5 py-0.2 rounded shrink-0">
+                          {itemQty}x
+                        </span>
+                      )}
                       <h4 className="font-bold text-sm truncate">
                         {item.link ? (
                           <a
@@ -749,7 +757,7 @@ export default function PartyLootSection({
                           Per Character
                         </span>
                       )}
-                      {item.isGood ? (
+                      {isGoodOrCurrency ? (
                         <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded uppercase font-bold">
                           Good (Full Resale)
                         </span>
@@ -760,112 +768,59 @@ export default function PartyLootSection({
                       )}
                     </div>
                     <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
-                      {item.isPerCharacter ? (
-                        <>
-                          <span>Value: {formatGP(item.valueGP)} / player</span>
-                          <span className="opacity-50">|</span>
-                          <span>Total: {formatGP(totalItemValue)}</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>Value: {formatGP(item.valueGP)}</span>
-                          <span className="opacity-50">|</span>
-                          <span>Resale: {formatGP(resaleValue)}</span>
-                        </>
-                      )}
+                      <span>
+                        worth {itemQty > 1 ? `${formatGP(item.valueGP * itemQty)} (${formatGP(item.valueGP)} each)` : formatGP(item.valueGP)}
+                      </span>
+                      <span className="opacity-50">|</span>
+                      <span>Pool Value: {formatGP(totalItemValue)}</span>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                    {item.isPerCharacter ? (
-                      <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                        {/* If user's character has claimed this per-character item */}
-                        {userCharacterInSession && item.claimedByCharacters?.includes(userCharacterInSession._id) ? (
-                          <div className="flex items-center gap-1.5 bg-primary/10 text-primary px-2 py-1 rounded-md border border-primary/20">
-                            <User className="h-3 w-3 text-primary" />
-                            <span className="text-[10px] font-bold">You Claimed</span>
-                            <button
-                              onClick={() => handleUnclaim(item.id, userCharacterInSession._id)}
-                              className="hover:text-destructive transition-colors ml-0.5"
-                              title="Unclaim for yourself"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </div>
-                        ) : userCharacterInSession ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-[10px] font-bold px-2 gap-1 border-primary/30 text-primary hover:bg-primary/10"
-                            onClick={() => handleClaim(item.id, userCharacterInSession._id)}
+                    <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                      {claimedList.map((cId, idx) => {
+                        const isMyChar = Boolean(userCharacterInSession && cId === userCharacterInSession._id)
+                        const charName = session.attendingCharacters.find((c) => c._id === cId)?.name || 'Claimed'
+                        return (
+                          <div
+                            key={`${cId}-${idx}`}
+                            className={cn(
+                              'flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border',
+                              isMyChar
+                                ? 'bg-primary/15 text-primary border-primary/30'
+                                : 'bg-muted/50 text-muted-foreground border-border/40'
+                            )}
                           >
-                            Claim
-                          </Button>
-                        ) : null}
+                            <User className={cn('h-2.5 w-2.5 shrink-0', isMyChar ? 'text-primary' : 'text-muted-foreground')} />
+                            <span className="truncate max-w-[100px]">{isMyChar ? `${charName} (You)` : charName}</span>
+                            {(isMyChar || session.canManage) && (
+                              <button
+                                onClick={() => handleUnclaim(item.id, cId)}
+                                className="hover:text-destructive transition-colors ml-0.5"
+                                title={`Unclaim for ${charName}`}
+                              >
+                                <X className="h-2.5 w-2.5" />
+                              </button>
+                            )}
+                          </div>
+                        )
+                      })}
 
-                        {/* If other characters claimed it, display small indicator / tags */}
-                        {(item.claimedByCharacters?.length || 0) > 0 && (
-                          <div className="flex items-center gap-1 flex-wrap">
-                            {item.claimedByCharacters?.map((cId) => {
-                              if (userCharacterInSession && cId === userCharacterInSession._id) return null
-                              const otherChar = session.attendingCharacters.find((c) => c._id === cId)
-                              return (
-                                <div
-                                  key={cId}
-                                  className="flex items-center gap-1 bg-muted/50 px-1.5 py-0.5 rounded text-[10px] text-muted-foreground border border-border/40"
-                                >
-                                  <span>{otherChar?.name || 'Claimed'}</span>
-                                  {session.canManage && (
-                                    <button
-                                      onClick={() => handleUnclaim(item.id, cId)}
-                                      className="hover:text-destructive transition-colors ml-0.5"
-                                      title={`Unclaim for ${otherChar?.name || 'character'}`}
-                                    >
-                                      <X className="h-2.5 w-2.5" />
-                                    </button>
-                                  )}
-                                </div>
-                              )
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    ) : item.claimedBy ? (
-                      <div className="flex items-center gap-1.5 bg-muted/50 px-2 py-1 rounded-md border border-border/40">
-                        <User
-                          className={cn(
-                            'h-3 w-3',
-                            isClaimedByMe ? 'text-primary' : 'text-muted-foreground'
-                          )}
-                        />
-                        <span
-                          className={cn(
-                            'text-[10px] font-bold truncate max-w-[80px]',
-                            isClaimedByMe ? 'text-primary' : 'text-muted-foreground'
-                          )}
+                      {remainingSlots > 0 && userCharacterInSession ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-[10px] font-bold px-2 gap-1 border-primary/30 text-primary hover:bg-primary/10"
+                          onClick={() => handleClaim(item.id, userCharacterInSession._id)}
                         >
-                          {isClaimedByMe ? 'You' : claimedCharacter?.name || 'Claimed'}
+                          Claim {remainingSlots > 1 ? `(${remainingSlots})` : ''}
+                        </Button>
+                      ) : remainingSlots === 0 ? (
+                        <span className="text-[10px] text-muted-foreground font-medium">
+                          All Claimed ✓
                         </span>
-                        {(isClaimedByMe || session.canManage) && (
-                          <button
-                            onClick={() => handleUnclaim(item.id)}
-                            className="hover:text-destructive transition-colors ml-0.5"
-                            title="Unclaim"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        )}
-                      </div>
-                    ) : !item.isGood && userCharacterInSession ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-[10px] font-bold px-2 gap-1"
-                        onClick={() => handleClaim(item.id, userCharacterInSession._id)}
-                      >
-                        Claim
-                      </Button>
-                    ) : null}
+                      ) : null}
+                    </div>
 
                     {session.canManage && (
                       <div className="flex items-center gap-1 border-l pl-2 border-border/40">
@@ -878,7 +833,8 @@ export default function PartyLootSection({
                             setName(item.name)
                             setLink(item.link || '')
                             setValueGP(item.valueGP.toString())
-                            setIsGood(item.isGood)
+                            setQuantity((item.quantity || 1).toString())
+                            setIsGood(Boolean(item.isGood || item.isCurrency))
                             setIsPerCharacter(Boolean(item.isPerCharacter))
                           }}
                         >
@@ -918,15 +874,27 @@ export default function PartyLootSection({
                 <label className="font-medium">Link</label>
                 <Input value={link} onChange={(e) => setLink(e.target.value)} className="h-8" />
               </div>
-              <div className="space-y-1">
-                <label className="font-medium">Value in GP</label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={valueGP}
-                  onChange={(e) => setValueGP(e.target.value)}
-                  className="h-8 font-mono"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-medium">Value in GP</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={valueGP}
+                    onChange={(e) => setValueGP(e.target.value)}
+                    className="h-8 font-mono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="font-medium">Quantity</label>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                    className="h-8 font-mono"
+                  />
+                </div>
               </div>
               <div className="flex flex-col gap-2 pt-2">
                 <div className="flex items-center gap-2">
