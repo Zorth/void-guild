@@ -249,28 +249,26 @@ export default function AttendingCharactersList({
         const hasGivenGmComm = !!myGmComm
         const cosmeticsStyles = resolveCosmeticsStyles(char.cosmetics)
         
-        const actionButtons = (
-          <>
-            {char.isDead ? (
-              <span className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30 shrink-0">
-                <Skull className="h-3 w-3" />
-                <span>{char.diedAtSessionId === sessionId ? 'Died Here' : 'Deceased'}</span>
-              </span>
-            ) : canMarkDied ? (
+        const showMarkDied = Boolean(canMarkDied && !char.isDead)
+        const hasActionButtons = Boolean(showMarkDied || sessionId || (sessionId && isUserCharacter) || canCommend)
+
+        const actionButtons = hasActionButtons ? (
+          <div className="inline-flex items-center rounded-full border border-border/50 bg-background/50 backdrop-blur-sm divide-x divide-border/40 overflow-hidden shadow-xs shrink-0">
+            {showMarkDied && (
               <button
                 type="button"
-                className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full border border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 hover:text-rose-300 transition-all shrink-0 focus:outline-none"
+                className="inline-flex items-center gap-1 text-[9px] font-bold px-2.5 py-1 bg-rose-500/10 text-rose-400 hover:bg-rose-500/25 hover:text-rose-300 transition-colors shrink-0 focus:outline-none cursor-pointer"
                 onClick={() => setCharacterToMarkDead(char)}
                 title={`Mark ${char.name} as died in this session`}
               >
                 <Skull className="h-3 w-3" />
                 <span>Mark Died</span>
               </button>
-            ) : null}
+            )}
             {sessionId && (
               <button
                 type="button"
-                className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full border border-border/40 bg-muted/30 text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-all shrink-0 focus:outline-none"
+                className="inline-flex items-center gap-1 text-[9px] font-bold px-2.5 py-1 bg-muted/20 text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors shrink-0 focus:outline-none cursor-pointer"
                 onClick={() => handleOpenQuoteDialog(char)}
                 title={`Log a quote by ${char.name}`}
               >
@@ -290,10 +288,10 @@ export default function AttendingCharactersList({
                   <button
                     type="button"
                     className={cn(
-                      "inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full border transition-all shrink-0 focus:outline-none",
+                      "inline-flex items-center gap-1 text-[9px] font-bold px-2.5 py-1 transition-colors shrink-0 focus:outline-none cursor-pointer",
                       (sessionCommendations?.countsByCharacter[char._id]?.total ?? 0) > 0
-                        ? "bg-purple-500/20 text-purple-600 dark:text-purple-300 border-purple-500/40 hover:bg-purple-500/30 shadow-sm"
-                        : "bg-muted/30 text-muted-foreground border-border/40 hover:bg-muted/60"
+                        ? "bg-purple-500/20 text-purple-600 dark:text-purple-300 hover:bg-purple-500/30"
+                        : "bg-muted/20 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                     )}
                     title="View commendations received this session"
                   >
@@ -350,10 +348,10 @@ export default function AttendingCharactersList({
                   <button
                     type="button"
                     className={cn(
-                      "inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full border transition-all shrink-0 focus:outline-none",
+                      "inline-flex items-center gap-1 text-[9px] font-bold px-2.5 py-1 transition-colors shrink-0 focus:outline-none cursor-pointer",
                       isAnyCommendedByMe
-                        ? "bg-purple-500/20 text-purple-600 dark:text-purple-300 border-purple-500/40 hover:bg-purple-500/30 shadow-sm"
-                        : "bg-muted/30 text-muted-foreground border-border/40 hover:bg-muted/60"
+                        ? "bg-purple-500/20 text-purple-600 dark:text-purple-300 hover:bg-purple-500/30"
+                        : "bg-muted/20 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                     )}
                     title="Commend this character"
                   >
@@ -539,8 +537,8 @@ export default function AttendingCharactersList({
                 </PopoverContent>
               </Popover>
             )}
-          </>
-        )
+          </div>
+        ) : null
 
         const isWorldBg = Boolean(char.cosmetics?.bgColor?.startsWith('world_bg_'))
         const isWorldBorder = Boolean(char.cosmetics?.borderShape?.startsWith('world_border_'))
@@ -635,7 +633,7 @@ export default function AttendingCharactersList({
                         {isUserCharacter && <span className="text-[10px] bg-purple-200 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded-full uppercase tracking-wider font-bold shrink-0">You</span>}
                         {char.isDead && (
                           <span className="text-[10px] bg-rose-500/20 text-rose-400 border border-rose-500/30 px-1.5 py-0.5 rounded-full uppercase tracking-wider font-bold shrink-0 flex items-center gap-1">
-                            <Skull className="h-3 w-3" /> Deceased
+                            <Skull className="h-3 w-3" /> {char.diedAtSessionId === sessionId ? 'Died Here' : 'Deceased'}
                           </span>
                         )}
                         {/* Book Icon */}
@@ -870,8 +868,8 @@ export default function AttendingCharactersList({
               </div>
             </div>
 
-            {/* Mobile second row: Action buttons (Quote & Commend) */}
-            {(sessionId || canCommend) && (
+            {/* Mobile second row: Action buttons (Death, Quote & Commend) */}
+            {hasActionButtons && (
               <div className="flex sm:hidden items-center gap-2 pt-2 border-t border-border/20 w-full relative z-10">
                 {actionButtons}
               </div>

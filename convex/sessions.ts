@@ -90,6 +90,49 @@ export function computeEffectiveLevel(session: Doc<'sessions'>, quest: Doc<'ques
   return numericSessionLevel
 }
 
+async function getCharacterOpenSessionConflict(
+  ctx: QueryCtx | MutationCtx,
+  characterId: Id<'characters'>,
+  excludeSessionId?: Id<'sessions'>
+): Promise<{ session: Doc<'sessions'>; worldName: string } | null> {
+  const openSessions = await ctx.db
+    .query('sessions')
+    .withIndex('by_locked', (q) => q.eq('locked', false))
+    .take(500)
+
+  const conflictingSession = openSessions.find(
+    (s) => s._id !== excludeSessionId && (s.characters || []).includes(characterId)
+  )
+
+  if (!conflictingSession) return null
+
+  const world = conflictingSession.world ? await ctx.db.get(conflictingSession.world) : null
+  return {
+    session: conflictingSession,
+    worldName: world?.name || 'Unknown World',
+  }
+}
+
+async function assertCharacterNotInAnotherOpenSession(
+  ctx: QueryCtx | MutationCtx,
+  character: Doc<'characters'>,
+  currentSessionId: Id<'sessions'>
+) {
+  const conflict = await getCharacterOpenSessionConflict(ctx, character._id, currentSessionId)
+  if (conflict) {
+    const dateStr = conflict.session.date
+      ? ` on ${new Date(conflict.session.date).toLocaleDateString('en-GB', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        })}`
+      : ''
+    throw new Error(
+      `${character.name} is already signed up for another open session (${conflict.worldName}${dateStr}). A character cannot sign up for another session until their current session closes.`
+    )
+  }
+}
+
 export const listSessions = query({
   args: { past: v.boolean() },
   handler: async (ctx, args) => {
@@ -570,6 +613,42 @@ export const getSession = query({
       isMember: userMap.get(c.userId) ?? false,
     }))
 
+    const busyCharacterSessions: Record<
+      Id<'characters'>,
+      { sessionId: Id<'sessions'>; worldName: string; date?: number }
+    > = {}
+    if (!session.locked) {
+      const otherOpenSessions = await ctx.db
+        .query('sessions')
+        .withIndex('by_locked', (q) => q.eq('locked', false))
+        .take(500)
+      const relevantOpenSessions = otherOpenSessions.filter(
+        (s) => s._id !== session._id && (s.characters || []).length > 0
+      )
+      if (relevantOpenSessions.length > 0) {
+        const openWorldIds = Array.from(
+          new Set(relevantOpenSessions.map((s) => s.world).filter((w): w is Id<'worlds'> => Boolean(w)))
+        )
+        const openWorldDocs = await Promise.all(openWorldIds.map((id) => ctx.db.get(id)))
+        const openWorldMap = new Map<string, string>()
+        openWorldDocs.forEach((w) => {
+          if (w) openWorldMap.set(w._id, w.name)
+        })
+        for (const s of relevantOpenSessions) {
+          const wName = openWorldMap.get(s.world) || 'Unknown World'
+          for (const cId of s.characters || []) {
+            if (!busyCharacterSessions[cId]) {
+              busyCharacterSessions[cId] = {
+                sessionId: s._id,
+                worldName: wName,
+                date: s.date,
+              }
+            }
+          }
+        }
+      }
+    }
+
     return {
       ...session,
       level: computeEffectiveLevel(session, quest),
@@ -584,6 +663,7 @@ export const getSession = query({
       interestedPlayers: session.interestedPlayers || [], // Include interested players
       quest: quest,
       hasMap,
+      busyCharacterSessions,
     }
   },
 })
@@ -1053,6 +1133,8 @@ export const joinSession = mutation({
       return
     }
 
+    await assertCharacterNotInAnotherOpenSession(ctx, character, args.sessionId)
+
     // Check if the user already has a character in this session
     const userCharactersInSession = await Promise.all(
         session.characters.map(charId => ctx.db.get(charId))
@@ -1111,6 +1193,10 @@ export const swapSessionCharacter = mutation({
       throw new Error('Character not found or you do not own it.')
     }
 
+    if (newCharacter.isDead) {
+      throw new Error('This character has died and cannot join sessions.')
+    }
+
     if (newCharacter.system !== session.system) {
       throw new Error(`This is a ${session.system} session, but your new character is ${newCharacter.system}.`)
     }
@@ -1129,6 +1215,8 @@ export const swapSessionCharacter = mutation({
     if (session.characters.includes(args.newCharacterId)) {
       throw new Error('New character is already in this session.')
     }
+
+    await assertCharacterNotInAnotherOpenSession(ctx, newCharacter, args.sessionId)
 
     // Replace oldCharacterId with newCharacterId preserving position
     const updatedCharacters = session.characters.map((id) =>
@@ -1225,6 +1313,10 @@ export const joinIntroSession = mutation({
         throw new Error('Character not found or you do not own it')
       }
 
+      if (character.isDead) {
+        throw new Error('This character has died and cannot join sessions.')
+      }
+
       if (character.system !== session.system) {
         throw new Error(`This is a ${session.system} session, but your character is ${character.system}.`)
       }
@@ -1236,6 +1328,8 @@ export const joinIntroSession = mutation({
           `Level difference too high. This is a Level ${effectiveLevel} intro session, so only characters between Level ${Math.max(1, effectiveLevel - 4)} and Level ${effectiveLevel + 4} can join (your character is Level ${character.lvl}).`
         )
       }
+
+      await assertCharacterNotInAnotherOpenSession(ctx, character, args.sessionId)
     } else {
       // Find or generate a unique placeholder character name for the user
       const dbUser = await ctx.db
@@ -1336,6 +1430,8 @@ export const adminAddCharacterToSession = mutation({
       if (character.system !== session.system) {
           throw new Error(`This is a ${session.system} session, but this character is ${character.system}.`)
       }
+
+      await assertCharacterNotInAnotherOpenSession(ctx, character, args.sessionId)
   
       await ctx.db.patch(args.sessionId, {
         characters: [...session.characters, args.characterId],
@@ -1408,6 +1504,8 @@ export const inviteCharacterToSession = mutation({
       throw new Error(`This is a ${session.system} session, but this character is ${character.system}.`)
     }
 
+    await assertCharacterNotInAnotherOpenSession(ctx, character, args.sessionId)
+
     // Check if that player already has another character in this session
     const sessionChars = await Promise.all(
       session.characters.map((id) => ctx.db.get(id))
@@ -1470,8 +1568,23 @@ export const getAvailableCharactersToInvite = query({
       .collect()
     const sessionCharSet = new Set(session.characters)
 
-    // Filter characters not already in this session and not dead
-    const matching = matchingChars.filter((c) => !c.isDead && !sessionCharSet.has(c._id))
+    const otherOpenSessions = await ctx.db
+      .query('sessions')
+      .withIndex('by_locked', (q) => q.eq('locked', false))
+      .take(500)
+    const busyCharSet = new Set<Id<'characters'>>()
+    for (const s of otherOpenSessions) {
+      if (s._id !== args.sessionId) {
+        for (const cId of s.characters || []) {
+          busyCharSet.add(cId)
+        }
+      }
+    }
+
+    // Filter characters not already in this session, not signed up in another open session, and not dead
+    const matching = matchingChars.filter(
+      (c) => !c.isDead && !sessionCharSet.has(c._id) && !busyCharSet.has(c._id)
+    )
 
     // Resolve owner usernames/names for easier identification
     const userIds = Array.from(new Set(matching.map((c) => c.userId)))

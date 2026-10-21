@@ -15,6 +15,18 @@ import {
 import { Doc, Id } from '@/convex/_generated/dataModel'
 import { Loader2, LogOut, UserCheck, Lock, Sprout, Sparkles, ExternalLink, RefreshCw } from 'lucide-react'
 
+interface BusyCharacterInfo {
+  character: Doc<'characters'>
+  sessionId: Id<'sessions'>
+  worldName: string
+  date?: number
+}
+
+interface OutOfLevelCharacterInfo {
+  character: Doc<'characters'>
+  reason: 'high' | 'low'
+}
+
 interface SessionJoinFormProps {
   sessionLocked: boolean
   sessionPlanning?: boolean
@@ -25,6 +37,8 @@ interface SessionJoinFormProps {
   hasCharactersOutOfLevelRange?: boolean
   isFull: boolean
   availableCharacters: Doc<'characters'>[]
+  busyCharacters?: BusyCharacterInfo[]
+  outOfLevelCharacters?: OutOfLevelCharacterInfo[]
   userCharactersCount: number
   matchingSystemCharactersCount?: number
   selectedCharacterId: Id<'characters'> | ''
@@ -50,6 +64,8 @@ export default function SessionJoinForm({
   hasCharactersOutOfLevelRange,
   isFull,
   availableCharacters,
+  busyCharacters = [],
+  outOfLevelCharacters = [],
   userCharactersCount,
   matchingSystemCharactersCount,
   selectedCharacterId,
@@ -223,7 +239,7 @@ export default function SessionJoinForm({
               </button>
             </div>
           </div>
-        ) : availableCharacters.length === 0 ? (
+        ) : availableCharacters.length === 0 && busyCharacters.length === 0 && outOfLevelCharacters.length === 0 ? (
           <div className="text-sm text-muted-foreground italic text-center p-4 bg-muted/10 rounded-md flex flex-col items-center gap-2">
             {sessionIsIntro ? (
               <div className="space-y-3 not-italic text-center w-full">
@@ -266,15 +282,6 @@ export default function SessionJoinForm({
                   Create one on the home page →
                 </a>
               </>
-            ) : hasCharactersOutOfLevelRange && typeof sessionLevel === 'number' && sessionLevel > 0 ? (
-              <>
-                <p>
-                  None of your {sessionSystem === 'PF' ? 'Pathfinder' : sessionSystem === 'DnD' ? 'D&D 5e' : ''} characters are within the eligible level range for this Level {sessionLevel} session (Levels {Math.max(1, sessionLevel - 4)} &ndash; {sessionLevel + 4}).
-                </p>
-                <a href="/" className="text-primary hover:underline font-semibold not-italic">
-                  Create one on the home page →
-                </a>
-              </>
             ) : (
               <p>All your {sessionSystem === 'PF' ? 'Pathfinder' : sessionSystem === 'DnD' ? 'D&D 5e' : ''} characters are already in this session.</p>
             )}
@@ -308,8 +315,60 @@ export default function SessionJoinForm({
                     {char.name} (Lvl {char.lvl})
                   </option>
                 ))}
+                {busyCharacters.map(({ character: char, worldName }) => (
+                  <option key={char._id} value={char._id} disabled>
+                    {char.name} (Lvl {char.lvl}) — Signed up in {worldName}
+                  </option>
+                ))}
+                {outOfLevelCharacters.map(({ character: char, reason }) => (
+                  <option key={char._id} value={char._id} disabled>
+                    {char.name} (Lvl {char.lvl}) -- level too {reason}
+                  </option>
+                ))}
               </select>
             </div>
+            {availableCharacters.length === 0 && (
+              <div className="text-xs text-muted-foreground p-3 bg-muted/10 rounded-md border border-border/40 space-y-2">
+                {busyCharacters.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-amber-400 font-medium text-center">
+                      Your eligible character{busyCharacters.length > 1 ? 's are' : ' is'} already signed up for another open session:
+                    </p>
+                    {busyCharacters.map(({ character: c, sessionId: busySessionId, worldName, date }) => (
+                      <div
+                        key={c._id}
+                        className="bg-amber-500/10 border border-amber-500/20 rounded-md p-2 flex items-center justify-between gap-2"
+                      >
+                        <span className="font-semibold text-foreground truncate">{c.name} (Lvl {c.lvl})</span>
+                        <a
+                          href={`/sessions/${busySessionId}`}
+                          className="text-amber-400 hover:underline font-medium shrink-0"
+                        >
+                          {worldName}
+                          {date
+                            ? ` (${new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })})`
+                            : ''}{' '}
+                          →
+                        </a>
+                      </div>
+                    ))}
+                    <p className="text-[11px] text-muted-foreground text-center pt-0.5">
+                      A character cannot sign up for another session until their current session closes.
+                    </p>
+                  </div>
+                )}
+                {outOfLevelCharacters.length > 0 && typeof sessionLevel === 'number' && sessionLevel > 0 && (
+                  <p className="text-center italic">
+                    Only characters between Level {Math.max(1, sessionLevel - 4)} and Level {sessionLevel + 4} can join this Level {sessionLevel} session.
+                  </p>
+                )}
+                <div className="text-center pt-0.5">
+                  <a href="/" className="text-primary hover:underline font-semibold">
+                    Create another character on the home page →
+                  </a>
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <Button
                 className="w-full"
@@ -347,7 +406,7 @@ export default function SessionJoinForm({
           </DialogDescription>
         </DialogHeader>
 
-        {availableCharacters.length > 0 ? (
+        {availableCharacters.length > 0 || busyCharacters.length > 0 || outOfLevelCharacters.length > 0 ? (
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               <label className="text-sm font-medium">Select New Character</label>
@@ -357,9 +416,22 @@ export default function SessionJoinForm({
                 onChange={(e) => setTargetCharacterId(e.target.value as Id<'characters'> | '')}
                 disabled={isSwapping}
               >
+                {availableCharacters.length === 0 && (
+                  <option value="">-- No eligible character available --</option>
+                )}
                 {availableCharacters.map((c) => (
                   <option key={c._id} value={c._id}>
                     {c.name} (Lvl {c.lvl}{c.class ? ` ${c.class}` : ''})
+                  </option>
+                ))}
+                {busyCharacters.map(({ character: c, worldName }) => (
+                  <option key={c._id} value={c._id} disabled>
+                    {c.name} (Lvl {c.lvl}{c.class ? ` ${c.class}` : ''}) — Signed up in {worldName}
+                  </option>
+                ))}
+                {outOfLevelCharacters.map(({ character: c, reason }) => (
+                  <option key={c._id} value={c._id} disabled>
+                    {c.name} (Lvl {c.lvl}{c.class ? ` ${c.class}` : ''}) -- level too {reason}
                   </option>
                 ))}
               </select>

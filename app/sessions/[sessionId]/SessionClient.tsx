@@ -62,6 +62,10 @@ interface SessionWithGM extends Doc<'sessions'> {
     interestedPlayers?: { userId: string; username: string }[];
     quest?: Doc<'quests'> | null;
     hasMap?: boolean;
+    busyCharacterSessions?: Record<
+      Id<'characters'>,
+      { sessionId: Id<'sessions'>; worldName: string; date?: number }
+    >;
 }
 
 export default function SessionClient() {
@@ -481,7 +485,9 @@ export default function SessionClient() {
     }
   }
 
-  const availableCharacters = (userCharacters ?? []).filter(char => {
+  const busyCharacterSessions = session.busyCharacterSessions ?? {}
+
+  const eligibleSystemAndLevelCharacters = (userCharacters ?? []).filter(char => {
     if (char.isDead || session.characters.includes(char._id) || char.system !== session.system) {
       return false
     }
@@ -490,15 +496,39 @@ export default function SessionClient() {
     }
     return true
   })
-  const hasCharactersOutOfLevelRange = (userCharacters ?? []).some(
-    c => !c.isDead && c.system === session.system &&
-      !session.characters.includes(c._id) &&
-      typeof session.level === 'number' &&
-      session.level > 0 &&
-      Math.abs(c.lvl - session.level) >= 5
+
+  const availableCharacters = eligibleSystemAndLevelCharacters.filter(
+    char => !busyCharacterSessions[char._id]
   )
+
+  const busyCharacters = eligibleSystemAndLevelCharacters
+    .filter(char => Boolean(busyCharacterSessions[char._id]))
+    .map(char => ({
+      character: char,
+      ...busyCharacterSessions[char._id],
+    }))
+
+  const outOfLevelCharacters = (userCharacters ?? [])
+    .filter(char => {
+      if (char.isDead || session.characters.includes(char._id) || char.system !== session.system) {
+        return false
+      }
+      if (typeof session.level === 'number' && session.level > 0) {
+        return Math.abs(char.lvl - session.level) >= 5
+      }
+      return false
+    })
+    .map(char => ({
+      character: char,
+      reason: char.lvl > (session.level as number) ? ('high' as const) : ('low' as const),
+    }))
+
+  const hasCharactersOutOfLevelRange = outOfLevelCharacters.length > 0
   const adminAvailableCharacters = allCharacters?.filter(char => 
-    !char.isDead && !session.characters.includes(char._id) && char.system === session.system
+    !char.isDead &&
+    !session.characters.includes(char._id) &&
+    char.system === session.system &&
+    !busyCharacterSessions[char._id]
   ) ?? []
   const isFull = session.characters.length >= session.maxPlayers
 
@@ -613,6 +643,8 @@ export default function SessionClient() {
               hasCharactersOutOfLevelRange={hasCharactersOutOfLevelRange}
               isFull={isFull}
               availableCharacters={availableCharacters}
+              busyCharacters={busyCharacters}
+              outOfLevelCharacters={outOfLevelCharacters}
               userCharactersCount={userCharacters?.length ?? 0}
               matchingSystemCharactersCount={(userCharacters ?? []).filter(c => c.system === session.system).length}
               selectedCharacterId={selectedCharacterId}
@@ -1200,9 +1232,11 @@ export default function SessionClient() {
                                       <option value="">-- Choose a character ({filteredInviteCharacters.length} available) --</option>
                                       {filteredInviteCharacters.map((char) => {
                                         const rankStr = char.rank && char.rank !== 'none' ? ` [${char.rank.toUpperCase()}]` : '';
+                                        const isLevelTooLow = !session.isPrivate && typeof session.level === 'number' && session.level > 0 && char.lvl < session.level - 4;
+                                        const isLevelTooHigh = !session.isPrivate && typeof session.level === 'number' && session.level > 0 && char.lvl > session.level + 4;
                                         return (
-                                          <option key={char._id} value={char._id}>
-                                            {char.name} (Lvl {char.lvl} {char.class || 'Unknown'}{rankStr}) - {char.ownerName}
+                                          <option key={char._id} value={char._id} disabled={isLevelTooLow || isLevelTooHigh}>
+                                            {char.name} (Lvl {char.lvl} {char.class || 'Unknown'}{rankStr}) - {char.ownerName}{isLevelTooLow ? ' -- level too low' : isLevelTooHigh ? ' -- level too high' : ''}
                                           </option>
                                         );
                                       })}
