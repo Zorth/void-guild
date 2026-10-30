@@ -1807,17 +1807,58 @@ export const lockSession = mutation({
       await ctx.db.patch(args.sessionId, { locked: true, xpGains })
 
       if (session.questId) {
-        await ctx.db.patch(session.questId, {
-          isCompleted: true,
-          completedSessionId: session._id,
-          completedAt: Date.now(),
-        })
-        await deletePinsForQuest(ctx, session.questId)
-        await syncActiveSessionsForQuestChange(ctx, session.world as Id<'worlds'> | undefined, {
-          affectedQuestId: session.questId,
-          isRemovedOrCompleted: true,
-          excludeSessionId: session._id,
-        })
+        const questDoc = await ctx.db.get(session.questId)
+        if (questDoc?.isDungeon) {
+          const totalLevels = questDoc.totalDungeonLevels || 1
+          const prevLevel = questDoc.currentDungeonLevel || 1
+          const completedHistory = questDoc.completedSessionIds || []
+          const updatedHistory = completedHistory.includes(session._id) ? completedHistory : [...completedHistory, session._id]
+          const isFinalLevel = prevLevel >= totalLevels
+
+          if (isFinalLevel) {
+            await ctx.db.patch(session.questId, {
+              isCompleted: true,
+              completedSessionId: session._id,
+              completedSessionIds: updatedHistory,
+              completedAt: Date.now(),
+            })
+            await deletePinsForQuest(ctx, session.questId)
+            await syncActiveSessionsForQuestChange(ctx, session.world as Id<'worlds'> | undefined, {
+              affectedQuestId: session.questId,
+              isRemovedOrCompleted: true,
+              excludeSessionId: session._id,
+            })
+          } else {
+            const nextLvl = prevLevel + 1
+            const nextPF = questDoc.levelPF !== undefined ? questDoc.levelPF + 1 : undefined
+            const nextDnD = questDoc.levelDnD !== undefined ? questDoc.levelDnD + 1 : undefined
+            const nextLevelLegacy = questDoc.level !== undefined ? questDoc.level + 1 : (nextPF ?? nextDnD)
+            await ctx.db.patch(session.questId, {
+              currentDungeonLevel: nextLvl,
+              levelPF: nextPF,
+              levelDnD: nextDnD,
+              level: nextLevelLegacy,
+              completedSessionIds: updatedHistory,
+            })
+            await syncActiveSessionsForQuestChange(ctx, session.world as Id<'worlds'> | undefined, {
+              affectedQuestId: session.questId,
+              isRemovedOrCompleted: false,
+              excludeSessionId: session._id,
+            })
+          }
+        } else {
+          await ctx.db.patch(session.questId, {
+            isCompleted: true,
+            completedSessionId: session._id,
+            completedAt: Date.now(),
+          })
+          await deletePinsForQuest(ctx, session.questId)
+          await syncActiveSessionsForQuestChange(ctx, session.world as Id<'worlds'> | undefined, {
+            affectedQuestId: session.questId,
+            isRemovedOrCompleted: true,
+            excludeSessionId: session._id,
+          })
+        }
       }
 
       // Apply pending void contribution if any directly within mutation transaction
@@ -1876,11 +1917,35 @@ export const unlockSession = mutation({
       }
   
       if (session.questId) {
-        await ctx.db.patch(session.questId, {
-          isCompleted: false,
-          completedSessionId: undefined,
-          completedAt: undefined,
-        })
+        const questDoc = await ctx.db.get(session.questId)
+        if (questDoc?.isDungeon) {
+          const completedHistory = (questDoc.completedSessionIds || []).filter((id) => id !== session._id)
+          const currentLvl = questDoc.currentDungeonLevel || 1
+          const wasCompleted = questDoc.isCompleted
+          // If it was completed by this session, it was at totalDungeonLevels
+          // If it wasn't marked completed yet, it had incremented past this session, so decrement 1 level
+          const newLevel = wasCompleted ? currentLvl : Math.max(1, currentLvl - 1)
+          const decPF = questDoc.levelPF !== undefined ? (wasCompleted ? questDoc.levelPF : Math.max(1, questDoc.levelPF - 1)) : undefined
+          const decDnD = questDoc.levelDnD !== undefined ? (wasCompleted ? questDoc.levelDnD : Math.max(1, questDoc.levelDnD - 1)) : undefined
+          const decLegacy = questDoc.level !== undefined ? (wasCompleted ? questDoc.level : Math.max(1, questDoc.level - 1)) : (decPF ?? decDnD)
+
+          await ctx.db.patch(session.questId, {
+            isCompleted: false,
+            completedSessionId: undefined,
+            completedAt: undefined,
+            completedSessionIds: completedHistory,
+            currentDungeonLevel: newLevel,
+            levelPF: decPF,
+            levelDnD: decDnD,
+            level: decLegacy,
+          })
+        } else {
+          await ctx.db.patch(session.questId, {
+            isCompleted: false,
+            completedSessionId: undefined,
+            completedAt: undefined,
+          })
+        }
         await syncActiveSessionsForQuestChange(ctx, session.world as Id<'worlds'> | undefined, {
           affectedQuestId: session.questId,
         })
@@ -1908,17 +1973,58 @@ export const forceLockSession = mutation({
       await ctx.db.patch(args.sessionId, { locked: true, xpGains: [] })
 
       if (session.questId) {
-        await ctx.db.patch(session.questId, {
-          isCompleted: true,
-          completedSessionId: session._id,
-          completedAt: Date.now(),
-        })
-        await deletePinsForQuest(ctx, session.questId)
-        await syncActiveSessionsForQuestChange(ctx, session.world as Id<'worlds'> | undefined, {
-          affectedQuestId: session.questId,
-          isRemovedOrCompleted: true,
-          excludeSessionId: session._id,
-        })
+        const questDoc = await ctx.db.get(session.questId)
+        if (questDoc?.isDungeon) {
+          const totalLevels = questDoc.totalDungeonLevels || 1
+          const prevLevel = questDoc.currentDungeonLevel || 1
+          const completedHistory = questDoc.completedSessionIds || []
+          const updatedHistory = completedHistory.includes(session._id) ? completedHistory : [...completedHistory, session._id]
+          const isFinalLevel = prevLevel >= totalLevels
+
+          if (isFinalLevel) {
+            await ctx.db.patch(session.questId, {
+              isCompleted: true,
+              completedSessionId: session._id,
+              completedSessionIds: updatedHistory,
+              completedAt: Date.now(),
+            })
+            await deletePinsForQuest(ctx, session.questId)
+            await syncActiveSessionsForQuestChange(ctx, session.world as Id<'worlds'> | undefined, {
+              affectedQuestId: session.questId,
+              isRemovedOrCompleted: true,
+              excludeSessionId: session._id,
+            })
+          } else {
+            const nextLvl = prevLevel + 1
+            const nextPF = questDoc.levelPF !== undefined ? questDoc.levelPF + 1 : undefined
+            const nextDnD = questDoc.levelDnD !== undefined ? questDoc.levelDnD + 1 : undefined
+            const nextLevelLegacy = questDoc.level !== undefined ? questDoc.level + 1 : (nextPF ?? nextDnD)
+            await ctx.db.patch(session.questId, {
+              currentDungeonLevel: nextLvl,
+              levelPF: nextPF,
+              levelDnD: nextDnD,
+              level: nextLevelLegacy,
+              completedSessionIds: updatedHistory,
+            })
+            await syncActiveSessionsForQuestChange(ctx, session.world as Id<'worlds'> | undefined, {
+              affectedQuestId: session.questId,
+              isRemovedOrCompleted: false,
+              excludeSessionId: session._id,
+            })
+          }
+        } else {
+          await ctx.db.patch(session.questId, {
+            isCompleted: true,
+            completedSessionId: session._id,
+            completedAt: Date.now(),
+          })
+          await deletePinsForQuest(ctx, session.questId)
+          await syncActiveSessionsForQuestChange(ctx, session.world as Id<'worlds'> | undefined, {
+            affectedQuestId: session.questId,
+            isRemovedOrCompleted: true,
+            excludeSessionId: session._id,
+          })
+        }
       }
 
       // Apply pending void contribution if any directly within mutation transaction
@@ -1946,10 +2052,35 @@ export const forceUnlockSession = mutation({
       if (!session.locked) return
   
       if (session.questId) {
-        await ctx.db.patch(session.questId, {
-          isCompleted: false,
-          completedSessionId: undefined,
-          completedAt: undefined,
+        const questDoc = await ctx.db.get(session.questId)
+        if (questDoc?.isDungeon) {
+          const completedHistory = (questDoc.completedSessionIds || []).filter((id) => id !== session._id)
+          const currentLvl = questDoc.currentDungeonLevel || 1
+          const wasCompleted = questDoc.isCompleted
+          const newLevel = wasCompleted ? currentLvl : Math.max(1, currentLvl - 1)
+          const decPF = questDoc.levelPF !== undefined ? (wasCompleted ? questDoc.levelPF : Math.max(1, questDoc.levelPF - 1)) : undefined
+          const decDnD = questDoc.levelDnD !== undefined ? (wasCompleted ? questDoc.levelDnD : Math.max(1, questDoc.levelDnD - 1)) : undefined
+          const decLegacy = questDoc.level !== undefined ? (wasCompleted ? questDoc.level : Math.max(1, questDoc.level - 1)) : (decPF ?? decDnD)
+
+          await ctx.db.patch(session.questId, {
+            isCompleted: false,
+            completedSessionId: undefined,
+            completedAt: undefined,
+            completedSessionIds: completedHistory,
+            currentDungeonLevel: newLevel,
+            levelPF: decPF,
+            levelDnD: decDnD,
+            level: decLegacy,
+          })
+        } else {
+          await ctx.db.patch(session.questId, {
+            isCompleted: false,
+            completedSessionId: undefined,
+            completedAt: undefined,
+          })
+        }
+        await syncActiveSessionsForQuestChange(ctx, session.world as Id<'worlds'> | undefined, {
+          affectedQuestId: session.questId,
         })
       }
 

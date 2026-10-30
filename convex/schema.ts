@@ -167,6 +167,17 @@ export default defineSchema({
         isHidden: v.optional(v.boolean()), // Hidden from regular players by world owner
         completedSessionId: v.optional(v.id("sessions")),
         completedAt: v.optional(v.number()),
+        // Dungeon fields
+        isDungeon: v.optional(v.boolean()), // True if this quest is a dungeon with multiple sequential levels
+        totalDungeonLevels: v.optional(v.number()), // Total number of levels / sessions required (e.g. 3)
+        currentDungeonLevel: v.optional(v.number()), // Current level index completed / reached (1-based, starts at 1)
+        dungeonEntrances: v.optional(v.array(v.object({
+            name: v.string(), // e.g. "Main Gate", "Flooded Underhalls", "Upper Spire"
+            startLevel: v.number(), // The starting level for this entrance (e.g. 1 or 5)
+            levelPF: v.optional(v.number()), // Optional PF specific level for this entrance
+            levelDnD: v.optional(v.number()), // Optional DnD specific level for this entrance
+        }))),
+        completedSessionIds: v.optional(v.array(v.id("sessions"))), // Completed session history for dungeon runs
     }).index('by_worldId', ['worldId'])
       .index('by_characterId', ['characterId'])
       .index('by_worldId_isSuggested', ['worldId', 'isSuggested']),

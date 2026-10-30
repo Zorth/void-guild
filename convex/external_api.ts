@@ -483,6 +483,15 @@ export const createQuest = mutation({
         rewardOther: v.optional(v.string()),
         tags: v.optional(v.array(v.string())),
         characterId: v.optional(v.string()),
+        isDungeon: v.optional(v.boolean()),
+        totalDungeonLevels: v.optional(v.number()),
+        currentDungeonLevel: v.optional(v.number()),
+        dungeonEntrances: v.optional(v.array(v.object({
+            name: v.string(),
+            startLevel: v.number(),
+            levelPF: v.optional(v.number()),
+            levelDnD: v.optional(v.number()),
+        }))),
     },
     handler: async (ctx, args) => {
         const user = await requireUser(ctx, args.apiKey)
@@ -555,6 +564,15 @@ export const updateQuest = mutation({
         rewardType: v.optional(v.union(v.literal('party'), v.literal('per_person'))),
         rewardMoneyGP: v.optional(v.number()),
         rewardOther: v.optional(v.string()),
+        isDungeon: v.optional(v.boolean()),
+        totalDungeonLevels: v.optional(v.number()),
+        currentDungeonLevel: v.optional(v.number()),
+        dungeonEntrances: v.optional(v.array(v.object({
+            name: v.string(),
+            startLevel: v.number(),
+            levelPF: v.optional(v.number()),
+            levelDnD: v.optional(v.number()),
+        }))),
     },
     handler: async (ctx, args) => {
         const user = await requireUser(ctx, args.apiKey)

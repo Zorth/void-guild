@@ -22,10 +22,18 @@ export const formatDiscordCurrency = (text: string): string => {
 export const getQuestLevelStr = (q: any): string => {
   const pf = q.levelPF ?? (q.levelDnD === undefined ? q.level : undefined);
   const dnd = q.levelDnD;
-  if (pf !== undefined && dnd !== undefined) return `Lvl PF:${pf}/DnD:${dnd}`;
-  if (pf !== undefined) return `Lvl PF:${pf}`;
-  if (dnd !== undefined) return `Lvl DnD:${dnd}`;
-  return "Lvl ?";
+  let base = "Lvl ?";
+  if (pf !== undefined && dnd !== undefined) base = `Lvl PF:${pf}/DnD:${dnd}`;
+  else if (pf !== undefined) base = `Lvl PF:${pf}`;
+  else if (dnd !== undefined) base = `Lvl DnD:${dnd}`;
+
+  if (q.isDungeon) {
+    const total = q.totalDungeonLevels || 1;
+    const current = q.currentDungeonLevel || 1;
+    const remaining = Math.max(0, total - current + 1);
+    base += ` (Dungeon: ${remaining} session${remaining === 1 ? '' : 's'} left)`;
+  }
+  return base;
 };
 
 /**

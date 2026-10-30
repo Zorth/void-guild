@@ -20,6 +20,15 @@ export const createQuest = mutation({
     characterId: v.optional(v.id('characters')),
     isSuggested: v.optional(v.boolean()),
     isHidden: v.optional(v.boolean()),
+    isDungeon: v.optional(v.boolean()),
+    totalDungeonLevels: v.optional(v.number()),
+    currentDungeonLevel: v.optional(v.number()),
+    dungeonEntrances: v.optional(v.array(v.object({
+      name: v.string(),
+      startLevel: v.number(),
+      levelPF: v.optional(v.number()),
+      levelDnD: v.optional(v.number()),
+    }))),
   },
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
@@ -115,6 +124,18 @@ export const createQuest = mutation({
 
     const { levelPF, levelDnD, isSuggested: _sug, rewardMoneyGP: _rm, ...otherFields } = args
 
+    const isDungeon = Boolean(args.isDungeon)
+    const totalDungeonLevels = isDungeon ? Math.max(1, Math.round(args.totalDungeonLevels || 1)) : undefined
+    const currentDungeonLevel = isDungeon ? Math.max(1, Math.round(args.currentDungeonLevel || 1)) : undefined
+    const dungeonEntrances = isDungeon && args.dungeonEntrances && args.dungeonEntrances.length > 0
+      ? args.dungeonEntrances.map(e => ({
+          name: e.name.trim(),
+          startLevel: Math.max(1, Math.round(e.startLevel)),
+          levelPF: e.levelPF !== undefined ? Math.max(1, Math.round(e.levelPF)) : undefined,
+          levelDnD: e.levelDnD !== undefined ? Math.max(1, Math.round(e.levelDnD)) : undefined,
+        }))
+      : undefined
+
     const questId = await ctx.db.insert('quests', {
       ...otherFields,
       reward: finalReward,
@@ -123,6 +144,11 @@ export const createQuest = mutation({
       rewardOther: args.rewardOther?.trim(),
       levelPF: levelPF === null ? undefined : levelPF,
       levelDnD: levelDnD === null ? undefined : levelDnD,
+      isDungeon,
+      totalDungeonLevels,
+      currentDungeonLevel,
+      dungeonEntrances,
+      completedSessionIds: [],
       owner: user.subject,
       characterRank,
       isSponsored,
@@ -159,6 +185,15 @@ export const updateQuest = mutation({
     tags: v.optional(v.array(v.string())),
     characterId: v.optional(v.id('characters')),
     isHidden: v.optional(v.boolean()),
+    isDungeon: v.optional(v.boolean()),
+    totalDungeonLevels: v.optional(v.number()),
+    currentDungeonLevel: v.optional(v.number()),
+    dungeonEntrances: v.optional(v.array(v.object({
+      name: v.string(),
+      startLevel: v.number(),
+      levelPF: v.optional(v.number()),
+      levelDnD: v.optional(v.number()),
+    }))),
   },
   handler: async (ctx, args) => {
     const user = await ctx.auth.getUserIdentity()
@@ -269,6 +304,26 @@ export const updateQuest = mutation({
 
     const effectiveWorldId = args.worldId !== undefined ? args.worldId : quest.worldId
     const effectiveIsHidden = args.isHidden !== undefined ? args.isHidden : quest.isHidden
+    const effectiveIsDungeon = args.isDungeon !== undefined ? Boolean(args.isDungeon) : quest.isDungeon
+    const effectiveTotalDungeonLevels = effectiveIsDungeon
+      ? (args.totalDungeonLevels !== undefined ? Math.max(1, Math.round(args.totalDungeonLevels)) : (quest.totalDungeonLevels || 1))
+      : undefined
+    const effectiveCurrentDungeonLevel = effectiveIsDungeon
+      ? (args.currentDungeonLevel !== undefined ? Math.max(1, Math.round(args.currentDungeonLevel)) : (quest.currentDungeonLevel || 1))
+      : undefined
+
+    const effectiveDungeonEntrances = effectiveIsDungeon
+      ? (args.dungeonEntrances !== undefined
+          ? (args.dungeonEntrances.length > 0
+              ? args.dungeonEntrances.map(e => ({
+                  name: e.name.trim(),
+                  startLevel: Math.max(1, Math.round(e.startLevel)),
+                  levelPF: e.levelPF !== undefined ? Math.max(1, Math.round(e.levelPF)) : undefined,
+                  levelDnD: e.levelDnD !== undefined ? Math.max(1, Math.round(e.levelDnD)) : undefined,
+                }))
+              : undefined)
+          : quest.dungeonEntrances)
+      : undefined
 
     await ctx.db.patch(args.questId, {
       name: args.name,
@@ -289,6 +344,10 @@ export const updateQuest = mutation({
       sponsoredAmount,
       netCost,
       isHidden: effectiveIsHidden,
+      isDungeon: effectiveIsDungeon,
+      totalDungeonLevels: effectiveTotalDungeonLevels,
+      currentDungeonLevel: effectiveCurrentDungeonLevel,
+      dungeonEntrances: effectiveDungeonEntrances,
     })
 
     await syncActiveSessionsForQuestChange(ctx, effectiveWorldId, {
@@ -528,6 +587,64 @@ export const rejectSuggestedQuest = mutation({
     await ctx.db.patch(args.questId, {
       suggestionStatus: 'rejected',
     })
+  },
+})
+
+export const setDungeonLevel = mutation({
+  args: {
+    questId: v.id('quests'),
+    level: v.number(),
+    levelPF: v.optional(v.number()),
+    levelDnD: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    const quest = await ctx.db.get(args.questId)
+    if (!quest) throw new Error('Quest not found')
+    if (!quest.isDungeon) throw new Error('Quest is not a dungeon')
+
+    const isAdminUser = await isAdmin(ctx)
+    let isWorldOwner = false
+    if (quest.worldId) {
+      const world = await ctx.db.get(quest.worldId)
+      isWorldOwner = Boolean(world && (world.owner === user.subject || world.owner === user.tokenIdentifier))
+    }
+    const isQuestOwner = quest.owner === user.subject || quest.owner === user.tokenIdentifier
+    if (!isQuestOwner && !isWorldOwner && !isAdminUser) {
+      throw new Error('Only the quest owner, world owner, or an admin can change the active dungeon entrance level.')
+    }
+
+    const targetDungeonLevel = Math.max(1, Math.round(args.level))
+    // Calculate new quest levels
+    // If explicit levelPF or levelDnD are provided, use them; otherwise adjust relatively or assign target
+    const currentFloor = quest.currentDungeonLevel || 1
+    const delta = targetDungeonLevel - currentFloor
+
+    const newLevelPF = args.levelPF !== undefined
+      ? args.levelPF
+      : (quest.levelPF !== undefined ? Math.max(1, quest.levelPF + delta) : targetDungeonLevel)
+
+    const newLevelDnD = args.levelDnD !== undefined
+      ? args.levelDnD
+      : (quest.levelDnD !== undefined ? Math.max(1, quest.levelDnD + delta) : targetDungeonLevel)
+
+    const newLevelLegacy = quest.level !== undefined ? Math.max(1, quest.level + delta) : (newLevelPF ?? newLevelDnD)
+
+    await ctx.db.patch(args.questId, {
+      currentDungeonLevel: targetDungeonLevel,
+      levelPF: newLevelPF,
+      levelDnD: newLevelDnD,
+      level: newLevelLegacy,
+    })
+
+    await syncActiveSessionsForQuestChange(ctx, quest.worldId, {
+      affectedQuestId: args.questId,
+      isRemovedOrCompleted: false,
+    })
+
+    return { currentDungeonLevel: targetDungeonLevel, levelPF: newLevelPF, levelDnD: newLevelDnD }
   },
 })
 

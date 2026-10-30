@@ -3,7 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
-import { X, Eye, EyeOff, Search, Check } from 'lucide-react'
+import { X, Eye, EyeOff, Search, Check, Castle } from 'lucide-react'
 import { Id } from '@/convex/_generated/dataModel'
 
 interface QuestItem {
@@ -15,6 +15,15 @@ interface QuestItem {
   levelDnD?: number | null
   questgiver?: string
   reward?: string
+  isDungeon?: boolean
+  totalDungeonLevels?: number
+  currentDungeonLevel?: number
+  dungeonEntrances?: Array<{
+    name: string
+    startLevel: number
+    levelPF?: number
+    levelDnD?: number
+  }>
 }
 
 interface MapQuestsPanelProps {
@@ -151,6 +160,20 @@ export function MapQuestsPanel({
                           {levelDisplay}
                         </span>
                       )}
+                      {quest.isDungeon && (() => {
+                        const total = quest.totalDungeonLevels || 1
+                        const current = quest.currentDungeonLevel || 1
+                        const remaining = Math.max(0, total - current + 1)
+                        return (
+                          <span 
+                            className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.2 rounded bg-orange-500/20 text-orange-300 border border-orange-500/30"
+                            title={`Dungeon Quest: Level ${current}/${total} (${remaining} session${remaining === 1 ? '' : 's'} remaining)`}
+                          >
+                            <Castle className="h-2.5 w-2.5 text-orange-400" />
+                            {remaining} left
+                          </span>
+                        )
+                      })()}
                       {placedPin && (
                         <span className="text-[9px] font-medium px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-0.5">
                           <Check className="h-2.5 w-2.5" /> On Map

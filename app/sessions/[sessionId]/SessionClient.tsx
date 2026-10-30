@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { useState, useEffect, useMemo } from 'react'
 import { Id, Doc } from '@/convex/_generated/dataModel'
 import Link from 'next/link'
-import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, Unlock, Globe, Scroll, Trophy, Menu, User, Target, UserPlus, Coins, Map, Sprout, Loader2, Sparkles } from 'lucide-react'
+import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, Unlock, Globe, Scroll, Trophy, Menu, User, Target, UserPlus, Coins, Map, Sprout, Loader2, Sparkles, Castle, DoorOpen } from 'lucide-react'
 import { useAuth, SignInButton } from '@clerk/nextjs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatDate, formatTime as formatTimeUtil, getLevelBadgeStyle, getDualLevelBadgeStyle, CharacterRankIcon, getSessionWikiUrl, cn } from '@/lib/utils'
@@ -90,6 +90,7 @@ export default function SessionClient() {
   const adminAddCharacterToSession = useMutation(api.sessions.adminAddCharacterToSession)
   const inviteCharacterToSession = useMutation(api.sessions.inviteCharacterToSession)
   const selectQuest = useMutation(api.sessions.selectQuest)
+  const setDungeonLevel = useMutation(api.quests.setDungeonLevel)
   const importQuestRewards = useMutation(api.sessions.importQuestRewardsToLoot)
   const expressInterest = useMutation(api.sessions.expressInterest)
   const withdrawInterest = useMutation(api.sessions.withdrawInterest)
@@ -1064,6 +1065,20 @@ export default function SessionClient() {
                                     <div className="flex items-center gap-2 font-bold text-sm flex-wrap">
                                         <Scroll className="h-4 w-4 text-primary" />
                                         Active Quest
+                                        {q.isDungeon && (() => {
+                                            const total = (q as any).totalDungeonLevels || 1
+                                            const current = (q as any).currentDungeonLevel || 1
+                                            const remaining = Math.max(0, total - current + 1)
+                                            return (
+                                                <span 
+                                                    className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/40 ml-1 shadow-xs"
+                                                    title={`Dungeon Quest: Floor ${current}/${total} (${remaining} session${remaining === 1 ? '' : 's'} remaining)`}
+                                                >
+                                                    <Castle className="h-2.5 w-2.5 text-orange-400" />
+                                                    Dungeon ({remaining} left)
+                                                </span>
+                                            )
+                                        })()}
                                         {q.characterId && (
                                             <span 
                                                 className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 ml-1 shadow-xs"
@@ -1117,6 +1132,65 @@ export default function SessionClient() {
                                                     {tag}
                                                 </span>
                                             ))}
+                                        </div>
+                                    )}
+                                    {q.isDungeon && (q as any).dungeonEntrances && (q as any).dungeonEntrances.length > 0 && (
+                                        <div className="p-2 rounded bg-orange-500/5 border border-orange-500/20 space-y-1.5 text-xs">
+                                            <div className="flex items-center justify-between text-[11px] font-bold text-orange-300">
+                                                <span className="flex items-center gap-1.5">
+                                                    <DoorOpen className="h-3.5 w-3.5 text-orange-400" />
+                                                    Dungeon Entrances / Checkpoints
+                                                </span>
+                                                {isOwnerOrAdmin && !session.locked && (
+                                                    <span className="text-[10px] text-muted-foreground font-normal">
+                                                        Select starting floor
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {(q as any).dungeonEntrances.map((ent: any, idx: number) => {
+                                                    const isSelected = (q as any).currentDungeonLevel === ent.startLevel
+                                                    return (
+                                                        <button
+                                                            key={idx}
+                                                            type="button"
+                                                            disabled={!isOwnerOrAdmin || session.locked}
+                                                            onClick={async (e) => {
+                                                                e.stopPropagation()
+                                                                if (!isOwnerOrAdmin || session.locked) return
+                                                                try {
+                                                                    await setDungeonLevel({
+                                                                        questId: q._id,
+                                                                        level: ent.startLevel,
+                                                                        levelPF: ent.levelPF,
+                                                                        levelDnD: ent.levelDnD,
+                                                                    })
+                                                                    toast.success(`Dungeon active entrance set to ${ent.name} (Lvl ${ent.startLevel})`)
+                                                                } catch (err: any) {
+                                                                    toast.error(err.message || 'Failed to switch entrance')
+                                                                }
+                                                            }}
+                                                            className={cn(
+                                                                "px-2 py-1 rounded text-[11px] font-medium flex items-center gap-1.5 border transition-all",
+                                                                isSelected
+                                                                    ? "bg-orange-500 text-white border-orange-600 shadow-xs font-bold"
+                                                                    : "bg-muted/40 border-orange-500/30 text-orange-200 hover:bg-orange-500/20",
+                                                                (!isOwnerOrAdmin || session.locked) && "cursor-default"
+                                                            )}
+                                                            title={isOwnerOrAdmin && !session.locked ? `Select ${ent.name} (Start at Floor ${ent.startLevel})` : undefined}
+                                                        >
+                                                            <DoorOpen className="h-3 w-3" />
+                                                            <span>{ent.name}</span>
+                                                            <span className={cn(
+                                                                "px-1 rounded text-[9px] font-bold",
+                                                                isSelected ? "bg-white/20 text-white" : "bg-orange-500/20 text-orange-300"
+                                                            )}>
+                                                                Lvl {ent.startLevel}
+                                                            </span>
+                                                        </button>
+                                                    )
+                                                })}
+                                            </div>
                                         </div>
                                     )}
                                     {q.characterId && (

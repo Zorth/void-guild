@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
-import { Scroll, Sword, Trophy, User, Hash, Coins, Sparkles, Globe, EyeOff } from 'lucide-react'
+import { Scroll, Sword, Trophy, User, Hash, Coins, Sparkles, Globe, EyeOff, Castle, Plus, Trash2, DoorOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface QuestDialogProps {
@@ -44,6 +44,15 @@ interface QuestDialogProps {
     isSponsored?: boolean
     sponsoredAmount?: string
     netCost?: string
+    isDungeon?: boolean
+    totalDungeonLevels?: number
+    currentDungeonLevel?: number
+    dungeonEntrances?: Array<{
+      name: string
+      startLevel: number
+      levelPF?: number
+      levelDnD?: number
+    }>
   }
 }
 
@@ -59,6 +68,10 @@ export default function QuestDialog({ isOpen, onClose, worldId, isWorldOwner = f
   const [tagsString, setTagsString] = useState('')
   const [isGlobal, setIsGlobal] = useState(false)
   const [isHidden, setIsHidden] = useState(false)
+  const [isDungeon, setIsDungeon] = useState(false)
+  const [totalDungeonLevels, setTotalDungeonLevels] = useState<number>(3)
+  const [currentDungeonLevel, setCurrentDungeonLevel] = useState<number>(1)
+  const [dungeonEntrances, setDungeonEntrances] = useState<Array<{ name: string; startLevel: number; levelPF?: number; levelDnD?: number }>>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const isAdmin = useQuery(api.sessions.isAdminQuery)
@@ -79,6 +92,10 @@ export default function QuestDialog({ isOpen, onClose, worldId, isWorldOwner = f
       setTagsString(quest.tags?.join(', ') || '')
       setIsGlobal(!quest.worldId)
       setIsHidden(Boolean(quest.isHidden))
+      setIsDungeon(Boolean(quest.isDungeon))
+      setTotalDungeonLevels(quest.totalDungeonLevels || 3)
+      setCurrentDungeonLevel(quest.currentDungeonLevel || 1)
+      setDungeonEntrances(quest.dungeonEntrances || [])
     } else {
       setName('')
       setLevelPF(null)
@@ -91,6 +108,10 @@ export default function QuestDialog({ isOpen, onClose, worldId, isWorldOwner = f
       setTagsString('')
       setIsGlobal(!worldId)
       setIsHidden(false)
+      setIsDungeon(false)
+      setTotalDungeonLevels(3)
+      setCurrentDungeonLevel(1)
+      setDungeonEntrances([])
     }
   }, [quest, isOpen, worldId])
 
@@ -124,6 +145,10 @@ export default function QuestDialog({ isOpen, onClose, worldId, isWorldOwner = f
           worldId: targetWorldId,
           isHidden,
           characterId: quest.characterId,
+          isDungeon,
+          totalDungeonLevels: isDungeon ? Math.max(1, totalDungeonLevels) : undefined,
+          currentDungeonLevel: isDungeon ? Math.max(1, currentDungeonLevel) : undefined,
+          dungeonEntrances: isDungeon && dungeonEntrances.length > 0 ? dungeonEntrances.filter(e => e.name.trim()) : undefined,
         })
         toast.success('Quest updated successfully!')
       } else {
@@ -139,6 +164,10 @@ export default function QuestDialog({ isOpen, onClose, worldId, isWorldOwner = f
           tags,
           worldId: targetWorldId,
           isHidden,
+          isDungeon,
+          totalDungeonLevels: isDungeon ? Math.max(1, totalDungeonLevels) : undefined,
+          currentDungeonLevel: isDungeon ? Math.max(1, currentDungeonLevel) : undefined,
+          dungeonEntrances: isDungeon && dungeonEntrances.length > 0 ? dungeonEntrances.filter(e => e.name.trim()) : undefined,
         })
         toast.success('Quest created successfully!')
       }
@@ -227,6 +256,135 @@ export default function QuestDialog({ isOpen, onClose, worldId, isWorldOwner = f
               </label>
             </div>
           )}
+
+          {/* Dungeon Quest Toggle */}
+          <div className="space-y-3 p-3 rounded-lg bg-orange-500/10 border border-orange-500/25">
+            <div className="flex items-center gap-2.5">
+              <input
+                type="checkbox"
+                id="isDungeonQuest"
+                checked={isDungeon}
+                onChange={(e) => setIsDungeon(e.target.checked)}
+                className="h-4 w-4 rounded border-border text-orange-500 focus:ring-orange-500 cursor-pointer accent-orange-500 shrink-0"
+              />
+              <label htmlFor="isDungeonQuest" className="text-xs font-semibold text-foreground cursor-pointer flex items-center gap-1.5 select-none">
+                <Castle className="h-3.5 w-3.5 text-orange-400 shrink-0" />
+                <span>Dungeon Quest (Multi-level quest that increments level each session)</span>
+              </label>
+            </div>
+
+            {isDungeon && (
+              <>
+                <div className="pt-2 border-t border-orange-500/20 grid grid-cols-2 gap-3 text-xs">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-orange-200">
+                      Total Dungeon Levels
+                    </label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={totalDungeonLevels}
+                      onChange={(e) => setTotalDungeonLevels(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="bg-muted/40 border-orange-500/30 text-xs h-8"
+                    />
+                    <p className="text-[10px] text-muted-foreground">Total sessions/levels to finish</p>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-orange-200">
+                      Active Level / Floor
+                    </label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={totalDungeonLevels}
+                      value={currentDungeonLevel}
+                      onChange={(e) => setCurrentDungeonLevel(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="bg-muted/40 border-orange-500/30 text-xs h-8"
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      {Math.max(0, totalDungeonLevels - currentDungeonLevel + 1)} session(s) remaining
+                    </p>
+                  </div>
+                </div>
+
+                {/* Dungeon Entrances */}
+                <div className="pt-2 border-t border-orange-500/20 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-orange-200 flex items-center gap-1.5">
+                      <DoorOpen className="h-3.5 w-3.5 text-orange-400" />
+                      Multiple Entrances / Starting Points
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-6 text-[10px] px-2 border-orange-500/40 text-orange-300 hover:bg-orange-500/20"
+                      onClick={() => {
+                        setDungeonEntrances([
+                          ...dungeonEntrances,
+                          {
+                            name: `Entrance ${dungeonEntrances.length + 1}`,
+                            startLevel: Math.min(totalDungeonLevels, dungeonEntrances.length * 3 + 1),
+                          },
+                        ])
+                      }}
+                    >
+                      <Plus className="h-3 w-3 mr-1" /> Add Entrance
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    Define shortcut checkpoints or alternate starting floors (e.g. Level 1 start vs Level 5 start).
+                  </p>
+
+                  {dungeonEntrances.length > 0 && (
+                    <div className="space-y-1.5">
+                      {dungeonEntrances.map((entrance, index) => (
+                        <div key={index} className="flex items-center gap-2 p-1.5 rounded bg-muted/40 border border-orange-500/20 text-xs">
+                          <Input
+                            placeholder="Entrance name (e.g. Lower Mines)"
+                            value={entrance.name}
+                            onChange={(e) => {
+                              const updated = [...dungeonEntrances]
+                              updated[index].name = e.target.value
+                              setDungeonEntrances(updated)
+                            }}
+                            className="h-7 text-xs flex-1 bg-transparent"
+                          />
+                          <div className="flex items-center gap-1 shrink-0">
+                            <span className="text-[10px] text-muted-foreground font-semibold">Start Lvl:</span>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={totalDungeonLevels}
+                              value={entrance.startLevel}
+                              onChange={(e) => {
+                                const updated = [...dungeonEntrances]
+                                updated[index].startLevel = Math.max(1, parseInt(e.target.value) || 1)
+                                setDungeonEntrances(updated)
+                              }}
+                              className="h-7 w-14 text-xs bg-transparent text-center font-bold"
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-destructive hover:bg-destructive/10 shrink-0"
+                            onClick={() => {
+                              setDungeonEntrances(dungeonEntrances.filter((_, i) => i !== index))
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">

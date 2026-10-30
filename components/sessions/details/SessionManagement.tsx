@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { Pencil, CheckCircle2, Shield, Send, Bell, XCircle, Scroll, Calendar, CalendarRange, Clock, Unlock, User, Globe, Target, Sprout, RefreshCw, Coins, Sparkles } from 'lucide-react'
+import { Pencil, CheckCircle2, Shield, Send, Bell, XCircle, Scroll, Calendar, CalendarRange, Clock, Unlock, User, Globe, Target, Sprout, RefreshCw, Coins, Sparkles, Castle, DoorOpen } from 'lucide-react'
 import SessionDialog from '@/components/sessions/SessionDialog'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -221,6 +221,27 @@ export default function SessionManagement({
                                                 );
                                             })()}
                                             <span className="font-semibold break-words" title={quest.name}>{quest.name}</span>
+                                            {quest.isDungeon && (() => {
+                                                const total = quest.totalDungeonLevels || 1
+                                                const current = quest.currentDungeonLevel || 1
+                                                const remaining = Math.max(0, total - current + 1)
+                                                const entrances = (quest as any).dungeonEntrances || []
+                                                const hasMultiple = entrances.length > 1
+                                                return (
+                                                    <span 
+                                                        className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/40 shrink-0"
+                                                        title={`Dungeon Quest: Floor ${current}/${total} (${remaining} session${remaining === 1 ? '' : 's'} remaining)`}
+                                                    >
+                                                        <Castle className="h-2.5 w-2.5 text-orange-400" />
+                                                        <span>Dungeon ({remaining} left)</span>
+                                                        {hasMultiple && (
+                                                            <span className="text-[8px] bg-orange-500/30 text-orange-200 px-1 rounded font-normal">
+                                                                {entrances.length} entrances
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                )
+                                            })()}
                                             {!quest.worldId && (
                                                 <span 
                                                     className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40 shrink-0"
@@ -249,6 +270,29 @@ export default function SessionManagement({
                                                 </span>
                                             )}
                                         </div>
+                                        {quest.isDungeon && (quest as any).dungeonEntrances && (quest as any).dungeonEntrances.length > 0 && (
+                                            <div className="flex flex-wrap items-center gap-1 text-[9px] text-orange-300">
+                                                <span className="font-semibold flex items-center gap-0.5">
+                                                    <DoorOpen className="h-2.5 w-2.5" /> Entrances:
+                                                </span>
+                                                {(quest as any).dungeonEntrances.map((ent: any, idx: number) => {
+                                                    const isActive = (quest.currentDungeonLevel || 1) === ent.startLevel
+                                                    return (
+                                                        <span
+                                                            key={idx}
+                                                            className={cn(
+                                                                "px-1 py-0.2 rounded border font-mono",
+                                                                isActive 
+                                                                    ? "bg-orange-500/25 border-orange-500/60 text-orange-200 font-bold"
+                                                                    : "bg-muted/40 border-border/30 text-muted-foreground"
+                                                            )}
+                                                        >
+                                                            {ent.name}: Lvl {ent.startLevel}
+                                                        </span>
+                                                    )
+                                                })}
+                                            </div>
+                                        )}
                                         {(quest.rewardMoneyGP || quest.rewardOther || quest.reward) && (
                                             <div className="flex items-center gap-1 text-[10px] text-amber-300 font-mono">
                                                 <Coins className="h-3 w-3 text-amber-400 shrink-0" />

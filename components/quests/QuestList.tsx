@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { 
   Scroll, Sword, Trophy, User, Hash, Plus, Pencil, Trash2, 
   ChevronDown, ChevronUp, MapPin, Tag, Crown, Check, X, Sparkles, Globe,
-  SlidersHorizontal, Eye, EyeOff, RotateCcw
+  SlidersHorizontal, Eye, EyeOff, RotateCcw, Castle, DoorOpen
 } from 'lucide-react'
 import { useAuth } from '@clerk/nextjs'
 import QuestDialog from './QuestDialog'
@@ -52,6 +52,7 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
   const approveSuggestedQuest = useMutation(api.quests.approveSuggestedQuest)
   const rejectSuggestedQuest = useMutation(api.quests.rejectSuggestedQuest)
   const toggleQuestHidden = useMutation(api.quests.toggleQuestHidden)
+  const setDungeonLevel = useMutation(api.quests.setDungeonLevel)
 
   const effectiveWorldOwner = worldOwner ?? worldDoc?.owner
   const isWorldOwner = Boolean((userId && userId === effectiveWorldOwner) || isAdmin)
@@ -490,6 +491,30 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
                                   <span className={cn(isSidebar ? "inline" : "sm:hidden")}>Global</span>
                               </span>
                           )}
+                          {quest.isDungeon && (() => {
+                              const total = quest.totalDungeonLevels || 1
+                              const current = quest.currentDungeonLevel || 1
+                              const remaining = Math.max(0, total - current + 1)
+                              const entrances = quest.dungeonEntrances || []
+                              const hasMultiple = entrances.length > 1
+                              const entranceSummary = hasMultiple 
+                                ? ` • Entrances: ${entrances.map((e: any) => `Lvl ${e.startLevel}`).join(', ')}` 
+                                : ''
+                              return (
+                                <span 
+                                  className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/40 ml-1.5 align-middle shadow-xs shrink-0"
+                                  title={`Dungeon Quest: Floor ${current}/${total} (${remaining} session${remaining === 1 ? '' : 's'} remaining)${entranceSummary}`}
+                                >
+                                    <Castle className="h-2.5 w-2.5 text-orange-400" />
+                                    <span>Dungeon ({remaining} left)</span>
+                                    {hasMultiple && (
+                                      <span className="text-[8px] bg-orange-500/30 text-orange-200 px-1 rounded font-normal hidden sm:inline">
+                                        {entrances.length} entrances
+                                      </span>
+                                    )}
+                                </span>
+                              )
+                          })()}
                           {quest.isHidden && (
                               <span 
                                 className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 ml-1.5 align-middle shadow-xs shrink-0"
@@ -531,6 +556,31 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
                                   </>
                               )}
                           </p>
+                      )}
+                      {/* Dungeon entrance shortcuts visible on collapsed card */}
+                      {quest.isDungeon && quest.dungeonEntrances && quest.dungeonEntrances.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1 mt-1 text-[9px]">
+                              <span className="text-orange-400/80 font-semibold flex items-center gap-0.5">
+                                  <DoorOpen className="h-2.5 w-2.5" /> Entrances:
+                              </span>
+                              {quest.dungeonEntrances.map((ent: any, idx: number) => {
+                                  const isActive = (quest.currentDungeonLevel || 1) === ent.startLevel
+                                  return (
+                                      <span
+                                          key={idx}
+                                          className={cn(
+                                              "px-1.5 py-0.2 rounded border font-mono font-medium",
+                                              isActive 
+                                                  ? "bg-orange-500/25 border-orange-500/60 text-orange-200 font-bold"
+                                                  : "bg-muted/30 border-border/30 text-muted-foreground"
+                                          )}
+                                          title={`${ent.name} (Start Level ${ent.startLevel})`}
+                                      >
+                                          {ent.name}: Lvl {ent.startLevel}
+                                      </span>
+                                  )
+                              })}
+                          </div>
                       )}
                       {/* Tags on collapsed and expanded versions */}
                       {quest.tags && quest.tags.length > 0 && (
@@ -600,6 +650,81 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
                         )}
                         
                         <div className="grid grid-cols-1 gap-1.5 pt-1">
+                            {quest.isDungeon && (() => {
+                                const total = quest.totalDungeonLevels || 1
+                                const current = quest.currentDungeonLevel || 1
+                                const remaining = Math.max(0, total - current + 1)
+                                const entrances = quest.dungeonEntrances || []
+                                return (
+                                    <div className="space-y-2">
+                                        <div className="flex items-center gap-2 text-[11px] text-orange-300 bg-orange-500/10 border border-orange-500/20 rounded-md px-2.5 py-1.5 flex-wrap">
+                                            <Castle className="h-3.5 w-3.5 text-orange-400 shrink-0" />
+                                            <span>
+                                                <strong>Dungeon Quest:</strong> Progressing floor <strong>{current}</strong> of <strong>{total}</strong> ({remaining} session{remaining === 1 ? '' : 's'} remaining). Increases by 1 level after each completed session.
+                                            </span>
+                                        </div>
+                                        {entrances.length > 0 && (
+                                            <div className="p-2 rounded bg-orange-500/5 border border-orange-500/20 space-y-1.5 text-xs">
+                                                <div className="flex items-center justify-between text-[11px] font-bold text-orange-300">
+                                                    <span className="flex items-center gap-1.5">
+                                                        <DoorOpen className="h-3.5 w-3.5 text-orange-400" />
+                                                        Available Dungeon Entrances
+                                                    </span>
+                                                    {canEdit && (
+                                                        <span className="text-[10px] text-muted-foreground font-normal">
+                                                            Click an entrance to set starting floor
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {entrances.map((ent: any, idx: number) => {
+                                                        const isSelected = current === ent.startLevel
+                                                        return (
+                                                            <button
+                                                                key={idx}
+                                                                type="button"
+                                                                disabled={!canEdit}
+                                                                onClick={async (e) => {
+                                                                    e.stopPropagation()
+                                                                    if (!canEdit) return
+                                                                    try {
+                                                                        await setDungeonLevel({
+                                                                            questId: quest._id,
+                                                                            level: ent.startLevel,
+                                                                            levelPF: ent.levelPF,
+                                                                            levelDnD: ent.levelDnD,
+                                                                        })
+                                                                        toast.success(`Dungeon set to ${ent.name} (Start Level ${ent.startLevel})`)
+                                                                    } catch (err: any) {
+                                                                        toast.error(err.message || 'Failed to switch entrance')
+                                                                    }
+                                                                }}
+                                                                className={cn(
+                                                                    "px-2 py-1 rounded text-[11px] font-medium flex items-center gap-1.5 border transition-all",
+                                                                    isSelected
+                                                                        ? "bg-orange-500 text-white border-orange-600 shadow-xs font-bold"
+                                                                        : "bg-muted/40 border-orange-500/30 text-orange-200 hover:bg-orange-500/20",
+                                                                    !canEdit && "cursor-default"
+                                                                )}
+                                                                title={canEdit ? `Click to activate ${ent.name} (Floor ${ent.startLevel})` : undefined}
+                                                            >
+                                                                <DoorOpen className="h-3 w-3" />
+                                                                <span>{ent.name}</span>
+                                                                <span className={cn(
+                                                                    "px-1 rounded text-[9px] font-bold",
+                                                                    isSelected ? "bg-white/20 text-white" : "bg-orange-500/20 text-orange-300"
+                                                                )}>
+                                                                    Lvl {ent.startLevel}
+                                                                </span>
+                                                            </button>
+                                                        )
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )
+                            })()}
                             {quest.reward && (
                                 <div className="flex items-start gap-2 text-[11px] flex-wrap">
                                     <div className="flex items-center gap-1.5 shrink-0">
