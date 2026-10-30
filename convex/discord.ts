@@ -52,7 +52,7 @@ export const syncSessionToDiscord = internalAction({
     if (isIntro) {
         levelStr = `[Lvl ${session.system === 'PF' ? 1 : 3}]`;
     } else if (session.selectedQuest) {
-        levelStr = `[${getQuestLevelStr(session.selectedQuest)}]`;
+        levelStr = `[${getQuestLevelStr(session.selectedQuest, true)}]`;
     }
     
     const interestCount = (session.interestedPlayers || []).length;

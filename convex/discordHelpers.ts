@@ -19,7 +19,7 @@ export const formatDiscordCurrency = (text: string): string => {
 /**
  * Returns formatted quest level string for Discord display.
  */
-export const getQuestLevelStr = (q: any): string => {
+export const getQuestLevelStr = (q: any, compact = false): string => {
   const pf = q.levelPF ?? (q.levelDnD === undefined ? q.level : undefined);
   const dnd = q.levelDnD;
   let base = "Lvl ?";
@@ -31,7 +31,16 @@ export const getQuestLevelStr = (q: any): string => {
     const total = q.totalDungeonLevels || 1;
     const current = q.currentDungeonLevel || 1;
     const remaining = Math.max(0, total - current + 1);
-    base += ` (Dungeon: ${remaining} session${remaining === 1 ? '' : 's'} left)`;
+    const entrances = q.dungeonEntrances || [];
+    if (compact) {
+      base += ` 🏰 [${remaining} left]`;
+    } else {
+      let entStr = "";
+      if (entrances.length > 1) {
+        entStr = ` • Entrances: ${entrances.map((e: any) => `Lvl ${e.startLevel}`).join(", ")}`;
+      }
+      base += ` 🏰 Dungeon (${remaining} session${remaining === 1 ? '' : 's'} left${entStr})`;
+    }
   }
   return base;
 };
