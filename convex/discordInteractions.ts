@@ -599,3 +599,111 @@ export const getUserUnclaimedSummary = query({
     };
   },
 });
+
+/**
+ * Searches active available quests for autocomplete in a session forum thread or globally.
+ */
+export const searchQuestsForSession = query({
+  args: {
+    query: v.string(),
+    threadId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    let session = null;
+    if (args.threadId) {
+      session = await ctx.db
+        .query("sessions")
+        .withIndex("by_discordThreadId", (q) => q.eq("discordThreadId", args.threadId))
+        .first();
+    }
+
+    const worldQuests = session?.world
+      ? await ctx.db
+          .query("quests")
+          .withIndex("by_worldId", (q) => q.eq("worldId", session.world))
+          .collect()
+      : await ctx.db.query("quests").collect();
+
+    const worldlessQuests = await ctx.db
+      .query("quests")
+      .withIndex("by_worldId", (q) => q.eq("worldId", undefined))
+      .collect();
+
+    const questMap = new Map<string, typeof worldlessQuests[0]>();
+    for (const q of worldQuests) questMap.set(q._id, q);
+    for (const q of worldlessQuests) questMap.set(q._id, q);
+
+    const activeQuests = Array.from(questMap.values()).filter(
+      (q) => !q.isCompleted && !q.isHidden && !q.isSuggested
+    );
+
+    const queryLower = args.query.toLowerCase().trim();
+
+    const filtered = queryLower
+      ? activeQuests.filter((q) => q.name.toLowerCase().includes(queryLower))
+      : activeQuests;
+
+    return filtered.slice(0, 25).map((q) => {
+      let lvlStr = "";
+      if (q.levelPF !== undefined && q.levelDnD !== undefined) {
+        lvlStr = `PF:${q.levelPF}/DnD:${q.levelDnD}`;
+      } else if (q.levelPF !== undefined) {
+        lvlStr = `PF:${q.levelPF}`;
+      } else if (q.levelDnD !== undefined) {
+        lvlStr = `DnD:${q.levelDnD}`;
+      } else if (q.level !== undefined) {
+        lvlStr = `Lvl ${q.level}`;
+      } else {
+        lvlStr = "TBD";
+      }
+
+      let dungeonTag = "";
+      if (q.isDungeon) {
+        const total = q.totalDungeonLevels || 1;
+        const cur = q.currentDungeonLevel || 1;
+        const rem = Math.max(0, total - cur + 1);
+        dungeonTag = ` [🏰 ${rem} left]`;
+      }
+
+      const label = `${q.name} (${lvlStr})${dungeonTag}`.substring(0, 100);
+      return {
+        name: label,
+        value: q._id,
+      };
+    });
+  },
+});
+
+/**
+ * Returns full details for a quest to be suggested for voting in Discord.
+ */
+export const getQuestVoteDetails = query({
+  args: {
+    questId: v.id("quests"),
+    threadId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const quest = await ctx.db.get(args.questId);
+    if (!quest) return null;
+
+    let session = null;
+    if (args.threadId) {
+      session = await ctx.db
+        .query("sessions")
+        .withIndex("by_discordThreadId", (q) => q.eq("discordThreadId", args.threadId))
+        .first();
+    }
+
+    let worldName = "The Void (Global)";
+    if (quest.worldId) {
+      const w = await ctx.db.get(quest.worldId);
+      if (w) worldName = w.name;
+    }
+
+    return {
+      quest,
+      session,
+      worldName,
+    };
+  },
+});

@@ -504,7 +504,7 @@ export const notifySessionDetailsChanged = internalAction({
       new Set(
         attendingCharacters
           .map((c: any) => c?.discordId)
-          .filter((id): id is string => Boolean(id) && id !== session.gmDiscordId)
+          .filter((id: any): id is string => Boolean(id) && id !== session.gmDiscordId)
       )
     );
 
@@ -1027,6 +1027,147 @@ export const resyncSessionDiscord = action({
 });
 
 
+
+/**
+ * Posts a quest vote proposal to a Discord channel/thread, adds 👍 / 👎 reactions, and pins the message.
+ */
+export const postQuestVote = action({
+  args: {
+    channelId: v.string(),
+    questId: v.string(),
+    suggestedByDiscordId: v.optional(v.string()),
+    suggestedByName: v.optional(v.string()),
+  },
+  handler: async (ctx, args): Promise<{ messageId: string; questName: string }> => {
+    const botToken = process.env.DISCORD_BOT_TOKEN;
+    if (!botToken) {
+      throw new Error("Discord bot token not configured");
+    }
+
+    const details: any = await ctx.runQuery(api.discordInteractions.getQuestVoteDetails, {
+      questId: args.questId as Id<"quests">,
+      threadId: args.channelId,
+    });
+
+    if (!details || !details.quest) {
+      throw new Error("Quest not found");
+    }
+
+    const q = details.quest;
+    const session = details.session;
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://guild.tarragon.be";
+
+    const questUrl = session
+      ? `${baseUrl}/sessions/${session._id}`
+      : `${baseUrl}/world/${encodeURIComponent(details.worldName)}`;
+
+    const qLevel = getQuestLevelStr(q);
+    const authorStr = args.suggestedByDiscordId
+      ? `<@${args.suggestedByDiscordId}>`
+      : (args.suggestedByName || "A player");
+
+    let desc = q.description || "";
+    if (desc.length > 300) {
+      desc = desc.substring(0, 297) + "...";
+    }
+
+    const fields: any[] = [
+      { name: "Difficulty / Level", value: qLevel, inline: true },
+      { name: "World", value: details.worldName, inline: true },
+    ];
+
+    if (q.reward) {
+      fields.push({
+        name: "Reward",
+        value: `${q.reward}${q.rewardType === 'per_person' ? ' (per person)' : ' (party total)'}`,
+        inline: true,
+      });
+    }
+
+    if (q.questgiver) {
+      fields.push({ name: "Questgiver", value: q.questgiver, inline: true });
+    }
+
+    if (q.isDungeon && q.dungeonEntrances && q.dungeonEntrances.length > 0) {
+      const entList = q.dungeonEntrances
+        .map((e: any) => `• **${e.name}**: Start Level ${e.startLevel}`)
+        .join("\n");
+      fields.push({ name: "🚪 Dungeon Entrances", value: entList, inline: false });
+    }
+
+    const embed: any = {
+      title: `🗳️ Quest Proposal: ${q.name}`,
+      url: questUrl,
+      description: desc ? `> ${desc.replace(/\n+/g, "\n> ")}` : undefined,
+      color: q.isDungeon ? 0xf97316 : 0x3b82f6,
+      fields,
+      footer: {
+        text: "Vote with 👍 (Yes) or 👎 (No) below! • Void Guild",
+      },
+      timestamp: new Date().toISOString(),
+    };
+
+    const content = `🗳️ ${authorStr} suggested a quest for this session! React with 👍 or 👎 to vote:`;
+
+    // 1. Post proposal message
+    const postRes = await fetch(`${DISCORD_API_BASE}/channels/${args.channelId}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bot ${botToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        content,
+        embeds: [embed],
+      }),
+    });
+
+    if (!postRes.ok) {
+      const err = await postRes.text();
+      throw new Error(`Failed to post message to Discord (${postRes.status}): ${err}`);
+    }
+
+    const messageData: any = await postRes.json();
+    const messageId: string = messageData.id;
+
+    // 2. Add reactions: 👍 (%F0%9F%91%8D) and 👎 (%F0%9F%91%8E)
+    try {
+      await fetch(
+        `${DISCORD_API_BASE}/channels/${args.channelId}/messages/${messageId}/reactions/%F0%9F%91%8D/@me`,
+        {
+          method: "PUT",
+          headers: { Authorization: `Bot ${botToken}` },
+        }
+      );
+      await fetch(
+        `${DISCORD_API_BASE}/channels/${args.channelId}/messages/${messageId}/reactions/%F0%9F%91%8E/@me`,
+        {
+          method: "PUT",
+          headers: { Authorization: `Bot ${botToken}` },
+        }
+      );
+    } catch (reactErr) {
+      console.warn("Could not add initial reactions to vote message:", reactErr);
+    }
+
+    // 3. Pin the message in the channel/thread
+    try {
+      await fetch(`${DISCORD_API_BASE}/channels/${args.channelId}/pins/${messageId}`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bot ${botToken}`,
+        },
+      });
+    } catch (pinErr) {
+      console.warn("Could not pin quest vote message:", pinErr);
+    }
+
+    return {
+      messageId,
+      questName: q.name,
+    };
+  },
+});
 
 /**
  * Locks and archives a Discord thread.

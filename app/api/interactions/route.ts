@@ -85,6 +85,20 @@ export async function POST(req: Request) {
           },
         }), { headers: { 'Content-Type': 'application/json' } });
       }
+
+      if (name === 'quest-vote' || name === 'vote-quest' || name === 'suggest-quest') {
+        const results = await convex.query(api.discordInteractions.searchQuestsForSession, {
+          query: queryArg,
+          threadId: interaction.channel_id || interaction.channel?.id,
+        });
+
+        return new Response(JSON.stringify({
+          type: 8,
+          data: {
+            choices: results.map(r => ({ name: r.name, value: r.value }))
+          },
+        }), { headers: { 'Content-Type': 'application/json' } });
+      }
     }
 
     if (interaction.type === 2) { // APPLICATION_COMMAND
@@ -748,6 +762,54 @@ export async function POST(req: Request) {
           return new Response(JSON.stringify({
             type: 4,
             data: { content: "Error searching Archives of Nethys." },
+          }), { headers: { 'Content-Type': 'application/json' } });
+        }
+      }
+
+      // 13. /suggest-quest or /vote-quest <quest>
+      if (name === 'quest-vote' || name === 'vote-quest' || name === 'suggest-quest') {
+        const questId = options?.find((o: any) => o.name === 'quest')?.value || options?.[0]?.value;
+        const channelId = interaction.channel_id || interaction.channel?.id;
+
+        if (!questId) {
+          return new Response(JSON.stringify({
+            type: 4,
+            data: { content: "Please select a quest to vote on.", flags: 64 },
+          }), { headers: { 'Content-Type': 'application/json' } });
+        }
+
+        if (!channelId) {
+          return new Response(JSON.stringify({
+            type: 4,
+            data: { content: "This command can only be used in a Discord channel or session forum thread.", flags: 64 },
+          }), { headers: { 'Content-Type': 'application/json' } });
+        }
+
+        try {
+          const userDiscordId = interaction.member?.user?.id || interaction.user?.id;
+          const userDisplayName = interaction.member?.nick || interaction.member?.user?.global_name || interaction.member?.user?.username || interaction.user?.global_name || interaction.user?.username;
+
+          // Call the Convex action to post, react with 👍 / 👎, and pin
+          await convex.action(api.discord.postQuestVote, {
+            channelId,
+            questId,
+            suggestedByDiscordId: userDiscordId,
+            suggestedByName: userDisplayName,
+          });
+
+          // Acknowledge ephemeral so caller knows it succeeded
+          return new Response(JSON.stringify({
+            type: 4,
+            data: {
+              content: "✅ Quest proposal posted, pinned, and open for voting!",
+              flags: 64, // Ephemeral confirmation to the user
+            },
+          }), { headers: { 'Content-Type': 'application/json' } });
+        } catch (e: any) {
+          console.error("Error creating quest vote:", e);
+          return new Response(JSON.stringify({
+            type: 4,
+            data: { content: `Failed to suggest quest for voting: ${e?.message || 'Unknown error'}`, flags: 64 },
           }), { headers: { 'Content-Type': 'application/json' } });
         }
       }

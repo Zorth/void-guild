@@ -93,6 +93,7 @@ export default defineSchema({
     .index('by_owner', ['owner'])
     .index('by_world', ['world'])
     .index('by_date', ['date'])
+    .index('by_discordThreadId', ['discordThreadId'])
     .index('by_guildmaster_cut', ['guildmasterCut.characterId']),
     worlds: defineTable({
         name: v.string(),

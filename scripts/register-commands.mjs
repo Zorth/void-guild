@@ -158,6 +158,19 @@ async function registerCommands() {
             required: true,
           }
         ]
+      },
+      {
+        name: 'vote-quest',
+        description: 'Suggest a quest for voting in a session thread or channel with pinned 👍 / 👎 reactions',
+        options: [
+          {
+            name: 'quest',
+            description: 'Select an available quest to put up for vote',
+            type: 3, // STRING
+            required: true,
+            autocomplete: true,
+          }
+        ]
       }
     ]),
   });
