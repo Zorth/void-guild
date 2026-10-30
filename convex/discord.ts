@@ -1028,86 +1028,158 @@ export const resyncSessionDiscord = action({
 
 
 
+const VOTE_NUMBER_EMOJIS = [
+  "1️⃣", // 1%EF%B8%8F%E2%83%A3
+  "2️⃣", // 2%EF%B8%8F%E2%83%A3
+  "3️⃣", // 3%EF%B8%8F%E2%83%A3
+  "4️⃣", // 4%EF%B8%8F%E2%83%A3
+  "5️⃣", // 5%EF%B8%8F%E2%83%A3
+];
+
+const VOTE_NUMBER_URL_ENCODED = [
+  "1%EF%B8%8F%E2%83%A3",
+  "2%EF%B8%8F%E2%83%A3",
+  "3%EF%B8%8F%E2%83%A3",
+  "4%EF%B8%8F%E2%83%A3",
+  "5%EF%B8%8F%E2%83%A3",
+];
+
 /**
- * Posts a quest vote proposal to a Discord channel/thread, adds 👍 / 👎 reactions, and pins the message.
+ * Posts a quest/plotline vote proposal to a Discord channel/thread, adds reactions, and pins the message.
+ * Supports single quest (👍 / 👎) or multiple choice (1️⃣, 2️⃣, 3️⃣...) with custom plotline options.
  */
 export const postQuestVote = action({
   args: {
     channelId: v.string(),
-    questId: v.string(),
+    options: v.array(v.string()), // 1 to 5 options (quest IDs or freeform text)
     suggestedByDiscordId: v.optional(v.string()),
     suggestedByName: v.optional(v.string()),
   },
-  handler: async (ctx, args): Promise<{ messageId: string; questName: string }> => {
+  handler: async (ctx, args): Promise<{ messageId: string; optionCount: number }> => {
     const botToken = process.env.DISCORD_BOT_TOKEN;
     if (!botToken) {
       throw new Error("Discord bot token not configured");
     }
 
-    const details: any = await ctx.runQuery(api.discordInteractions.getQuestVoteDetails, {
-      questId: args.questId as Id<"quests">,
+    const filteredOptions = args.options.map(o => o.trim()).filter(Boolean).slice(0, 5);
+    if (filteredOptions.length === 0) {
+      throw new Error("At least one quest or plotline option is required");
+    }
+
+    const details: any = await ctx.runQuery(api.discordInteractions.getMultiQuestVoteDetails, {
+      options: filteredOptions,
       threadId: args.channelId,
     });
 
-    if (!details || !details.quest) {
-      throw new Error("Quest not found");
+    if (!details || !details.options || details.options.length === 0) {
+      throw new Error("Could not resolve voting options");
     }
 
-    const q = details.quest;
     const session = details.session;
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://guild.tarragon.be";
-
-    const questUrl = session
-      ? `${baseUrl}/sessions/${session._id}`
-      : `${baseUrl}/world/${encodeURIComponent(details.worldName)}`;
-
-    const qLevel = getQuestLevelStr(q);
     const authorStr = args.suggestedByDiscordId
       ? `<@${args.suggestedByDiscordId}>`
       : (args.suggestedByName || "A player");
 
-    let desc = q.description || "";
-    if (desc.length > 300) {
-      desc = desc.substring(0, 297) + "...";
-    }
+    const isMultipleChoice = details.options.length > 1;
 
-    const fields: any[] = [
-      { name: "Difficulty / Level", value: qLevel, inline: true },
-      { name: "World", value: details.worldName, inline: true },
-    ];
+    let embedTitle = "";
+    let embedDescription = "";
+    const fields: any[] = [];
+    let embedColor = 0x3b82f6;
 
-    if (q.reward) {
-      fields.push({
-        name: "Reward",
-        value: `${q.reward}${q.rewardType === 'per_person' ? ' (per person)' : ' (party total)'}`,
-        inline: true,
+    if (!isMultipleChoice) {
+      // Single Option (Yes/No vote with 👍 / 👎)
+      const opt = details.options[0];
+      if (opt.type === "quest") {
+        const q = opt.quest;
+        embedTitle = `🗳️ Quest Proposal: ${q.name}`;
+        embedColor = q.isDungeon ? 0xf97316 : 0x3b82f6;
+        const qLevel = getQuestLevelStr(q);
+        const questUrl = session
+          ? `${baseUrl}/sessions/${session._id}`
+          : `${baseUrl}/world/${encodeURIComponent(opt.worldName)}`;
+
+        if (q.description) {
+          const desc = q.description.length > 300 ? q.description.substring(0, 297) + "..." : q.description;
+          embedDescription = `> ${desc.replace(/\n+/g, "\n> ")}`;
+        }
+
+        fields.push({ name: "Difficulty / Level", value: qLevel, inline: true });
+        fields.push({ name: "World", value: opt.worldName, inline: true });
+
+        if (q.reward) {
+          fields.push({
+            name: "Reward",
+            value: `${q.reward}${q.rewardType === 'per_person' ? ' (per person)' : ' (party total)'}`,
+            inline: true,
+          });
+        }
+        if (q.questgiver) {
+          fields.push({ name: "Questgiver", value: q.questgiver, inline: true });
+        }
+        if (q.isDungeon && q.dungeonEntrances && q.dungeonEntrances.length > 0) {
+          const entList = q.dungeonEntrances
+            .map((e: any) => `• **${e.name}**: Start Level ${e.startLevel}`)
+            .join("\n");
+          fields.push({ name: "🚪 Dungeon Entrances", value: entList, inline: false });
+        }
+      } else {
+        // Single custom plotline
+        embedTitle = `🗳️ Plotline Proposal: ${opt.title}`;
+        embedColor = 0x8b5cf6;
+        fields.push({ name: "World", value: details.defaultWorldName, inline: true });
+        fields.push({ name: "Type", value: "Custom Plotline / Objective", inline: true });
+      }
+    } else {
+      // Multiple Choice poll (1️⃣, 2️⃣, 3️⃣...)
+      embedTitle = `🗳️ Session Quest & Plotline Vote`;
+      embedColor = 0x8b5cf6;
+      embedDescription = "Vote for your preferred adventure path by reacting with the corresponding number below:";
+
+      details.options.forEach((opt: any, index: number) => {
+        const numEmoji = VOTE_NUMBER_EMOJIS[index] || `${index + 1}.`;
+        if (opt.type === "quest") {
+          const q = opt.quest;
+          const qLevel = getQuestLevelStr(q);
+          let val = `**Level:** ${qLevel} • **World:** ${opt.worldName}`;
+          if (q.reward) {
+            val += `\n**Reward:** ${q.reward}`;
+          }
+          if (q.isDungeon && q.dungeonEntrances && q.dungeonEntrances.length > 0) {
+            val += `\n*Entrances: ${q.dungeonEntrances.map((e: any) => `${e.name} (Lvl ${e.startLevel})`).join(", ")}*`;
+          }
+          fields.push({
+            name: `${numEmoji} ${q.name}`,
+            value: val,
+            inline: false,
+          });
+        } else {
+          fields.push({
+            name: `${numEmoji} ${opt.title}`,
+            value: `*Custom Plotline / Free-form Adventure Objective*`,
+            inline: false,
+          });
+        }
       });
     }
 
-    if (q.questgiver) {
-      fields.push({ name: "Questgiver", value: q.questgiver, inline: true });
-    }
-
-    if (q.isDungeon && q.dungeonEntrances && q.dungeonEntrances.length > 0) {
-      const entList = q.dungeonEntrances
-        .map((e: any) => `• **${e.name}**: Start Level ${e.startLevel}`)
-        .join("\n");
-      fields.push({ name: "🚪 Dungeon Entrances", value: entList, inline: false });
-    }
-
     const embed: any = {
-      title: `🗳️ Quest Proposal: ${q.name}`,
-      url: questUrl,
-      description: desc ? `> ${desc.replace(/\n+/g, "\n> ")}` : undefined,
-      color: q.isDungeon ? 0xf97316 : 0x3b82f6,
+      title: embedTitle,
+      description: embedDescription || undefined,
+      color: embedColor,
       fields,
       footer: {
-        text: "Vote with 👍 (Yes) or 👎 (No) below! • Void Guild",
+        text: isMultipleChoice
+          ? `React with 1️⃣ to ${VOTE_NUMBER_EMOJIS[details.options.length - 1]} to vote! • Void Guild`
+          : "Vote with 👍 (Yes) or 👎 (No) below! • Void Guild",
       },
       timestamp: new Date().toISOString(),
     };
 
-    const content = `🗳️ ${authorStr} suggested a quest for this session! React with 👍 or 👎 to vote:`;
+    const content = isMultipleChoice
+      ? `🗳️ ${authorStr} proposed **${details.options.length} options** for this session! Vote with the numbers below:`
+      : `🗳️ ${authorStr} suggested a quest/plotline for this session! React with 👍 or 👎 to vote:`;
 
     // 1. Post proposal message
     const postRes = await fetch(`${DISCORD_API_BASE}/channels/${args.channelId}/messages`, {
@@ -1130,22 +1202,37 @@ export const postQuestVote = action({
     const messageData: any = await postRes.json();
     const messageId: string = messageData.id;
 
-    // 2. Add reactions: 👍 (%F0%9F%91%8D) and 👎 (%F0%9F%91%8E)
+    // 2. Add reactions
     try {
-      await fetch(
-        `${DISCORD_API_BASE}/channels/${args.channelId}/messages/${messageId}/reactions/%F0%9F%91%8D/@me`,
-        {
-          method: "PUT",
-          headers: { Authorization: `Bot ${botToken}` },
+      if (isMultipleChoice) {
+        for (let i = 0; i < details.options.length; i++) {
+          const encEmoji = VOTE_NUMBER_URL_ENCODED[i];
+          if (encEmoji) {
+            await fetch(
+              `${DISCORD_API_BASE}/channels/${args.channelId}/messages/${messageId}/reactions/${encEmoji}/@me`,
+              {
+                method: "PUT",
+                headers: { Authorization: `Bot ${botToken}` },
+              }
+            );
+          }
         }
-      );
-      await fetch(
-        `${DISCORD_API_BASE}/channels/${args.channelId}/messages/${messageId}/reactions/%F0%9F%91%8E/@me`,
-        {
-          method: "PUT",
-          headers: { Authorization: `Bot ${botToken}` },
-        }
-      );
+      } else {
+        await fetch(
+          `${DISCORD_API_BASE}/channels/${args.channelId}/messages/${messageId}/reactions/%F0%9F%91%8D/@me`,
+          {
+            method: "PUT",
+            headers: { Authorization: `Bot ${botToken}` },
+          }
+        );
+        await fetch(
+          `${DISCORD_API_BASE}/channels/${args.channelId}/messages/${messageId}/reactions/%F0%9F%91%8E/@me`,
+          {
+            method: "PUT",
+            headers: { Authorization: `Bot ${botToken}` },
+          }
+        );
+      }
     } catch (reactErr) {
       console.warn("Could not add initial reactions to vote message:", reactErr);
     }
@@ -1164,7 +1251,7 @@ export const postQuestVote = action({
 
     return {
       messageId,
-      questName: q.name,
+      optionCount: details.options.length,
     };
   },
 });

@@ -87,15 +87,31 @@ export async function POST(req: Request) {
       }
 
       if (name === 'quest-vote' || name === 'vote-quest' || name === 'suggest-quest') {
+        const focusedOption = options?.find((o: any) => o.focused);
+        const queryVal = focusedOption ? focusedOption.value : queryArg;
         const results = await convex.query(api.discordInteractions.searchQuestsForSession, {
-          query: queryArg,
+          query: queryVal || "",
           threadId: interaction.channel_id || interaction.channel?.id,
         });
+
+        const choices: any[] = results.map(r => ({ name: r.name, value: r.value }));
+
+        // If the user typed custom text that doesn't match an existing quest ID, offer a free-form custom option
+        if (queryVal && queryVal.trim().length > 0) {
+          const trimmed = queryVal.trim();
+          const alreadyMatchedExact = choices.some(c => c.name.toLowerCase() === trimmed.toLowerCase());
+          if (!alreadyMatchedExact) {
+            choices.unshift({
+              name: `📝 Custom: "${trimmed.substring(0, 85)}"`,
+              value: trimmed.substring(0, 100),
+            });
+          }
+        }
 
         return new Response(JSON.stringify({
           type: 8,
           data: {
-            choices: results.map(r => ({ name: r.name, value: r.value }))
+            choices: choices.slice(0, 25),
           },
         }), { headers: { 'Content-Type': 'application/json' } });
       }
@@ -766,15 +782,25 @@ export async function POST(req: Request) {
         }
       }
 
-      // 13. /suggest-quest or /vote-quest <quest>
+      // 13. /suggest-quest or /vote-quest <option1> [option2] ...
       if (name === 'quest-vote' || name === 'vote-quest' || name === 'suggest-quest') {
-        const questId = options?.find((o: any) => o.name === 'quest')?.value || options?.[0]?.value;
+        const optionKeys = ['option1', 'option2', 'option3', 'option4', 'option5', 'quest'];
+        const extractedOptions: string[] = [];
+
+        if (Array.isArray(options)) {
+          for (const opt of options) {
+            if (typeof opt?.value === 'string' && opt.value.trim().length > 0) {
+              extractedOptions.push(opt.value.trim());
+            }
+          }
+        }
+
         const channelId = interaction.channel_id || interaction.channel?.id;
 
-        if (!questId) {
+        if (extractedOptions.length === 0) {
           return new Response(JSON.stringify({
             type: 4,
-            data: { content: "Please select a quest to vote on.", flags: 64 },
+            data: { content: "Please provide at least one quest or custom plotline to vote on.", flags: 64 },
           }), { headers: { 'Content-Type': 'application/json' } });
         }
 
@@ -789,19 +815,22 @@ export async function POST(req: Request) {
           const userDiscordId = interaction.member?.user?.id || interaction.user?.id;
           const userDisplayName = interaction.member?.nick || interaction.member?.user?.global_name || interaction.member?.user?.username || interaction.user?.global_name || interaction.user?.username;
 
-          // Call the Convex action to post, react with 👍 / 👎, and pin
-          await convex.action(api.discord.postQuestVote, {
+          // Call the Convex action to post, add reactions (👍/👎 or 1️⃣/2️⃣/3️⃣...), and pin
+          const result = await convex.action(api.discord.postQuestVote, {
             channelId,
-            questId,
+            options: extractedOptions,
             suggestedByDiscordId: userDiscordId,
             suggestedByName: userDisplayName,
           });
 
-          // Acknowledge ephemeral so caller knows it succeeded
+          const countMsg = result.optionCount > 1
+            ? `with ${result.optionCount} multiple choice options`
+            : "proposal";
+
           return new Response(JSON.stringify({
             type: 4,
             data: {
-              content: "✅ Quest proposal posted, pinned, and open for voting!",
+              content: `✅ Quest/plotline vote ${countMsg} posted, pinned, and open for voting!`,
               flags: 64, // Ephemeral confirmation to the user
             },
           }), { headers: { 'Content-Type': 'application/json' } });

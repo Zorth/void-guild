@@ -675,17 +675,14 @@ export const searchQuestsForSession = query({
 });
 
 /**
- * Returns full details for a quest to be suggested for voting in Discord.
+ * Returns full details for one or more quest/custom options to be suggested for voting in Discord.
  */
-export const getQuestVoteDetails = query({
+export const getMultiQuestVoteDetails = query({
   args: {
-    questId: v.id("quests"),
+    options: v.array(v.string()), // Array of quest IDs or free-form strings
     threadId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const quest = await ctx.db.get(args.questId);
-    if (!quest) return null;
-
     let session = null;
     if (args.threadId) {
       session = await ctx.db
@@ -694,16 +691,46 @@ export const getQuestVoteDetails = query({
         .first();
     }
 
-    let worldName = "The Void (Global)";
-    if (quest.worldId) {
-      const w = await ctx.db.get(quest.worldId);
-      if (w) worldName = w.name;
+    let defaultWorldName = "The Void (Global)";
+    if (session?.world) {
+      const w = await ctx.db.get(session.world);
+      if (w) defaultWorldName = w.name;
     }
 
+    const resolvedOptions = await Promise.all(
+      args.options.map(async (rawOpt) => {
+        const trimmed = rawOpt.trim();
+        // Check if rawOpt is a valid quest ID
+        const normalizedId = ctx.db.normalizeId("quests", trimmed);
+        if (normalizedId) {
+          const quest = await ctx.db.get(normalizedId);
+          if (quest) {
+            let worldName = defaultWorldName;
+            if (quest.worldId) {
+              const qw = await ctx.db.get(quest.worldId);
+              if (qw) worldName = qw.name;
+            }
+            return {
+              type: "quest" as const,
+              quest,
+              worldName,
+            };
+          }
+        }
+
+        // Free-form / custom plotline option
+        return {
+          type: "custom" as const,
+          title: trimmed,
+          worldName: defaultWorldName,
+        };
+      })
+    );
+
     return {
-      quest,
       session,
-      worldName,
+      defaultWorldName,
+      options: resolvedOptions,
     };
   },
 });

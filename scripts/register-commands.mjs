@@ -161,13 +161,41 @@ async function registerCommands() {
       },
       {
         name: 'vote-quest',
-        description: 'Suggest a quest for voting in a session thread or channel with pinned 👍 / 👎 reactions',
+        description: 'Suggest quest(s) or plotline(s) for voting with pinned reaction poll',
         options: [
           {
-            name: 'quest',
-            description: 'Select an available quest to put up for vote',
+            name: 'option1',
+            description: 'First quest or custom plotline (pick from list or type custom text)',
             type: 3, // STRING
             required: true,
+            autocomplete: true,
+          },
+          {
+            name: 'option2',
+            description: 'Second quest or custom plotline (optional for multiple choice)',
+            type: 3, // STRING
+            required: false,
+            autocomplete: true,
+          },
+          {
+            name: 'option3',
+            description: 'Third quest or custom plotline',
+            type: 3, // STRING
+            required: false,
+            autocomplete: true,
+          },
+          {
+            name: 'option4',
+            description: 'Fourth quest or custom plotline',
+            type: 3, // STRING
+            required: false,
+            autocomplete: true,
+          },
+          {
+            name: 'option5',
+            description: 'Fifth quest or custom plotline',
+            type: 3, // STRING
+            required: false,
             autocomplete: true,
           }
         ]
