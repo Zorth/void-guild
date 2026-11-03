@@ -22,6 +22,7 @@ export const createQuest = mutation({
     isHidden: v.optional(v.boolean()),
     isDungeon: v.optional(v.boolean()),
     totalDungeonLevels: v.optional(v.number()),
+    showTotalDungeonLevels: v.optional(v.boolean()),
     currentDungeonLevel: v.optional(v.number()),
     dungeonEntrances: v.optional(v.array(v.object({
       name: v.string(),
@@ -126,6 +127,7 @@ export const createQuest = mutation({
 
     const isDungeon = Boolean(args.isDungeon)
     const totalDungeonLevels = isDungeon ? Math.max(1, Math.round(args.totalDungeonLevels || 1)) : undefined
+    const showTotalDungeonLevels = isDungeon ? Boolean(args.showTotalDungeonLevels) : undefined
     const currentDungeonLevel = isDungeon ? Math.max(1, Math.round(args.currentDungeonLevel || 1)) : undefined
     const dungeonEntrances = isDungeon && args.dungeonEntrances && args.dungeonEntrances.length > 0
       ? args.dungeonEntrances.map(e => ({
@@ -146,6 +148,7 @@ export const createQuest = mutation({
       levelDnD: levelDnD === null ? undefined : levelDnD,
       isDungeon,
       totalDungeonLevels,
+      showTotalDungeonLevels,
       currentDungeonLevel,
       dungeonEntrances,
       completedSessionIds: [],
@@ -187,6 +190,7 @@ export const updateQuest = mutation({
     isHidden: v.optional(v.boolean()),
     isDungeon: v.optional(v.boolean()),
     totalDungeonLevels: v.optional(v.number()),
+    showTotalDungeonLevels: v.optional(v.boolean()),
     currentDungeonLevel: v.optional(v.number()),
     dungeonEntrances: v.optional(v.array(v.object({
       name: v.string(),
@@ -308,6 +312,9 @@ export const updateQuest = mutation({
     const effectiveTotalDungeonLevels = effectiveIsDungeon
       ? (args.totalDungeonLevels !== undefined ? Math.max(1, Math.round(args.totalDungeonLevels)) : (quest.totalDungeonLevels || 1))
       : undefined
+    const effectiveShowTotalDungeonLevels = effectiveIsDungeon
+      ? (args.showTotalDungeonLevels !== undefined ? Boolean(args.showTotalDungeonLevels) : Boolean(quest.showTotalDungeonLevels))
+      : undefined
     const effectiveCurrentDungeonLevel = effectiveIsDungeon
       ? (args.currentDungeonLevel !== undefined ? Math.max(1, Math.round(args.currentDungeonLevel)) : (quest.currentDungeonLevel || 1))
       : undefined
@@ -346,6 +353,7 @@ export const updateQuest = mutation({
       isHidden: effectiveIsHidden,
       isDungeon: effectiveIsDungeon,
       totalDungeonLevels: effectiveTotalDungeonLevels,
+      showTotalDungeonLevels: effectiveShowTotalDungeonLevels,
       currentDungeonLevel: effectiveCurrentDungeonLevel,
       dungeonEntrances: effectiveDungeonEntrances,
     })
@@ -684,6 +692,45 @@ export const toggleQuestHidden = mutation({
     })
 
     return nextHidden
+  },
+})
+
+export const toggleShowTotalDungeonLevels = mutation({
+  args: {
+    questId: v.id('quests'),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    const quest = await ctx.db.get(args.questId)
+    if (!quest) throw new Error('Quest not found')
+    if (!quest.isDungeon) throw new Error('Quest is not a dungeon')
+
+    const isAdminUser = await isAdmin(ctx)
+    let isWorldOwner = false
+    if (quest.worldId) {
+      const world = await ctx.db.get(quest.worldId)
+      isWorldOwner = Boolean(world && (world.owner === user.subject || world.owner === user.tokenIdentifier))
+    } else {
+      isWorldOwner = isAdminUser
+    }
+
+    if (!isWorldOwner && !isAdminUser) {
+      throw new Error('Only the world owner or an admin can toggle total dungeon level visibility.')
+    }
+
+    const nextShow = !quest.showTotalDungeonLevels
+    await ctx.db.patch(args.questId, {
+      showTotalDungeonLevels: nextShow,
+    })
+
+    await syncActiveSessionsForQuestChange(ctx, quest.worldId, {
+      affectedQuestId: args.questId,
+      isRemovedOrCompleted: false,
+    })
+
+    return nextShow
   },
 })
 

@@ -28,18 +28,21 @@ export const getQuestLevelStr = (q: any, compact = false): string => {
   else if (dnd !== undefined) base = `Lvl DnD:${dnd}`;
 
   if (q.isDungeon) {
+    const showTotal = Boolean(q.showTotalDungeonLevels);
     const total = q.totalDungeonLevels || 1;
     const current = q.currentDungeonLevel || 1;
     const remaining = Math.max(0, total - current + 1);
     const entrances = q.dungeonEntrances || [];
     if (compact) {
-      base += ` 🏰 [${remaining} left]`;
+      base += showTotal ? ` 🏰 [${remaining} left]` : ` 🏰 [Dungeon]`;
     } else {
       let entStr = "";
       if (entrances.length > 1) {
         entStr = ` • Entrances: ${entrances.map((e: any) => `Lvl ${e.startLevel}`).join(", ")}`;
       }
-      base += ` 🏰 Dungeon (${remaining} session${remaining === 1 ? '' : 's'} left${entStr})`;
+      base += showTotal
+        ? ` 🏰 Dungeon (${remaining} session${remaining === 1 ? '' : 's'} left${entStr})`
+        : ` 🏰 Dungeon${entStr ? ` (${entStr.replace(/^ • /, '')})` : ''}`;
     }
   }
   return base;

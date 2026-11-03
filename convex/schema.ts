@@ -171,6 +171,7 @@ export default defineSchema({
         // Dungeon fields
         isDungeon: v.optional(v.boolean()), // True if this quest is a dungeon with multiple sequential levels
         totalDungeonLevels: v.optional(v.number()), // Total number of levels / sessions required (e.g. 3)
+        showTotalDungeonLevels: v.optional(v.boolean()), // If true, total floors/remaining sessions are visible to players (hidden by default)
         currentDungeonLevel: v.optional(v.number()), // Current level index completed / reached (1-based, starts at 1)
         dungeonEntrances: v.optional(v.array(v.object({
             name: v.string(), // e.g. "Main Gate", "Flooded Underhalls", "Upper Spire"

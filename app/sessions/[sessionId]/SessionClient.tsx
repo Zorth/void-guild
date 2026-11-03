@@ -1069,13 +1069,17 @@ export default function SessionClient() {
                                             const total = (q as any).totalDungeonLevels || 1
                                             const current = (q as any).currentDungeonLevel || 1
                                             const remaining = Math.max(0, total - current + 1)
+                                            const showTotal = Boolean((q as any).showTotalDungeonLevels || isOwnerOrAdmin)
                                             return (
                                                 <span 
                                                     className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/40 ml-1 shadow-xs"
-                                                    title={`Dungeon Quest: Floor ${current}/${total} (${remaining} session${remaining === 1 ? '' : 's'} remaining)`}
+                                                    title={showTotal 
+                                                        ? `Dungeon Quest: Floor ${current}/${total} (${remaining} session${remaining === 1 ? '' : 's'} remaining)`
+                                                        : `Dungeon Quest: Floor ${current}`
+                                                    }
                                                 >
                                                     <Castle className="h-2.5 w-2.5 text-orange-400" />
-                                                    Dungeon ({remaining} left)
+                                                    Dungeon{showTotal ? ` (${remaining} left)` : ''}
                                                 </span>
                                             )
                                         })()}

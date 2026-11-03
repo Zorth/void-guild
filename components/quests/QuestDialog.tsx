@@ -46,6 +46,7 @@ interface QuestDialogProps {
     netCost?: string
     isDungeon?: boolean
     totalDungeonLevels?: number
+    showTotalDungeonLevels?: boolean
     currentDungeonLevel?: number
     dungeonEntrances?: Array<{
       name: string
@@ -70,6 +71,7 @@ export default function QuestDialog({ isOpen, onClose, worldId, isWorldOwner = f
   const [isHidden, setIsHidden] = useState(false)
   const [isDungeon, setIsDungeon] = useState(false)
   const [totalDungeonLevels, setTotalDungeonLevels] = useState<number>(3)
+  const [showTotalDungeonLevels, setShowTotalDungeonLevels] = useState<boolean>(false)
   const [currentDungeonLevel, setCurrentDungeonLevel] = useState<number>(1)
   const [dungeonEntrances, setDungeonEntrances] = useState<Array<{ name: string; startLevel: number; levelPF?: number; levelDnD?: number }>>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -94,6 +96,7 @@ export default function QuestDialog({ isOpen, onClose, worldId, isWorldOwner = f
       setIsHidden(Boolean(quest.isHidden))
       setIsDungeon(Boolean(quest.isDungeon))
       setTotalDungeonLevels(quest.totalDungeonLevels || 3)
+      setShowTotalDungeonLevels(Boolean(quest.showTotalDungeonLevels))
       setCurrentDungeonLevel(quest.currentDungeonLevel || 1)
       setDungeonEntrances(quest.dungeonEntrances || [])
     } else {
@@ -110,6 +113,7 @@ export default function QuestDialog({ isOpen, onClose, worldId, isWorldOwner = f
       setIsHidden(false)
       setIsDungeon(false)
       setTotalDungeonLevels(3)
+      setShowTotalDungeonLevels(false)
       setCurrentDungeonLevel(1)
       setDungeonEntrances([])
     }
@@ -147,6 +151,7 @@ export default function QuestDialog({ isOpen, onClose, worldId, isWorldOwner = f
           characterId: quest.characterId,
           isDungeon,
           totalDungeonLevels: isDungeon ? Math.max(1, totalDungeonLevels) : undefined,
+          showTotalDungeonLevels: isDungeon ? showTotalDungeonLevels : undefined,
           currentDungeonLevel: isDungeon ? Math.max(1, currentDungeonLevel) : undefined,
           dungeonEntrances: isDungeon && dungeonEntrances.length > 0 ? dungeonEntrances.filter(e => e.name.trim()) : undefined,
         })
@@ -166,6 +171,7 @@ export default function QuestDialog({ isOpen, onClose, worldId, isWorldOwner = f
           isHidden,
           isDungeon,
           totalDungeonLevels: isDungeon ? Math.max(1, totalDungeonLevels) : undefined,
+          showTotalDungeonLevels: isDungeon ? showTotalDungeonLevels : undefined,
           currentDungeonLevel: isDungeon ? Math.max(1, currentDungeonLevel) : undefined,
           dungeonEntrances: isDungeon && dungeonEntrances.length > 0 ? dungeonEntrances.filter(e => e.name.trim()) : undefined,
         })
@@ -306,6 +312,28 @@ export default function QuestDialog({ isOpen, onClose, worldId, isWorldOwner = f
                       {Math.max(0, totalDungeonLevels - currentDungeonLevel + 1)} session(s) remaining
                     </p>
                   </div>
+                </div>
+
+                {/* Show Total Levels to Players Toggle (World Owner or Admin) */}
+                <div className="pt-2 border-t border-orange-500/20 flex items-center justify-between gap-3 text-xs">
+                  <div className="space-y-0.5">
+                    <label htmlFor="showTotalDungeonLevels" className="text-[11px] font-bold text-orange-200 cursor-pointer flex items-center gap-1.5 select-none">
+                      <span>Show Total Levels & Remaining to Players</span>
+                    </label>
+                    <p className="text-[10px] text-muted-foreground">
+                      {showTotalDungeonLevels
+                        ? "Visible to all players (e.g. 'Floor 1/3 (3 left)')."
+                        : "Hidden from players by default (players see only 'Floor 1' and 'Dungeon' badge)."}
+                    </p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    id="showTotalDungeonLevels"
+                    checked={showTotalDungeonLevels}
+                    onChange={(e) => setShowTotalDungeonLevels(e.target.checked)}
+                    disabled={!isWorldOwner && !isAdmin}
+                    className="h-4 w-4 rounded border-border text-orange-500 focus:ring-orange-500 cursor-pointer accent-orange-500 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
                 </div>
 
                 {/* Dungeon Entrances */}

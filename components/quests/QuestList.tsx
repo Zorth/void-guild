@@ -52,6 +52,7 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
   const approveSuggestedQuest = useMutation(api.quests.approveSuggestedQuest)
   const rejectSuggestedQuest = useMutation(api.quests.rejectSuggestedQuest)
   const toggleQuestHidden = useMutation(api.quests.toggleQuestHidden)
+  const toggleShowTotalDungeonLevels = useMutation(api.quests.toggleShowTotalDungeonLevels)
   const setDungeonLevel = useMutation(api.quests.setDungeonLevel)
 
   const effectiveWorldOwner = worldOwner ?? worldDoc?.owner
@@ -134,6 +135,15 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
       toast.success(currentHidden ? 'Quest is now visible to everyone' : 'Quest is now hidden from players')
     } catch (error: any) {
       toast.error(error.message || 'Failed to toggle quest visibility')
+    }
+  }
+
+  const handleToggleShowTotalDungeonLevels = async (questId: Id<'quests'>, currentShow: boolean) => {
+    try {
+      await toggleShowTotalDungeonLevels({ questId })
+      toast.success(currentShow ? 'Total dungeon levels now hidden from players' : 'Total dungeon levels now shown to players')
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to toggle dungeon floor visibility')
     }
   }
 
@@ -421,18 +431,34 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
                   {canEdit && (
                     <div className="flex items-center gap-0.5">
                       {isWorldOwner && (
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className={cn(
-                            "h-6 w-6", 
-                            quest.isHidden ? "text-amber-400 hover:text-amber-300 hover:bg-amber-500/10" : "text-muted-foreground hover:text-foreground"
-                          )} 
-                          onClick={() => handleToggleHidden(quest._id, Boolean(quest.isHidden))}
-                          title={quest.isHidden ? "Unhide quest (make visible to players)" : "Hide quest from players"}
-                        >
-                          {quest.isHidden ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                        </Button>
+                        <>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className={cn(
+                              "h-6 w-6", 
+                              quest.isHidden ? "text-amber-400 hover:text-amber-300 hover:bg-amber-500/10" : "text-muted-foreground hover:text-foreground"
+                            )} 
+                            onClick={() => handleToggleHidden(quest._id, Boolean(quest.isHidden))}
+                            title={quest.isHidden ? "Unhide quest (make visible to players)" : "Hide quest from players"}
+                          >
+                            {quest.isHidden ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                          </Button>
+                          {quest.isDungeon && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className={cn(
+                                "h-6 w-6", 
+                                quest.showTotalDungeonLevels ? "text-orange-400 hover:text-orange-300 hover:bg-orange-500/10" : "text-muted-foreground hover:text-foreground"
+                              )} 
+                              onClick={() => handleToggleShowTotalDungeonLevels(quest._id, Boolean(quest.showTotalDungeonLevels))}
+                              title={quest.showTotalDungeonLevels ? "Hide total dungeon levels from players" : "Show total dungeon levels to players"}
+                            >
+                              <Castle className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </>
                       )}
                       <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" onClick={() => handleEdit(quest)} title="Edit quest">
                         <Pencil className="h-3 w-3" />
@@ -497,16 +523,20 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
                               const remaining = Math.max(0, total - current + 1)
                               const entrances = quest.dungeonEntrances || []
                               const hasMultiple = entrances.length > 1
+                              const showTotal = Boolean(quest.showTotalDungeonLevels || isWorldOwner)
                               const entranceSummary = hasMultiple 
                                 ? ` • Entrances: ${entrances.map((e: any) => `Lvl ${e.startLevel}`).join(', ')}` 
                                 : ''
+                              const title = showTotal
+                                ? `Dungeon Quest: Floor ${current}/${total} (${remaining} session${remaining === 1 ? '' : 's'} remaining)${entranceSummary}`
+                                : `Dungeon Quest: Floor ${current}${entranceSummary}`
                               return (
                                 <span 
                                   className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/40 ml-1.5 align-middle shadow-xs shrink-0"
-                                  title={`Dungeon Quest: Floor ${current}/${total} (${remaining} session${remaining === 1 ? '' : 's'} remaining)${entranceSummary}`}
+                                  title={title}
                                 >
                                     <Castle className="h-2.5 w-2.5 text-orange-400" />
-                                    <span>Dungeon ({remaining} left)</span>
+                                    <span>Dungeon{showTotal ? ` (${remaining} left)` : ''}</span>
                                     {hasMultiple && (
                                       <span className="text-[8px] bg-orange-500/30 text-orange-200 px-1 rounded font-normal hidden sm:inline">
                                         {entrances.length} entrances
@@ -655,12 +685,21 @@ export default function QuestList({ worldId, worldOwner, isSidebar = false, filt
                                 const current = quest.currentDungeonLevel || 1
                                 const remaining = Math.max(0, total - current + 1)
                                 const entrances = quest.dungeonEntrances || []
+                                const showTotal = Boolean(quest.showTotalDungeonLevels || isWorldOwner)
                                 return (
                                     <div className="space-y-2">
                                         <div className="flex items-center gap-2 text-[11px] text-orange-300 bg-orange-500/10 border border-orange-500/20 rounded-md px-2.5 py-1.5 flex-wrap">
                                             <Castle className="h-3.5 w-3.5 text-orange-400 shrink-0" />
                                             <span>
-                                                <strong>Dungeon Quest:</strong> Progressing floor <strong>{current}</strong> of <strong>{total}</strong> ({remaining} session{remaining === 1 ? '' : 's'} remaining). Increases by 1 level after each completed session.
+                                                {showTotal ? (
+                                                    <>
+                                                        <strong>Dungeon Quest:</strong> Progressing floor <strong>{current}</strong> of <strong>{total}</strong> ({remaining} session{remaining === 1 ? '' : 's'} remaining). Increases by 1 level after each completed session.
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <strong>Dungeon Quest:</strong> Progressing floor <strong>{current}</strong>. Increases by 1 level after each completed session.
+                                                    </>
+                                                )}
                                             </span>
                                         </div>
                                         {entrances.length > 0 && (

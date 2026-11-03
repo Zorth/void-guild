@@ -17,6 +17,7 @@ interface QuestItem {
   reward?: string
   isDungeon?: boolean
   totalDungeonLevels?: number
+  showTotalDungeonLevels?: boolean
   currentDungeonLevel?: number
   dungeonEntrances?: Array<{
     name: string
@@ -164,13 +165,17 @@ export function MapQuestsPanel({
                         const total = quest.totalDungeonLevels || 1
                         const current = quest.currentDungeonLevel || 1
                         const remaining = Math.max(0, total - current + 1)
+                        const showTotal = Boolean(quest.showTotalDungeonLevels || isOwner)
                         return (
                           <span 
                             className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.2 rounded bg-orange-500/20 text-orange-300 border border-orange-500/30"
-                            title={`Dungeon Quest: Level ${current}/${total} (${remaining} session${remaining === 1 ? '' : 's'} remaining)`}
+                            title={showTotal 
+                              ? `Dungeon Quest: Level ${current}/${total} (${remaining} session${remaining === 1 ? '' : 's'} remaining)`
+                              : `Dungeon Quest: Level ${current}`
+                            }
                           >
                             <Castle className="h-2.5 w-2.5 text-orange-400" />
-                            {remaining} left
+                            {showTotal ? `${remaining} left` : 'Dungeon'}
                           </span>
                         )
                       })()}

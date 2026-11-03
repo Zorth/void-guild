@@ -227,13 +227,17 @@ export default function SessionManagement({
                                                 const remaining = Math.max(0, total - current + 1)
                                                 const entrances = (quest as any).dungeonEntrances || []
                                                 const hasMultiple = entrances.length > 1
+                                                const showTotal = Boolean((quest as any).showTotalDungeonLevels)
                                                 return (
                                                     <span 
                                                         className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/40 shrink-0"
-                                                        title={`Dungeon Quest: Floor ${current}/${total} (${remaining} session${remaining === 1 ? '' : 's'} remaining)`}
+                                                        title={showTotal 
+                                                            ? `Dungeon Quest: Floor ${current}/${total} (${remaining} session${remaining === 1 ? '' : 's'} remaining)`
+                                                            : `Dungeon Quest: Floor ${current}`
+                                                        }
                                                     >
                                                         <Castle className="h-2.5 w-2.5 text-orange-400" />
-                                                        <span>Dungeon ({remaining} left)</span>
+                                                        <span>Dungeon{showTotal ? ` (${remaining} left)` : ''}</span>
                                                         {hasMultiple && (
                                                             <span className="text-[8px] bg-orange-500/30 text-orange-200 px-1 rounded font-normal">
                                                                 {entrances.length} entrances

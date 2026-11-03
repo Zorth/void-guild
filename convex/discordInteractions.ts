@@ -659,10 +659,14 @@ export const searchQuestsForSession = query({
 
       let dungeonTag = "";
       if (q.isDungeon) {
-        const total = q.totalDungeonLevels || 1;
-        const cur = q.currentDungeonLevel || 1;
-        const rem = Math.max(0, total - cur + 1);
-        dungeonTag = ` [🏰 ${rem} left]`;
+        if (q.showTotalDungeonLevels) {
+          const total = q.totalDungeonLevels || 1;
+          const cur = q.currentDungeonLevel || 1;
+          const rem = Math.max(0, total - cur + 1);
+          dungeonTag = ` [🏰 ${rem} left]`;
+        } else {
+          dungeonTag = ` [🏰 Dungeon]`;
+        }
       }
 
       const label = `${q.name} (${lvlStr})${dungeonTag}`.substring(0, 100);

@@ -485,6 +485,7 @@ export const createQuest = mutation({
         characterId: v.optional(v.string()),
         isDungeon: v.optional(v.boolean()),
         totalDungeonLevels: v.optional(v.number()),
+        showTotalDungeonLevels: v.optional(v.boolean()),
         currentDungeonLevel: v.optional(v.number()),
         dungeonEntrances: v.optional(v.array(v.object({
             name: v.string(),
@@ -566,6 +567,7 @@ export const updateQuest = mutation({
         rewardOther: v.optional(v.string()),
         isDungeon: v.optional(v.boolean()),
         totalDungeonLevels: v.optional(v.number()),
+        showTotalDungeonLevels: v.optional(v.boolean()),
         currentDungeonLevel: v.optional(v.number()),
         dungeonEntrances: v.optional(v.array(v.object({
             name: v.string(),
