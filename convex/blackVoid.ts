@@ -4,6 +4,7 @@ import { internal } from './_generated/api'
 import { Doc, Id } from './_generated/dataModel'
 import { isAdmin } from './roles'
 import { adjustCharacterMoney, parseGpAmount } from './moneyHelpers'
+import { calculateVoidReward } from './voidObjectives'
 
 // Helper function to decorate a listing with character info
 async function decorateListing(ctx: QueryCtx, listing: Doc<'blackVoidListings'>) {
@@ -298,6 +299,35 @@ export const getUserBlackVoidNotifications = query({
                     if (Math.abs(pendingMoneyAdjustmentGP) > 0.001) {
                         hasPendingLog = true
                         break
+                    }
+                }
+            }
+
+            // H. Void Objective (Community Objective) rewards awaiting claim
+            if (!hasPendingLog) {
+                const voidContribs = await ctx.db
+                    .query('voidObjectiveContributions')
+                    .withIndex('by_character', (q) => q.eq('characterId', char._id))
+                    .take(50)
+
+                for (const contrib of voidContribs) {
+                    if (contrib.amount <= 0 && !contrib.rewardClaimed) continue
+                    const objective = await ctx.db
+                        .query('voidObjectives')
+                        .withIndex('by_monthKey', (q) => q.eq('monthKey', contrib.monthKey))
+                        .unique()
+                    if (!objective) continue
+
+                    let achievedTier = 0
+                    if (objective.currentProgress >= objective.tier3Goal) achievedTier = 3
+                    else if (objective.currentProgress >= objective.tier2Goal) achievedTier = 2
+                    else if (objective.currentProgress >= objective.tier1Goal) achievedTier = 1
+
+                    if (achievedTier > 0) {
+                        if (!contrib.rewardClaimed || achievedTier > (contrib.claimedTier || 0)) {
+                            hasPendingLog = true
+                            break
+                        }
                     }
                 }
             }
@@ -1126,6 +1156,52 @@ export const markAllCharacterTransactionsClaimed = mutation({
             }
         }
 
+        // 8. Claim Void Objective (Community Objective) rewards
+        const voidContribs = await ctx.db
+            .query('voidObjectiveContributions')
+            .withIndex('by_character', (q) => q.eq('characterId', args.characterId))
+            .take(50)
+
+        for (const contrib of voidContribs) {
+            if (contrib.amount <= 0 && !contrib.rewardClaimed) continue
+            const objective = await ctx.db
+                .query('voidObjectives')
+                .withIndex('by_monthKey', (q) => q.eq('monthKey', contrib.monthKey))
+                .unique()
+            if (!objective) continue
+
+            let achievedTier = 0
+            if (objective.currentProgress >= objective.tier3Goal) achievedTier = 3
+            else if (objective.currentProgress >= objective.tier2Goal) achievedTier = 2
+            else if (objective.currentProgress >= objective.tier1Goal) achievedTier = 1
+
+            if (achievedTier > 0) {
+                const currentRewardGP = calculateVoidReward(achievedTier, character.lvl)
+                if (!contrib.rewardClaimed) {
+                    await ctx.db.patch(contrib._id, {
+                        rewardClaimed: true,
+                        claimedTier: achievedTier,
+                        claimedRewardGP: currentRewardGP,
+                        claimedAt: Date.now(),
+                    })
+                    totalDeltaGp += currentRewardGP
+                    count++
+                } else if (achievedTier > (contrib.claimedTier || 0)) {
+                    const prevGP = contrib.claimedRewardGP || 0
+                    const diff = Math.round((currentRewardGP - prevGP) * 100) / 100
+                    await ctx.db.patch(contrib._id, {
+                        claimedTier: achievedTier,
+                        claimedRewardGP: currentRewardGP,
+                        claimedAt: Date.now(),
+                    })
+                    if (diff > 0) {
+                        totalDeltaGp += diff
+                        count++
+                    }
+                }
+            }
+        }
+
         if (totalDeltaGp !== 0) {
             await adjustCharacterMoney(ctx, args.characterId, totalDeltaGp)
         }
@@ -1484,6 +1560,81 @@ export const getCharacterTransactions = query({
                 })
         )
 
+        // 7. Void Objective (Community Objective) Rewards
+        const voidContribsRaw = await ctx.db
+            .query('voidObjectiveContributions')
+            .withIndex('by_character', (q) => q.eq('characterId', args.characterId!))
+            .take(50)
+
+        const voidObjectiveRewardsRaw = await Promise.all(
+            voidContribsRaw
+                .filter((c) => c.amount > 0 || c.rewardClaimed)
+                .map(async (c) => {
+                    const objective = await ctx.db
+                        .query('voidObjectives')
+                        .withIndex('by_monthKey', (q) => q.eq('monthKey', c.monthKey))
+                        .unique()
+
+                    let achievedTier = 0
+                    if (objective) {
+                        if (objective.currentProgress >= objective.tier3Goal) achievedTier = 3
+                        else if (objective.currentProgress >= objective.tier2Goal) achievedTier = 2
+                        else if (objective.currentProgress >= objective.tier1Goal) achievedTier = 1
+                    } else if (c.claimedTier) {
+                        achievedTier = c.claimedTier
+                    }
+
+                    const charLvl = character?.lvl || 1
+                    const isRewardClaimed = Boolean(c.rewardClaimed)
+                    const claimedTier = c.claimedTier || 0
+                    const previousClaimedAmount = isRewardClaimed
+                        ? (c.claimedRewardGP ??
+                          (claimedTier > 0 ? calculateVoidReward(claimedTier, charLvl) : 0))
+                        : 0
+
+                    const currentRewardGP =
+                        isRewardClaimed && achievedTier <= claimedTier
+                            ? previousClaimedAmount
+                            : achievedTier > 0
+                            ? calculateVoidReward(achievedTier, charLvl)
+                            : 0
+
+                    const pendingRewardAdjustmentGP = !isRewardClaimed
+                        ? currentRewardGP
+                        : achievedTier > claimedTier
+                        ? Math.max(0, Math.round((currentRewardGP - previousClaimedAmount) * 100) / 100)
+                        : 0
+
+                    const tier1RewardGP = calculateVoidReward(1, charLvl)
+
+                    return {
+                        _id: c._id,
+                        contributionId: c._id,
+                        monthKey: c.monthKey,
+                        objectiveTitle: objective?.title || `Void Objective (${c.monthKey})`,
+                        objectiveDescription: objective?.description,
+                        unit: objective?.unit || 'progress',
+                        contributedAmount: c.amount,
+                        currentProgress: objective?.currentProgress ?? c.amount,
+                        tier1Goal: objective?.tier1Goal ?? 10,
+                        tier2Goal: objective?.tier2Goal ?? 25,
+                        tier3Goal: objective?.tier3Goal ?? 50,
+                        achievedTier,
+                        claimedTier,
+                        currentRewardGP,
+                        tier1RewardGP,
+                        isRewardClaimed,
+                        previousClaimedAmount,
+                        pendingRewardAdjustmentGP,
+                        completedAt: c.claimedAt || objective?.deadline || c._creationTime,
+                    }
+                })
+        )
+
+        const voidObjectiveRewards = voidObjectiveRewardsRaw.sort((a, b) =>
+            b.monthKey.localeCompare(a.monthKey)
+        )
+
         const characterDetails = await ctx.db
             .query('characterDetails')
             .withIndex('by_characterId', (q) => q.eq('characterId', args.characterId))
@@ -1514,6 +1665,7 @@ export const getCharacterTransactions = query({
             completedQuestsToPay,
             guildmasterAreaGains,
             sessionRewards,
+            voidObjectiveRewards,
             betsWon,
             betsLost,
             currentMoney,

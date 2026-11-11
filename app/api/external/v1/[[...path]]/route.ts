@@ -96,6 +96,7 @@ function getApiDocsResponse() {
             { method: "PATCH", path: "/black-void/claim/buyer", description: "Toggle claim state for a won auction listing" },
             { method: "PATCH", path: "/black-void/claim/quest", description: "Toggle claim state for quest reimbursement or payment" },
             { method: "PATCH", path: "/black-void/claim/guildmaster", description: "Toggle claim state for Guildmaster regional loot compensation" },
+            { method: "PATCH", path: "/black-void/claim/objective", description: "Toggle claim state for monthly Void Objective community reward" },
             { method: "PATCH", path: "/black-void/claim/bet/winner", description: "Toggle claim state for a won bet" },
             { method: "PATCH", path: "/black-void/claim/bet/loser", description: "Toggle claim state for a lost bet" },
             { method: "PATCH", path: "/black-void/claim/all", description: "Mark all log entries for a character as claimed" },
@@ -325,6 +326,9 @@ export async function PATCH(
                 }
                 if (subresource === 'guildmaster') {
                     return handleResponse(convex.mutation(api.external_api.toggleBlackVoidGuildmasterClaimed, { apiKey, sessionId: body.sessionId }));
+                }
+                if (subresource === 'objective') {
+                    return handleResponse(convex.mutation(api.external_api.toggleBlackVoidObjectiveClaimed, { apiKey, contributionId: body.contributionId, characterId: body.characterId }));
                 }
                 if (subresource === 'bet') {
                     if (path[3] === 'winner') {

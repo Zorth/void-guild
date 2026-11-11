@@ -2,6 +2,7 @@ import { query, mutation } from './_generated/server'
 import { v } from 'convex/values'
 import { Doc, Id } from './_generated/dataModel'
 import { isAdmin } from './roles'
+import { adjustCharacterMoney } from './moneyHelpers'
 
 /**
  * Helper to get the YYYY-MM key and deadline for a given date or offset month in CE(S)T (Europe/Paris) time.
@@ -405,12 +406,9 @@ export const claimReward = mutation({
     if (!contribution) throw new Error('Contribution not found')
 
     const character = await ctx.db.get(contribution.characterId)
-    if (!character || character.userId !== user.subject) {
+    const isAdminUser = await isAdmin(ctx)
+    if (!character || (character.userId !== user.subject && !isAdminUser)) {
       throw new Error('You do not own this character')
-    }
-
-    if (contribution.rewardClaimed) {
-      throw new Error('Reward has already been claimed for this objective')
     }
 
     const objective = await ctx.db
@@ -433,7 +431,13 @@ export const claimReward = mutation({
       throw new Error('Objective did not reach Tier 1. No reward is available.')
     }
 
+    if (contribution.rewardClaimed && (contribution.claimedTier || 0) >= achievedTier) {
+      throw new Error('Reward has already been claimed for this objective')
+    }
+
     const rewardGP = calculateVoidReward(achievedTier, character.lvl)
+    const previousClaimed = contribution.rewardClaimed ? (contribution.claimedRewardGP || 0) : 0
+    const diffGP = Math.round((rewardGP - previousClaimed) * 100) / 100
 
     await ctx.db.patch(contribution._id, {
       rewardClaimed: true,
@@ -442,9 +446,99 @@ export const claimReward = mutation({
       claimedAt: Date.now(),
     })
 
+    if (diffGP !== 0) {
+      await adjustCharacterMoney(ctx, character._id, diffGP)
+    }
+
     return {
       claimedTier: achievedTier,
       rewardGP,
+    }
+  },
+})
+
+/**
+ * Toggle or adjust a character's Void Objective reward in the Character Sheet Log.
+ */
+export const toggleObjectiveRewardClaimed = mutation({
+  args: {
+    contributionId: v.id('voidObjectiveContributions'),
+    characterId: v.id('characters'),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.auth.getUserIdentity()
+    if (!user) throw new Error('Not authenticated')
+
+    const contribution = await ctx.db.get(args.contributionId)
+    if (!contribution) throw new Error('Contribution not found')
+
+    const character = await ctx.db.get(args.characterId)
+    const isAdminUser = await isAdmin(ctx)
+    if (
+      !character ||
+      contribution.characterId !== args.characterId ||
+      (character.userId !== user.subject && !isAdminUser)
+    ) {
+      throw new Error('You do not own this character')
+    }
+
+    const objective = await ctx.db
+      .query('voidObjectives')
+      .withIndex('by_monthKey', (q) => q.eq('monthKey', contribution.monthKey))
+      .unique()
+
+    let achievedTier = 0
+    if (objective) {
+      if (objective.currentProgress >= objective.tier3Goal) achievedTier = 3
+      else if (objective.currentProgress >= objective.tier2Goal) achievedTier = 2
+      else if (objective.currentProgress >= objective.tier1Goal) achievedTier = 1
+    } else if (contribution.claimedTier) {
+      achievedTier = contribution.claimedTier
+    }
+
+    const isClaimed = Boolean(contribution.rewardClaimed)
+    const claimedTier = contribution.claimedTier || 0
+    const previousClaimedGP = isClaimed
+      ? (contribution.claimedRewardGP ??
+        (claimedTier > 0 ? calculateVoidReward(claimedTier, character.lvl) : 0))
+      : 0
+
+    if (!isClaimed) {
+      if (achievedTier === 0) {
+        throw new Error('Objective has not reached Tier 1 yet.')
+      }
+      const rewardGP = calculateVoidReward(achievedTier, character.lvl)
+      await ctx.db.patch(contribution._id, {
+        rewardClaimed: true,
+        claimedTier: achievedTier,
+        claimedRewardGP: rewardGP,
+        claimedAt: Date.now(),
+      })
+      if (rewardGP !== 0) {
+        await adjustCharacterMoney(ctx, args.characterId, rewardGP)
+      }
+      return { rewardClaimed: true, rewardGP }
+    } else if (achievedTier > claimedTier) {
+      const newRewardGP = calculateVoidReward(achievedTier, character.lvl)
+      const diffGP = Math.round((newRewardGP - previousClaimedGP) * 100) / 100
+      await ctx.db.patch(contribution._id, {
+        rewardClaimed: true,
+        claimedTier: achievedTier,
+        claimedRewardGP: newRewardGP,
+        claimedAt: Date.now(),
+      })
+      if (diffGP !== 0) {
+        await adjustCharacterMoney(ctx, args.characterId, diffGP)
+      }
+      return { rewardClaimed: true, rewardGP: newRewardGP }
+    } else {
+      await ctx.db.patch(contribution._id, {
+        rewardClaimed: false,
+      })
+      if (previousClaimedGP !== 0) {
+        await adjustCharacterMoney(ctx, args.characterId, -previousClaimedGP)
+      }
+      return { rewardClaimed: false, rewardGP: 0 }
     }
   },
 })

@@ -4,6 +4,7 @@ import { internal } from './_generated/api'
 import { Id } from './_generated/dataModel'
 import { roundToTwoSigFigs, getNextValidBid } from './blackVoid'
 import { parseGpAmount } from './moneyHelpers'
+import { calculateVoidReward } from './voidObjectives'
 import { deletePinsForQuest } from './maps'
 
 async function validateKey(ctx: any, apiKey?: string) {
@@ -2084,6 +2085,77 @@ export const getBlackVoidCharacterLog = query({
                 })
         )
 
+        // 6. Void Objective (Community Objective) Rewards
+        const voidContribsRaw = await ctx.db
+            .query('voidObjectiveContributions')
+            .withIndex('by_character', (q) => q.eq('characterId', charId))
+            .take(50)
+
+        const voidObjectiveRewardsRaw = await Promise.all(
+            voidContribsRaw
+                .filter((c) => c.amount > 0 || c.rewardClaimed)
+                .map(async (c) => {
+                    const objective = await ctx.db
+                        .query('voidObjectives')
+                        .withIndex('by_monthKey', (q) => q.eq('monthKey', c.monthKey))
+                        .unique()
+
+                    let achievedTier = 0
+                    if (objective) {
+                        if (objective.currentProgress >= objective.tier3Goal) achievedTier = 3
+                        else if (objective.currentProgress >= objective.tier2Goal) achievedTier = 2
+                        else if (objective.currentProgress >= objective.tier1Goal) achievedTier = 1
+                    } else if (c.claimedTier) {
+                        achievedTier = c.claimedTier
+                    }
+
+                    const charLvl = character?.lvl || 1
+                    const isRewardClaimed = Boolean(c.rewardClaimed)
+                    const claimedTier = c.claimedTier || 0
+                    const previousClaimedAmount = isRewardClaimed
+                        ? (c.claimedRewardGP ??
+                          (claimedTier > 0 ? calculateVoidReward(claimedTier, charLvl) : 0))
+                        : 0
+
+                    const currentRewardGP =
+                        isRewardClaimed && achievedTier <= claimedTier
+                            ? previousClaimedAmount
+                            : achievedTier > 0
+                            ? calculateVoidReward(achievedTier, charLvl)
+                            : 0
+
+                    const pendingRewardAdjustmentGP = !isRewardClaimed
+                        ? currentRewardGP
+                        : achievedTier > claimedTier
+                        ? Math.max(0, Math.round((currentRewardGP - previousClaimedAmount) * 100) / 100)
+                        : 0
+
+                    return {
+                        _id: c._id,
+                        contributionId: c._id,
+                        monthKey: c.monthKey,
+                        objectiveTitle: objective?.title || `Void Objective (${c.monthKey})`,
+                        unit: objective?.unit || 'progress',
+                        contributedAmount: c.amount,
+                        currentProgress: objective?.currentProgress ?? c.amount,
+                        tier1Goal: objective?.tier1Goal ?? 10,
+                        tier2Goal: objective?.tier2Goal ?? 25,
+                        tier3Goal: objective?.tier3Goal ?? 50,
+                        achievedTier,
+                        claimedTier,
+                        currentRewardGP,
+                        isRewardClaimed,
+                        previousClaimedAmount,
+                        pendingRewardAdjustmentGP,
+                        completedAt: c.claimedAt || objective?.deadline || c._creationTime,
+                    }
+                })
+        )
+
+        const voidObjectiveRewards = voidObjectiveRewardsRaw.sort((a, b) =>
+            b.monthKey.localeCompare(a.monthKey)
+        )
+
         const characterDetails = await ctx.db
             .query('characterDetails')
             .withIndex('by_characterId', (q) => q.eq('characterId', charId))
@@ -2113,6 +2185,7 @@ export const getBlackVoidCharacterLog = query({
         const unclaimedSponsored = sponsoredQuestReimbursements.filter((q) => !q.reimbursementClaimed).length
         const unclaimedQuests = completedQuestsToPay.filter((q) => !q.paymentClaimed).length
         const unclaimedGM = guildmasterAreaGains.filter((g) => !g.reimbursementClaimed).length
+        const unclaimedVoidObjectives = voidObjectiveRewards.filter((r) => r.pendingRewardAdjustmentGP > 0).length
         const unclaimedBetsWon = betsWon.filter((b) => !b.winnerClaimed).length
         const unclaimedBetsLost = betsLost.filter((b) => !b.loserClaimed).length
 
@@ -2123,6 +2196,7 @@ export const getBlackVoidCharacterLog = query({
             unclaimedSponsored +
             unclaimedQuests +
             unclaimedGM +
+            unclaimedVoidObjectives +
             unclaimedBetsWon +
             unclaimedBetsLost
 
@@ -2138,6 +2212,7 @@ export const getBlackVoidCharacterLog = query({
             sponsoredQuestReimbursements,
             completedQuestsToPay,
             guildmasterAreaGains,
+            voidObjectiveRewards,
             betsWon,
             betsLost,
         }
@@ -2256,6 +2331,76 @@ export const toggleBlackVoidGuildmasterClaimed = mutation({
             },
         })
         return { success: true, guildmasterClaimed: !currentClaimed }
+    },
+})
+
+export const toggleBlackVoidObjectiveClaimed = mutation({
+    args: {
+        apiKey: v.string(),
+        contributionId: v.string(),
+        characterId: v.optional(v.string()),
+    },
+    handler: async (ctx, args) => {
+        const user = await requireUser(ctx, args.apiKey)
+        const cId = ctx.db.normalizeId('voidObjectiveContributions', args.contributionId)
+        if (!cId) throw new Error('Invalid contribution ID')
+
+        const contribution = await ctx.db.get(cId)
+        if (!contribution) throw new Error('Contribution not found')
+
+        const char = await ctx.db.get(contribution.characterId)
+        if (!char || (char.userId !== user.userId && !user.isAdmin)) {
+            throw new Error('Unauthorized: You do not own this character')
+        }
+
+        const objective = await ctx.db
+            .query('voidObjectives')
+            .withIndex('by_monthKey', (q) => q.eq('monthKey', contribution.monthKey))
+            .unique()
+
+        let achievedTier = 0
+        if (objective) {
+            if (objective.currentProgress >= objective.tier3Goal) achievedTier = 3
+            else if (objective.currentProgress >= objective.tier2Goal) achievedTier = 2
+            else if (objective.currentProgress >= objective.tier1Goal) achievedTier = 1
+        } else if (contribution.claimedTier) {
+            achievedTier = contribution.claimedTier
+        }
+
+        const isClaimed = Boolean(contribution.rewardClaimed)
+        const claimedTier = contribution.claimedTier || 0
+        const previousClaimedGP = isClaimed
+            ? (contribution.claimedRewardGP ??
+                (claimedTier > 0 ? calculateVoidReward(claimedTier, char.lvl) : 0))
+            : 0
+
+        if (!isClaimed) {
+            if (achievedTier === 0) {
+                throw new Error('Objective has not reached Tier 1 yet.')
+            }
+            const rewardGP = calculateVoidReward(achievedTier, char.lvl)
+            await ctx.db.patch(contribution._id, {
+                rewardClaimed: true,
+                claimedTier: achievedTier,
+                claimedRewardGP: rewardGP,
+                claimedAt: Date.now(),
+            })
+            return { success: true, rewardClaimed: true, rewardGP }
+        } else if (achievedTier > claimedTier) {
+            const newRewardGP = calculateVoidReward(achievedTier, char.lvl)
+            await ctx.db.patch(contribution._id, {
+                rewardClaimed: true,
+                claimedTier: achievedTier,
+                claimedRewardGP: newRewardGP,
+                claimedAt: Date.now(),
+            })
+            return { success: true, rewardClaimed: true, rewardGP: newRewardGP }
+        } else {
+            await ctx.db.patch(contribution._id, {
+                rewardClaimed: false,
+            })
+            return { success: true, rewardClaimed: false, rewardGP: 0 }
+        }
     },
 })
 
@@ -2403,6 +2548,36 @@ export const markAllBlackVoidLogClaimed = mutation({
         for (const bet of lostBets) {
             if (bet.status === 'completed' && !bet.loserClaimed) {
                 await ctx.db.patch(bet._id, { loserClaimed: true })
+            }
+        }
+
+        // Mark Void Objective rewards
+        const voidContribs = await ctx.db
+            .query('voidObjectiveContributions')
+            .withIndex('by_character', (q) => q.eq('characterId', charId))
+            .take(50)
+
+        for (const contrib of voidContribs) {
+            if (contrib.amount <= 0 && !contrib.rewardClaimed) continue
+            const objective = await ctx.db
+                .query('voidObjectives')
+                .withIndex('by_monthKey', (q) => q.eq('monthKey', contrib.monthKey))
+                .unique()
+            if (!objective) continue
+
+            let achievedTier = 0
+            if (objective.currentProgress >= objective.tier3Goal) achievedTier = 3
+            else if (objective.currentProgress >= objective.tier2Goal) achievedTier = 2
+            else if (objective.currentProgress >= objective.tier1Goal) achievedTier = 1
+
+            if (achievedTier > 0 && (!contrib.rewardClaimed || achievedTier > (contrib.claimedTier || 0))) {
+                const currentRewardGP = calculateVoidReward(achievedTier, char.lvl)
+                await ctx.db.patch(contrib._id, {
+                    rewardClaimed: true,
+                    claimedTier: achievedTier,
+                    claimedRewardGP: currentRewardGP,
+                    claimedAt: Date.now(),
+                })
             }
         }
 

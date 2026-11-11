@@ -31,6 +31,7 @@ import {
   Save,
   Wallet,
   Download,
+  Target,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -92,6 +93,7 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
   const togglePaymentClaimed = useMutation(api.quests.toggleQuestPaymentClaimed)
   const toggleSessionCutClaimed = useMutation(api.sessions.toggleGuildmasterCutClaimed)
   const toggleSessionMoneyClaimed = useMutation(api.sessions.toggleSessionMoneyClaimed)
+  const toggleObjectiveRewardClaimed = useMutation(api.voidObjectives.toggleObjectiveRewardClaimed)
   const toggleBetWinnerClaimed = useMutation(api.blackVoidBets.toggleBetWinnerClaimed)
   const toggleBetLoserClaimed = useMutation(api.blackVoidBets.toggleBetLoserClaimed)
   const markAllClaimed = useMutation(api.blackVoid.markAllCharacterTransactionsClaimed)
@@ -106,6 +108,7 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
     completedQuestsToPay = [],
     guildmasterAreaGains = [],
     sessionRewards = [],
+    voidObjectiveRewards = [],
     betsWon = [],
     betsLost = [],
     currentMoney,
@@ -158,6 +161,11 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
     [sessionRewards]
   )
 
+  const pendingVoidObjectiveRewards = useMemo(
+    () => voidObjectiveRewards.filter((r: any) => r.pendingRewardAdjustmentGP > 0),
+    [voidObjectiveRewards]
+  )
+
   const pendingWonBets = useMemo(
     () => betsWon.filter((bet: any) => !bet.winnerClaimed),
     [betsWon]
@@ -175,6 +183,7 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
     for (const q of pendingSponsoredQuests) income += q.totalSponsoredAmountGP ?? parseGpAmount(q.sponsoredAmount)
     for (const g of pendingGuildmasterGains) income += parseGpAmount(g.guildmasterCut)
     for (const s of pendingSessionMoneyGains) income += s.pendingMoneyAdjustmentGP
+    for (const r of pendingVoidObjectiveRewards) income += r.pendingRewardAdjustmentGP
     for (const b of pendingWonBets) income += b.wagerAmount
 
     let expense = 0
@@ -191,6 +200,7 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
       pendingGuildmasterGains.length +
       pendingSessionMoneyGains.length +
       pendingSessionMoneyDeductions.length +
+      pendingVoidObjectiveRewards.length +
       pendingWonBets.length +
       pendingLostBets.length
 
@@ -208,6 +218,7 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
     pendingGuildmasterGains,
     pendingSessionMoneyGains,
     pendingSessionMoneyDeductions,
+    pendingVoidObjectiveRewards,
     pendingWonBets,
     pendingLostBets,
   ])
@@ -291,6 +302,15 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
       toast.success('Updated session money cut log state!')
     } catch {
       toast.error('Failed to update session money status')
+    }
+  }
+
+  const handleToggleObjectiveRewardClaimed = async (contributionId: Id<'voidObjectiveContributions'>) => {
+    try {
+      await toggleObjectiveRewardClaimed({ contributionId, characterId })
+      toast.success('Updated community objective reward log state!')
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to update community objective reward status')
     }
   }
 
@@ -505,13 +525,51 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
               )}
 
               {/* 2. Pending Gold Income */}
-              {(pendingSoldItems.length > 0 || pendingSponsoredQuests.length > 0 || pendingGuildmasterGains.length > 0 || pendingSessionMoneyGains.length > 0 || pendingWonBets.length > 0) && (
+              {(pendingSoldItems.length > 0 || pendingSponsoredQuests.length > 0 || pendingGuildmasterGains.length > 0 || pendingSessionMoneyGains.length > 0 || pendingVoidObjectiveRewards.length > 0 || pendingWonBets.length > 0) && (
                 <div className="space-y-2">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
                     <ArrowDownLeft className="h-4 w-4 shrink-0" />
                     Pending Gold Income (+{formatGpAmount(totalPendingIncome)})
                   </h4>
                   <div className="grid gap-2">
+                    {pendingVoidObjectiveRewards.map((obj: any) => (
+                      <div
+                        key={obj._id}
+                        className="p-2.5 rounded-md border border-emerald-500/30 bg-emerald-950/15 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 text-xs"
+                      >
+                        <div className="flex items-start sm:items-center gap-2 min-w-0">
+                          <Target className="h-4 w-4 text-purple-400 shrink-0 mt-0.5 sm:mt-0" />
+                          <div className="min-w-0 break-words">
+                            <span className="font-bold text-foreground">
+                              {obj.isRewardClaimed ? 'Community Objective Tier Upgrade' : 'Community Objective Reward'}: {obj.objectiveTitle}
+                            </span>
+                            <span className="text-muted-foreground block sm:inline sm:ml-2">
+                              ({obj.monthKey} • Tier {obj.achievedTier})
+                              {obj.isRewardClaimed && (
+                                <span className="text-[10px] text-emerald-400 ml-1">
+                                  [Upgraded from Tier {obj.claimedTier} ({obj.previousClaimedAmount} GP) to Tier {obj.achievedTier} ({obj.currentRewardGP} GP)]
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-border/20">
+                          <span className="font-mono font-bold text-emerald-300">
+                            +{formatGpAmount(obj.pendingRewardAdjustmentGP)}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleToggleObjectiveRewardClaimed(obj.contributionId)}
+                            className="h-7 px-2.5 text-[11px] border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-300 gap-1"
+                          >
+                            <CheckCheck className="h-3 w-3" />
+                            {obj.isRewardClaimed ? 'Mark Adjusted' : 'Mark Added'}
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+
                     {pendingSessionMoneyGains.map((sess: any) => (
                       <div
                         key={sess._id}
@@ -1306,6 +1364,128 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
                         </span>
                       </label>
                     </div>
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 5c. Community Void Objective Rewards */}
+      {voidObjectiveRewards.length > 0 && (
+        <Card className="border-purple-500/30 bg-card/60 overflow-hidden">
+          <CardHeader className="p-3.5 sm:p-5 border-b border-border/20">
+            <CardTitle className="text-sm sm:text-base font-bold flex flex-wrap items-center justify-between gap-2 text-purple-300">
+              <span className="flex items-center gap-2">
+                <Target className="h-4 w-4 sm:h-5 sm:w-5 text-purple-400 shrink-0" />
+                <span>Community Objective Rewards</span>
+              </span>
+              <span className="text-[11px] text-muted-foreground font-normal">
+                Monthly Void Objectives
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-3.5 sm:p-5">
+            <div className="space-y-3">
+              {voidObjectiveRewards.map((obj: any) => {
+                const isClaimed = obj.isRewardClaimed
+                const canClaimOrAdjust = obj.achievedTier > 0 || isClaimed
+
+                return (
+                  <div
+                    key={obj._id}
+                    className={cn(
+                      "p-3 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 sm:gap-3 transition-all",
+                      isClaimed && obj.pendingRewardAdjustmentGP === 0
+                        ? "bg-emerald-950/20 border-emerald-500/30"
+                        : isClaimed && obj.pendingRewardAdjustmentGP > 0
+                        ? "bg-amber-950/20 border-amber-500/35"
+                        : obj.achievedTier > 0
+                        ? "bg-purple-950/20 border-purple-500/30"
+                        : "bg-muted/20 border-border/30"
+                    )}
+                  >
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-xs sm:text-sm text-foreground break-words">
+                          {obj.objectiveTitle}
+                        </span>
+                        <span className="text-[10px] uppercase font-mono font-bold bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded">
+                          {obj.monthKey}
+                        </span>
+                        {obj.achievedTier > 0 ? (
+                          <span className="text-[10px] uppercase font-bold bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded">
+                            Tier {obj.achievedTier} Reached
+                          </span>
+                        ) : (
+                          <span className="text-[10px] uppercase font-bold bg-muted text-muted-foreground px-1.5 py-0.5 rounded">
+                            Awaiting Tier 1 ({obj.currentProgress}/{obj.tier1Goal} {obj.unit})
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="text-xs text-muted-foreground break-words">
+                        Contributed:{' '}
+                        <strong className="text-purple-300 font-mono">
+                          +{obj.contributedAmount} {obj.unit}
+                        </strong>{' '}
+                        • Community Progress:{' '}
+                        <strong className="text-foreground font-mono">
+                          {obj.currentProgress} / {obj.tier3Goal} {obj.unit}
+                        </strong>
+                      </p>
+
+                      {canClaimOrAdjust ? (
+                        <p className="text-xs text-muted-foreground break-words">
+                          Tier {obj.achievedTier || obj.claimedTier} Reward:{' '}
+                          <strong className="text-emerald-300 font-mono font-bold">
+                            +{formatGpAmount(obj.currentRewardGP)}
+                          </strong>
+                          {isClaimed && obj.pendingRewardAdjustmentGP > 0 && (
+                            <span className="block mt-0.5 text-[11px] font-medium text-amber-300">
+                              ⚠️ Adjustment Needed:{' '}
+                              <strong className="text-emerald-300 font-mono">
+                                +{formatGpAmount(obj.pendingRewardAdjustmentGP)}
+                              </strong>{' '}
+                              (Objective upgraded from Tier {obj.claimedTier} [{obj.previousClaimedAmount} GP] to Tier {obj.achievedTier} [{obj.currentRewardGP} GP])
+                            </span>
+                          )}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic">
+                          Tier 1 Est. Reward: <strong className="text-amber-300/90 font-mono not-italic">+{formatGpAmount(obj.tier1RewardGP)}</strong> once Tier 1 ({obj.tier1Goal} {obj.unit}) is reached.
+                        </p>
+                      )}
+                    </div>
+
+                    {canClaimOrAdjust && (
+                      <div className="self-end sm:self-auto shrink-0 pt-1 sm:pt-0">
+                        <label className="flex items-center gap-2 cursor-pointer bg-background/60 hover:bg-background px-2.5 py-1.5 rounded-md border border-purple-500/30 text-xs">
+                          <Checkbox
+                            checked={isClaimed && obj.pendingRewardAdjustmentGP === 0}
+                            onCheckedChange={() => handleToggleObjectiveRewardClaimed(obj.contributionId)}
+                            className="border-purple-400 data-[state=checked]:bg-emerald-600"
+                          />
+                          <span
+                            className={cn(
+                              "font-medium text-[11px]",
+                              isClaimed && obj.pendingRewardAdjustmentGP === 0
+                                ? "text-emerald-300"
+                                : obj.pendingRewardAdjustmentGP > 0 && isClaimed
+                                ? "text-amber-300"
+                                : "text-muted-foreground"
+                            )}
+                          >
+                            {isClaimed
+                              ? obj.pendingRewardAdjustmentGP > 0
+                                ? 'Adjust on Sheet'
+                                : 'Added to Sheet ✓'
+                              : 'Add to Sheet'}
+                          </span>
+                        </label>
+                      </div>
+                    )}
                   </div>
                 )
               })}
