@@ -155,6 +155,14 @@ function BlackVoidContent() {
   // Auto-select initial character
   useEffect(() => {
     if (userCharacters && userCharacters.length > 0 && !selectedCharacterId) {
+      const charParam = searchParams.get('characterId')
+      if (charParam) {
+        const found = userCharacters.find((c: any) => c._id === charParam)
+        if (found) {
+          setSelectedCharacterId(found._id)
+          return
+        }
+      }
       const savedId = localStorage.getItem('black_void_active_character_id') as Id<'characters'>
       const exists = userCharacters.find((c: any) => c._id === savedId)
       if (exists) {
@@ -163,7 +171,7 @@ function BlackVoidContent() {
         setSelectedCharacterId(userCharacters[0]._id)
       }
     }
-  }, [userCharacters, selectedCharacterId])
+  }, [userCharacters, selectedCharacterId, searchParams])
 
   const handleSelectCharacter = (id: Id<'characters'>) => {
     setSelectedCharacterId(id)

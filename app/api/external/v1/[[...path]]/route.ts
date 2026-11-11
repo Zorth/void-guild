@@ -94,6 +94,7 @@ function getApiDocsResponse() {
             { method: "POST", path: "/black-void/bid", description: "Place bid, 2-sig-fig auto-bid cap, or buyout on item" },
             { method: "PATCH", path: "/black-void/claim/seller", description: "Toggle claim state for a sold listing" },
             { method: "PATCH", path: "/black-void/claim/buyer", description: "Toggle claim state for a won auction listing" },
+            { method: "PATCH", path: "/black-void/claim/session", description: "Toggle claim state for session net gold loot cut" },
             { method: "PATCH", path: "/black-void/claim/quest", description: "Toggle claim state for quest reimbursement or payment" },
             { method: "PATCH", path: "/black-void/claim/guildmaster", description: "Toggle claim state for Guildmaster regional loot compensation" },
             { method: "PATCH", path: "/black-void/claim/objective", description: "Toggle claim state for monthly Void Objective community reward" },
@@ -320,6 +321,14 @@ export async function PATCH(
                 }
                 if (subresource === 'buyer') {
                     return handleResponse(convex.mutation(api.external_api.toggleBlackVoidBuyerClaimed, { apiKey, listingId: body.listingId }));
+                }
+                if (subresource === 'session') {
+                    return handleResponse(convex.mutation(api.external_api.toggleBlackVoidSessionClaimed, {
+                        apiKey,
+                        sessionId: body.sessionId,
+                        characterId: body.characterId,
+                        currentNetMoneyGP: body.currentNetMoneyGP,
+                    }));
                 }
                 if (subresource === 'quest') {
                     return handleResponse(convex.mutation(api.external_api.toggleBlackVoidQuestClaimed, { apiKey, questId: body.questId, type: body.type }));

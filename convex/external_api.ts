@@ -2085,6 +2085,94 @@ export const getBlackVoidCharacterLog = query({
                 })
         )
 
+        // 5.5 Session Rewards (Claimed Loot Items & Net GP Cuts)
+        const lockedSessions = await ctx.db
+            .query('sessions')
+            .withIndex('by_locked', (q) => q.eq('locked', true))
+            .collect()
+        const attendedSessions = lockedSessions.filter(
+            (s) => Array.isArray(s.characters) && s.characters.includes(charId)
+        )
+
+        const sessionRewards = await Promise.all(
+            attendedSessions.map(async (sess) => {
+                let worldName = 'The Void'
+                if (sess.world) {
+                    const w = await ctx.db.get(sess.world)
+                    if (w) worldName = w.name
+                }
+
+                const lootList = sess.loot || []
+                const attendingCount = (sess.characters || []).length || 1
+
+                // Total session loot value
+                const totalLootValue = lootList.reduce((sum, item) => {
+                    const baseVal = (item.isGood || item.isCurrency) ? item.valueGP : item.valueGP / 2
+                    const qty = (item.quantity ?? 1) * (item.isPerCharacter ? attendingCount : 1)
+                    return sum + baseVal * qty
+                }, 0)
+
+                const sharePerPlayer = totalLootValue / attendingCount
+
+                // Items claimed by THIS character (Currency is auto-distributed and never treated as a claimed physical item)
+                const characterClaimedItems = lootList.filter((item) =>
+                    !item.isCurrency && (
+                        item.claimedBy === charId ||
+                        (item.claimedByCharacters && item.claimedByCharacters.includes(charId))
+                    )
+                )
+
+                // Total GP value of items claimed by THIS character
+                const userClaimedValue = characterClaimedItems.reduce((sum, item) => {
+                    const val = item.isGood ? item.valueGP : item.valueGP / 2
+                    const claimedList = item.claimedByCharacters && item.claimedByCharacters.length > 0
+                        ? item.claimedByCharacters
+                        : (item.claimedBy ? [item.claimedBy] : [])
+                    const count = claimedList.filter((id) => id === charId).length
+                    return sum + val * count
+                }, 0)
+
+                // Net GP cut (Share minus value of claimed items)
+                const currentNetMoneyGP = Math.round((sharePerPlayer - userClaimedValue) * 100) / 100
+
+                // Check claimed log record
+                const claimedLog = await ctx.db
+                    .query('sessionClaimedLogs')
+                    .withIndex('by_session_character', (q) =>
+                        q.eq('sessionId', sess._id).eq('characterId', charId)
+                    )
+                    .first()
+
+                const isMoneyClaimed = Boolean(claimedLog)
+                const previousClaimedAmount = claimedLog ? claimedLog.claimedMoneyAmount : 0
+                // Outstanding diff: if money was already marked added, any reduction in cut shows as pending adjustment
+                const pendingMoneyAdjustmentGP = isMoneyClaimed
+                    ? Math.round((currentNetMoneyGP - previousClaimedAmount) * 100) / 100
+                    : currentNetMoneyGP
+
+                return {
+                    _id: sess._id,
+                    sessionId: sess._id,
+                    sessionName: `Session: ${worldName}`,
+                    worldName,
+                    completedAt: sess.date || sess._creationTime,
+                    claimedItems: characterClaimedItems.map((item) => ({
+                        id: item.id,
+                        name: item.name,
+                        valueGP: item.valueGP,
+                        isGood: item.isGood,
+                        link: item.link,
+                    })),
+                    sharePerPlayer: Math.round(sharePerPlayer * 100) / 100,
+                    userClaimedValue: Math.round(userClaimedValue * 100) / 100,
+                    currentNetMoneyGP,
+                    isMoneyClaimed,
+                    previousClaimedAmount,
+                    pendingMoneyAdjustmentGP,
+                }
+            })
+        )
+
         // 6. Void Objective (Community Objective) Rewards
         const voidContribsRaw = await ctx.db
             .query('voidObjectiveContributions')
@@ -2188,6 +2276,7 @@ export const getBlackVoidCharacterLog = query({
         const unclaimedVoidObjectives = voidObjectiveRewards.filter((r) => r.pendingRewardAdjustmentGP > 0).length
         const unclaimedBetsWon = betsWon.filter((b) => !b.winnerClaimed).length
         const unclaimedBetsLost = betsLost.filter((b) => !b.loserClaimed).length
+        const unclaimedSessions = sessionRewards.filter((s) => Math.abs(s.pendingMoneyAdjustmentGP) > 0.001).length
 
         const unclaimedCount =
             unclaimedItems +
@@ -2198,7 +2287,8 @@ export const getBlackVoidCharacterLog = query({
             unclaimedGM +
             unclaimedVoidObjectives +
             unclaimedBetsWon +
-            unclaimedBetsLost
+            unclaimedBetsLost +
+            unclaimedSessions
 
         return {
             characterId: charId,
@@ -2212,6 +2302,7 @@ export const getBlackVoidCharacterLog = query({
             sponsoredQuestReimbursements,
             completedQuestsToPay,
             guildmasterAreaGains,
+            sessionRewards,
             voidObjectiveRewards,
             betsWon,
             betsLost,
@@ -2331,6 +2422,55 @@ export const toggleBlackVoidGuildmasterClaimed = mutation({
             },
         })
         return { success: true, guildmasterClaimed: !currentClaimed }
+    },
+})
+
+export const toggleBlackVoidSessionClaimed = mutation({
+    args: {
+        apiKey: v.string(),
+        sessionId: v.string(),
+        characterId: v.string(),
+        currentNetMoneyGP: v.number(),
+    },
+    handler: async (ctx, args) => {
+        const user = await requireUser(ctx, args.apiKey)
+        const sId = ctx.db.normalizeId('sessions', args.sessionId)
+        if (!sId) throw new Error('Invalid session ID')
+        const charId = ctx.db.normalizeId('characters', args.characterId)
+        if (!charId) throw new Error('Invalid character ID')
+
+        const char = await ctx.db.get(charId)
+        if (!char || (char.userId !== user.userId && !user.isAdmin)) {
+            throw new Error('Unauthorized: You do not own this character')
+        }
+
+        const existingLog = await ctx.db
+            .query('sessionClaimedLogs')
+            .withIndex('by_session_character', (q) =>
+                q.eq('sessionId', sId).eq('characterId', charId)
+            )
+            .first()
+
+        if (existingLog) {
+            if (existingLog.claimedMoneyAmount !== args.currentNetMoneyGP) {
+                await ctx.db.patch(existingLog._id, {
+                    claimedMoneyAmount: args.currentNetMoneyGP,
+                    claimedAt: Date.now(),
+                })
+                return { success: true, isMoneyClaimed: true, claimedMoneyAmount: args.currentNetMoneyGP }
+            } else {
+                await ctx.db.delete(existingLog._id)
+                return { success: true, isMoneyClaimed: false, claimedMoneyAmount: 0 }
+            }
+        } else {
+            await ctx.db.insert('sessionClaimedLogs', {
+                sessionId: sId,
+                characterId: charId,
+                claimedMoneyAmount: args.currentNetMoneyGP,
+                claimedAt: Date.now(),
+            })
+            return { success: true, isMoneyClaimed: true, claimedMoneyAmount: args.currentNetMoneyGP }
+        }
     },
 })
 
@@ -2548,6 +2688,60 @@ export const markAllBlackVoidLogClaimed = mutation({
         for (const bet of lostBets) {
             if (bet.status === 'completed' && !bet.loserClaimed) {
                 await ctx.db.patch(bet._id, { loserClaimed: true })
+            }
+        }
+
+        // Mark session money cuts
+        const attendedSessions = await ctx.db
+            .query('sessions')
+            .withIndex('by_locked', (q) => q.eq('locked', true))
+            .collect()
+
+        for (const sess of attendedSessions) {
+            const characters = sess.characters || []
+            if (!characters.includes(charId)) continue
+
+            const existingLog = await ctx.db
+                .query('sessionClaimedLogs')
+                .withIndex('by_session_character', (q) =>
+                    q.eq('sessionId', sess._id).eq('characterId', charId)
+                )
+                .first()
+
+            const lootList = sess.loot || []
+            const attendingCount = characters.length
+            const totalLootValue = lootList.reduce((sum, item) => {
+                const baseVal = (item.isGood || item.isCurrency) ? item.valueGP : item.valueGP / 2
+                const qty = (item.quantity ?? 1) * (item.isPerCharacter ? attendingCount : 1)
+                return sum + baseVal * qty
+            }, 0)
+
+            const sharePerPlayer = totalLootValue / attendingCount
+            const userClaimedValue = lootList.reduce((sum, item) => {
+                if (item.isCurrency) return sum
+                const val = item.isGood ? item.valueGP : item.valueGP / 2
+                const claimedList = item.claimedByCharacters && item.claimedByCharacters.length > 0
+                    ? item.claimedByCharacters
+                    : (item.claimedBy ? [item.claimedBy] : [])
+                const count = claimedList.filter((id) => id === charId).length
+                return sum + val * count
+            }, 0)
+            const currentNetMoneyGP = Math.round((sharePerPlayer - userClaimedValue) * 100) / 100
+
+            if (existingLog) {
+                if (existingLog.claimedMoneyAmount !== currentNetMoneyGP) {
+                    await ctx.db.patch(existingLog._id, {
+                        claimedMoneyAmount: currentNetMoneyGP,
+                        claimedAt: Date.now(),
+                    })
+                }
+            } else {
+                await ctx.db.insert('sessionClaimedLogs', {
+                    sessionId: sess._id,
+                    characterId: charId,
+                    claimedMoneyAmount: currentNetMoneyGP,
+                    claimedAt: Date.now(),
+                })
             }
         }
 
