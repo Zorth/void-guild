@@ -317,6 +317,8 @@ export const getUserBlackVoidNotifications = query({
                         .withIndex('by_monthKey', (q) => q.eq('monthKey', contrib.monthKey))
                         .unique()
                     if (!objective) continue
+                    // Rewards only become available once the objective's month has ended
+                    if (objective.deadline > Date.now()) continue
 
                     let achievedTier = 0
                     if (objective.currentProgress >= objective.tier3Goal) achievedTier = 3
@@ -1172,6 +1174,8 @@ export const markAllCharacterTransactionsClaimed = mutation({
                 .withIndex('by_monthKey', (q) => q.eq('monthKey', contrib.monthKey))
                 .unique()
             if (!objective) continue
+            // Rewards only become available once the objective's month has ended
+            if (objective.deadline > Date.now()) continue
 
             let achievedTier = 0
             if (objective.currentProgress >= objective.tier3Goal) achievedTier = 3
@@ -1581,6 +1585,10 @@ export const getCharacterTransactions = query({
                         .withIndex('by_monthKey', (q) => q.eq('monthKey', c.monthKey))
                         .unique()
 
+                    // Rewards only become available once the objective's month has ended
+                    const isOngoing = !!objective && objective.deadline > Date.now()
+                    if (isOngoing && !c.rewardClaimed) return null
+
                     let achievedTier = 0
                     if (objective) {
                         if (objective.currentProgress >= objective.tier3Goal) achievedTier = 3
@@ -1589,6 +1597,7 @@ export const getCharacterTransactions = query({
                     } else if (c.claimedTier) {
                         achievedTier = c.claimedTier
                     }
+                    if (isOngoing) achievedTier = Math.min(achievedTier, c.claimedTier || 0)
 
                     const charLvl = character?.lvl || 1
                     const isRewardClaimed = Boolean(c.rewardClaimed)
@@ -1637,7 +1646,9 @@ export const getCharacterTransactions = query({
                 })
         )
 
-        const voidObjectiveRewards = voidObjectiveRewardsRaw.sort((a, b) =>
+        const voidObjectiveRewards = voidObjectiveRewardsRaw
+            .filter((r): r is NonNullable<typeof r> => r !== null)
+            .sort((a, b) =>
             b.monthKey.localeCompare(a.monthKey)
         )
 

@@ -487,6 +487,10 @@ export const toggleObjectiveRewardClaimed = mutation({
       .withIndex('by_monthKey', (q) => q.eq('monthKey', contribution.monthKey))
       .unique()
 
+    if (objective && objective.deadline > Date.now() && !contribution.rewardClaimed) {
+      throw new Error('This objective has not ended yet.')
+    }
+
     let achievedTier = 0
     if (objective) {
       if (objective.currentProgress >= objective.tier3Goal) achievedTier = 3
