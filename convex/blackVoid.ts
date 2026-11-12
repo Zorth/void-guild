@@ -184,7 +184,7 @@ export const getUserBlackVoidNotifications = query({
                     .collect()
 
                 for (const item of wonListings) {
-                    if (!item.buyerClaimed) {
+                    if (item.status === 'completed' && !item.buyerClaimed) {
                         hasPendingLog = true
                         break
                     }
@@ -946,6 +946,9 @@ export const toggleBuyerClaimed = mutation({
         if (!character || character.userId !== user.subject || listing.winningBidderCharacterId !== args.characterId) {
             throw new Error('You are not the winning buyer of this listing.')
         }
+        if (listing.status !== 'completed') {
+            throw new Error('This auction has not ended yet.')
+        }
 
         const nextClaimed = !listing.buyerClaimed
         await ctx.db.patch(args.listingId, {
@@ -998,7 +1001,7 @@ export const markAllCharacterTransactionsClaimed = mutation({
             .collect()
 
         for (const item of wonListings) {
-            if (!item.buyerClaimed) {
+            if (item.status === 'completed' && !item.buyerClaimed) {
                 await ctx.db.patch(item._id, { buyerClaimed: true })
                 const amt = item.winningAmount || 0
                 totalDeltaGp -= amt
@@ -1270,7 +1273,10 @@ export const getCharacterTransactions = query({
             .withIndex('by_winningBidderCharacterId', (q) => q.eq('winningBidderCharacterId', args.characterId!))
             .collect()
 
-        const wonListings = await Promise.all(wonListingsRaw.map((l) => decorateListing(ctx, l)))
+        // Only finished auctions count as won; the current top bidder of an active auction hasn't won yet
+        const wonListings = await Promise.all(
+            wonListingsRaw.filter((l) => l.status === 'completed').map((l) => decorateListing(ctx, l))
+        )
 
         const itemsSoldOrActive = createdListings.filter((l) => l.type === 'item')
         const servicesOffered = createdListings.filter((l) => l.type === 'service')
