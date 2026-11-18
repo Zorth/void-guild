@@ -178,8 +178,9 @@ export const syncSessionToDiscord = internalAction({
       callToAction;
 
     // Truncate messageContent if it somehow still exceeds 2000 chars (Discord limit)
-    const finalMessageContent = messageContent.length > 2000 
-        ? messageContent.substring(0, 1990) + "\n(Truncated...)" 
+    const truncationSuffix = "\n(Truncated...)";
+    const finalMessageContent = messageContent.length > 2000
+        ? messageContent.substring(0, 2000 - truncationSuffix.length) + truncationSuffix
         : messageContent;
 
     // Format the list of signed-up characters and interested players for the embed fields
@@ -766,8 +767,8 @@ export const sendSessionNotification = action({
     }
 
     const sessionLink = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://guild.tarragon.be'}/sessions/${session._id}`;
-    const guildId = process.env.DISCORD_GUILD_ID;
-    const threadLink = (guildId && session.discordThreadId) 
+    const guildId = process.env.DISCORD_GUILD_ID || "878674783972261918";
+    const threadLink = (guildId && session.discordThreadId)
       ? `https://discord.com/channels/${guildId}/${session.discordThreadId}` 
       : null;
 
@@ -821,7 +822,9 @@ export const sendSessionNotification = action({
     if (args.type !== 'cancel') {
       const links: string[] = [];
       if (session.discordThreadId) {
-        links.push(`💬 <#${session.discordThreadId}>`);
+        links.push(`💬 [Discussion Thread](${threadLink}) (<#${session.discordThreadId}>)`);
+      } else {
+        console.warn(`No Discord forum thread exists for session ${args.sessionId}; announcement has no thread link.`);
       }
       links.push(`🌐 [View on Guild](${sessionLink})`);
       if (session.location) {
