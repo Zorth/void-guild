@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
-import { Scroll, Sword, Trophy, User, Hash, Coins, Sparkles, Globe, EyeOff, Castle, Plus, Trash2, DoorOpen } from 'lucide-react'
+import { Scroll, Sword, Trophy, User, Hash, Coins, Sparkles, Globe, EyeOff, Castle, Plus, Trash2, DoorOpen, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface QuestDialogProps {
@@ -45,6 +45,7 @@ interface QuestDialogProps {
     sponsoredAmount?: string
     netCost?: string
     isDungeon?: boolean
+    isOpenTable?: boolean
     totalDungeonLevels?: number
     showTotalDungeonLevels?: boolean
     currentDungeonLevel?: number
@@ -70,6 +71,7 @@ export default function QuestDialog({ isOpen, onClose, worldId, isWorldOwner = f
   const [isGlobal, setIsGlobal] = useState(false)
   const [isHidden, setIsHidden] = useState(false)
   const [isDungeon, setIsDungeon] = useState(false)
+  const [isOpenTable, setIsOpenTable] = useState(false)
   const [totalDungeonLevels, setTotalDungeonLevels] = useState<number>(3)
   const [showTotalDungeonLevels, setShowTotalDungeonLevels] = useState<boolean>(false)
   const [currentDungeonLevel, setCurrentDungeonLevel] = useState<number>(1)
@@ -95,6 +97,7 @@ export default function QuestDialog({ isOpen, onClose, worldId, isWorldOwner = f
       setIsGlobal(!quest.worldId)
       setIsHidden(Boolean(quest.isHidden))
       setIsDungeon(Boolean(quest.isDungeon))
+      setIsOpenTable(Boolean(quest.isOpenTable))
       setTotalDungeonLevels(quest.totalDungeonLevels || 3)
       setShowTotalDungeonLevels(Boolean(quest.showTotalDungeonLevels))
       setCurrentDungeonLevel(quest.currentDungeonLevel || 1)
@@ -112,6 +115,7 @@ export default function QuestDialog({ isOpen, onClose, worldId, isWorldOwner = f
       setIsGlobal(!worldId)
       setIsHidden(false)
       setIsDungeon(false)
+      setIsOpenTable(false)
       setTotalDungeonLevels(3)
       setShowTotalDungeonLevels(false)
       setCurrentDungeonLevel(1)
@@ -150,6 +154,7 @@ export default function QuestDialog({ isOpen, onClose, worldId, isWorldOwner = f
           isHidden,
           characterId: quest.characterId,
           isDungeon,
+          isOpenTable,
           totalDungeonLevels: isDungeon ? Math.max(1, totalDungeonLevels) : undefined,
           showTotalDungeonLevels: isDungeon ? showTotalDungeonLevels : undefined,
           currentDungeonLevel: isDungeon ? Math.max(1, currentDungeonLevel) : undefined,
@@ -170,6 +175,7 @@ export default function QuestDialog({ isOpen, onClose, worldId, isWorldOwner = f
           worldId: targetWorldId,
           isHidden,
           isDungeon,
+          isOpenTable,
           totalDungeonLevels: isDungeon ? Math.max(1, totalDungeonLevels) : undefined,
           showTotalDungeonLevels: isDungeon ? showTotalDungeonLevels : undefined,
           currentDungeonLevel: isDungeon ? Math.max(1, currentDungeonLevel) : undefined,
@@ -262,6 +268,21 @@ export default function QuestDialog({ isOpen, onClose, worldId, isWorldOwner = f
               </label>
             </div>
           )}
+
+          {/* Open Table Toggle */}
+          <div className="flex items-center gap-2.5 p-3 rounded-lg bg-sky-500/10 border border-sky-500/25">
+            <input
+              type="checkbox"
+              id="isOpenTableQuest"
+              checked={isOpenTable}
+              onChange={(e) => setIsOpenTable(e.target.checked)}
+              className="h-4 w-4 rounded border-border text-sky-500 focus:ring-sky-500 cursor-pointer accent-sky-500 shrink-0"
+            />
+            <label htmlFor="isOpenTableQuest" className="text-xs font-semibold text-foreground cursor-pointer flex items-center gap-1.5 select-none">
+              <Users className="h-3.5 w-3.5 text-sky-400 shrink-0" />
+              <span>Open Table (Any level can join, flat 250 XP for everyone)</span>
+            </label>
+          </div>
 
           {/* Dungeon Quest Toggle */}
           <div className="space-y-3 p-3 rounded-lg bg-orange-500/10 border border-orange-500/25">

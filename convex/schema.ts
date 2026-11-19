@@ -43,6 +43,7 @@ export default defineSchema({
         planning: v.optional(v.boolean()),
         isPrivate: v.optional(v.boolean()),
         isIntro: v.optional(v.boolean()),
+        isOpenTable: v.optional(v.boolean()), // Any level may join; flat 250 XP for everyone
         characters: v.array(v.id("characters")),
         deadCharacters: v.optional(v.array(v.id("characters"))),
         gmCharacter: v.optional(v.id("characters")),
@@ -166,6 +167,7 @@ export default defineSchema({
         suggestionStatus: v.optional(v.union(v.literal('pending'), v.literal('approved'), v.literal('rejected'))), // Approval status
         isCompleted: v.optional(v.boolean()),
         isHidden: v.optional(v.boolean()), // Hidden from regular players by world owner
+        isOpenTable: v.optional(v.boolean()), // Sessions running this quest are Open Tables (any level, flat 250 XP)
         completedSessionId: v.optional(v.id("sessions")),
         completedAt: v.optional(v.number()),
         // Dungeon fields

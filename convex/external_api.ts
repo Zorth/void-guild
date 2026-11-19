@@ -176,6 +176,7 @@ export const createSession = mutation({
         planning: v.optional(v.boolean()),
         isPrivate: v.optional(v.boolean()),
         isIntro: v.optional(v.boolean()),
+        isOpenTable: v.optional(v.boolean()),
         worldId: v.optional(v.string()),
         inGameDate: v.optional(v.object({
             year: v.number(),
@@ -301,6 +302,7 @@ export const updateSession = mutation({
         planning: v.optional(v.boolean()),
         isPrivate: v.optional(v.boolean()),
         isIntro: v.optional(v.boolean()),
+        isOpenTable: v.optional(v.boolean()),
         inGameDate: v.optional(v.object({
             year: v.number(),
             month: v.number(),
@@ -485,6 +487,7 @@ export const createQuest = mutation({
         tags: v.optional(v.array(v.string())),
         characterId: v.optional(v.string()),
         isDungeon: v.optional(v.boolean()),
+        isOpenTable: v.optional(v.boolean()),
         totalDungeonLevels: v.optional(v.number()),
         showTotalDungeonLevels: v.optional(v.boolean()),
         currentDungeonLevel: v.optional(v.number()),
@@ -567,6 +570,7 @@ export const updateQuest = mutation({
         rewardMoneyGP: v.optional(v.number()),
         rewardOther: v.optional(v.string()),
         isDungeon: v.optional(v.boolean()),
+        isOpenTable: v.optional(v.boolean()),
         totalDungeonLevels: v.optional(v.number()),
         showTotalDungeonLevels: v.optional(v.boolean()),
         currentDungeonLevel: v.optional(v.number()),

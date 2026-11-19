@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useState, useEffect, useMemo } from 'react'
 import SessionDialog from './SessionDialog'
 import Link from 'next/link'
-import { Book, Lock, ChevronLeft, ChevronRight, User, Shield, Filter, Sprout, Calendar, Plus } from 'lucide-react'
+import { Book, Lock, ChevronLeft, ChevronRight, User, Shield, Filter, Sprout, Users, Calendar, Plus } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn, getLevelBadgeStyle, getDualLevelBadgeStyle, formatDate, formatTime, CharacterRankIcon, getSessionWikiUrl } from '@/lib/utils'
 import './sessions.css'
@@ -38,6 +38,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { track } from '@vercel/analytics'
 
 type SessionWithDetails = Doc<'sessions'> & {
+  isOpenTableEffective?: boolean
     isOwner: boolean;
     characterNames: string[];
     worldName: string; // Add worldName to the type
@@ -623,6 +624,11 @@ function FiveDayOverview({ sessions, userCharacterIds }: { sessions: SessionWith
                                                             <Sprout className="h-3 w-3 text-emerald-400 shrink-0" />
                                                         </span>
                                                     )}
+                                                    {session.isOpenTableEffective && (
+                                                        <span title="Open Table">
+                                                            <Users className="h-3 w-3 text-sky-400 shrink-0" />
+                                                        </span>
+                                                    )}
                                                     {session.isPrivate && (
                                                         <Lock className="h-3 w-3 text-amber-500 shrink-0 ml-auto" />
                                                     )}
@@ -1048,6 +1054,12 @@ export default function Sessions({ filters }: { filters?: { pf: boolean, dnd: bo
                                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/30 uppercase tracking-wider">
                                   <Sprout className="h-2.5 w-2.5" />
                                   Intro
+                                </span>
+                              )}
+                              {session.isOpenTableEffective && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold text-sky-400 border border-sky-500/30 uppercase tracking-wider">
+                                  <Users className="h-2.5 w-2.5" />
+                                  Open Table
                                 </span>
                               )}
                               {isPlanning && <div className="text-[10px] bg-purple-600 text-white px-2 py-0.5 rounded-full uppercase tracking-widest font-black shadow-sm">Planning</div>}
