@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { UserButton } from '@clerk/nextjs'
-import { Trophy, Key, Bell } from 'lucide-react'
+import { Trophy, Key, Bell, CalendarDays } from 'lucide-react'
+import { CalendarFeedDialog } from '@/components/CalendarFeedDialog'
 import { DragonHeadIcon } from '@/components/characters/MembershipBadge'
 import AchievementsModal from '@/components/AchievementsModal'
 import { ApiKeyDialog } from '@/components/ApiKeyDialog'
@@ -12,6 +13,7 @@ export default function CustomUserButton() {
   const [isAchievementsOpen, setIsAchievementsOpen] = useState(false)
   const [isApiDialogOpen, setIsApiDialogOpen] = useState(false)
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false)
 
   return (
     <>
@@ -34,6 +36,11 @@ export default function CustomUserButton() {
             onClick={() => setIsNotificationsOpen(true)}
           />
           <UserButton.Action
+            label="Calendar Feed"
+            labelIcon={<CalendarDays className="h-4 w-4 text-purple-400" />}
+            onClick={() => setIsCalendarOpen(true)}
+          />
+          <UserButton.Action
             label="Achievements"
             labelIcon={<Trophy className="h-4 w-4 text-amber-500" />}
             onClick={() => setIsAchievementsOpen(true)}
@@ -49,6 +56,11 @@ export default function CustomUserButton() {
       <NotificationsDialog
         open={isNotificationsOpen}
         onOpenChange={setIsNotificationsOpen}
+      />
+
+      <CalendarFeedDialog
+        open={isCalendarOpen}
+        onOpenChange={setIsCalendarOpen}
       />
 
       <AchievementsModal
