@@ -1,6 +1,6 @@
 'use client'
 
-import { useMutation, useQuery } from 'convex/react'
+import { useAction, useMutation, useQuery } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,6 +16,17 @@ import { FormEvent, useState } from 'react'
 import { Id, Doc } from '@/convex/_generated/dataModel'
 import { fireVoidParticles } from '@/lib/particles'
 import { track } from '@vercel/analytics'
+import { toast } from 'sonner'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Sprout, Users } from 'lucide-react'
 
 interface SessionDialogProps {
@@ -101,6 +112,9 @@ export default function SessionDialog({ session, trigger, hasWorld, initialDate 
   const createSession = useMutation(api.sessions.createSession)
   const updateSession = useMutation(api.sessions.updateSession)
   const deleteSession = useMutation(api.sessions.deleteSession)
+  const sendNotification = useAction(api.discord.sendSessionNotification)
+  const [announceSessionId, setAnnounceSessionId] = useState<Id<'sessions'> | null>(null)
+  const [isAnnouncing, setIsAnnouncing] = useState(false)
   const userCharacters = useQuery(api.characters.listCharacters)
   const worldName = useQuery(api.worlds.getWorldByOwner) // Fetch the current world details to display the name
 
@@ -299,7 +313,7 @@ export default function SessionDialog({ session, trigger, hasWorld, initialDate 
             fireVoidParticles(e.clientX, e.clientY);
         }
 
-        await createSession({
+        const newSessionId = await createSession({
           date: sessionDateTime,
           // world, // Removed: world is now derived
           level: levelValue,
@@ -314,10 +328,26 @@ export default function SessionDialog({ session, trigger, hasWorld, initialDate 
           isOpenTable: isOpenTable,
         })
         track('session_created', { worldName: worldName?.name, system, planning, isPrivate, isIntro });
+        setAnnounceSessionId(newSessionId)
       }
       setIsOpen(false)
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  async function handleAnnounce() {
+    if (!announceSessionId) return
+    setIsAnnouncing(true)
+    try {
+      await sendNotification({ sessionId: announceSessionId, type: 'new' })
+      toast.success('Session announced on Discord!')
+    } catch (error) {
+      console.error('Failed to announce session on Discord:', error)
+      toast.error('Failed to announce session on Discord.')
+    } finally {
+      setIsAnnouncing(false)
+      setAnnounceSessionId(null)
     }
   }
 
@@ -330,6 +360,7 @@ export default function SessionDialog({ session, trigger, hasWorld, initialDate 
   }
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {trigger || (
@@ -591,5 +622,28 @@ export default function SessionDialog({ session, trigger, hasWorld, initialDate 
         </form>
       </DialogContent>
     </Dialog>
+    <AlertDialog open={announceSessionId !== null} onOpenChange={(open) => { if (!open && !isAnnouncing) setAnnounceSessionId(null) }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Announce on Discord?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Do you want to announce this new session to Discord? This pings the system role in the activity channel with a link to the session&apos;s forum thread.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isAnnouncing}>Not now</AlertDialogCancel>
+          <AlertDialogAction
+            disabled={isAnnouncing}
+            onClick={(e) => {
+              e.preventDefault()
+              void handleAnnounce()
+            }}
+          >
+            {isAnnouncing ? 'Announcing...' : 'Announce'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   )
 }
