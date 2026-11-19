@@ -11,23 +11,23 @@ import { evaluateAndSyncUserAchievements } from './achievements'
 import { removeUserAvailabilityOnDate } from './planning'
 import { deletePinsForQuest } from './maps'
 
-export const OPEN_TABLE_XP = 250
+export const EXPEDITION_XP = 250
 
 /**
- * An Open Table session accepts characters of any level and awards a flat XP amount.
- * A session is an Open Table if it is flagged itself or if its selected quest is flagged.
+ * An Expedition session accepts characters of any level and awards a flat XP amount.
+ * A session is an Expedition if it is flagged itself or if its selected quest is flagged.
  */
-export function isOpenTableSession(session: Doc<'sessions'>, quest: Doc<'quests'> | null): boolean {
-  return Boolean(session.isOpenTable || quest?.isOpenTable)
+export function isExpeditionSession(session: Doc<'sessions'>, quest: Doc<'quests'> | null): boolean {
+  return Boolean(session.isExpedition || quest?.isExpedition)
 }
 
 /**
  * XP gain based on session level and character level.
  * Level 1 and 2 sessions count as minimum level 3 for XP calculation.
- * GMs and Open Table sessions always receive a flat 250 XP.
+ * GMs and Expedition sessions always receive a flat 250 XP.
  */
-export function calculateXPGain(sessionLevel: number, characterLevel: number, isGM: boolean, isOpenTable = false): number {
-  if (isGM || isOpenTable) return OPEN_TABLE_XP
+export function calculateXPGain(sessionLevel: number, characterLevel: number, isGM: boolean, isExpedition = false): number {
+  if (isGM || isExpedition) return EXPEDITION_XP
 
   const effectiveSessionLevel = Math.max(3, sessionLevel)
   const L = effectiveSessionLevel - characterLevel
@@ -210,7 +210,7 @@ export const listSessions = query({
       }
       return {
         ...session,
-        isOpenTableEffective: isOpenTableSession(session, questDoc),
+        isExpeditionEffective: isExpeditionSession(session, questDoc),
         level: computeEffectiveLevel(session, questDoc),
         worldName: worldDoc ? worldDoc.name : 'Unknown World',
         characterNames: characterDocs.map((c) => c.name),
@@ -279,7 +279,7 @@ export const publicListSessions = query({
       }
       return {
         ...session,
-        isOpenTableEffective: isOpenTableSession(session, questDoc),
+        isExpeditionEffective: isExpeditionSession(session, questDoc),
         level: computeEffectiveLevel(session, questDoc),
         worldName: worldDoc ? worldDoc.name : 'Unknown World',
         characterNames: characterDocs.map((c) => c.name),
@@ -369,7 +369,7 @@ export const getPublicSession = query({
       planning: session.planning,
       isPrivate: session.isPrivate,
       isIntro: session.isIntro,
-      isOpenTable: session.isOpenTable,
+      isExpedition: session.isExpedition,
       location: session.location,
     };
   },
@@ -665,7 +665,7 @@ export const getSession = query({
 
     return {
       ...session,
-      isOpenTableEffective: isOpenTableSession(session, quest),
+      isExpeditionEffective: isExpeditionSession(session, quest),
       level: computeEffectiveLevel(session, quest),
       worldName: worldDoc ? (worldDoc as Doc<'worlds'>).name : 'Unknown World',
       // Hide gmCharacter ID from non-managers
@@ -734,9 +734,9 @@ export const previewXPGains = query({
 
         const quest = session.questId ? await ctx.db.get(session.questId) : null
         const effectiveLevel = computeEffectiveLevel(session, quest)
-        const openTable = isOpenTableSession(session, quest)
+        const expedition = isExpeditionSession(session, quest)
 
-        if (effectiveLevel === undefined && !openTable) {
+        if (effectiveLevel === undefined && !expedition) {
             return []
         }
 
@@ -748,7 +748,7 @@ export const previewXPGains = query({
         const characters = await Promise.all(characterIds.map(id => ctx.db.get(id)))
         
         return characters.filter((c): c is Doc<'characters'> => c !== null).map(char => {
-            const xpGain = calculateXPGain(effectiveLevel ?? 0, char.lvl, char._id === session.gmCharacter, openTable)
+            const xpGain = calculateXPGain(effectiveLevel ?? 0, char.lvl, char._id === session.gmCharacter, expedition)
             const { lvl: newLvl, xp: newXp } = calculateNewStats(char.lvl, char.xp, xpGain)
             return {
                 id: char._id,
@@ -777,7 +777,7 @@ export const createSession = mutation({
     planning: v.optional(v.boolean()),
     isPrivate: v.optional(v.boolean()),
     isIntro: v.optional(v.boolean()),
-    isOpenTable: v.optional(v.boolean()),
+    isExpedition: v.optional(v.boolean()),
     questId: v.optional(v.id('quests')),
     inGameDate: v.optional(v.object({
       year: v.number(),
@@ -826,7 +826,7 @@ export const createSession = mutation({
       }
     }
 
-    const isIntro = Boolean(args.isIntro) && !args.isOpenTable
+    const isIntro = Boolean(args.isIntro) && !args.isExpedition
     const level = isIntro ? (args.system === 'PF' ? 1 : 3) : args.level
 
     const sessionId = await ctx.db.insert('sessions', {
@@ -844,7 +844,7 @@ export const createSession = mutation({
       planning: args.planning,
       isPrivate: args.isPrivate ?? false,
       isIntro,
-      isOpenTable: args.isOpenTable ?? false,
+      isExpedition: args.isExpedition ?? false,
       questId: isIntro ? undefined : args.questId,
     })
 
@@ -882,7 +882,7 @@ export const updateSession = mutation({
     planning: v.optional(v.boolean()),
     isPrivate: v.optional(v.boolean()),
     isIntro: v.optional(v.boolean()),
-    isOpenTable: v.optional(v.boolean()),
+    isExpedition: v.optional(v.boolean()),
     questId: v.optional(v.id('quests')),
   },
   handler: async (ctx, args) => {
@@ -910,7 +910,7 @@ export const updateSession = mutation({
 
     const locationChanged = (prevLocation || '').trim() !== (newLocation || '').trim()
 
-    const isIntro = Boolean(args.isIntro) && !args.isOpenTable
+    const isIntro = Boolean(args.isIntro) && !args.isExpedition
     const level = isIntro ? (args.system === 'PF' ? 1 : 3) : args.level
 
     await ctx.db.patch(args.sessionId, {
@@ -925,7 +925,7 @@ export const updateSession = mutation({
       planning: args.planning,
       isPrivate: args.isPrivate ?? false,
       isIntro,
-      isOpenTable: args.isOpenTable ?? false,
+      isExpedition: args.isExpedition ?? false,
       questId: isIntro ? undefined : args.questId,
     })
 
@@ -1142,7 +1142,7 @@ export const joinSession = mutation({
 
     const quest = session.questId && !session.isIntro ? await ctx.db.get(session.questId) : null
     const effectiveLevel = computeEffectiveLevel(session, quest)
-    if (!isOpenTableSession(session, quest) && typeof effectiveLevel === 'number' && effectiveLevel > 0) {
+    if (!isExpeditionSession(session, quest) && typeof effectiveLevel === 'number' && effectiveLevel > 0) {
       const levelDiff = Math.abs(character.lvl - effectiveLevel)
       if (levelDiff >= 5) {
         throw new Error(
@@ -1225,7 +1225,7 @@ export const swapSessionCharacter = mutation({
 
     const quest = session.questId && !session.isIntro ? await ctx.db.get(session.questId) : null
     const effectiveLevel = computeEffectiveLevel(session, quest)
-    if (!isOpenTableSession(session, quest) && typeof effectiveLevel === 'number' && effectiveLevel > 0) {
+    if (!isExpeditionSession(session, quest) && typeof effectiveLevel === 'number' && effectiveLevel > 0) {
       const levelDiff = Math.abs(newCharacter.lvl - effectiveLevel)
       if (levelDiff >= 5) {
         throw new Error(
@@ -1345,7 +1345,7 @@ export const joinIntroSession = mutation({
 
       const effectiveLevel = session.system === 'PF' ? 1 : 3
       const levelDiff = Math.abs(character.lvl - effectiveLevel)
-      if (!session.isOpenTable && levelDiff >= 5) {
+      if (!session.isExpedition && levelDiff >= 5) {
         throw new Error(
           `Level difference too high. This is a Level ${effectiveLevel} intro session, so only characters between Level ${Math.max(1, effectiveLevel - 4)} and Level ${effectiveLevel + 4} can join (your character is Level ${character.lvl}).`
         )
@@ -1773,9 +1773,9 @@ export const lockSession = mutation({
   
       const quest = session.questId ? await ctx.db.get(session.questId) : null
       const effectiveLevel = computeEffectiveLevel(session, quest)
-      const openTable = isOpenTableSession(session, quest)
+      const expedition = isExpeditionSession(session, quest)
 
-      if (effectiveLevel === undefined && !openTable) {
+      if (effectiveLevel === undefined && !expedition) {
           throw new Error('Session cannot be locked without a level or selected quest with a level.')
       }
 
@@ -1794,7 +1794,7 @@ export const lockSession = mutation({
           if (character.isDead) {
             continue
           }
-          const xpGain = calculateXPGain(effectiveLevel ?? 0, character.lvl, character._id === session.gmCharacter, openTable)
+          const xpGain = calculateXPGain(effectiveLevel ?? 0, character.lvl, character._id === session.gmCharacter, expedition)
           const { lvl: newLvl, xp: newXp } = calculateNewStats(character.lvl, character.xp, xpGain)
           
           xpGains.push({

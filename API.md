@@ -35,10 +35,10 @@ https://guild.tarragon.be/api/external/v1
 * **GET** `/session/:sessionId/characters` - List attending characters in a session.
 * **GET** `/session/:sessionId/quotes` - List character quotes logged in a session.
 * **GET** `/session/:sessionId/state` - Get live initiative and clock state.
-* **POST** `/session` - Create a new session (GM/Admin). Body: `{ date?, level?, maxPlayers, system, location?, planning?, isPrivate?, isIntro?, isOpenTable?, worldId?, inGameDate?: { year, month, day, era?, endYear?, endMonth?, endDay? } }`. *(Note: If `inGameDate` is omitted, it defaults automatically to the campaign world's current calendar date; if `isIntro` is true, level defaults automatically to 1 for Pathfinder or 3 for DnD).*
+* **POST** `/session` - Create a new session (GM/Admin). Body: `{ date?, level?, maxPlayers, system, location?, planning?, isPrivate?, isIntro?, isExpedition?, worldId?, inGameDate?: { year, month, day, era?, endYear?, endMonth?, endDay? } }`. *(Note: If `inGameDate` is omitted, it defaults automatically to the campaign world's current calendar date; if `isIntro` is true, level defaults automatically to 1 for Pathfinder or 3 for DnD).*
 * **POST** `/session/:sessionId/loot` - Add loot item to a session (Owner/Admin). Body: `{ name, valueGP, isGood, isPerCharacter?: boolean, link?: string, quantity?: number }`. *(Note: If `quantity` is greater than 1, multiple individual item instances are created. If `isPerCharacter` is true, each party character claims their own copy).*
 * **POST** `/session/:sessionId/commendation` - Submit a character commendation. Body: `{ toCharacterId, category }`.
-* **PATCH** `/session/:sessionId` - Update session parameters (Owner/Admin). Body: `{ date?, level?, maxPlayers?, location?, locked?, planning?, isPrivate?, isIntro?, isOpenTable?, inGameDate?: { year, month, day, era?, endYear?, endMonth?, endDay? } }`.
+* **PATCH** `/session/:sessionId` - Update session parameters (Owner/Admin). Body: `{ date?, level?, maxPlayers?, location?, locked?, planning?, isPrivate?, isIntro?, isExpedition?, inGameDate?: { year, month, day, era?, endYear?, endMonth?, endDay? } }`.
 * **PATCH** `/session/:sessionId/state` - Update initiative/clock (Owner/Admin). Body: `{ initiative?, currentIndex?, round?, timeSeconds?, isClockRunning?, multiplier? }`.
 
 ### Characters

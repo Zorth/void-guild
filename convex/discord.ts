@@ -59,11 +59,11 @@ export const syncSessionToDiscord = internalAction({
     const interestStr = interestCount > 0 ? ` (+${interestCount})` : "";
     const privateTag = isPrivate ? " [PRIVATE]" : "";
     const introTag = isIntro ? " 🌱 [INTRO]" : "";
-    const openTableTag = (session.isOpenTable || session.selectedQuest?.isOpenTable) ? " 🍻 [OPEN TABLE]" : "";
+    const expeditionTag = (session.isExpedition || session.selectedQuest?.isExpedition) ? " 🧭 [EXPEDITION]" : "";
 
     let threadName = isPlanning 
-      ? `(PLANNING) The Void: ${session.worldName}${privateTag}${introTag}${openTableTag} ${levelStr} [${interestCount} Interested]`
-      : `(${dateStr}) The Void: ${session.worldName}${privateTag}${introTag}${openTableTag} ${levelStr} [${session.attendingCharacters.length}/${session.maxPlayers}${interestStr}]`;
+      ? `(PLANNING) The Void: ${session.worldName}${privateTag}${introTag}${expeditionTag} ${levelStr} [${interestCount} Interested]`
+      : `(${dateStr}) The Void: ${session.worldName}${privateTag}${introTag}${expeditionTag} ${levelStr} [${session.attendingCharacters.length}/${session.maxPlayers}${interestStr}]`;
 
     if (threadName.length > 100) {
       threadName = threadName.substring(0, 97) + "...";

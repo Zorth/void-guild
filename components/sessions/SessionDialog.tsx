@@ -27,7 +27,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Sprout, Users } from 'lucide-react'
+import { Sprout, Compass } from 'lucide-react'
 
 interface SessionDialogProps {
   session?: Doc<'sessions'>
@@ -148,7 +148,7 @@ export default function SessionDialog({ session, trigger, hasWorld, initialDate 
   const [planning, setPlanning] = useState(session?.planning || false)
   const [isPrivate, setIsPrivate] = useState(session?.isPrivate || false)
   const [isIntro, setIsIntro] = useState(session?.isIntro || false)
-  const [isOpenTable, setIsOpenTable] = useState(session?.isOpenTable || false)
+  const [isExpedition, setIsExpedition] = useState(session?.isExpedition || false)
   const [isOpen, setIsOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -171,7 +171,7 @@ export default function SessionDialog({ session, trigger, hasWorld, initialDate 
         // setWorld(session.world) // Removed: world is now derived
         const sessIntro = session.isIntro || false
         setIsIntro(sessIntro)
-        setIsOpenTable(session.isOpenTable || false)
+        setIsExpedition(session.isExpedition || false)
         setLevel(sessIntro ? (session.system === 'PF' ? '1' : '3') : (session.level !== undefined ? session.level.toString() : '0'))
         setMaxPlayers(session.maxPlayers.toString())
         setGmCharacter(session.gmCharacter || '')
@@ -303,7 +303,7 @@ export default function SessionDialog({ session, trigger, hasWorld, initialDate 
           planning: planning,
           isPrivate: isPrivate,
           isIntro: isIntro,
-          isOpenTable: isOpenTable,
+          isExpedition: isExpedition,
         })
         track('session_updated', { worldName: worldName?.name, system, planning, isPrivate, isIntro });
       } else {
@@ -325,7 +325,7 @@ export default function SessionDialog({ session, trigger, hasWorld, initialDate 
           planning: planning,
           isPrivate: isPrivate,
           isIntro: isIntro,
-          isOpenTable: isOpenTable,
+          isExpedition: isExpedition,
         })
         track('session_created', { worldName: worldName?.name, system, planning, isPrivate, isIntro });
         setAnnounceSessionId(newSessionId)
@@ -425,7 +425,7 @@ export default function SessionDialog({ session, trigger, hasWorld, initialDate 
               onChange={(e) => {
                 const checked = e.target.checked
                 setIsIntro(checked)
-                if (checked) setIsOpenTable(false)
+                if (checked) setIsExpedition(false)
                 if (checked) {
                   setLevel(system === 'PF' ? '1' : '3')
                   if (errors.level) setErrors({ ...errors, level: '' })
@@ -451,12 +451,12 @@ export default function SessionDialog({ session, trigger, hasWorld, initialDate 
           <div className="flex items-center space-x-2 bg-muted/30 p-3 rounded-lg border border-sky-500/20">
             <input
               type="checkbox"
-              id="open-table-toggle"
+              id="expedition-toggle"
               className="h-4 w-4 rounded border-gray-300 text-sky-600 focus:ring-sky-500 cursor-pointer shrink-0"
-              checked={isOpenTable}
+              checked={isExpedition}
               onChange={(e) => {
                 const checked = e.target.checked
-                setIsOpenTable(checked)
+                setIsExpedition(checked)
                 if (checked && isIntro) {
                   setIsIntro(false)
                   setLevel(session ? (session.level !== undefined ? session.level.toString() : '0') : '0')
@@ -465,14 +465,14 @@ export default function SessionDialog({ session, trigger, hasWorld, initialDate 
             />
             <div className="grid gap-1.5 leading-none">
                 <label
-                    htmlFor="open-table-toggle"
+                    htmlFor="expedition-toggle"
                     className="text-sm font-bold leading-none cursor-pointer flex items-center gap-1.5 text-sky-600 dark:text-sky-400"
                 >
-                    <Users className="h-4 w-4 shrink-0" />
-                    <span>Open Table (Any Level)</span>
+                    <Compass className="h-4 w-4 shrink-0" />
+                    <span>Expedition (RP / Exploration)</span>
                 </label>
                 <p className="text-[10px] text-muted-foreground leading-normal">
-                    Characters of any level can join, and everyone earns a flat 250 XP. Selecting an Open Table quest enables this automatically.
+                    For roleplay and exploration missions. Characters of any level can join, and everyone earns a flat 250 XP. Selecting an Expedition quest enables this automatically.
                 </p>
             </div>
           </div>

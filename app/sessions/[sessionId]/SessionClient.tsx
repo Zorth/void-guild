@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { useState, useEffect, useMemo } from 'react'
 import { Id, Doc } from '@/convex/_generated/dataModel'
 import Link from 'next/link'
-import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, Unlock, Globe, Scroll, Trophy, Menu, User, Target, UserPlus, Coins, Map, Sprout, Loader2, Sparkles, Castle, DoorOpen, Users } from 'lucide-react'
+import { Book, Calendar, ChevronLeft, Lock as LockIcon, Shield, MapPin, Clock, Unlock, Globe, Scroll, Trophy, Menu, User, Target, UserPlus, Coins, Map, Sprout, Loader2, Sparkles, Castle, DoorOpen, Compass } from 'lucide-react'
 import { useAuth, SignInButton } from '@clerk/nextjs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatDate, formatTime as formatTimeUtil, getLevelBadgeStyle, getDualLevelBadgeStyle, CharacterRankIcon, getSessionWikiUrl, cn } from '@/lib/utils'
@@ -53,7 +53,7 @@ import ReputationSystem from '@/components/world/ReputationSystem'
 import VoidObjectiveContributeModal from '@/components/sessions/details/VoidObjectiveContributeModal'
 
 interface SessionWithGM extends Doc<'sessions'> {
-  isOpenTableEffective?: boolean
+  isExpeditionEffective?: boolean
     attendingCharacters: Doc<'characters'>[];
     isOwner: boolean;
     canManage: boolean;
@@ -886,10 +886,10 @@ export default function SessionClient() {
                                         Intro
                                     </span>
                                 )}
-                                {session.isOpenTableEffective && (
+                                {session.isExpeditionEffective && (
                                     <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/15 px-2.5 py-0.5 text-xs font-bold text-sky-400 border border-sky-500/30 shadow-xs uppercase tracking-wider">
-                                        <Users className="h-3.5 w-3.5" />
-                                        Open Table
+                                        <Compass className="h-3.5 w-3.5" />
+                                        Expedition
                                     </span>
                                 )}
                                 {session.planning && <div className="text-[10px] bg-purple-600 text-white px-2 py-0.5 rounded-full uppercase tracking-widest font-black shadow-sm">Planning</div>}
