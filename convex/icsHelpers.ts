@@ -47,7 +47,9 @@ export const buildIcs = (sessions: CalendarSession[], now: number, calendarName:
     'PRODID:-//Guild of The Void//Sessions//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
+    `NAME:${escapeText(calendarName)}`,
     `X-WR-CALNAME:${escapeText(calendarName)}`,
+    `X-WR-CALDESC:${escapeText('Public sessions, quests and signups from the Guild of The Void')}`,
     'X-PUBLISHED-TTL:PT1H',
     'REFRESH-INTERVAL;VALUE=DURATION:PT1H',
   ]
