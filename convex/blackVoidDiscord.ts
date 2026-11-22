@@ -672,6 +672,7 @@ export const getContactServiceListingDetails = internalQuery({
  */
 export const contactServiceListing = internalAction({
   args: {
+    inquiryId: v.id("blackVoidInquiries"),
     listingId: v.id("blackVoidListings"),
     buyerCharacterId: v.id("characters"),
     message: v.optional(v.string()),
@@ -761,6 +762,10 @@ export const contactServiceListing = internalAction({
       } else {
         const threadData = await threadRes.json();
         const threadId = threadData.id;
+        await ctx.runMutation(internal.blackVoidDiscord.setInquiryThread, {
+          inquiryId: args.inquiryId,
+          discordThreadId: threadId,
+        });
 
         // 3. If an optional note/message was provided by the user, post it into the thread
         if (args.message && args.message.trim()) {
@@ -789,3 +794,94 @@ export const contactServiceListing = internalAction({
 });
 
 
+
+
+export const setInquiryThread = internalMutation({
+  args: {
+    inquiryId: v.id("blackVoidInquiries"),
+    discordThreadId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.inquiryId, { discordThreadId: args.discordThreadId });
+  },
+});
+
+/**
+ * Order, both characters and both Discord IDs for posting order updates into the inquiry thread.
+ */
+export const getOrderDiscordDetails = internalQuery({
+  args: { orderId: v.id("blackVoidOrders") },
+  handler: async (ctx, args) => {
+    const order = await ctx.db.get(args.orderId);
+    if (!order) return null;
+    const inquiry = await ctx.db.get(order.inquiryId);
+    const provider = await ctx.db.get(order.providerCharacterId);
+    const buyer = await ctx.db.get(order.buyerCharacterId);
+    if (!inquiry || !provider || !buyer) return null;
+
+    const [providerUser, buyerUser] = await Promise.all(
+      [provider, buyer].map((c) =>
+        ctx.db.query("users").withIndex("by_userId", (q) => q.eq("userId", c.userId)).first()
+      )
+    );
+
+    return {
+      threadId: inquiry.discordThreadId ?? null,
+      serviceName: order.serviceName,
+      description: order.description,
+      priceGp: order.priceGp,
+      itemName: order.itemName,
+      itemQty: order.itemQty,
+      lastProposedByCharacterId: order.lastProposedByCharacterId,
+      provider: { _id: provider._id, name: provider.name, discordId: providerUser?.discordId ?? null },
+      buyer: { _id: buyer._id, name: buyer.name, discordId: buyerUser?.discordId ?? null },
+    };
+  },
+});
+
+/**
+ * Posts a standing order status update into the inquiry thread, pinging the other party.
+ */
+export const postOrderUpdate = internalAction({
+  args: {
+    orderId: v.id("blackVoidOrders"),
+    event: v.union(v.literal("proposed"), v.literal("accepted"), v.literal("delivered"), v.literal("cancelled")),
+    actorCharacterId: v.id("characters"),
+  },
+  handler: async (ctx, args): Promise<boolean> => {
+    const details: FunctionReturnType<typeof internal.blackVoidDiscord.getOrderDiscordDetails> = await ctx.runQuery(
+      internal.blackVoidDiscord.getOrderDiscordDetails,
+      { orderId: args.orderId }
+    );
+    if (!details) return false;
+    if (!details.threadId) {
+      console.warn("Order has no Discord inquiry thread; skipping update.");
+      return false;
+    }
+
+    const actorIsProvider = details.provider._id === args.actorCharacterId;
+    const actor = actorIsProvider ? details.provider : details.buyer;
+    const other = actorIsProvider ? details.buyer : details.provider;
+    const otherTag = other.discordId ? ` (<@${other.discordId}>)` : "";
+
+    const terms = [
+      details.priceGp > 0 ? `${DISCORD_GP_EMOJI} **${details.priceGp} GP**` : null,
+      details.itemName ? `**${(details.itemQty ?? 1) > 1 ? `${details.itemQty}× ` : ""}${details.itemName}** to ${details.buyer.name}` : null,
+    ]
+      .filter(Boolean)
+      .join(" + ");
+    const notes = details.description ? `\n> ${details.description.replace(/\n/g, "\n> ")}` : "";
+
+    const lines = {
+      proposed: `📜 **${actor.name}** proposes terms for **${details.serviceName}** to **${other.name}**${otherTag}: ${terms}${notes}`,
+      accepted: `✅ **${actor.name}** accepted the order for **${details.serviceName}**${otherTag}: ${terms}. Mark it delivered once it's done.`,
+      delivered: `📦 **${actor.name}** marked the order for **${details.serviceName}** as delivered${otherTag}. Record the payment/item on your character sheet log.`,
+      cancelled: `❌ **${actor.name}** cancelled the order for **${details.serviceName}**${otherTag}.`,
+    } as const;
+
+    const res = await discordRequest(`/channels/${details.threadId}/messages`, "POST", {
+      content: lines[args.event],
+    });
+    return res !== null;
+  },
+});

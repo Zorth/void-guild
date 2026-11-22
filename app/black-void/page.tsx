@@ -1105,7 +1105,7 @@ function BlackVoidContent() {
                     buyerCharacterId: selectedCharacterId,
                     message: contactMessage.trim() || undefined,
                   })
-                  toast.success(`Inquiry sent to #black_void for ${contactingService.name}!`)
+                  toast.success(`Inquiry sent to #black_void for ${contactingService.name}! Propose terms from your Character Sheet Log.`)
                   setContactingService(null)
                   setContactMessage('')
                 } catch (err: any) {

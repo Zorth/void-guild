@@ -1209,6 +1209,35 @@ export const markAllCharacterTransactionsClaimed = mutation({
             }
         }
 
+        // 9. Claim delivered service orders (provider is paid, buyer pays and receives the item)
+        const providedOrders = await ctx.db
+            .query('blackVoidOrders')
+            .withIndex('by_providerCharacterId', (q) => q.eq('providerCharacterId', args.characterId))
+            .order('desc')
+            .take(100)
+
+        for (const order of providedOrders) {
+            if (order.status === 'delivered' && !order.providerClaimed && order.priceGp > 0) {
+                await ctx.db.patch(order._id, { providerClaimed: true })
+                totalDeltaGp += order.priceGp
+                count++
+            }
+        }
+
+        const boughtOrders = await ctx.db
+            .query('blackVoidOrders')
+            .withIndex('by_buyerCharacterId', (q) => q.eq('buyerCharacterId', args.characterId))
+            .order('desc')
+            .take(100)
+
+        for (const order of boughtOrders) {
+            if (order.status === 'delivered' && !order.buyerClaimed) {
+                await ctx.db.patch(order._id, { buyerClaimed: true })
+                totalDeltaGp -= order.priceGp
+                count++
+            }
+        }
+
         if (totalDeltaGp !== 0) {
             await adjustCharacterMoney(ctx, args.characterId, totalDeltaGp)
         }
@@ -1978,13 +2007,22 @@ export const contactServiceListing = mutation({
             throw new Error('You cannot contact yourself for your own service listing.')
         }
 
+        const inquiryId = await ctx.db.insert('blackVoidInquiries', {
+            listingId: args.listingId,
+            serviceName: listing.name,
+            providerCharacterId: listing.characterId,
+            buyerCharacterId: args.buyerCharacterId,
+            createdAt: Date.now(),
+        })
+
         await ctx.scheduler.runAfter(0, internal.blackVoidDiscord.contactServiceListing, {
+            inquiryId,
             listingId: args.listingId,
             buyerCharacterId: args.buyerCharacterId,
             message: args.message?.trim() || undefined,
         })
 
-        return { success: true }
+        return { success: true, inquiryId }
     },
 })
 

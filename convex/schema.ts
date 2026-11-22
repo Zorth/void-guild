@@ -293,6 +293,41 @@ export default defineSchema({
         buyerClaimed: v.optional(v.boolean()),
     }).index('by_listingId', ['listingId'])
       .index('by_characterId', ['characterId']),
+    // A client contacting a service provider; the Discord thread is where orders for it get discussed
+    blackVoidInquiries: defineTable({
+        listingId: v.id('blackVoidListings'),
+        serviceName: v.string(), // Snapshot so the inquiry survives the listing being deleted
+        providerCharacterId: v.id('characters'),
+        buyerCharacterId: v.id('characters'),
+        discordThreadId: v.optional(v.string()),
+        createdAt: v.number(),
+    }).index('by_providerCharacterId', ['providerCharacterId'])
+      .index('by_buyerCharacterId', ['buyerCharacterId']),
+    // Standing orders: after contact, either party proposes price and/or item; once agreed and delivered it is logged on both sheets
+    blackVoidOrders: defineTable({
+        inquiryId: v.id('blackVoidInquiries'),
+        listingId: v.id('blackVoidListings'),
+        serviceName: v.string(), // Snapshot so the order survives the listing being deleted
+        providerCharacterId: v.id('characters'),
+        buyerCharacterId: v.id('characters'),
+        description: v.optional(v.string()),
+        priceGp: v.number(), // Agreed payment from buyer to provider (0 for item-only orders)
+        itemName: v.optional(v.string()), // Item delivered to the buyer
+        itemQty: v.optional(v.number()),
+        status: v.union(
+            v.literal('proposed'),
+            v.literal('agreed'),
+            v.literal('delivered'),
+            v.literal('cancelled')
+        ),
+        lastProposedByCharacterId: v.id('characters'), // The other party is the one who can accept
+        providerClaimed: v.optional(v.boolean()), // Provider added payment to character sheet
+        buyerClaimed: v.optional(v.boolean()), // Buyer deducted payment / added item on character sheet
+        createdAt: v.number(),
+        updatedAt: v.number(),
+        deliveredAt: v.optional(v.number()),
+    }).index('by_providerCharacterId', ['providerCharacterId'])
+      .index('by_buyerCharacterId', ['buyerCharacterId']),
     blackVoidBets: defineTable({
         senderCharacterId: v.id('characters'),
         targetCharacterId: v.optional(v.id('characters')), // Specific opponent or null for open challenge

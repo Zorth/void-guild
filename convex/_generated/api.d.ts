@@ -13,6 +13,7 @@ import type * as activity from "../activity.js";
 import type * as blackVoid from "../blackVoid.js";
 import type * as blackVoidBets from "../blackVoidBets.js";
 import type * as blackVoidDiscord from "../blackVoidDiscord.js";
+import type * as blackVoidOrders from "../blackVoidOrders.js";
 import type * as calendar from "../calendar.js";
 import type * as characters from "../characters.js";
 import type * as commendations from "../commendations.js";
@@ -50,6 +51,7 @@ declare const fullApi: ApiFromModules<{
   blackVoid: typeof blackVoid;
   blackVoidBets: typeof blackVoidBets;
   blackVoidDiscord: typeof blackVoidDiscord;
+  blackVoidOrders: typeof blackVoidOrders;
   calendar: typeof calendar;
   characters: typeof characters;
   commendations: typeof commendations;

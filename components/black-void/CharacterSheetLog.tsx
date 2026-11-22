@@ -36,6 +36,7 @@ import {
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import ServiceListingDialog from '@/components/black-void/ServiceListingDialog'
+import ServiceOrdersCard from '@/components/black-void/ServiceOrdersCard'
 import ManualCharacterImportDialog from '@/components/black-void/ManualCharacterImportDialog'
 import { useState, useMemo, useEffect } from 'react'
 
@@ -87,6 +88,9 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
   const [isSavingCurrency, setIsSavingCurrency] = useState(false)
 
   const transactions = useQuery(api.blackVoid.getCharacterTransactions, characterId ? { characterId } : 'skip')
+  const serviceOrders = useQuery(api.blackVoidOrders.getCharacterOrders, characterId ? { characterId } : 'skip')
+  const serviceInquiries = useQuery(api.blackVoidOrders.getCharacterInquiries, characterId ? { characterId } : 'skip')
+  const toggleOrderClaimed = useMutation(api.blackVoidOrders.toggleOrderClaimed)
   const toggleSellerClaimed = useMutation(api.blackVoid.toggleSellerClaimed)
   const toggleBuyerClaimed = useMutation(api.blackVoid.toggleBuyerClaimed)
   const toggleQuestClaimed = useMutation(api.quests.toggleQuestReimbursementClaimed)
@@ -176,6 +180,27 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
     [betsLost]
   )
 
+  // Delivered service orders waiting to be recorded on the character sheet
+  const pendingOrderIncome = useMemo(
+    () => (serviceOrders ?? []).filter((o: any) => o.status === 'delivered' && o.role === 'provider' && !o.isClaimed && o.priceGp > 0),
+    [serviceOrders]
+  )
+
+  const pendingOrderPurchases = useMemo(
+    () => (serviceOrders ?? []).filter((o: any) => o.status === 'delivered' && o.role === 'buyer' && !o.isClaimed),
+    [serviceOrders]
+  )
+
+  const pendingOrderExpenses = useMemo(
+    () => pendingOrderPurchases.filter((o: any) => o.priceGp > 0),
+    [pendingOrderPurchases]
+  )
+
+  const pendingOrderItems = useMemo(
+    () => pendingOrderPurchases.filter((o: any) => o.itemName),
+    [pendingOrderPurchases]
+  )
+
   // Calculations for summary metrics
   const { totalPendingIncome, totalPendingExpense, netPendingGold, totalPendingCount } = useMemo(() => {
     let income = 0
@@ -185,12 +210,14 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
     for (const s of pendingSessionMoneyGains) income += s.pendingMoneyAdjustmentGP
     for (const r of pendingVoidObjectiveRewards) income += r.pendingRewardAdjustmentGP
     for (const b of pendingWonBets) income += b.wagerAmount
+    for (const o of pendingOrderIncome) income += o.priceGp
 
     let expense = 0
     for (const item of pendingWonItems) expense += parseGpAmount(item.winningAmount)
     for (const q of pendingQuestsToPay) expense += q.totalToPayGP ?? parseGpAmount(q.actualToPay)
     for (const s of pendingSessionMoneyDeductions) expense += Math.abs(s.pendingMoneyAdjustmentGP)
     for (const b of pendingLostBets) expense += b.wagerAmount
+    for (const o of pendingOrderExpenses) expense += o.priceGp
 
     const count =
       pendingSoldItems.length +
@@ -202,7 +229,9 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
       pendingSessionMoneyDeductions.length +
       pendingVoidObjectiveRewards.length +
       pendingWonBets.length +
-      pendingLostBets.length
+      pendingLostBets.length +
+      pendingOrderIncome.length +
+      pendingOrderPurchases.length
 
     return {
       totalPendingIncome: Math.round(income * 100) / 100,
@@ -221,6 +250,9 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
     pendingVoidObjectiveRewards,
     pendingWonBets,
     pendingLostBets,
+    pendingOrderIncome,
+    pendingOrderExpenses,
+    pendingOrderPurchases,
   ])
 
   // Manual currency calculated total
@@ -329,6 +361,15 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
       toast.success('Updated betting loss log state!')
     } catch {
       toast.error('Failed to update betting loss status')
+    }
+  }
+
+  const handleToggleOrderClaimed = async (orderId: Id<'blackVoidOrders'>) => {
+    try {
+      await toggleOrderClaimed({ orderId, characterId })
+      toast.success('Updated service order log state!')
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to update service order status')
     }
   }
 
@@ -467,7 +508,7 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
                 <Package className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" /> Items to Add
               </span>
               <span className="text-sm sm:text-base font-bold font-mono text-cyan-200 mt-0.5 truncate">
-                {pendingWonItems.length} {pendingWonItems.length === 1 ? 'Item' : 'Items'}
+                {pendingWonItems.length + pendingOrderItems.length} {pendingWonItems.length + pendingOrderItems.length === 1 ? 'Item' : 'Items'}
               </span>
             </div>
           </div>
@@ -487,11 +528,11 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
           ) : (
             <div className="space-y-4">
               {/* 1. Pending Items to Add to Inventory */}
-              {pendingWonItems.length > 0 && (
+              {(pendingWonItems.length > 0 || pendingOrderItems.length > 0) && (
                 <div className="space-y-2">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
                     <PackageCheck className="h-4 w-4 shrink-0" />
-                    Items to Add to Inventory ({pendingWonItems.length})
+                    Items to Add to Inventory ({pendingWonItems.length + pendingOrderItems.length})
                   </h4>
                   <div className="grid gap-2">
                     {pendingWonItems.map((item: any) => (
@@ -520,12 +561,41 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
                         </Button>
                       </div>
                     ))}
+
+                    {pendingOrderItems.map((order: any) => (
+                      <div
+                        key={order._id}
+                        className="p-2.5 rounded-md border border-cyan-500/30 bg-cyan-950/15 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 text-xs"
+                      >
+                        <div className="flex items-start sm:items-center gap-2 min-w-0">
+                          <Package className="h-4 w-4 text-cyan-400 shrink-0 mt-0.5 sm:mt-0" />
+                          <div className="min-w-0 break-words">
+                            <span className="font-bold text-foreground">
+                              {order.itemQty > 1 ? `${order.itemQty}× ` : ''}{order.itemName}
+                            </span>
+                            <span className="text-muted-foreground block sm:inline sm:ml-2">
+                              (Service order{order.priceGp > 0 ? <> for <span className="text-amber-300 font-mono font-medium">{order.priceGp} GP</span></> : ''} from {order.counterpartName})
+                            </span>
+                          </div>
+                        </div>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleToggleOrderClaimed(order._id)}
+                          className="h-7 px-2.5 text-[11px] border-cyan-500/30 hover:bg-cyan-500/20 text-cyan-200 self-end sm:self-auto shrink-0 gap-1"
+                        >
+                          <CheckCheck className="h-3 w-3" />
+                          Mark Added
+                        </Button>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
 
               {/* 2. Pending Gold Income */}
-              {(pendingSoldItems.length > 0 || pendingSponsoredQuests.length > 0 || pendingGuildmasterGains.length > 0 || pendingSessionMoneyGains.length > 0 || pendingVoidObjectiveRewards.length > 0 || pendingWonBets.length > 0) && (
+              {(pendingSoldItems.length > 0 || pendingSponsoredQuests.length > 0 || pendingGuildmasterGains.length > 0 || pendingSessionMoneyGains.length > 0 || pendingVoidObjectiveRewards.length > 0 || pendingWonBets.length > 0 || pendingOrderIncome.length > 0) && (
                 <div className="space-y-2">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
                     <ArrowDownLeft className="h-4 w-4 shrink-0" />
@@ -637,6 +707,33 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
                       </div>
                     ))}
 
+                    {pendingOrderIncome.map((order: any) => (
+                      <div
+                        key={order._id}
+                        className="p-2.5 rounded-md border border-emerald-500/30 bg-emerald-950/15 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 text-xs"
+                      >
+                        <div className="flex items-start sm:items-center gap-2 min-w-0">
+                          <Hammer className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5 sm:mt-0" />
+                          <div className="min-w-0 break-words">
+                            <span className="font-bold text-foreground">Service Delivered: {order.serviceName}</span>
+                            <span className="text-muted-foreground block sm:inline sm:ml-2">for {order.counterpartName}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-border/20">
+                          <span className="font-mono font-bold text-emerald-300">+{order.priceGp} GP</span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleToggleOrderClaimed(order._id)}
+                            className="h-7 px-2.5 text-[11px] border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-300 gap-1"
+                          >
+                            <CheckCheck className="h-3 w-3" />
+                            Mark Added
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+
                     {pendingSoldItems.map((item: any) => (
                       <div
                         key={item._id}
@@ -722,7 +819,7 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
               )}
 
               {/* 3. Pending Gold Expenses */}
-              {(pendingWonItems.length > 0 || pendingQuestsToPay.length > 0 || pendingSessionMoneyDeductions.length > 0 || pendingLostBets.length > 0) && (
+              {(pendingWonItems.length > 0 || pendingQuestsToPay.length > 0 || pendingSessionMoneyDeductions.length > 0 || pendingLostBets.length > 0 || pendingOrderExpenses.length > 0) && (
                 <div className="space-y-2">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
                     <ArrowUpRight className="h-4 w-4 shrink-0" />
@@ -810,6 +907,33 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
                             variant="outline"
                             size="sm"
                             onClick={() => handleToggleBuyerClaimed(item._id)}
+                            className="h-7 px-2.5 text-[11px] border-amber-500/30 hover:bg-amber-500/20 text-amber-300 gap-1"
+                          >
+                            <CheckCheck className="h-3 w-3" />
+                            Mark Deducted
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+
+                    {pendingOrderExpenses.map((order: any) => (
+                      <div
+                        key={order._id}
+                        className="p-2.5 rounded-md border border-amber-500/30 bg-amber-950/15 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 text-xs"
+                      >
+                        <div className="flex items-start sm:items-center gap-2 min-w-0">
+                          <Hammer className="h-4 w-4 text-amber-400 shrink-0 mt-0.5 sm:mt-0" />
+                          <div className="min-w-0 break-words">
+                            <span className="font-bold text-foreground">Service Ordered: {order.serviceName}</span>
+                            <span className="text-muted-foreground block sm:inline sm:ml-2">from {order.counterpartName}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-border/20">
+                          <span className="font-mono font-bold text-amber-300">-{order.priceGp} GP</span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleToggleOrderClaimed(order._id)}
                             className="h-7 px-2.5 text-[11px] border-amber-500/30 hover:bg-amber-500/20 text-amber-300 gap-1"
                           >
                             <CheckCheck className="h-3 w-3" />
@@ -1603,6 +1727,9 @@ export default function CharacterSheetLog({ characterId }: CharacterSheetLogProp
           </CardContent>
         </Card>
       )}
+
+      {/* 7. Standing Service Orders */}
+      <ServiceOrdersCard characterId={characterId} orders={serviceOrders ?? []} inquiries={serviceInquiries ?? []} />
 
       {/* 7. Crafting Services Offered */}
       {servicesOffered.length > 0 && (
